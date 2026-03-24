@@ -25,7 +25,7 @@ export default function Home() {
         </div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 flex flex-col items-start">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 font-medium text-sm mb-8 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1B3C6C]/20 border border-blue-500/30 text-blue-300 font-medium text-sm mb-8 backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4" />
             <span>Ontario's Independent Homeowner Guide</span>
           </div>
@@ -41,7 +41,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link 
               to="/match" 
-              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-blue-600/25 flex items-center justify-center gap-2"
+              className="bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-blue-600/25 flex items-center justify-center gap-2"
             >
               Find Vetted Contractors <ArrowRight className="w-5 h-5" />
             </Link>
@@ -66,7 +66,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-100">
             <div className="p-6">
-              <div className="mx-auto w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+              <div className="mx-auto w-16 h-16 bg-blue-50 text-[#1B3C6C] rounded-2xl flex items-center justify-center mb-6">
                 <FileText className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-3">Permit & Code Clarity</h3>
@@ -101,48 +101,48 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Category Card 1 */}
             <Link to="/basements" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <HomeIcon className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Basement Finishing</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">From framing to flooring, understand the costs and process of finishing your Ontario basement.</p>
-              <div className="flex items-center text-blue-600 font-semibold text-sm mt-auto">
+              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
 
             {/* Category Card 2 */}
             <Link to="/legal-suites" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Legal Secondary Suites</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">Navigate zoning, fire separation, and municipal requirements to build a legal income suite.</p>
-              <div className="flex items-center text-blue-600 font-semibold text-sm mt-auto">
+              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
 
             {/* Category Card 3 */}
             <Link to="#" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <PaintBucket className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Kitchen Renovations</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">Budgeting for cabinets, countertops, and layouts. Find the right team for the heart of your home.</p>
-              <div className="flex items-center text-blue-600 font-semibold text-sm mt-auto">
+              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
 
             {/* Category Card 4 */}
             <Link to="#" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <Bath className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Bathroom Remodels</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">Waterproofing, plumbing, and tile costs. Learn what to expect before you start demo day.</p>
-              <div className="flex items-center text-blue-600 font-semibold text-sm mt-auto">
+              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
@@ -151,7 +151,7 @@ export default function Home() {
       </section>
 
       {/* Lead Capture Block */}
-      <section className="py-20 bg-blue-600 text-white relative overflow-hidden">
+      <section className="py-20 bg-[#1B3C6C] text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
@@ -198,7 +198,7 @@ export default function Home() {
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Real Ontario Pricing Data</h2>
               <p className="text-lg text-slate-600">We aggregate data from hundreds of recent projects to give you realistic budget expectations before you talk to a contractor.</p>
             </div>
-            <Link to="/costs" className="text-blue-600 font-semibold flex items-center hover:text-blue-700 whitespace-nowrap">
+            <Link to="/costs" className="text-[#1B3C6C] font-semibold flex items-center hover:text-blue-700 whitespace-nowrap">
               View All Cost Guides <ArrowRight className="w-4 h-4 ml-2" />
             </Link>
           </div>
@@ -222,9 +222,9 @@ export default function Home() {
             </div>
 
             {/* Pricing Card 2 */}
-            <div className="border border-blue-600 rounded-2xl p-8 shadow-xl relative transform md:-translate-y-4 bg-white">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
-              <div className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Legal Secondary Suite</div>
+            <div className="border border-[#1B3C6C] rounded-2xl p-8 shadow-xl relative transform md:-translate-y-4 bg-white">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1B3C6C] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
+              <div className="text-sm font-bold text-[#1B3C6C] uppercase tracking-wider mb-2">Legal Secondary Suite</div>
               <div className="text-3xl font-bold text-slate-900 mb-4">$85k - $140k+</div>
               <p className="text-slate-600 text-sm mb-6">Full conversion including separate entrance, fire separation, and full kitchen/bath.</p>
               <div className="space-y-3 pt-6 border-t border-slate-100">
@@ -262,7 +262,7 @@ export default function Home() {
       {/* Contractor Matching CTA */}
       <section className="py-20 bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-8">
+          <div className="w-20 h-20 bg-[#1B3C6C]/20 rounded-full flex items-center justify-center mx-auto mb-8">
             <Hammer className="w-10 h-10 text-[#5694CF]" />
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
@@ -271,7 +271,7 @@ export default function Home() {
           </p>
           <Link 
             to="/match" 
-            className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-600/25"
+            className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-600/25"
           >
             Get Matched Now
           </Link>
