@@ -27,7 +27,7 @@ export default function Home() {
           
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#5694CF]/30 border border-[#1B3C6C]/40 text-[#1B3C6C] text-sm mb-8 backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4" />
-            Ontario's Independent Homeowner Guide
+            Ontario's Independent Homeowner Guide SABAH
           </div>
 
           <h1 className="text-5xl lg:text-7xl font-bold mb-6">
