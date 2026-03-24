@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Home, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -9,23 +9,21 @@ export default function Footer() {
           
           {/* Brand */}
           <div className="space-y-6">
-            <Link to="/" className="flex items-center gap-2 text-white">
-              <div className="bg-blue-600 text-white p-1.5 rounded-lg">
-                <Home className="h-5 w-5" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">
-                Ontario<span className="text-blue-500">Reno</span>
-              </span>
+            <Link to="/" className="flex items-center text-white">
+              <img
+                src="/logo-white.png?v=2"
+                alt="OntarioReno"
+                className="h-8 w-auto object-contain"
+              />
             </Link>
             <p className="text-sm leading-relaxed text-slate-400">
-              Ontario's trusted homeowner resource platform. We help you understand costs, navigate permits, and connect with vetted local contractors.
+              Ontario&apos;s trusted homeowner resource platform. We help you understand costs, navigate permits, and connect with vetted local contractors.
             </p>
             <div className="flex space-x-4">
-              {/* Social placeholders */}
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-colors cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-[#1B3C6C] transition-colors cursor-pointer">
                 <span className="text-xs font-bold">FB</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-colors cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-[#1B3C6C] transition-colors cursor-pointer">
                 <span className="text-xs font-bold">IG</span>
               </div>
             </div>
@@ -35,11 +33,11 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-6">Renovation Hubs</h3>
             <ul className="space-y-4 text-sm">
-              <li><Link to="/basements" className="hover:text-blue-400 transition-colors">Basement Finishing</Link></li>
-              <li><Link to="/legal-suites" className="hover:text-blue-400 transition-colors">Legal Secondary Suites</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Kitchen Renovations</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Bathroom Renovations</Link></li>
-              <li><Link to="/costs" className="hover:text-blue-400 transition-colors">2026 Cost Guides</Link></li>
+              <li><Link to="/basements" className="hover:text-[#5694CF] transition-colors">Basement Finishing</Link></li>
+              <li><Link to="/legal-suites" className="hover:text-[#5694CF] transition-colors">Legal Secondary Suites</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Kitchen Renovations</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Bathroom Renovations</Link></li>
+              <li><Link to="/costs" className="hover:text-[#5694CF] transition-colors">2026 Cost Guides</Link></li>
             </ul>
           </div>
 
@@ -47,11 +45,11 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-6">City Guides</h3>
             <ul className="space-y-4 text-sm">
-              <li><Link to="/city/toronto" className="hover:text-blue-400 transition-colors">Toronto</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Mississauga</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Brampton</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Vaughan</Link></li>
-              <li><Link to="#" className="hover:text-blue-400 transition-colors">Ottawa</Link></li>
+              <li><Link to="/city/toronto" className="hover:text-[#5694CF] transition-colors">Toronto</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Mississauga</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Brampton</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Vaughan</Link></li>
+              <li><Link to="#" className="hover:text-[#5694CF] transition-colors">Ottawa</Link></li>
             </ul>
           </div>
 
@@ -73,7 +71,10 @@ export default function Footer() {
               </li>
             </ul>
             <div className="mt-6">
-              <Link to="/match" className="inline-block bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-700">
+              <Link
+                to="/match"
+                className="inline-block bg-slate-800 hover:bg-[#1B3C6C] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-700"
+              >
                 Contractor Login
               </Link>
             </div>
