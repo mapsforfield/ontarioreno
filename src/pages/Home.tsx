@@ -31,7 +31,7 @@ export default function Home() {
           </div>
           
           <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-3xl leading-tight">
-            Plan Your Renovation with <span className="text-blue-500">Confidence.</span>
+            Plan Your Renovation with <span className="text-[#5694CF]">Confidence.</span>
           </h1>
           
           <p className="text-xl text-slate-300 mb-10 max-w-2xl leading-relaxed">
@@ -263,7 +263,7 @@ export default function Home() {
       <section className="py-20 bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-8">
-            <Hammer className="w-10 h-10 text-blue-500" />
+            <Hammer className="w-10 h-10 text-[#5694CF]" />
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
