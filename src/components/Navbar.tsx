@@ -82,7 +82,7 @@ export default function Navbar() {
 
             <Link
               to="/match"
-              className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+              className="bg-[#5694CF] text-white px-6 py-2.5 rounded-full font-semibold hover:bg-[#1B3C6C] transition-colors shadow-sm hover:shadow-md"
             >
               Get Matched
             </Link>
