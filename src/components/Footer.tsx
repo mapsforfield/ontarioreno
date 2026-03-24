@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="space-y-6">
             <Link to="/" className="flex items-center">
   <img 
-    src="/logo-white.png" 
+    src="public/logo-white.png" 
     alt="OntarioReno" 
     className="h-8 w-auto"
   />
