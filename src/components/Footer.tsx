@@ -11,10 +11,10 @@ export default function Footer() {
           <div className="space-y-6">
             <Link to="/" className="flex items-center">
   <img 
-    src="public/logo-white.png" 
-    alt="OntarioReno" 
-    className="h-8 w-auto"
-  />
+  src="/logo-white.png?v=2" 
+  alt="OntarioReno" 
+  className="h-8 w-auto"
+/>
 </Link><
             <p className="text-sm leading-relaxed text-slate-400">
               Ontario's trusted homeowner resource platform. We help you understand costs, navigate permits, and connect with vetted local contractors.
