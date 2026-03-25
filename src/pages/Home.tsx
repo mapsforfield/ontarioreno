@@ -16,10 +16,8 @@ export default function Home() {
       <section className="relative bg-slate-900 text-white overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-40">
           <img 
-            src="https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=2000" 
-            alt="Ontario Home Renovation" 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
+            src="/hero.png" 
+            aclassName="w-full h-full object-cover" 
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
         </div>
