@@ -37,54 +37,40 @@ export default function Match() {
   };
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    const payload = {
-      projectType: formData.projectType,
-      budget: formData.budget,
-      timeline: formData.timeline,
-      name: `${formData.firstName} ${formData.lastName}`.trim(),
-      email: formData.email,
-      phone: formData.phone,
-      message: `Postal Code: ${formData.postalCode}`,
-    };
+  const payload = {
+    projectType: formData.projectType,
+    budget: formData.budget,
+    timeline: formData.timeline,
+    name: `${formData.firstName} ${formData.lastName}`.trim(),
+    email: formData.email,
+    phone: formData.phone,
+    message: `Postal Code: ${formData.postalCode}`,
+  };
 
-    try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbwhdb6WWcBop_0k2SMzXVHlmjSWTLi90FLRTBOyTHFes-Q-B2Q7O6IS_ycqzJDg5HYe/exec', {
+  try {
+    await fetch(
+      'https://script.google.com/macros/s/AKfycbwhdb6WWcBop_0k2SMzXVHlmjSWTLi90FLRTBOyTHFes-Q-B2Q7O6IS_ycqzJDg5HYe/exec',
+      {
         method: 'POST',
+        mode: 'no-cors',
         headers: {
           'Content-Type': 'text/plain',
         },
         body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('Submitted successfully!');
-        setFormData({
-          projectType: 'Basement Finishing',
-          budget: 'Under $25,000',
-          timeline: 'Immediately',
-          firstName: '',
-          lastName: '',
-          email: '',
-          phone: '',
-          postalCode: '',
-        });
-        setStep(1);
-      } else {
-        alert('Something went wrong. Please try again.');
-        console.error(result);
       }
-    } catch (error) {
-      alert('Something went wrong. Please try again.');
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    );
+
+    alert('Submitted successfully!');
+  } catch (error) {
+    alert('REAL ERROR: ' + error);
+    console.error(error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="bg-slate-50 min-h-screen py-12">
