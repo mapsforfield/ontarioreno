@@ -52,7 +52,7 @@ export default function Match() {
 
   try {
     await fetch(
-      'https://script.google.com/macros/s/AKfycbwhdb6WWcBop_0k2SMzXVHlmjSWTLi90FLRTBOyTHFes-Q-B2Q7O6IS_ycqzJDg5HYe/exec',
+      'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec',
       {
         method: 'POST',
         mode: 'no-cors',
