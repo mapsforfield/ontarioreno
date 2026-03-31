@@ -19,9 +19,6 @@ export default function HamiltonGrantCalculator() {
   const rawGrant = eligibleCost * 0.7;
   const grant = Math.min(rawGrant, 40000);
   const netCost = Math.max(totalCost - grant, 0);
-  const monthly = Math.round(netCost / 120);
-  const rent = 1600;
-  const monthlySurplus = rent - monthly;
   const fullGrantUnlocked = grant >= 40000;
 
   const message = useMemo(() => {
@@ -87,12 +84,7 @@ export default function HamiltonGrantCalculator() {
               {formatCurrency(rawGrant)}
             </span>
             {rawGrant > 40000 && (
-              <>
-                {" "}
-                <span className="text-slate-500">
-                  (capped at {formatCurrency(40000)})
-                </span>
-              </>
+              <span className="text-slate-500"> (capped at {formatCurrency(40000)})</span>
             )}
           </p>
         </div>
@@ -104,7 +96,7 @@ export default function HamiltonGrantCalculator() {
         </p>
       </div>
 
-      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
         <div
           className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center ${
             fullGrantUnlocked ? "pt-14 pb-6 px-6" : "p-6"
@@ -126,28 +118,10 @@ export default function HamiltonGrantCalculator() {
 
         <div className="rounded-3xl bg-slate-50 p-6 text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Your Real Cost
+            Your Real Cost After Grant
           </p>
           <p className="mt-3 text-3xl font-extrabold text-slate-900">
             {formatCurrency(netCost)}
-          </p>
-        </div>
-
-        <div className="rounded-3xl bg-slate-50 p-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Est. Monthly Cost
-          </p>
-          <p className="mt-3 text-3xl font-extrabold text-slate-900">
-            {formatCurrency(monthly)}/mo
-          </p>
-        </div>
-
-        <div className="rounded-3xl bg-slate-50 p-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Potential Rent
-          </p>
-          <p className="mt-3 text-3xl font-extrabold text-green-600">
-            {formatCurrency(rent)}/mo
           </p>
         </div>
       </div>
@@ -155,10 +129,7 @@ export default function HamiltonGrantCalculator() {
       <div className="mt-8 rounded-2xl bg-slate-900 px-5 py-4 text-center">
         <p className="text-base font-bold text-white md:text-lg">{message}</p>
         <p className="mt-2 text-sm text-slate-300 md:text-base">
-          In many cases, your rental income can cover or exceed your monthly cost.
-        </p>
-        <p className="mt-2 text-sm font-semibold text-yellow-300 md:text-base">
-          Potential monthly surplus: {formatCurrency(monthlySurplus)}
+          A properly structured basement project can significantly reduce your real out-of-pocket cost.
         </p>
       </div>
 
