@@ -38,7 +38,7 @@ export default function HamiltonGrantCalculator() {
   )} back based on a typical qualifying structure.`;
 
   return (
-    <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+    <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm md:p-8">
       <div className="mb-8">
         <p className="text-base font-semibold text-slate-900 md:text-lg">
           Move the slider to match your project — we’ll calculate everything for you.
@@ -96,35 +96,37 @@ export default function HamiltonGrantCalculator() {
         </p>
       </div>
 
-      <div className="mt-5 grid gap-5 md:grid-cols-2">
-        <div
-          className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center transition-all duration-300 ${
-            fullGrantUnlocked
-              ? "pt-14 pb-6 px-6 scale-[1.01] shadow-lg"
-              : "p-6"
-          }`}
-        >
-          {fullGrantUnlocked && (
-            <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm md:text-xs">
-              Max Grant Unlocked
-            </div>
-          )}
+      <div className="sticky top-3 z-10 mt-5">
+        <div className="grid grid-cols-2 gap-4 rounded-3xl bg-slate-50/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <div
+            className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center transition-all duration-300 ${
+              fullGrantUnlocked
+                ? "pt-14 pb-6 px-4 scale-[1.01] shadow-lg"
+                : "p-4 md:p-6"
+            }`}
+          >
+            {fullGrantUnlocked && (
+              <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm md:text-xs">
+                Max Grant Unlocked
+              </div>
+            )}
 
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Estimated Grant
-          </p>
-          <p className="mt-3 text-3xl font-extrabold text-green-600">
-            {formatCurrency(grant)}
-          </p>
-        </div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
+              Estimated Grant
+            </p>
+            <p className="mt-3 text-2xl font-extrabold text-green-600 md:text-3xl">
+              {formatCurrency(grant)}
+            </p>
+          </div>
 
-        <div className="rounded-3xl bg-slate-50 p-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Your Real Cost After Grant
-          </p>
-          <p className="mt-3 text-3xl font-extrabold text-slate-900">
-            {formatCurrency(netCost)}
-          </p>
+          <div className="rounded-3xl bg-white p-4 text-center shadow-sm md:bg-slate-50 md:p-6 md:shadow-none">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
+              Your Real Cost After Grant
+            </p>
+            <p className="mt-3 text-2xl font-extrabold text-slate-900 md:text-3xl">
+              {formatCurrency(netCost)}
+            </p>
+          </div>
         </div>
       </div>
 
