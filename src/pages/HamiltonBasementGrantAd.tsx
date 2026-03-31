@@ -39,9 +39,26 @@ export default function HamiltonBasementGrantAd() {
             </a>
           </div>
 
-          <p className="mt-4 text-sm text-slate-400">
-            ✔ No obligation • ✔ Local experts • ✔ Real numbers
-          </p>
+          <p className="mt-4 text-sm text-slate-300 text-center">
+  <span className="inline-flex items-center gap-6 flex-wrap justify-center">
+    
+    <span className="flex items-center gap-2">
+      <span className="text-green-400 text-base">✔</span>
+      No obligation
+    </span>
+
+    <span className="flex items-center gap-2">
+      <span className="text-green-400 text-base">✔</span>
+      Local experts
+    </span>
+
+    <span className="flex items-center gap-2">
+      <span className="text-green-400 text-base">✔</span>
+      Real numbers
+    </span>
+
+  </span>
+</p>
 
         </div>
       </section>
