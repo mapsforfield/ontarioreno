@@ -16,7 +16,8 @@ export default function HamiltonGrantCalculator() {
     [totalCost]
   );
 
-  const grant = Math.min(eligibleCost * 0.7, 40000);
+  const rawGrant = eligibleCost * 0.7;
+  const grant = Math.min(rawGrant, 40000);
   const netCost = Math.max(totalCost - grant, 0);
   const monthly = Math.round(netCost / 120);
   const rent = 1600;
@@ -73,12 +74,28 @@ export default function HamiltonGrantCalculator() {
           className="slider-blue h-4 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
         />
 
-        <p className="mt-3 text-sm text-slate-600">
-          Estimated qualifying amount:{" "}
-          <span className="font-semibold text-slate-900">
-            {formatCurrency(eligibleCost)}
-          </span>
-        </p>
+        <div className="mt-3 space-y-1 text-sm text-slate-600">
+          <p>
+            Estimated qualifying costs:{" "}
+            <span className="font-semibold text-slate-900">
+              {formatCurrency(eligibleCost)}
+            </span>
+          </p>
+          <p>
+            Grant covers 70% of that amount:{" "}
+            <span className="font-semibold text-slate-900">
+              {formatCurrency(rawGrant)}
+            </span>
+            {rawGrant > 40000 && (
+              <>
+                {" "}
+                <span className="text-slate-500">
+                  (capped at {formatCurrency(40000)})
+                </span>
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       <div className="mt-10">
