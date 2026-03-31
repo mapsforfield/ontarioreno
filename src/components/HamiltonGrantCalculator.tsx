@@ -43,7 +43,7 @@ export default function HamiltonGrantCalculator() {
         <p className="text-base font-semibold text-slate-900 md:text-lg">
           Move the slider to match your project — we’ll calculate everything for you.
         </p>
-        <p className="mt-2 text-sm text-slate-600 md:text-base">
+        <p className="mt-2 text-sm leading-7 text-slate-600 md:text-base">
           We use a typical estimate that about{" "}
           <span className="font-semibold">80% of a basement project qualifies</span>{" "}
           for the grant. Final numbers may vary depending on your scope, permits,
@@ -71,7 +71,7 @@ export default function HamiltonGrantCalculator() {
           className="slider-blue h-4 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
         />
 
-        <div className="mt-3 space-y-1 text-sm text-slate-600">
+        <div className="mt-3 space-y-1 text-sm leading-7 text-slate-600">
           <p>
             Estimated qualifying costs:{" "}
             <span className="font-semibold text-slate-900">
@@ -96,50 +96,44 @@ export default function HamiltonGrantCalculator() {
         </p>
       </div>
 
-      <div className="sticky top-3 z-10 mt-5">
-        <div className="grid grid-cols-2 gap-4 rounded-3xl bg-slate-50/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 md:bg-transparent md:p-0 md:backdrop-blur-none">
-          <div
-            className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center transition-all duration-300 ${
-              fullGrantUnlocked
-                ? "pt-14 pb-6 px-4 scale-[1.01] shadow-lg"
-                : "p-4 md:p-6"
-            }`}
-          >
-            {fullGrantUnlocked && (
-              <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm md:text-xs">
-                Max Grant Unlocked
-              </div>
-            )}
+      {fullGrantUnlocked && (
+        <div className="mt-4 text-center">
+          <span className="inline-flex rounded-full bg-green-600 px-4 py-2 text-[11px] font-extrabold uppercase tracking-wide text-white md:text-xs">
+            Max Grant Unlocked
+          </span>
+        </div>
+      )}
 
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
-              Estimated Grant
-            </p>
-            <p className="mt-3 text-2xl font-extrabold text-green-600 md:text-3xl">
-              {formatCurrency(grant)}
-            </p>
-          </div>
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-3xl border-2 border-green-200 bg-green-50 px-5 py-6 text-center shadow-sm md:px-6 md:py-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
+            Estimated Grant
+          </p>
+          <p className="mt-3 text-2xl font-extrabold text-green-600 md:text-3xl">
+            {formatCurrency(grant)}
+          </p>
+        </div>
 
-          <div className="rounded-3xl bg-white p-4 text-center shadow-sm md:bg-slate-50 md:p-6 md:shadow-none">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
-              Your Real Cost After Grant
-            </p>
-            <p className="mt-3 text-2xl font-extrabold text-slate-900 md:text-3xl">
-              {formatCurrency(netCost)}
-            </p>
-          </div>
+        <div className="rounded-3xl bg-slate-50 px-5 py-6 text-center shadow-sm md:px-6 md:py-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:text-sm">
+            Your Real Cost After Grant
+          </p>
+          <p className="mt-3 text-2xl font-extrabold text-slate-900 md:text-3xl">
+            {formatCurrency(netCost)}
+          </p>
         </div>
       </div>
 
       <div
-        className={`mt-8 rounded-2xl px-5 py-4 text-center transition-all duration-300 ${
+        className={`mt-8 rounded-2xl px-5 py-5 text-center transition-all duration-300 ${
           fullGrantUnlocked
-            ? "bg-green-600 text-white scale-[1.01] shadow-lg"
+            ? "bg-green-600 text-white shadow-lg"
             : "bg-slate-900 text-white"
         }`}
       >
-        <p className="text-base font-bold md:text-lg">{message}</p>
+        <p className="text-lg font-bold leading-8 md:text-xl">{message}</p>
         <p
-          className={`mt-2 text-sm md:text-base ${
+          className={`mt-3 text-sm leading-7 md:text-base ${
             fullGrantUnlocked ? "text-green-50" : "text-slate-300"
           }`}
         >
@@ -147,11 +141,13 @@ export default function HamiltonGrantCalculator() {
         </p>
       </div>
 
-      <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-center">
-        <p className="text-sm font-medium text-slate-700 md:text-base">{exampleText}</p>
+      <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-5 text-center">
+        <p className="text-sm font-medium leading-7 text-slate-700 md:text-base">
+          {exampleText}
+        </p>
       </div>
 
-      <div className="mt-6 text-center text-xs leading-6 text-slate-500 md:text-sm">
+      <div className="mt-6 text-center text-xs leading-7 text-slate-500 md:text-sm">
         Estimates only. This calculator assumes a typical project structure where
         roughly 80% of costs qualify. Final grant amounts depend on approved eligible
         costs, permits, and City of Hamilton review.
