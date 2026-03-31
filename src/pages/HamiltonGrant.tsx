@@ -140,20 +140,45 @@ export default function HamiltonGrant() {
 
           <div className="mx-auto max-w-4xl text-center">
             <h3 className="text-2xl font-extrabold text-slate-900 md:text-3xl">
-              What Most Homeowners Get Wrong
+              Where Most Homeowners Lose Money
             </h3>
 
             <p className="mt-4 text-lg leading-8 text-slate-700">
-              Many people assume they’ll automatically receive $40,000 — but
-              that only happens when the project is structured properly.
+              Most people assume they’ll automatically receive $40,000 — but
+              that’s not how the program works.
             </p>
 
-            <p className="mt-4 text-lg leading-8 text-slate-700">
-              In reality, poorly planned basements often qualify for far less
-              simply because the eligible portion was never optimized.
-            </p>
+            <div className="mt-8 grid gap-4 text-left md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="font-semibold text-slate-900">❌ Designing first</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Planning the layout without considering the grant often leads
+                  to missed eligibility.
+                </p>
+              </div>
 
-            <p className="mt-6 text-xl font-semibold text-slate-900 md:text-2xl">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="font-semibold text-slate-900">
+                  ❌ Misunderstanding costs
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Not all renovation costs qualify, which can reduce the grant
+                  significantly.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="font-semibold text-slate-900">
+                  ❌ Assuming max payout
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  The full $40K only happens when the project is structured
+                  properly.
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-8 text-xl font-semibold text-slate-900 md:text-2xl">
               The difference can be tens of thousands of dollars.
             </p>
           </div>
@@ -310,6 +335,26 @@ export default function HamiltonGrant() {
                 That’s why planning the right scope matters just as much as the
                 total budget.
               </p>
+            </div>
+          </div>
+
+          {/* Light CTA */}
+          <div className="mx-auto mt-12 max-w-3xl text-center">
+            <p className="text-lg text-slate-700">
+              Want a quick answer based on your actual home?
+            </p>
+
+            <p className="mt-2 text-slate-600">
+              We’ll walk you through what your basement could qualify for — no pressure.
+            </p>
+
+            <div className="mt-6">
+              <a
+                href="/match"
+                className="inline-flex rounded-xl border border-slate-900 px-6 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-900 hover:text-white"
+              >
+                Get a Free Assessment
+              </a>
             </div>
           </div>
 
