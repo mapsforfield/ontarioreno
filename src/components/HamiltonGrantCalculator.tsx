@@ -8,12 +8,12 @@ const formatCurrency = (value: number) =>
   });
 
 export default function HamiltonGrantCalculator() {
-  const [totalCost, setTotalCost] = useState(100000);
-  const [eligiblePercent, setEligiblePercent] = useState(80);
+  const [totalCost, setTotalCost] = useState(80000);
 
+  const eligiblePercent = 80;
   const eligibleCost = useMemo(
-    () => Math.round((totalCost * eligiblePercent) / 100),
-    [totalCost, eligiblePercent]
+    () => Math.round(totalCost * (eligiblePercent / 100)),
+    [totalCost]
   );
 
   const grant = Math.min(eligibleCost * 0.7, 40000);
@@ -27,77 +27,58 @@ export default function HamiltonGrantCalculator() {
     if (fullGrantUnlocked) {
       return "You’re in the ideal range — this project can unlock the full $40,000 grant.";
     }
-    if (eligiblePercent >= 70 && eligiblePercent < 80) {
-      return "You’re in a solid range, but increasing the qualifying portion could boost your grant.";
+    if (totalCost >= 60000) {
+      return "You’re in a strong range, and a well-structured project can significantly increase your grant.";
     }
-    return "This project may not be fully taking advantage of the incentive yet.";
-  }, [fullGrantUnlocked, eligiblePercent]);
+    return "This project may qualify for less than the full incentive, but it can still reduce your real cost substantially.";
+  }, [fullGrantUnlocked, totalCost]);
 
   const exampleText = `Example: a ${formatCurrency(
     totalCost
-  )} project with ${eligiblePercent}% qualifying costs could receive about ${formatCurrency(
+  )} project could receive about ${formatCurrency(
     grant
-  )} back.`;
+  )} back based on a typical qualifying structure.`;
 
   return (
     <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
       <div className="mb-8">
         <p className="text-base font-semibold text-slate-900 md:text-lg">
-          Move the sliders to match your project — we’ll calculate everything for you.
+          Move the slider to match your project — we’ll calculate everything for you.
         </p>
         <p className="mt-2 text-sm text-slate-600 md:text-base">
-          Most basement projects have about <span className="font-semibold">70% to 90%</span> of
-          costs that qualify for the grant.
+          We use a typical estimate that about{" "}
+          <span className="font-semibold">80% of a basement project qualifies</span>{" "}
+          for the grant. Final numbers may vary depending on your scope, permits,
+          and eligible construction costs.
         </p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <div>
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <label className="text-sm font-semibold text-slate-700 md:text-base">
-              Total Project Cost
-            </label>
-            <span className="text-base font-extrabold text-slate-900 md:text-lg">
-              {formatCurrency(totalCost)}
-            </span>
-          </div>
-
-          <input
-            type="range"
-            min={20000}
-            max={150000}
-            step={5000}
-            value={totalCost}
-            onChange={(e) => setTotalCost(Number(e.target.value))}
-            className="slider-blue h-4 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
-          />
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <label className="text-sm font-semibold text-slate-700 md:text-base">
+            Total Project Cost
+          </label>
+          <span className="text-base font-extrabold text-slate-900 md:text-lg">
+            {formatCurrency(totalCost)}
+          </span>
         </div>
 
-        <div>
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <label className="text-sm font-semibold text-slate-700 md:text-base">
-              Portion of Your Project That Qualifies
-            </label>
-            <span className="text-base font-extrabold text-slate-900 md:text-lg">
-              {eligiblePercent}%
-            </span>
-          </div>
+        <input
+          type="range"
+          min={20000}
+          max={150000}
+          step={5000}
+          value={totalCost}
+          onChange={(e) => setTotalCost(Number(e.target.value))}
+          className="slider-blue h-4 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
+        />
 
-          <input
-            type="range"
-            min={50}
-            max={100}
-            step={5}
-            value={eligiblePercent}
-            onChange={(e) => setEligiblePercent(Number(e.target.value))}
-            className="slider-blue h-4 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
-          />
-
-          <p className="mt-3 text-sm text-slate-600">
-            Estimated qualifying amount:{" "}
-            <span className="font-semibold text-slate-900">{formatCurrency(eligibleCost)}</span>
-          </p>
-        </div>
+        <p className="mt-3 text-sm text-slate-600">
+          Estimated qualifying amount:{" "}
+          <span className="font-semibold text-slate-900">
+            {formatCurrency(eligibleCost)}
+          </span>
+        </p>
       </div>
 
       <div className="mt-10">
@@ -169,8 +150,9 @@ export default function HamiltonGrantCalculator() {
       </div>
 
       <div className="mt-6 text-center text-xs leading-6 text-slate-500 md:text-sm">
-        Estimates only. Final grant depends on approved eligible costs, permits, and City of
-        Hamilton review.
+        Estimates only. This calculator assumes a typical project structure where
+        roughly 80% of costs qualify. Final grant amounts depend on approved eligible
+        costs, permits, and City of Hamilton review.
       </div>
     </div>
   );
