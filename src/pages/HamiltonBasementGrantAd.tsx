@@ -161,7 +161,7 @@ export default function HamiltonBasementGrantAd() {
             </p>
 
             <p className="mt-2 text-3xl font-extrabold text-slate-900">
-              $80,000 basement project
+              $75,000 basement project
             </p>
 
             <p className="mt-4 text-lg text-slate-600">
