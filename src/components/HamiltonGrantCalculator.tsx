@@ -107,9 +107,13 @@ export default function HamiltonGrantCalculator() {
       </div>
 
       <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative rounded-3xl border-2 border-green-200 bg-green-50 p-6 text-center">
+        <div
+          className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center ${
+            fullGrantUnlocked ? "pt-14 pb-6 px-6" : "p-6"
+          }`}
+        >
           {fullGrantUnlocked && (
-            <div className="absolute right-4 top-4 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white md:text-xs">
+            <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm md:text-xs">
               Max Grant Unlocked
             </div>
           )}
