@@ -98,8 +98,10 @@ export default function HamiltonGrantCalculator() {
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">
         <div
-          className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center ${
-            fullGrantUnlocked ? "pt-14 pb-6 px-6" : "p-6"
+          className={`relative rounded-3xl border-2 border-green-200 bg-green-50 text-center transition-all duration-300 ${
+            fullGrantUnlocked
+              ? "pt-14 pb-6 px-6 scale-[1.01] shadow-lg"
+              : "p-6"
           }`}
         >
           {fullGrantUnlocked && (
@@ -126,9 +128,19 @@ export default function HamiltonGrantCalculator() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-2xl bg-slate-900 px-5 py-4 text-center">
-        <p className="text-base font-bold text-white md:text-lg">{message}</p>
-        <p className="mt-2 text-sm text-slate-300 md:text-base">
+      <div
+        className={`mt-8 rounded-2xl px-5 py-4 text-center transition-all duration-300 ${
+          fullGrantUnlocked
+            ? "bg-green-600 text-white scale-[1.01] shadow-lg"
+            : "bg-slate-900 text-white"
+        }`}
+      >
+        <p className="text-base font-bold md:text-lg">{message}</p>
+        <p
+          className={`mt-2 text-sm md:text-base ${
+            fullGrantUnlocked ? "text-green-50" : "text-slate-300"
+          }`}
+        >
           A properly structured basement project can significantly reduce your real out-of-pocket cost.
         </p>
       </div>
