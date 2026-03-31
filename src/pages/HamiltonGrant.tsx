@@ -1,3 +1,5 @@
+import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
+
 export default function HamiltonGrant() {
   return (
     <main className="bg-white text-slate-900">
@@ -9,10 +11,12 @@ export default function HamiltonGrant() {
               Hamilton Basement Grant Guide
             </p>
             <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-              Build a Legal Basement Apartment in Hamilton and Get Up to $40,000 Back
+              Build a Legal Basement Apartment in Hamilton and Get Up to
+              $40,000 Back
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-              Understand how the incentive works, what costs qualify, and how much your project could receive.
+              Understand how the incentive works, what costs qualify, and how
+              much your project could receive.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
@@ -40,25 +44,31 @@ export default function HamiltonGrant() {
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Maximum Grant
             </p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-900">$40,000</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-900">
+              $40,000
+            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Coverage
             </p>
             <p className="mt-2 text-3xl font-extrabold text-slate-900">70%</p>
-            <p className="mt-1 text-sm text-slate-600">of eligible construction costs</p>
+            <p className="mt-1 text-sm text-slate-600">
+              of eligible construction costs
+            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Ideal Use
             </p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-900">Basement Units</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-900">
+              Basement Units
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Calculator placeholder */}
+      {/* Calculator */}
       <section id="calculator" className="bg-slate-50">
         <div className="mx-auto max-w-7xl px-6 py-16 md:px-8">
           <div className="mb-8 max-w-3xl">
@@ -66,26 +76,12 @@ export default function HamiltonGrant() {
               Estimate Your Hamilton Grant
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              We’re adding an interactive calculator here next so homeowners can estimate their grant, net project cost, and potential rental upside.
+              Adjust the project numbers below to estimate your grant, net cost,
+              monthly financing, and potential rental offset.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <div className="grid gap-6 md:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-6">
-                <p className="text-sm font-semibold text-slate-500">Estimated Grant</p>
-                <p className="mt-2 text-3xl font-extrabold">$0</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-6">
-                <p className="text-sm font-semibold text-slate-500">Estimated Net Cost</p>
-                <p className="mt-2 text-3xl font-extrabold">$0</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-6">
-                <p className="text-sm font-semibold text-slate-500">Potential Rent Offset</p>
-                <p className="mt-2 text-3xl font-extrabold">$1,500+</p>
-              </div>
-            </div>
-          </div>
+          <HamiltonGrantCalculator />
         </div>
       </section>
 
@@ -96,7 +92,9 @@ export default function HamiltonGrant() {
             How the Program Works
           </h2>
           <p className="mt-6 text-lg leading-8 text-slate-700">
-            The City of Hamilton incentive is not a flat $40,000 cheque. It covers up to 70% of eligible construction costs, to a maximum of $40,000 per eligible unit.
+            The City of Hamilton incentive is not a flat $40,000 cheque. It
+            covers up to 70% of eligible construction costs, to a maximum of
+            $40,000 per eligible unit.
           </p>
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
@@ -131,7 +129,8 @@ export default function HamiltonGrant() {
               Want to know what your home could qualify for?
             </h2>
             <p className="mt-4 max-w-2xl text-lg text-slate-300">
-              We help homeowners understand the numbers, plan legal basement units properly, and move toward a real estimate with confidence.
+              We help homeowners understand the numbers, plan legal basement
+              units properly, and move toward a real estimate with confidence.
             </p>
 
             <div className="mt-8">
