@@ -14,9 +14,9 @@ export default function HamiltonGrant() {
               Build a Legal Basement Apartment in Hamilton and Get Up to
               $40,000 Back
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-              Understand how the incentive works, what costs usually qualify,
-              and how much your project could receive.
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
+              Understand how the grant works, what costs usually qualify, and
+              how much your basement project could realistically receive.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
@@ -48,6 +48,7 @@ export default function HamiltonGrant() {
               $40,000
             </p>
           </div>
+
           <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Coverage
@@ -57,6 +58,7 @@ export default function HamiltonGrant() {
               of eligible construction costs
             </p>
           </div>
+
           <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Best Fit
@@ -85,7 +87,7 @@ export default function HamiltonGrant() {
         </div>
       </section>
 
-      {/* How to Maximize the Grant */}
+      {/* Unlock section */}
       <section className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-20">
           <div className="mb-12 text-center">
@@ -93,8 +95,9 @@ export default function HamiltonGrant() {
               How to Actually Unlock the Full $40,000
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-slate-600 md:text-xl">
-              Most homeowners don’t realize this — the grant isn’t automatic. It
-              depends on how your project is structured from the start.
+              The grant is not automatic. The total you receive depends on how
+              much of the project actually qualifies and how well the basement
+              is planned from the start.
             </p>
           </div>
 
@@ -105,8 +108,8 @@ export default function HamiltonGrant() {
               </h3>
               <p className="mt-3 text-base leading-7 text-slate-600">
                 The program covers up to 70% of qualifying construction work. If
-                too much of your budget goes to non-eligible items, you won’t
-                reach the full amount.
+                too much of the budget goes to non-eligible items, the grant
+                total drops quickly.
               </p>
             </div>
 
@@ -115,9 +118,9 @@ export default function HamiltonGrant() {
                 2. Proper Legal Layout
               </h3>
               <p className="mt-3 text-base leading-7 text-slate-600">
-                Your basement needs the right legal setup, including the layout,
-                required safety features, and the kind of work tied to the
-                permit.
+                Your basement needs the right legal setup, including the type of
+                work tied to the permit and the features required for a legal
+                secondary unit.
               </p>
             </div>
 
@@ -127,8 +130,8 @@ export default function HamiltonGrant() {
               </h3>
               <p className="mt-3 text-base leading-7 text-slate-600">
                 The biggest mistake homeowners make is designing first and
-                thinking about the grant later. By then, money is already left
-                on the table.
+                thinking about the grant later. By then, money is often already
+                left on the table.
               </p>
             </div>
           </div>
@@ -142,12 +145,12 @@ export default function HamiltonGrant() {
 
             <p className="mt-4 text-lg leading-8 text-slate-700">
               Many people assume they’ll automatically receive $40,000 — but
-              that only happens when the project is structured correctly.
+              that only happens when the project is structured properly.
             </p>
 
             <p className="mt-4 text-lg leading-8 text-slate-700">
               In reality, poorly planned basements often qualify for far less
-              simply because the eligible portion wasn’t optimized.
+              simply because the eligible portion was never optimized.
             </p>
 
             <p className="mt-6 text-xl font-semibold text-slate-900 md:text-2xl">
@@ -178,7 +181,7 @@ export default function HamiltonGrant() {
         </div>
       </section>
 
-      {/* What Usually Counts / Doesn't */}
+      {/* What counts */}
       <section className="bg-slate-50">
         <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-20">
           <div className="mb-12 text-center">
@@ -186,8 +189,8 @@ export default function HamiltonGrant() {
               What Usually Counts Toward the Grant
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-slate-600 md:text-xl">
-              This is one of the biggest reasons homeowners get confused. Not
-              every dollar in a basement renovation quote counts the same way.
+              This is one of the biggest sources of confusion. Not every dollar
+              in a basement renovation quote counts the same way.
             </p>
           </div>
 
@@ -237,9 +240,9 @@ export default function HamiltonGrant() {
         </div>
       </section>
 
-      {/* Worked Example */}
+      {/* Worked example + key takeaways */}
       <section className="bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 md:px-8 md:py-20">
+        <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-20">
           <div className="mb-12 text-center">
             <h2 className="text-3xl font-extrabold text-slate-900 md:text-5xl">
               Example: How a Project Reaches the Full $40,000
@@ -309,25 +312,8 @@ export default function HamiltonGrant() {
               </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Explanation */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 md:px-8 md:py-20">
-          <div className="mb-10">
-            <h2 className="text-3xl font-extrabold md:text-5xl">
-              How the Program Works
-            </h2>
-            <p className="mt-6 max-w-4xl text-lg leading-8 text-slate-700 md:text-xl">
-              The Hamilton incentive is not a flat $40,000 cheque. It covers up
-              to 70% of eligible construction costs, to a maximum of $40,000 per
-              eligible unit. That means the amount you receive depends on both
-              your project cost and how much of that work actually qualifies.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 p-7 shadow-sm">
               <h3 className="text-2xl font-bold text-slate-900">
                 What This Means for Homeowners
@@ -336,19 +322,19 @@ export default function HamiltonGrant() {
                 <li>• You do not automatically receive the full $40,000</li>
                 <li>• A larger project does not always mean a larger grant</li>
                 <li>• The qualifying portion of the work matters</li>
-                <li>• Legal layout and proper planning matter from the start</li>
+                <li>• Planning and legal setup matter from the start</li>
               </ul>
             </div>
 
             <div className="rounded-2xl border border-slate-200 p-7 shadow-sm">
               <h3 className="text-2xl font-bold text-slate-900">
-                Why This Page Matters
+                What Happens Next
               </h3>
               <ul className="mt-5 space-y-3 text-base leading-7 text-slate-700">
-                <li>• It gives you a realistic starting estimate</li>
-                <li>• It helps you understand why projects vary</li>
-                <li>• It shows what usually counts and what does not</li>
-                <li>• It prepares you for a better consultation</li>
+                <li>• Get a realistic project assessment</li>
+                <li>• Understand what usually qualifies</li>
+                <li>• Review the legal layout and likely scope</li>
+                <li>• Move forward with far more clarity and confidence</li>
               </ul>
             </div>
           </div>
