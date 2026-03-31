@@ -20,16 +20,24 @@ export default function HamiltonGrantCalculator() {
   const netCost = Math.max(totalCost - grant, 0);
   const monthly = Math.round(netCost / 120);
   const rent = 1600;
+  const monthlySurplus = rent - monthly;
+  const fullGrantUnlocked = grant >= 40000;
 
   const message = useMemo(() => {
-    if (grant >= 40000) {
+    if (fullGrantUnlocked) {
       return "You’re in the ideal range — this project can unlock the full $40,000 grant.";
     }
     if (eligiblePercent >= 70 && eligiblePercent < 80) {
       return "You’re in a solid range, but increasing the qualifying portion could boost your grant.";
     }
     return "This project may not be fully taking advantage of the incentive yet.";
-  }, [grant, eligiblePercent]);
+  }, [fullGrantUnlocked, eligiblePercent]);
+
+  const exampleText = `Example: a ${formatCurrency(
+    totalCost
+  )} project with ${eligiblePercent}% qualifying costs could receive about ${formatCurrency(
+    grant
+  )} back.`;
 
   return (
     <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
@@ -92,8 +100,20 @@ export default function HamiltonGrantCalculator() {
         </div>
       </div>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-3xl border-2 border-green-200 bg-green-50 p-6 text-center">
+      <div className="mt-10">
+        <p className="text-base font-semibold text-slate-900 md:text-lg">
+          Here’s what your project could look like:
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="relative rounded-3xl border-2 border-green-200 bg-green-50 p-6 text-center">
+          {fullGrantUnlocked && (
+            <div className="absolute right-4 top-4 rounded-full bg-green-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white md:text-xs">
+              Max Grant Unlocked
+            </div>
+          )}
+
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
             Estimated Grant
           </p>
@@ -135,6 +155,13 @@ export default function HamiltonGrantCalculator() {
         <p className="mt-2 text-sm text-slate-300 md:text-base">
           In many cases, your rental income can cover or exceed your monthly cost.
         </p>
+        <p className="mt-2 text-sm font-semibold text-yellow-300 md:text-base">
+          Potential monthly surplus: {formatCurrency(monthlySurplus)}
+        </p>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-center">
+        <p className="text-sm font-medium text-slate-700 md:text-base">{exampleText}</p>
       </div>
 
       <div className="mt-6 text-center text-xs leading-6 text-slate-500 md:text-sm">
