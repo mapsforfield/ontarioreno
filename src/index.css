@@ -1,1 +1,38 @@
 @import "tailwindcss";
+
+/* SLIDER STYLING */
+
+.slider-blue::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  cursor: pointer;
+  margin-top: -6px;
+}
+
+.slider-blue::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #60a5fa, #2563eb);
+}
+
+.slider-blue::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  cursor: pointer;
+}
+
+.slider-blue::-moz-range-track {
+  height: 16px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #60a5fa, #2563eb);
+}
