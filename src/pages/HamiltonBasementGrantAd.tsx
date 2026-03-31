@@ -1,4 +1,5 @@
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
+import { CheckCircle } from "lucide-react";
 
 export default function HamiltonBasementGrantAd() {
   return (
@@ -39,26 +40,27 @@ export default function HamiltonBasementGrantAd() {
             </a>
           </div>
 
+          {/* ✅ UPDATED ICON ROW */}
           <p className="mt-4 text-sm text-slate-300 text-center">
-  <span className="inline-flex items-center gap-6 flex-wrap justify-center">
-    
-    <span className="flex items-center gap-2">
-      <span className="text-green-400 text-base">✔</span>
-      No obligation
-    </span>
+            <span className="inline-flex items-center gap-6 flex-wrap justify-center">
 
-    <span className="flex items-center gap-2">
-      <span className="text-green-400 text-base">✔</span>
-      Local experts
-    </span>
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                No obligation
+              </span>
 
-    <span className="flex items-center gap-2">
-      <span className="text-green-400 text-base">✔</span>
-      Real numbers
-    </span>
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                Local experts
+              </span>
 
-  </span>
-</p>
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                Real numbers
+              </span>
+
+            </span>
+          </p>
 
         </div>
       </section>
@@ -78,7 +80,6 @@ export default function HamiltonBasementGrantAd() {
 
           <HamiltonGrantCalculator />
 
-          {/* LIGHT CTA */}
           <div className="mt-8 text-center">
             <p className="text-lg font-medium text-slate-700">
               Want exact numbers for your home?
