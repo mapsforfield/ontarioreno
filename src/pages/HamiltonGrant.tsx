@@ -76,12 +76,104 @@ export default function HamiltonGrant() {
               Estimate Your Hamilton Grant
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Adjust the project numbers below to estimate your grant, net cost,
-              monthly financing, and potential rental offset.
+              Adjust the project cost below to see how the grant could reduce
+              your real out-of-pocket renovation cost.
             </p>
           </div>
 
           <HamiltonGrantCalculator />
+        </div>
+      </section>
+
+      {/* How to Maximize the Grant */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-extrabold text-slate-900 md:text-4xl">
+              How to Actually Unlock the Full $40,000
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              Most homeowners don’t realize this — the grant isn’t automatic. It
+              depends on how your project is structured.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 md:text-xl">
+                1. Enough Eligible Construction
+              </h3>
+              <p className="mt-3 text-slate-600">
+                The grant covers up to 70% of qualifying construction work. If
+                too much of your budget goes to non-eligible items, you won’t
+                reach the full amount.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 md:text-xl">
+                2. Proper Legal Layout
+              </h3>
+              <p className="mt-3 text-slate-600">
+                Your basement must meet legal requirements like a separate
+                entrance, kitchen, bathroom, and egress windows to qualify.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 md:text-xl">
+                3. Smart Planning From Day One
+              </h3>
+              <p className="mt-3 text-slate-600">
+                The biggest mistake homeowners make is designing first and
+                thinking about the grant later. By then, money is already left
+                on the table.
+              </p>
+            </div>
+          </div>
+
+          <div className="my-12 h-px bg-slate-200"></div>
+
+          <div className="mx-auto max-w-3xl text-center">
+            <h3 className="text-2xl font-extrabold text-slate-900">
+              What Most Homeowners Get Wrong
+            </h3>
+
+            <p className="mt-4 text-lg text-slate-700">
+              Many people assume they’ll automatically receive $40,000 — but
+              that only happens when the project is structured correctly.
+            </p>
+
+            <p className="mt-4 text-lg text-slate-700">
+              In reality, poorly planned basements often qualify for far less
+              simply because the eligible portion wasn’t optimized.
+            </p>
+
+            <p className="mt-6 text-xl font-semibold text-slate-900">
+              The difference can be tens of thousands of dollars.
+            </p>
+          </div>
+
+          <div className="mt-16 rounded-3xl bg-slate-900 p-8 text-center text-white md:p-10">
+            <h3 className="text-2xl font-extrabold md:text-3xl">
+              This is where OntarioReno comes in
+            </h3>
+
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
+              We don’t just help you build a basement — we help you structure it
+              properly so you can maximize incentives, understand your real
+              numbers, and make a confident decision.
+            </p>
+
+            <div className="mt-8">
+              <a
+                href="/match"
+                className="inline-flex rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
+              >
+                Get a Free Assessment
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
