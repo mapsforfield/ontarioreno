@@ -9,6 +9,7 @@ export default function Navbar() {
   const location = useLocation();
 
   const navLinks = [
+    { name: 'Grants', href: '/hamilton-grant-guide' },
     { name: 'Cost Guides', href: '/costs' },
     { name: 'Contractor Match', href: '/match' },
     { name: 'Toronto Guide', href: '/city/toronto' },
@@ -123,7 +124,10 @@ export default function Navbar() {
             <Link
               key={link.name}
               to={link.href}
-              className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-[#5694CF] hover:bg-slate-50"
+              className={cn(
+                'block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-[#5694CF] hover:bg-slate-50',
+                location.pathname === link.href && 'text-[#5694CF] bg-slate-50'
+              )}
               onClick={() => setIsOpen(false)}
             >
               {link.name}
