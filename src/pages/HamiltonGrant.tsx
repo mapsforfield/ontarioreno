@@ -11,8 +11,7 @@ export default function HamiltonGrant() {
               Hamilton Basement Grant Guide
             </p>
             <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-              Build a Legal Basement Apartment in Hamilton and Get Up to
-              $40,000 Back
+              Build a Legal Basement Apartment in Hamilton and Get Up to $40,000 in Grant Funding
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
               Understand how the grant works, what costs usually qualify, and
@@ -68,6 +67,13 @@ export default function HamiltonGrant() {
             </p>
           </div>
         </div>
+         {/* Trust anchor */}
+  <div className="mx-auto max-w-4xl px-6 pb-10 text-center md:px-8">
+    <p className="text-sm text-slate-500">
+      This City of Hamilton–backed program is subject to approval, eligibility, and available funding.
+    </p>
+  </div>
+</section>
       </section>
 
       {/* Calculator */}
@@ -78,8 +84,7 @@ export default function HamiltonGrant() {
               Estimate Your Hamilton Grant
             </h2>
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 md:text-xl">
-              Adjust the project cost below to see how the grant could reduce
-              your real out-of-pocket renovation cost.
+              Based on typical project structures where a large portion of construction costs qualify. Final grant amounts depend on approved eligible costs.
             </p>
           </div>
 
