@@ -73,7 +73,6 @@ export default function HamiltonGrant() {
       This City of Hamilton–backed program is subject to approval, eligibility, and available funding.
     </p>
   </div>
-</section>
       </section>
 
       {/* Calculator */}
