@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -25,6 +26,39 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <Helmet>
+        <title>Ontario Reno | Plan Your Renovation with Confidence</title>
+
+        <meta
+          name="description"
+          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+        />
+
+        <link rel="canonical" href="https://ontarioreno.ca/" />
+
+        <meta
+          property="og:title"
+          content="Ontario Reno | Plan Your Renovation with Confidence"
+        />
+        <meta
+          property="og:description"
+          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+        />
+        <meta property="og:url" content="https://ontarioreno.ca/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://ontarioreno.ca/preview.jpg" />
+
+        <meta
+          name="twitter:title"
+          content="Ontario Reno | Plan Your Renovation with Confidence"
+        />
+        <meta
+          name="twitter:description"
+          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+        />
+        <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
+      </Helmet>
+
       {/* Hero Section */}
       <section className="relative bg-slate-900 text-white overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-40">
@@ -279,6 +313,7 @@ export default function Home() {
                       placeholder="John"
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
                     <input
@@ -287,6 +322,25 @@ export default function Home() {
                       placeholder="john@example.com"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="(416) 123-4567"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Project Address</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="123 Main St, Hamilton"
+                    />
+                  </div>
+
                   <button className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-colors mt-2">
                     Send Me The Guide
                   </button>

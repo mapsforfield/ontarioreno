@@ -1,9 +1,43 @@
+import { Helmet } from "react-helmet-async";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import { CheckCircle } from "lucide-react";
 
 export default function HamiltonBasementGrantAd() {
   return (
     <main className="bg-white text-slate-900">
+      <Helmet>
+        <title>Hamilton Basement Grant Calculator | Estimate Up to $40,000</title>
+
+        <meta
+          name="description"
+          content="Estimate how much you could receive from the Hamilton basement grant program. Use our calculator to see if your legal basement unit qualifies for up to $40,000."
+        />
+
+        <link rel="canonical" href="https://ontarioreno.ca/hamilton-basement-grant" />
+
+        <meta property="og:title" content="Hamilton Basement Grant Calculator" />
+        <meta
+          property="og:description"
+          content="Find out how much your basement project could qualify for under Hamilton’s $40K grant program."
+        />
+        <meta
+          property="og:url"
+          content="https://ontarioreno.ca/hamilton-basement-grant"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://ontarioreno.ca/preview.jpg" />
+
+        <meta
+          name="twitter:title"
+          content="Hamilton Basement Grant Calculator | Estimate Up to $40,000"
+        />
+        <meta
+          name="twitter:description"
+          content="Estimate how much you could receive from the Hamilton basement grant program. Use our calculator to see if your legal basement unit qualifies for up to $40,000."
+        />
+        <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
+      </Helmet>
+
       {/* HERO */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
