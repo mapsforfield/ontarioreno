@@ -57,7 +57,7 @@ export default function HamiltonBasementGrantAd() {
             </span>
           </p>
 
-          <p className="mt-3 text-xs font-medium tracking-wide text-slate-400">
+          <p className="mt-3 text-xs font-medium tracking-wide text-slate-300">
             City of Hamilton–backed incentive program. Subject to approval,
             eligibility, and available funding.
           </p>
@@ -187,6 +187,10 @@ export default function HamiltonBasementGrantAd() {
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
             We’ll help you understand your numbers, structure your project
             properly, and avoid leaving money on the table.
+          </p>
+
+          <p className="mt-4 text-xs font-medium tracking-wide text-slate-300">
+            Funding is limited and approval-based.
           </p>
 
           <div className="mt-8">
