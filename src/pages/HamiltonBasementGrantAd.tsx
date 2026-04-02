@@ -10,17 +10,17 @@ export default function HamiltonBasementGrantAd() {
         <div className="mx-auto max-w-5xl px-6 py-16 md:px-8 md:py-20 text-center">
 
           <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
-            Hamilton Basement Grant Program
+            Hamilton Basement Incentive Program
           </p>
 
           <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
-            Get Up to $40,000 Back
+            Reduce Your Basement Cost by
             <br />
-            for a Legal Basement Unit
+            Up to $40,000
           </h1>
 
           <p className="mt-4 text-lg text-slate-300 max-w-2xl mx-auto">
-            Most homeowners don’t realize this — the grant isn’t automatic.
+            Most homeowners don’t realize this — the incentive isn’t automatic.
             It depends on how your basement project is structured.
           </p>
 
@@ -40,10 +40,9 @@ export default function HamiltonBasementGrantAd() {
             </a>
           </div>
 
-          {/* ✅ UPDATED ICON ROW */}
+          {/* ICON ROW */}
           <p className="mt-4 text-sm text-slate-300 text-center">
             <span className="inline-flex items-center gap-6 flex-wrap justify-center">
-
               <span className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-400" />
                 No obligation
@@ -58,8 +57,12 @@ export default function HamiltonBasementGrantAd() {
                 <CheckCircle className="h-5 w-5 text-green-400" />
                 Real numbers
               </span>
-
             </span>
+          </p>
+
+          {/* TRUST MICRO */}
+          <p className="mt-3 text-xs text-slate-400">
+            City of Hamilton–backed program. Subject to approval and eligibility.
           </p>
 
         </div>
@@ -74,7 +77,7 @@ export default function HamiltonBasementGrantAd() {
               See What Your Basement Could Qualify For
             </h2>
             <p className="mt-3 text-lg text-slate-600">
-              Adjust your project cost — we’ll estimate your grant instantly.
+              Based on typical project structures. Final amounts depend on approved eligible costs.
             </p>
           </div>
 
@@ -91,6 +94,11 @@ export default function HamiltonBasementGrantAd() {
             >
               Get My Free Grant Assessment
             </a>
+
+            {/* LEAD FILTER */}
+            <p className="mt-3 text-xs text-slate-500">
+              Best suited for homeowners planning a full legal basement unit.
+            </p>
           </div>
 
         </div>
@@ -122,7 +130,7 @@ export default function HamiltonBasementGrantAd() {
                 ❌ Not Designed as a Legal Unit
               </h3>
               <p className="mt-3 text-slate-700">
-                Without proper layout (entrance, kitchen, egress), the project may not qualify at all.
+                Without proper layout, the project may not qualify at all.
               </p>
             </div>
 
@@ -131,7 +139,7 @@ export default function HamiltonBasementGrantAd() {
                 ❌ Planning Happens Too Late
               </h3>
               <p className="mt-3 text-slate-700">
-                By the time most people think about the grant, the structure is already wrong.
+                By the time most people think about the incentive, the structure is already wrong.
               </p>
             </div>
 
@@ -139,20 +147,24 @@ export default function HamiltonBasementGrantAd() {
 
           <div className="mt-10 text-center max-w-2xl mx-auto">
             <p className="text-xl font-semibold text-slate-900">
-              That mistake can cost you tens of thousands of dollars.
+              This can cost you tens of thousands.
             </p>
           </div>
 
         </div>
       </section>
 
-      {/* SIMPLE EXAMPLE */}
+      {/* EXAMPLE */}
       <section className="bg-slate-50">
         <div className="mx-auto max-w-4xl px-6 py-14 md:px-8 text-center">
 
           <h2 className="text-2xl font-extrabold md:text-3xl">
-            A Real Example
+            A Typical Example
           </h2>
+
+          <p className="mt-3 text-slate-600">
+            Based on a project where most construction costs qualify
+          </p>
 
           <div className="mt-8 rounded-2xl bg-white border border-slate-200 p-8 shadow-sm">
 
@@ -165,11 +177,11 @@ export default function HamiltonBasementGrantAd() {
             </p>
 
             <p className="mt-4 text-lg text-slate-600">
-              could receive
+              could receive up to
             </p>
 
             <p className="mt-2 text-4xl font-extrabold text-green-600">
-              $40,000 back
+              $40,000
             </p>
 
           </div>
