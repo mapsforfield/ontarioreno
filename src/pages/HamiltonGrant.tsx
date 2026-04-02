@@ -67,12 +67,13 @@ export default function HamiltonGrant() {
             </p>
           </div>
         </div>
-         {/* Trust anchor */}
-  <div className="mx-auto max-w-4xl px-6 pb-10 text-center md:px-8">
-    <p className="text-sm text-slate-500">
-      This City of Hamilton–backed program is subject to approval, eligibility, and available funding.
-    </p>
-  </div>
+
+        {/* Trust anchor */}
+        <div className="mx-auto max-w-4xl px-6 pb-10 text-center md:px-8">
+          <p className="text-sm font-medium tracking-wide text-slate-400">
+            This City of Hamilton–backed incentive program is subject to approval, eligibility, and available funding.
+          </p>
+        </div>
       </section>
 
       {/* Calculator */}
