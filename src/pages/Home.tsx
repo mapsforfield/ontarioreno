@@ -88,15 +88,15 @@ export default function Home() {
               <div className="max-w-3xl">
                 <div className="inline-flex items-center gap-2 rounded-full bg-yellow-100 text-yellow-900 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em]">
                   <Landmark className="w-4 h-4" />
-                  Featured Hamilton Opportunity
+                  Confirmed Hamilton Basement Grant
                 </div>
 
                 <h2 className="mt-4 text-2xl md:text-4xl font-bold text-slate-900 leading-tight">
-                  Hamilton Homeowners May Qualify for Up to $40,000 Toward a Legal Basement Unit
+                  Hamilton Homeowners May Qualify for Up to $40,000 Through the Hamilton Basement Grant
                 </h2>
 
                 <p className="mt-4 text-base md:text-lg text-slate-700 leading-relaxed max-w-2xl">
-                  We’ve confirmed a City of Hamilton–backed incentive program that can cover up to 70% of eligible construction costs for qualifying basement unit projects.
+                  We’ve confirmed a City of Hamilton–backed basement grant and ADU incentive that can cover up to 70% of eligible construction costs for qualifying legal basement unit projects.
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600">
@@ -114,24 +114,28 @@ export default function Home() {
                   </span>
                 </div>
 
-                <p className="mt-4 text-xs md:text-sm text-slate-500">
+                <p className="mt-4 text-sm text-slate-600 max-w-2xl">
+                  Looking for the Hamilton basement grant guide? Start with a quick estimate or read the full breakdown of eligible costs, approvals, and how the program works.
+                </p>
+
+                <p className="mt-3 text-xs md:text-sm text-slate-500">
                   Subject to approval, eligibility, and available funding.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:min-w-[260px]">
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:min-w-[280px]">
                 <Link
                   to="/hamilton-basement-grant"
                   className="inline-flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-6 py-4 font-semibold transition-all shadow-sm"
                 >
-                  See If You Qualify
+                  See My Estimated Grant
                 </Link>
 
                 <Link
                   to="/hamilton-grant-guide"
                   className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 px-6 py-4 font-semibold transition-all"
                 >
-                  Learn How It Works
+                  Read Full Grant Guide
                 </Link>
               </div>
             </div>
