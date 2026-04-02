@@ -8,7 +8,7 @@ export default function HamiltonBasementGrantAd() {
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
           <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
-            Hamilton Basement Incentive Program
+            Hamilton Basement Grant Program
           </p>
 
           <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
@@ -18,8 +18,14 @@ export default function HamiltonBasementGrantAd() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
-            Most homeowners don’t realize this — the incentive isn’t automatic.
-            It depends on how your basement project is structured.
+            The Hamilton basement grant isn’t automatic. It depends on how your
+            legal basement unit project is structured and how much of the work
+            qualifies.
+          </p>
+
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+            Estimate what a Hamilton legal basement apartment or secondary unit
+            project could qualify for under this City-backed incentive program.
           </p>
 
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -69,7 +75,7 @@ export default function HamiltonBasementGrantAd() {
         <div className="mx-auto max-w-5xl px-6 py-14 md:px-8">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-extrabold md:text-3xl">
-              See What Your Basement Could Qualify For
+              Estimate Your Hamilton Basement Grant
             </h2>
             <p className="mt-3 text-lg text-slate-600">
               Based on typical project structures. Final amounts depend on
@@ -219,7 +225,10 @@ export default function HamiltonBasementGrantAd() {
             <a href="/terms" className="hover:text-slate-900">
               Terms
             </a>
-            <a href="mailto:info@ontarioreno.ca" className="hover:text-slate-900">
+            <a
+              href="mailto:info@ontarioreno.ca"
+              className="hover:text-slate-900"
+            >
               info@ontarioreno.ca
             </a>
           </div>
