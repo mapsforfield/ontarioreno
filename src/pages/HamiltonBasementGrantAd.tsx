@@ -27,7 +27,7 @@ export default function HamiltonBasementGrantAd() {
               href="#calculator"
               className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
             >
-              Check What You Could Get
+              See My Estimated Grant
             </a>
 
             <a
