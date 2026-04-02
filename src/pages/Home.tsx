@@ -20,8 +20,102 @@ import { cn } from '../lib/utils';
 export default function Home() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
+  const [guideForm, setGuideForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+  });
+
+  const [guideSubmitting, setGuideSubmitting] = useState(false);
+  const [guideStatus, setGuideStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({
+    type: null,
+    message: '',
+  });
+
   const toggleFaq = (index: number) => {
     setActiveFaq(activeFaq === index ? null : index);
+  };
+
+  const handleGuideChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = e.target;
+    setGuideForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleGuideSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    setGuideStatus({ type: null, message: '' });
+
+    if (
+      !guideForm.name.trim() ||
+      !guideForm.email.trim() ||
+      !guideForm.phone.trim() ||
+      !guideForm.address.trim()
+    ) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please fill in all fields before submitting.',
+      });
+      return;
+    }
+
+    setGuideSubmitting(true);
+
+    try {
+      const response = await fetch(
+        'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+          },
+          body: JSON.stringify({
+            type: 'guide',
+            name: guideForm.name,
+            email: guideForm.email,
+            phone: guideForm.phone,
+            address: guideForm.address,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        setGuideStatus({
+          type: 'success',
+          message: 'Success — your guide request was submitted.',
+        });
+
+        setGuideForm({
+          name: '',
+          email: '',
+          phone: '',
+          address: '',
+        });
+      } else {
+        setGuideStatus({
+          type: 'error',
+          message: 'Something went wrong. Please try again.',
+        });
+      }
+    } catch (error) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Something went wrong. Please try again.',
+      });
+    } finally {
+      setGuideSubmitting(false);
+    }
   };
 
   return (
@@ -300,15 +394,20 @@ export default function Home() {
                 </li>
               </ul>
             </div>
+
             <div className="lg:w-5/12 w-full">
               <div className="bg-white rounded-2xl p-8 shadow-2xl text-slate-900">
                 <h3 className="text-2xl font-bold mb-2">Download Free Guide</h3>
                 <p className="text-slate-500 text-sm mb-6">Join 15,000+ Ontario homeowners planning smarter.</p>
-                <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+
+                <form className="space-y-4" onSubmit={handleGuideSubmit}>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
                     <input
+                      name="name"
                       type="text"
+                      value={guideForm.name}
+                      onChange={handleGuideChange}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="John"
                     />
@@ -317,7 +416,10 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
                     <input
+                      name="email"
                       type="email"
+                      value={guideForm.email}
+                      onChange={handleGuideChange}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="john@example.com"
                     />
@@ -326,7 +428,10 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
                     <input
+                      name="phone"
                       type="tel"
+                      value={guideForm.phone}
+                      onChange={handleGuideChange}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="(416) 123-4567"
                     />
@@ -335,16 +440,39 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Project Address</label>
                     <input
+                      name="address"
                       type="text"
+                      value={guideForm.address}
+                      onChange={handleGuideChange}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="123 Main St, Hamilton"
                     />
                   </div>
 
-                  <button className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-colors mt-2">
-                    Send Me The Guide
+                  <button
+                    type="submit"
+                    disabled={guideSubmitting}
+                    className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-colors mt-2"
+                  >
+                    {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
                   </button>
-                  <p className="text-xs text-slate-400 text-center mt-4">We respect your privacy. Unsubscribe anytime.</p>
+
+                  {guideStatus.message && (
+                    <p
+                      className={cn(
+                        'text-sm text-center mt-2',
+                        guideStatus.type === 'success'
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      )}
+                    >
+                      {guideStatus.message}
+                    </p>
+                  )}
+
+                  <p className="text-xs text-slate-400 text-center mt-4">
+                    We respect your privacy. Unsubscribe anytime.
+                  </p>
                 </form>
               </div>
             </div>
