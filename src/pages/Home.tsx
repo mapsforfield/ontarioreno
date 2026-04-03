@@ -349,26 +349,26 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link to="#" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
+            <Link to="/kitchen-renovations" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
               <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <PaintBucket className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Kitchen Renovations</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">
-                Budgeting for cabinets, countertops, and layouts. Find the right team for the heart of your home.
+                Real pricing for cabinets, countertops, and layout changes across Ontario kitchens.
               </p>
               <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
 
-            <Link to="#" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
+            <Link to="/bathroom-renovations" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
               <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
                 <Bath className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Bathroom Remodels</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Bathroom Renovations</h3>
               <p className="text-slate-600 text-sm mb-6 flex-grow">
-                Waterproofing, plumbing, and tile costs. Learn what to expect before you start demo day.
+                Waterproofing, plumbing, and tile costs explained before you start your project.
               </p>
               <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
                 Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
@@ -495,7 +495,7 @@ export default function Home() {
             <div className="max-w-2xl">
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Real Ontario Pricing Data</h2>
               <p className="text-lg text-slate-600">
-                We aggregate data from hundreds of recent projects to give you realistic budget expectations before you talk to a contractor.
+                Real price ranges based on recent Ontario projects, so you can set better expectations before speaking with a contractor.
               </p>
             </div>
             <Link to="/costs" className="text-[#1B3C6C] font-semibold flex items-center hover:text-blue-700 whitespace-nowrap">
@@ -506,14 +506,14 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="border border-slate-200 rounded-2xl p-8 hover:border-blue-200 hover:shadow-lg transition-all">
               <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Basement Finishing</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$45k - $75k+</div>
+              <div className="text-3xl font-bold text-slate-900 mb-4">$45K - $85K+</div>
               <p className="text-slate-600 text-sm mb-6">
-                Average cost for a standard 800 sq.ft. open-concept basement in the GTA.
+                Most projects fall between <strong>$50K - $70K</strong>, depending on size, layout, and finish level.
               </p>
               <div className="space-y-3 pt-6 border-t border-slate-100">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Permits</span>
-                  <span className="font-medium text-slate-900">~$1,500</span>
+                  <span className="text-slate-500">Typical use</span>
+                  <span className="font-medium text-slate-900">Personal living space</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Timeline</span>
@@ -526,15 +526,15 @@ export default function Home() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1B3C6C] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                 Most Popular
               </div>
-              <div className="text-sm font-bold text-[#1B3C6C] uppercase tracking-wider mb-2">Legal Secondary Suite</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$85k - $140k+</div>
+              <div className="text-sm font-bold text-[#1B3C6C] uppercase tracking-wider mb-2">Legal Basement Apartment</div>
+              <div className="text-3xl font-bold text-slate-900 mb-4">$60K - $140K+</div>
               <p className="text-slate-600 text-sm mb-6">
-                Full conversion including separate entrance, fire separation, and full kitchen/bath.
+                Most projects fall between <strong>$70K - $110K</strong>, depending on entrance work, permits, and code-compliant scope.
               </p>
               <div className="space-y-3 pt-6 border-t border-slate-100">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Permits & Drawings</span>
-                  <span className="font-medium text-slate-900">~$4,000+</span>
+                  <span className="text-slate-500">Permits &amp; Drawings</span>
+                  <span className="font-medium text-slate-900">~$3,000 - $5,000+</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Timeline</span>
@@ -545,18 +545,18 @@ export default function Home() {
 
             <div className="border border-slate-200 rounded-2xl p-8 hover:border-blue-200 hover:shadow-lg transition-all">
               <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Kitchen Renovation</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$30k - $65k+</div>
+              <div className="text-3xl font-bold text-slate-900 mb-4">$30K - $75K+</div>
               <p className="text-slate-600 text-sm mb-6">
-                Complete gut and remodel with mid-to-high end finishes and new appliances.
+                Most projects fall between <strong>$35K - $55K</strong>, depending on cabinetry, countertops, appliances, and layout complexity.
               </p>
               <div className="space-y-3 pt-6 border-t border-slate-100">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Design Fees</span>
-                  <span className="font-medium text-slate-900">~$2,000</span>
+                  <span className="text-slate-500">Design / planning</span>
+                  <span className="font-medium text-slate-900">Varies by scope</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Timeline</span>
-                  <span className="font-medium text-slate-900">5-8 Weeks</span>
+                  <span className="font-medium text-slate-900">3-6 Weeks</span>
                 </div>
               </div>
             </div>

@@ -12,14 +12,13 @@ export default function Navbar() {
     { name: 'Grants', href: '/hamilton-grant-guide' },
     { name: 'Cost Guides', href: '/costs' },
     { name: 'Contractor Match', href: '/match' },
-    { name: 'Toronto Guide', href: '/city/toronto' },
   ];
 
   const hubs = [
     { name: 'Basement Finishing', href: '/basements' },
     { name: 'Legal Secondary Suites', href: '/legal-suites' },
-    { name: 'Kitchen Renovations', href: '#' },
-    { name: 'Bathroom Renovations', href: '#' },
+    { name: 'Kitchen Renovations', href: '/kitchen-renovations' },
+    { name: 'Bathroom Renovations', href: '/bathroom-renovations' },
   ];
 
   return (
@@ -59,7 +58,12 @@ export default function Navbar() {
                   <Link
                     key={hub.name}
                     to={hub.href}
-                    className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#5694CF] font-medium transition-colors"
+                    className={cn(
+                      'block px-4 py-3 text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[#5694CF]',
+                      location.pathname === hub.href
+                        ? 'text-[#5694CF] bg-slate-50'
+                        : 'text-slate-700'
+                    )}
                   >
                     {hub.name}
                   </Link>
@@ -111,7 +115,12 @@ export default function Navbar() {
             <Link
               key={hub.name}
               to={hub.href}
-              className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-[#5694CF] hover:bg-slate-50"
+              className={cn(
+                'block px-3 py-2 rounded-md text-base font-medium hover:text-[#5694CF] hover:bg-slate-50',
+                location.pathname === hub.href
+                  ? 'text-[#5694CF] bg-slate-50'
+                  : 'text-slate-600'
+              )}
               onClick={() => setIsOpen(false)}
             >
               {hub.name}
