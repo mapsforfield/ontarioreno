@@ -172,11 +172,7 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-3xl leading-tight">
-            Plan Your Ontario Renovation
-            <br />
-            <span className="text-[#5694CF]">the Right Way</span>
-            <br />
-            Before You Spend a Dollar
+            Plan Your Renovation with <span className="text-[#5694CF]">Confidence.</span>
           </h1>
 
           <p className="text-xl text-slate-300 mb-4 max-w-2xl leading-relaxed">
@@ -184,7 +180,7 @@ export default function Home() {
           </p>
 
           <p className="text-sm text-slate-400 mb-10 max-w-2xl">
-            We don’t sell renovations. We help you make the right decisions before hiring anyone.
+            We don’t sell renovations. We help you make the right decision before hiring anyone.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
