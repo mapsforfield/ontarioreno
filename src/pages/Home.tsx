@@ -229,6 +229,14 @@ export default function Home() {
 
                 <p className="mt-4 text-base md:text-lg text-slate-700 leading-relaxed max-w-2xl">
                   We’ve confirmed a City of Hamilton–backed basement grant and ADU incentive that can cover up to 70% of eligible construction costs for qualifying legal basement unit projects.
+
+                  If you're unsure what qualifies, see what counts as a{" "}
+                  <Link
+                    to="/hamilton-secondary-suite-grant"
+                    className="font-semibold underline underline-offset-4"
+                  >
+                    legal secondary suite in Hamilton
+                  </Link>.
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600">

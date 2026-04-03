@@ -28,6 +28,11 @@ export default function HamiltonBasementGrantAd() {
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
             This is a <strong>real City of Hamilton grant (not a loan)</strong> for homeowners building a legal basement apartment or secondary suite.
+
+            Not sure what qualifies? See what counts as a{" "}
+            <a href="/hamilton-secondary-suite-grant" className="font-semibold underline underline-offset-4">
+              legal secondary suite in Hamilton
+            </a>.
           </p>
 
           {/* TRUST STRIP */}
@@ -151,6 +156,11 @@ export default function HamiltonBasementGrantAd() {
 
           <p className="text-center mt-10 text-xl font-semibold">
             This mistake can cost you tens of thousands.
+
+            If you want a full breakdown of how the program works, read the{" "}
+            <a href="/hamilton-grant-guide" className="underline underline-offset-4">
+              complete Hamilton grant guide
+            </a>.
           </p>
 
         </div>

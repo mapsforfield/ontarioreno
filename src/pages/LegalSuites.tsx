@@ -28,6 +28,14 @@ export default function LegalSuites() {
               The definitive guide to building a legal, code-compliant income
               suite. Learn about zoning, fire separation, egress, HVAC
               separation, and what real pricing looks like in Ontario.
+
+              If you're specifically comparing grant eligibility in Hamilton, see what counts as a{" "}
+              <Link
+                to="/hamilton-secondary-suite-grant"
+                className="font-semibold underline underline-offset-4"
+              >
+                legal secondary suite in Hamilton
+              </Link>.
             </p>
 
             <Link
@@ -389,8 +397,16 @@ export default function LegalSuites() {
 
                 <p className="text-slate-700 mb-4">
                   Homeowners in Hamilton may qualify for a city-backed incentive
-                  covering up to <strong>70% of eligible construction costs</strong>{' '}
+                  covering up to <strong>70% of eligible construction costs</strong>{" "}
                   when building a legal basement apartment or secondary unit.
+
+                  For a fuller breakdown of how the program works, read the{" "}
+                  <Link
+                    to="/hamilton-grant-guide"
+                    className="font-semibold underline underline-offset-4"
+                  >
+                    Hamilton grant guide
+                  </Link>.
                 </p>
 
                 <p className="text-xs text-slate-500 mb-5">

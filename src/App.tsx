@@ -9,6 +9,7 @@ import Costs from './pages/Costs';
 import Match from './pages/Match';
 import HamiltonGrant from './pages/HamiltonGrant';
 import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
+import HamiltonSecondarySuiteGrant from './pages/HamiltonSecondarySuiteGrant';
 
 export default function App() {
   return (
@@ -23,9 +24,8 @@ export default function App() {
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
           <Route path="hamilton-grant-guide" element={<HamiltonGrant />} />
-          <Route
-            path="hamilton-basement-grant"
-            element={<HamiltonBasementGrantAd />}
+          <Route path="hamilton-secondary-suite-grant" element={<HamiltonSecondarySuiteGrant />} />
+          <Route path="hamilton-basement-grant" element={<HamiltonBasementGrantAd />}
           />
         </Route>
       </Routes>

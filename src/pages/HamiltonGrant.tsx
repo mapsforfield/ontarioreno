@@ -115,6 +115,11 @@ export default function HamiltonGrant() {
 
           <p className="text-center text-lg text-slate-600">
             Yes — this is a real City of Hamilton incentive program. It is <strong>not a loan</strong>, and homeowners may receive up to $40,000 depending on how their basement project is structured and approved.
+
+            Not every finished basement qualifies, however. To understand what the program is actually looking for, see what counts as a{" "}
+            <a href="/hamilton-secondary-suite-grant" className="font-semibold underline underline-offset-4">
+              legal secondary suite in Hamilton
+            </a>.
           </p>
         </div>
       </section>
@@ -154,6 +159,12 @@ export default function HamiltonGrant() {
 
           <p className="text-center mt-8 font-semibold text-xl">
             The difference can be tens of thousands of dollars.
+
+            If you're planning a basement renovation specifically, see how the{" "}
+            <a href="/hamilton-basement-grant" className="underline underline-offset-4">
+              Hamilton basement grant works
+            </a>{" "}
+            and how homeowners typically structure their projects.
           </p>
 
         </div>
