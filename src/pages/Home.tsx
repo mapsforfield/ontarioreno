@@ -178,7 +178,7 @@ export default function Home() {
           </h1>
 
           <p className="text-xl text-slate-300 mb-4 max-w-2xl leading-relaxed">
-            We help Ontario homeowners navigate permits, understand real costs, and identify the best-fit contractor for their project. Not a contracting company — your independent advocate.
+            We help Ontario homeowners understand real costs, avoid expensive mistakes, and choose the right contractor for their project.
           </p>
 
           <p className="text-sm text-slate-400 mb-10 max-w-2xl">
@@ -208,7 +208,7 @@ export default function Home() {
               <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Ontario specific
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
             </div>
           </div>
         </div>
