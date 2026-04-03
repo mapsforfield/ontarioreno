@@ -172,7 +172,9 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-4xl leading-tight">
-            Plan Your Ontario Renovation the Right Way — <span className="text-[#5694CF]">Before You Spend a Dollar.</span>
+            Plan Your Ontario Renovation the Right Way
+            <br />
+            Before You Spend a Dollar
           </h1>
 
           <p className="text-xl text-slate-300 mb-4 max-w-2xl leading-relaxed">
