@@ -121,22 +121,22 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <Helmet>
-        <title>Ontario Reno | Plan Your Renovation with Confidence</title>
+        <title>Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching</title>
 
         <meta
           name="description"
-          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
         />
 
         <link rel="canonical" href="https://ontarioreno.ca/" />
 
         <meta
           property="og:title"
-          content="Ontario Reno | Plan Your Renovation with Confidence"
+          content="Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching"
         />
         <meta
           property="og:description"
-          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
         />
         <meta property="og:url" content="https://ontarioreno.ca/" />
         <meta property="og:type" content="website" />
@@ -144,11 +144,11 @@ export default function Home() {
 
         <meta
           name="twitter:title"
-          content="Ontario Reno | Plan Your Renovation with Confidence"
+          content="Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching"
         />
         <meta
           name="twitter:description"
-          content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
         />
         <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
       </Helmet>
@@ -168,15 +168,19 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 flex flex-col items-start">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1B3C6C]/20 border border-blue-500/30 text-blue-300 font-medium text-sm mb-8 backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4" />
-            <span>Ontario's Independent Homeowner Guide</span>
+            <span>Ontario&apos;s Independent Homeowner Guide</span>
           </div>
 
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-3xl leading-tight">
-            Plan Your Renovation with <span className="text-[#5694CF]">Confidence.</span>
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-4xl leading-tight">
+            Plan Your Ontario Renovation the Right Way — <span className="text-[#5694CF]">Before You Spend a Dollar.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 mb-10 max-w-2xl leading-relaxed">
-            We help Ontario homeowners navigate permits, understand real costs, and connect with vetted local contractors. Not a contracting company—your independent advocate.
+          <p className="text-xl text-slate-300 mb-4 max-w-2xl leading-relaxed">
+            We help Ontario homeowners navigate permits, understand real costs, and identify the best-fit contractor for their project. Not a contracting company — your independent advocate.
+          </p>
+
+          <p className="text-sm text-slate-400 mb-10 max-w-2xl">
+            We don’t sell renovations. We help you make the right decisions before hiring anyone.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -184,7 +188,7 @@ export default function Home() {
               to="/match"
               className="bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-blue-600/25 flex items-center justify-center gap-2"
             >
-              Find Vetted Contractors <ArrowRight className="w-5 h-5" />
+              Find the Right Contractor <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               to="/costs"
@@ -194,12 +198,12 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="mt-12 flex items-center gap-6 text-sm text-slate-400 font-medium">
+          <div className="mt-12 flex flex-wrap items-center gap-6 text-sm text-slate-400 font-medium">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Vetted pros
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Ontario specific
@@ -234,7 +238,7 @@ export default function Home() {
                   </span>
                   <span className="inline-flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    For qualifying Hamilton properties
+                    Not a loan
                   </span>
                   <span className="inline-flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -284,6 +288,7 @@ export default function Home() {
                 Stop guessing. We break down Ontario building codes and municipal permit requirements into plain English.
               </p>
             </div>
+
             <div className="p-6">
               <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
                 <Calculator className="w-8 h-8" />
@@ -293,13 +298,14 @@ export default function Home() {
                 Access real, localized cost data for basements, kitchens, and legal suites across the GTA and beyond.
               </p>
             </div>
+
             <div className="p-6">
               <div className="mx-auto w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6">
                 <Users className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">Contractor Matching</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Best-Fit Contractor Matching</h3>
               <p className="text-slate-600 leading-relaxed">
-                Skip the directory scrolling. Tell us your project, and we'll match you with up to 3 vetted, licensed pros.
+                Skip the directory scrolling. We help identify the right contractor for your project based on scope, budget, and track record.
               </p>
             </div>
           </div>
@@ -312,7 +318,7 @@ export default function Home() {
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Explore Our Renovation Hubs</h2>
             <p className="text-lg text-slate-600">
-              Comprehensive guides, cost breakdowns, and expert advice for Ontario's most popular home improvement projects.
+              Comprehensive guides, cost breakdowns, and expert advice for Ontario&apos;s most popular home improvement projects.
             </p>
           </div>
 
@@ -378,13 +384,15 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
             <div className="lg:w-1/2">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">Get the 2026 Ontario Renovation Cost Guide</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">
+                Get the 2026 Ontario Renovation Cost Guide Before You Get Your First Quote
+              </h2>
               <p className="text-blue-100 text-lg mb-8">
                 Stop guessing on pricing. Download our comprehensive PDF guide breaking down average costs for basements, kitchens, and legal suites across 15+ Ontario cities.
               </p>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-300" /> Material vs. Labor breakdowns
+                  <CheckCircle2 className="w-5 h-5 text-blue-300" /> Material vs. labour breakdowns
                 </li>
                 <li className="flex items-center gap-3">
                   <CheckCircle2 className="w-5 h-5 text-blue-300" /> Permit fee estimates by municipality
@@ -564,15 +572,15 @@ export default function Home() {
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            Don't risk your home with unverified contractors. Tell us about your project, and we'll match you with up to 3 licensed, insured, and vetted professionals in your area.
+            We help you identify the best-fit contractor for your project — based on scope, budget, and real track record. Not random referrals, and not whoever pays to be shown.
           </p>
           <Link
             to="/match"
             className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-600/25"
           >
-            Get Matched Now
+            Find the Right Contractor
           </Link>
-          <p className="mt-6 text-sm text-slate-500">100% free service for homeowners. No obligation to hire.</p>
+          <p className="mt-6 text-sm text-slate-500">100% free for homeowners. No obligation to hire.</p>
         </div>
       </section>
 
@@ -588,11 +596,15 @@ export default function Home() {
             {[
               {
                 q: "Is OntarioReno a contracting company?",
-                a: "No. OntarioReno is an independent homeowner resource platform. We provide educational content, cost guides, and a matching service to connect you with vetted local contractors. We do not perform the renovation work ourselves."
+                a: "No. OntarioReno is an independent homeowner resource platform. We provide educational content, cost guides, and a matching service to help homeowners make better decisions before hiring. We do not perform the renovation work ourselves."
               },
               {
                 q: "How much does it cost to use your matching service?",
-                a: "Our matching service is 100% free for homeowners. We charge a small lead fee to the contractors in our network when they are matched with a project. This allows us to keep the platform free and unbiased for you."
+                a: "Our matching service is 100% free for homeowners. We may earn a referral fee from contractors in our network, but our positioning is based on project fit, not random placement or homeowner-facing bias."
+              },
+              {
+                q: "How do you choose which contractors to recommend?",
+                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to show you dozens of options — it’s to help point you toward the company that makes the most sense for your specific project."
               },
               {
                 q: "Do I really need a permit to finish my basement?",
