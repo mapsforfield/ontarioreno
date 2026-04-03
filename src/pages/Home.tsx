@@ -72,7 +72,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec?type=guide',
+        'https://script.google.com/macros/s/AKfycbx01lpcatHsLZzoS_anmr1NhnxV_3D9bgnh0MYmIMpBpbqWYot4rfpGDthUEyqZXRei/exec',
         {
           method: 'POST',
           headers: {
