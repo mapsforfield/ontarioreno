@@ -171,8 +171,10 @@ export default function Home() {
             <span>Ontario&apos;s Independent Homeowner Guide</span>
           </div>
 
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-4xl leading-tight">
-            Plan Your Ontario Renovation the Right Way
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-3xl leading-tight">
+            Plan Your Ontario Renovation
+            <br />
+            <span className="text-[#5694CF]">the Right Way</span>
             <br />
             Before You Spend a Dollar
           </h1>
