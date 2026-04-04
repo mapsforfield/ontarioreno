@@ -403,8 +403,22 @@ export default function Home() {
             />
 
             <div className="max-w-2xl">
-              <h2 className="text-[2.4rem] leading-[1.02] sm:text-5xl font-bold tracking-[-0.03em]">
-                Get the 2026 Ontario Renovation Cost Guide Before You Get Your First Quote
+              <h2 className="tracking-[-0.03em] leading-[1.04]">
+                <span className="block text-[15px] sm:text-[17px] font-medium uppercase tracking-[0.12em] text-blue-200 mb-4">
+                  Plan Smarter Before You Renovate
+                </span>
+
+                <span className="block text-[2.1rem] sm:text-[2.7rem] md:text-[3.1rem] font-semibold text-white">
+                  Get the 2026 Ontario
+                </span>
+
+                <span className="block text-[2.1rem] sm:text-[2.7rem] md:text-[3.1rem] font-bold bg-gradient-to-r from-white via-blue-100 to-blue-300 bg-clip-text text-transparent">
+                  Renovation Cost Guide
+                </span>
+
+                <span className="block mt-4 text-[1.1rem] sm:text-[1.3rem] md:text-[1.45rem] leading-[1.25] font-medium text-blue-100">
+                  Before You Get Your First Quote
+                </span>
               </h2>
 
               <p className="mt-6 text-[18px] leading-8 text-blue-100 max-w-[700px] mx-auto">
@@ -431,7 +445,7 @@ export default function Home() {
 
             <div className="w-full max-w-[440px]">
               <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-8 sm:p-9 text-left">
-                <h3 className="text-[2rem] leading-tight font-bold">Download Free Guide</h3>
+                <h3 className="text-[1.9rem] leading-tight font-bold">Get Instant Access</h3>
                 <p className="mt-2 text-[15px] text-slate-500">
                   Join 15,000+ Ontario homeowners planning smarter.
                 </p>
@@ -523,15 +537,15 @@ export default function Home() {
             className="hidden xl:grid items-center justify-center"
             style={{
               gridTemplateColumns: '980px 430px',
-              columnGap: '48px',
+              columnGap: '40px',
             }}
           >
             {/* Left content group: book + copy */}
             <div
               className="grid items-center"
               style={{
-                gridTemplateColumns: '360px minmax(560px, 760px)',
-                columnGap: '72px',
+                gridTemplateColumns: '340px minmax(560px, 760px)',
+                columnGap: '52px',
               }}
             >
               {/* Book */}
@@ -539,21 +553,29 @@ export default function Home() {
                 <img
                   src="/ontario-reno-cost-guide-3d-preview.png"
                   alt="2026 Ontario Renovation Cost Guide booklet preview"
-                  className="w-[320px] 2xl:w-[360px] h-auto object-contain drop-shadow-[0_42px_84px_rgba(0,0,0,0.40)]"
+                  className="w-[300px] 2xl:w-[340px] h-auto object-contain drop-shadow-[0_42px_84px_rgba(0,0,0,0.40)]"
                   loading="lazy"
                 />
               </div>
 
               {/* Copy */}
               <div className="max-w-[760px]">
-                <h2 className="text-[64px] leading-[0.97] font-bold tracking-[-0.035em]">
-                  Get the 2026 Ontario
-                  <br />
-                  Renovation Cost Guide
-                  <br />
-                  Before You Get Your
-                  <br />
-                  First Quote
+                <h2 className="tracking-[-0.035em] leading-[1.02]">
+                  <span className="block text-[15px] font-medium uppercase tracking-[0.14em] text-blue-200 mb-5">
+                    Plan Smarter Before You Renovate
+                  </span>
+
+                  <span className="block text-[54px] 2xl:text-[60px] font-semibold text-white">
+                    Get the 2026 Ontario
+                  </span>
+
+                  <span className="block text-[54px] 2xl:text-[60px] font-bold bg-gradient-to-r from-white via-blue-100 to-blue-300 bg-clip-text text-transparent">
+                    Renovation Cost Guide
+                  </span>
+
+                  <span className="block mt-5 text-[28px] 2xl:text-[31px] leading-[1.2] font-medium text-blue-100">
+                    Before You Get Your First Quote
+                  </span>
                 </h2>
 
                 <p className="mt-8 text-[21px] leading-9 text-blue-100 max-w-[650px]">
@@ -582,7 +604,7 @@ export default function Home() {
             {/* Form */}
             <div className="w-full max-w-[430px] justify-self-end">
               <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-9">
-                <h3 className="text-[2rem] leading-tight font-bold">Download Free Guide</h3>
+                <h3 className="text-[1.9rem] leading-tight font-bold">Get Instant Access</h3>
                 <p className="mt-2 text-[15px] text-slate-500">
                   Join 15,000+ Ontario homeowners planning smarter.
                 </p>
@@ -670,7 +692,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       {/* Pricing / Cost Education Teaser */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
