@@ -396,7 +396,7 @@ export default function Home() {
           {/* Mobile / tablet */}
           <div className="xl:hidden flex flex-col items-center text-center gap-8">
             <img
-              src="/ontario-reno-cost-guide-3d-preview.webp"
+              src="/ontario-reno-cost-guide-3d-preview.png"
               alt="2026 Ontario Renovation Cost Guide booklet preview"
               className="w-[250px] sm:w-[300px] md:w-[340px] h-auto object-contain drop-shadow-[0_35px_70px_rgba(0,0,0,0.38)]"
               loading="lazy"
