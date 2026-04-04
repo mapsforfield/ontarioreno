@@ -395,12 +395,14 @@ export default function Home() {
         <div className="relative z-10 max-w-[1800px] mx-auto px-6 lg:px-10 xl:px-14">
           {/* Mobile / tablet */}
           <div className="xl:hidden flex flex-col items-center text-center gap-8">
-            <img
-              src="/ontario-reno-cost-guide-3d-preview.png"
-              alt="2026 Ontario Renovation Cost Guide booklet preview"
-              className="w-[250px] sm:w-[300px] md:w-[340px] h-auto object-contain drop-shadow-[0_35px_70px_rgba(0,0,0,0.38)]"
-              loading="lazy"
-            />
+            <div className="relative isolate flex justify-center">
+              <img
+                src="/ontario-reno-cost-guide-3d-preview.png"
+                alt="2026 Ontario Renovation Cost Guide booklet preview"
+                className="relative z-10 w-[230px] sm:w-[275px] md:w-[320px] h-auto object-contain drop-shadow-[0_18px_34px_rgba(0,0,0,0.18)]"
+                loading="lazy"
+              />
+            </div>
 
             <div className="max-w-2xl">
               <h2 className="tracking-[-0.03em] leading-[1.04]">
@@ -687,81 +689,6 @@ export default function Home() {
                     We respect your privacy. Unsubscribe anytime.
                   </p>
                 </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      {/* Pricing / Cost Education Teaser */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-            <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Real Ontario Pricing Data</h2>
-              <p className="text-lg text-slate-600">
-                Real price ranges based on recent Ontario projects, so you can set better expectations before speaking with a contractor.
-              </p>
-            </div>
-            <Link to="/costs" className="text-[#1B3C6C] font-semibold flex items-center hover:text-blue-700 whitespace-nowrap">
-              View All Cost Guides <ArrowRight className="w-4 h-4 ml-2" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="border border-slate-200 rounded-2xl p-8 hover:border-blue-200 hover:shadow-lg transition-all">
-              <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Basement Finishing</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$45K - $85K+</div>
-              <p className="text-slate-600 text-sm mb-6">
-                Most projects fall between <strong>$50K - $70K</strong>, depending on size, layout, and finish level.
-              </p>
-              <div className="space-y-3 pt-6 border-t border-slate-100">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Typical use</span>
-                  <span className="font-medium text-slate-900">Personal living space</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Timeline</span>
-                  <span className="font-medium text-slate-900">4-6 Weeks</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-[#1B3C6C] rounded-2xl p-8 shadow-xl relative transform md:-translate-y-4 bg-white">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1B3C6C] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                Most Popular
-              </div>
-              <div className="text-sm font-bold text-[#1B3C6C] uppercase tracking-wider mb-2">Legal Basement Apartment</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$60K - $140K+</div>
-              <p className="text-slate-600 text-sm mb-6">
-                Most projects fall between <strong>$70K - $110K</strong>, depending on entrance work, permits, and code-compliant scope.
-              </p>
-              <div className="space-y-3 pt-6 border-t border-slate-100">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Permits &amp; Drawings</span>
-                  <span className="font-medium text-slate-900">~$3,000 - $5,000+</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Timeline</span>
-                  <span className="font-medium text-slate-900">8-12 Weeks</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-slate-200 rounded-2xl p-8 hover:border-blue-200 hover:shadow-lg transition-all">
-              <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Kitchen Renovation</div>
-              <div className="text-3xl font-bold text-slate-900 mb-4">$30K - $75K+</div>
-              <p className="text-slate-600 text-sm mb-6">
-                Most projects fall between <strong>$35K - $55K</strong>, depending on cabinetry, countertops, appliances, and layout complexity.
-              </p>
-              <div className="space-y-3 pt-6 border-t border-slate-100">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Design / planning</span>
-                  <span className="font-medium text-slate-900">Varies by scope</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Timeline</span>
-                  <span className="font-medium text-slate-900">3-6 Weeks</span>
-                </div>
               </div>
             </div>
           </div>
