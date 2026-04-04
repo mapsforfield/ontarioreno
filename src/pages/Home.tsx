@@ -392,7 +392,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 
-        <div className="relative z-10 max-w-[1500px] mx-auto px-6 lg:px-10 xl:px-12">
+        <div className="relative z-10 max-w-[1800px] mx-auto px-6 lg:px-10 xl:px-14">
           {/* Mobile / tablet */}
           <div className="xl:hidden flex flex-col items-center text-center gap-8">
             <img
@@ -520,61 +520,68 @@ export default function Home() {
 
           {/* Desktop */}
           <div
-            className="hidden xl:grid items-center"
+            className="hidden xl:grid items-center justify-center"
             style={{
-              gridTemplateColumns: '360px minmax(540px, 1fr) 420px',
-              columnGap: '56px',
+              gridTemplateColumns: '980px 430px',
+              columnGap: '48px',
             }}
           >
-            {/* Book */}
-            <div className="flex justify-center">
-              <img
-                src="/ontario-reno-cost-guide-3d-preview.png"
-                alt="2026 Ontario Renovation Cost Guide booklet preview"
-                className="w-[340px] 2xl:w-[380px] h-auto object-contain drop-shadow-[0_40px_80px_rgba(0,0,0,0.4)]"
-                loading="lazy"
-              />
-            </div>
+            {/* Left content group: book + copy */}
+            <div
+              className="grid items-center"
+              style={{
+                gridTemplateColumns: '360px minmax(560px, 760px)',
+                columnGap: '72px',
+              }}
+            >
+              {/* Book */}
+              <div className="flex justify-center">
+                <img
+                  src="/ontario-reno-cost-guide-3d-preview.png"
+                  alt="2026 Ontario Renovation Cost Guide booklet preview"
+                  className="w-[320px] 2xl:w-[360px] h-auto object-contain drop-shadow-[0_42px_84px_rgba(0,0,0,0.40)]"
+                  loading="lazy"
+                />
+              </div>
 
-            {/* Copy */}
-            <div className="max-w-[640px]">
-              <h2 className="text-[58px] leading-[0.98] font-bold tracking-[-0.03em]">
-                Get the 2026 Ontario
-                <br />
-                Renovation Cost Guide
-                <br />
-                Before You Get Your
-                <br />
-                First Quote
-              </h2>
+              {/* Copy */}
+              <div className="max-w-[760px]">
+                <h2 className="text-[64px] leading-[0.97] font-bold tracking-[-0.035em]">
+                  Get the 2026 Ontario
+                  <br />
+                  Renovation Cost Guide
+                  <br />
+                  Before You Get Your
+                  <br />
+                  First Quote
+                </h2>
 
-              <p className="mt-8 text-[20px] leading-8 text-blue-100 max-w-[620px]">
-                Stop guessing on pricing. Download our comprehensive PDF guide
-                breaking down average costs for basements, kitchens, and legal suites
-                across 15+ Ontario cities.
-              </p>
+                <p className="mt-8 text-[21px] leading-9 text-blue-100 max-w-[650px]">
+                  Stop guessing on pricing. Download our comprehensive PDF guide
+                  breaking down average costs for basements, kitchens, and legal suites
+                  across 15+ Ontario cities.
+                </p>
 
-              <ul className="mt-8 space-y-4 max-w-[520px]">
-                <li className="flex items-start gap-3 text-blue-50">
-                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
-                  <span className="text-[17px] leading-7">Material vs. labour breakdowns</span>
-                </li>
-                <li className="flex items-start gap-3 text-blue-50">
-                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
-                  <span className="text-[17px] leading-7">Permit fee estimates by municipality</span>
-                </li>
-                <li className="flex items-start gap-3 text-blue-50">
-                  <span className="mt-0.5">
-                    <CheckCircle2 className="w-5 h-5 text-blue-300 shrink-0" />
-                  </span>
-                  <span className="text-[17px] leading-7">Red flags to watch out for in quotes</span>
-                </li>
-              </ul>
+                <ul className="mt-8 space-y-4 max-w-[560px]">
+                  <li className="flex items-start gap-3 text-blue-50">
+                    <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                    <span className="text-[17px] leading-7">Material vs. labour breakdowns</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-blue-50">
+                    <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                    <span className="text-[17px] leading-7">Permit fee estimates by municipality</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-blue-50">
+                    <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                    <span className="text-[17px] leading-7">Red flags to watch out for in quotes</span>
+                  </li>
+                </ul>
+              </div>
             </div>
 
             {/* Form */}
-            <div className="w-full max-w-[420px]">
-              <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-8">
+            <div className="w-full max-w-[430px] justify-self-end">
+              <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-9">
                 <h3 className="text-[2rem] leading-tight font-bold">Download Free Guide</h3>
                 <p className="mt-2 text-[15px] text-slate-500">
                   Join 15,000+ Ontario homeowners planning smarter.
