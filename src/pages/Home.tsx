@@ -387,80 +387,108 @@ export default function Home() {
       </section>
 
       {/* Lead Capture Block */}
-      <section className="py-20 bg-[#1B3C6C] text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
-            <div className="lg:w-1/2">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
+      <section className="relative overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
+        {/* Ambient background */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
+
+        <div className="relative z-10 max-w-[1500px] mx-auto px-6 lg:px-10 xl:px-12">
+          {/* Mobile / tablet */}
+          <div className="xl:hidden flex flex-col items-center text-center gap-8">
+            <img
+              src="/ontario-reno-cost-guide-3d-preview.png"
+              alt="2026 Ontario Renovation Cost Guide booklet preview"
+              className="w-[250px] sm:w-[300px] md:w-[340px] h-auto object-contain drop-shadow-[0_35px_70px_rgba(0,0,0,0.38)]"
+              loading="lazy"
+            />
+
+            <div className="max-w-2xl">
+              <h2 className="text-[2.4rem] leading-[1.02] sm:text-5xl font-bold tracking-[-0.03em]">
                 Get the 2026 Ontario Renovation Cost Guide Before You Get Your First Quote
               </h2>
-              <p className="text-blue-100 text-lg mb-8">
-                Stop guessing on pricing. Download our comprehensive PDF guide breaking down average costs for basements, kitchens, and legal suites across 15+ Ontario cities.
+
+              <p className="mt-6 text-[18px] leading-8 text-blue-100 max-w-[700px] mx-auto">
+                Stop guessing on pricing. Download our comprehensive PDF guide
+                breaking down average costs for basements, kitchens, and legal suites
+                across 15+ Ontario cities.
               </p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-300" /> Material vs. labour breakdowns
+
+              <ul className="mt-7 space-y-4 max-w-[520px] mx-auto text-left">
+                <li className="flex items-start gap-3 text-blue-50">
+                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                  <span className="text-[17px] leading-7">Material vs. labour breakdowns</span>
                 </li>
-                <li className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-300" /> Permit fee estimates by municipality
+                <li className="flex items-start gap-3 text-blue-50">
+                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                  <span className="text-[17px] leading-7">Permit fee estimates by municipality</span>
                 </li>
-                <li className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-300" /> Red flags to watch out for in quotes
+                <li className="flex items-start gap-3 text-blue-50">
+                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                  <span className="text-[17px] leading-7">Red flags to watch out for in quotes</span>
                 </li>
               </ul>
             </div>
 
-            <div className="lg:w-5/12 w-full">
-              <div className="bg-white rounded-2xl p-8 shadow-2xl text-slate-900">
-                <h3 className="text-2xl font-bold mb-2">Download Free Guide</h3>
-                <p className="text-slate-500 text-sm mb-6">Join 15,000+ Ontario homeowners planning smarter.</p>
+            <div className="w-full max-w-[440px]">
+              <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-8 sm:p-9 text-left">
+                <h3 className="text-[2rem] leading-tight font-bold">Download Free Guide</h3>
+                <p className="mt-2 text-[15px] text-slate-500">
+                  Join 15,000+ Ontario homeowners planning smarter.
+                </p>
 
-                <form className="space-y-4" onSubmit={handleGuideSubmit}>
+                <form className="mt-7 space-y-4" onSubmit={handleGuideSubmit}>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      First Name
+                    </label>
                     <input
                       name="name"
                       type="text"
                       value={guideForm.name}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="John"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Email Address
+                    </label>
                     <input
                       name="email"
                       type="email"
                       value={guideForm.email}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="john@example.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Phone Number
+                    </label>
                     <input
                       name="phone"
                       type="tel"
                       value={guideForm.phone}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="(416) 123-4567"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Project Address</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Project Address
+                    </label>
                     <input
                       name="address"
                       type="text"
                       value={guideForm.address}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="123 Main St, Hamilton"
                     />
                   </div>
@@ -468,25 +496,165 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={guideSubmitting}
-                    className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-colors mt-2"
+                    className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
                   >
                     {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
                   </button>
 
                   {guideStatus.message && (
                     <p
-                      className={cn(
-                        'text-sm text-center mt-2',
-                        guideStatus.type === 'success'
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      )}
+                      className={`text-sm text-center mt-2 ${guideStatus.type === 'success' ? 'text-green-600' : 'text-red-600'
+                        }`}
                     >
                       {guideStatus.message}
                     </p>
                   )}
 
-                  <p className="text-xs text-slate-400 text-center mt-4">
+                  <p className="text-xs text-slate-400 text-center pt-2">
+                    We respect your privacy. Unsubscribe anytime.
+                  </p>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop */}
+          <div
+            className="hidden xl:grid items-center"
+            style={{
+              gridTemplateColumns: '360px minmax(540px, 1fr) 420px',
+              columnGap: '56px',
+            }}
+          >
+            {/* Book */}
+            <div className="flex justify-center">
+              <img
+                src="/ontario-reno-cost-guide-3d-preview.png"
+                alt="2026 Ontario Renovation Cost Guide booklet preview"
+                className="w-[340px] 2xl:w-[380px] h-auto object-contain drop-shadow-[0_40px_80px_rgba(0,0,0,0.4)]"
+                loading="lazy"
+              />
+            </div>
+
+            {/* Copy */}
+            <div className="max-w-[640px]">
+              <h2 className="text-[58px] leading-[0.98] font-bold tracking-[-0.03em]">
+                Get the 2026 Ontario
+                <br />
+                Renovation Cost Guide
+                <br />
+                Before You Get Your
+                <br />
+                First Quote
+              </h2>
+
+              <p className="mt-8 text-[20px] leading-8 text-blue-100 max-w-[620px]">
+                Stop guessing on pricing. Download our comprehensive PDF guide
+                breaking down average costs for basements, kitchens, and legal suites
+                across 15+ Ontario cities.
+              </p>
+
+              <ul className="mt-8 space-y-4 max-w-[520px]">
+                <li className="flex items-start gap-3 text-blue-50">
+                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                  <span className="text-[17px] leading-7">Material vs. labour breakdowns</span>
+                </li>
+                <li className="flex items-start gap-3 text-blue-50">
+                  <CheckCircle2 className="mt-0.5 w-5 h-5 text-blue-300 shrink-0" />
+                  <span className="text-[17px] leading-7">Permit fee estimates by municipality</span>
+                </li>
+                <li className="flex items-start gap-3 text-blue-50">
+                  <span className="mt-0.5">
+                    <CheckCircle2 className="w-5 h-5 text-blue-300 shrink-0" />
+                  </span>
+                  <span className="text-[17px] leading-7">Red flags to watch out for in quotes</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Form */}
+            <div className="w-full max-w-[420px]">
+              <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-8">
+                <h3 className="text-[2rem] leading-tight font-bold">Download Free Guide</h3>
+                <p className="mt-2 text-[15px] text-slate-500">
+                  Join 15,000+ Ontario homeowners planning smarter.
+                </p>
+
+                <form className="mt-7 space-y-4" onSubmit={handleGuideSubmit}>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      First Name
+                    </label>
+                    <input
+                      name="name"
+                      type="text"
+                      value={guideForm.name}
+                      onChange={handleGuideChange}
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="John"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Email Address
+                    </label>
+                    <input
+                      name="email"
+                      type="email"
+                      value={guideForm.email}
+                      onChange={handleGuideChange}
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="john@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Phone Number
+                    </label>
+                    <input
+                      name="phone"
+                      type="tel"
+                      value={guideForm.phone}
+                      onChange={handleGuideChange}
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="(416) 123-4567"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Project Address
+                    </label>
+                    <input
+                      name="address"
+                      type="text"
+                      value={guideForm.address}
+                      onChange={handleGuideChange}
+                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      placeholder="123 Main St, Hamilton"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={guideSubmitting}
+                    className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
+                  >
+                    {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
+                  </button>
+
+                  {guideStatus.message && (
+                    <p
+                      className={`text-sm text-center mt-2 ${guideStatus.type === 'success' ? 'text-green-600' : 'text-red-600'
+                        }`}
+                    >
+                      {guideStatus.message}
+                    </p>
+                  )}
+
+                  <p className="text-xs text-slate-400 text-center pt-2">
                     We respect your privacy. Unsubscribe anytime.
                   </p>
                 </form>
