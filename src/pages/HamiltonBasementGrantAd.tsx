@@ -6,10 +6,10 @@ export default function HamiltonBasementGrantAd() {
   return (
     <main className="bg-white text-slate-900">
       <Helmet>
-        <title>Hamilton Basement Grant (Up to $40,000) | Check Eligibility</title>
+        <title>Hamilton Basement Grant ($40K) – Eligibility, Requirements & Calculator</title>
         <meta
           name="description"
-          content="Hamilton homeowners can receive up to $40,000 in grant funding (not a loan) for a legal basement apartment. Estimate your grant and check eligibility."
+          content="Hamilton homeowners can get up to $40,000 in grant funding for a legal basement apartment. Check eligibility, understand requirements, and estimate your grant in seconds."
         />
         <link rel="canonical" href="https://ontarioreno.ca/hamilton-basement-grant" />
       </Helmet>
@@ -19,15 +19,15 @@ export default function HamiltonBasementGrantAd() {
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
 
           <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
-            Hamilton Basement Grant Program
+            Hamilton Basement Grant (Up to $40,000)
           </p>
 
           <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
-            Get Up to $40,000 Toward Your Basement Renovation
+            Hamilton Basement Grant: Get Up to $40,000 for a Legal Basement Apartment
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
-            This is a <strong>real City of Hamilton grant (not a loan)</strong> for homeowners building a legal basement apartment or secondary suite.
+            The Hamilton Basement Grant gives homeowners up to $40,000 in funding (not a loan) to build a legal basement apartment or secondary suite. If you're planning a basement renovation in Hamilton, this program can cover a significant portion of your eligible construction costs.
 
             Not sure what qualifies? See what counts as a{" "}
             <a href="/hamilton-secondary-suite-grant" className="font-semibold underline underline-offset-4">

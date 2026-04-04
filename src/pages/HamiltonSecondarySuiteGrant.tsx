@@ -6,10 +6,10 @@ export default function HamiltonSecondarySuiteGrant() {
     return (
         <main className="bg-white text-slate-900">
             <Helmet>
-                <title>Hamilton Secondary Suite Grant | Up to $40,000 for Legal Units</title>
+                <title>Hamilton Secondary Suite Grant – What Qualifies for the $40,000 Grant?</title>
                 <meta
                     name="description"
-                    content="Learn how the Hamilton secondary suite grant works, what qualifies as a legal secondary suite, and how homeowners may receive up to $40,000 in grant funding."
+                    content="What qualifies as a legal secondary suite in Hamilton? Learn how the $40,000 grant works, what counts, and how to structure your basement to be eligible."
                 />
                 <link
                     rel="canonical"
@@ -22,19 +22,16 @@ export default function HamiltonSecondarySuiteGrant() {
                 <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-24">
                     <div className="max-w-4xl">
                         <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-yellow-400">
-                            Hamilton Secondary Suite Grant
+                            Hamilton Secondary Suite Grant (Up to $40,000)
                         </p>
-
                         <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-                            Hamilton Secondary Suite Grant:
+                            What Qualifies as a Secondary Suite
                             <br />
-                            Up to $40,000 for Legal Units
+                            for the $40,000 Hamilton Grant?
                         </h1>
 
                         <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-                            Hamilton homeowners may qualify for up to <strong>$40,000 in grant funding</strong> when creating a
-                            legal secondary suite. The key is that not every basement qualifies — the space must be planned and
-                            structured properly.
+                            Hamilton homeowners may qualify for up to <strong>$40,000 in grant funding</strong> when creating a legal secondary suite. However, not every finished basement qualifies — the space must meet specific layout, safety, and legal requirements to be eligible.
                         </p>
 
                         <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-300">
@@ -90,7 +87,7 @@ export default function HamiltonSecondarySuiteGrant() {
                     <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
                         <div>
                             <h2 className="text-3xl font-extrabold md:text-5xl">
-                                What Is a Secondary Suite?
+                                What Qualifies as a Legal Secondary Suite in Hamilton?
                             </h2>
 
                             <p className="mt-5 text-lg leading-8 text-slate-600">

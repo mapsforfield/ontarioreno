@@ -5,10 +5,10 @@ export default function HamiltonGrant() {
   return (
     <main className="bg-white text-slate-900">
       <Helmet>
-        <title>Hamilton Basement Grant (Up to $40,000) | Legal Secondary Suite Incentive</title>
+        <title>Hamilton Basement Grant Guide (2026) – $40,000 Eligibility, Rules & Calculator</title>
         <meta
           name="description"
-          content="Hamilton homeowners can receive up to $40,000 in grant funding (not a loan) to build a legal basement apartment or secondary suite. Check eligibility and estimate your grant."
+          content="Read the full Hamilton Basement Grant guide for 2026. Learn who qualifies, what costs count, how the $40,000 incentive works, and estimate your potential grant."
         />
         <link rel="canonical" href="https://ontarioreno.ca/hamilton-grant-guide" />
       </Helmet>
@@ -19,15 +19,15 @@ export default function HamiltonGrant() {
           <div className="max-w-4xl">
 
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-yellow-400">
-              Hamilton Basement Grant
+              Hamilton Basement Grant Guide (2026)
             </p>
 
             <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-              Hamilton Basement Grant (Up to $40,000 for Legal Secondary Suites)
+              Hamilton Basement Grant Guide: How the $40,000 Program Works
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-              Homeowners in Hamilton can receive up to <strong>$40,000 in grant funding</strong> — not a loan — to build a legal basement apartment or secondary suite.
+              Hamilton homeowners may qualify for up to <strong>$40,000 in grant funding</strong> — not a loan — when building a legal basement apartment or secondary suite. This guide explains who qualifies, how eligible costs are calculated, and how to estimate what your project could receive.
             </p>
 
             {/* TRUST STRIP */}
