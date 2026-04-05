@@ -1,38 +1,67 @@
-@import "tailwindcss";
+<!doctype html>
+<html lang="en">
+  <head>
 
-/* SLIDER STYLING */
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
 
-.slider-blue::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  background: #2563eb;
-  border: 3px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-  cursor: pointer;
-  margin-top: -6px;
-}
+    fbq('init', '1555050122256611');
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=1555050122256611&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Meta Pixel Code -->
 
-.slider-blue::-webkit-slider-runnable-track {
-  height: 16px;
-  border-radius: 9999px;
-  background: linear-gradient(to right, #60a5fa, #2563eb);
-}
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-.slider-blue::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  background: #2563eb;
-  border: 3px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-  cursor: pointer;
-}
+    <!-- Primary Title -->
+    <title>Ontario Reno | Plan Your Renovation with Confidence</title>
 
-.slider-blue::-moz-range-track {
-  height: 16px;
-  border-radius: 9999px;
-  background: linear-gradient(to right, #60a5fa, #2563eb);
-}
+    <!-- SEO Description -->
+    <meta
+      name="description"
+      content="Understand renovation costs, permits, legal suites, and what it takes to complete your project properly. Get guidance and connect with trusted contractors across Ontario."
+    />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Ontario Reno" />
+    <meta
+      property="og:description"
+      content="Plan your renovation with confidence. Learn what it actually takes and connect with trusted contractors across Ontario."
+    />
+    <meta property="og:url" content="https://ontarioreno.ca" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://ontarioreno.ca/preview.jpg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ontario Reno" />
+    <meta
+      name="twitter:description"
+      content="Plan your renovation with confidence. Learn costs, permits, and connect with trusted contractors."
+    />
+    <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#1B3C6C" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

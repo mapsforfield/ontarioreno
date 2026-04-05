@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
+import HamiltonGrantForm from "../components/HamiltonGrantForm";
 
 export default function HamiltonGrant() {
   return (
@@ -39,7 +40,7 @@ export default function HamiltonGrant() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <a
-                href="/match"
+                href="#eligibility-form"
                 className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
               >
                 Check If You Qualify for the $40K Grant
@@ -96,7 +97,7 @@ export default function HamiltonGrant() {
           {/* POST CALC CTA */}
           <div className="mt-10 text-center">
             <a
-              href="/match"
+              href="#eligibility-form"
               className="inline-flex rounded-xl bg-green-600 px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
             >
               Lock In Your Eligibility Review
@@ -105,6 +106,9 @@ export default function HamiltonGrant() {
 
         </div>
       </section>
+
+      {/* EMBEDDED FORM */}
+      <HamiltonGrantForm />
 
       {/* TRUST + CLARITY */}
       <section className="bg-white">
@@ -183,7 +187,7 @@ export default function HamiltonGrant() {
 
           <div className="mt-8">
             <a
-              href="/match"
+              href="#eligibility-form"
               className="inline-flex rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900"
             >
               Check Your Eligibility Now
@@ -208,7 +212,7 @@ export default function HamiltonGrant() {
 
             <div className="mt-8">
               <a
-                href="/match"
+                href="#eligibility-form"
                 className="inline-flex rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900"
               >
                 Check If You Qualify

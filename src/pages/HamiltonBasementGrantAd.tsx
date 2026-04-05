@@ -1,5 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
+import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import { CheckCircle } from "lucide-react";
 
 export default function HamiltonBasementGrantAd() {
@@ -17,7 +18,6 @@ export default function HamiltonBasementGrantAd() {
       {/* HERO */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
-
           <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
             Hamilton Basement Grant (Up to $40,000)
           </p>
@@ -62,7 +62,7 @@ export default function HamiltonBasementGrantAd() {
             </a>
 
             <a
-              href="/match"
+              href="#eligibility-form"
               className="rounded-xl border border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               Check If I Qualify
@@ -73,14 +73,12 @@ export default function HamiltonBasementGrantAd() {
           <p className="mt-4 text-xs text-slate-300">
             Funding is limited and subject to approval. Delays can impact eligibility.
           </p>
-
         </div>
       </section>
 
       {/* CALCULATOR */}
       <section id="calculator" className="bg-slate-50">
         <div className="mx-auto max-w-5xl px-6 py-14 md:px-8">
-
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-extrabold md:text-3xl">
               See How Much You Could Receive
@@ -99,7 +97,7 @@ export default function HamiltonBasementGrantAd() {
             </p>
 
             <a
-              href="/match"
+              href="#eligibility-form"
               className="mt-4 inline-flex rounded-xl bg-green-600 px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
             >
               Lock In My Eligibility Review
@@ -109,14 +107,15 @@ export default function HamiltonBasementGrantAd() {
               Best suited for homeowners planning a legal basement unit
             </p>
           </div>
-
         </div>
       </section>
+
+      {/* EMBEDDED FORM */}
+      <HamiltonGrantForm />
 
       {/* LOSS SECTION */}
       <section className="bg-white">
         <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
-
           <div className="mb-10 text-center">
             <h2 className="text-3xl font-extrabold md:text-4xl">
               Why Most Homeowners Miss Out on the Full $40,000
@@ -124,13 +123,12 @@ export default function HamiltonBasementGrantAd() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-
             <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
               <h3 className="text-lg font-bold text-red-700">
                 ❌ Too Much Non-Eligible Work
               </h3>
               <p className="mt-3 text-slate-700">
-                Not all renovation costs qualify — this reduces your payout fast.
+                Not all renovation costs qualify. This reduces your payout fast.
               </p>
             </div>
 
@@ -151,10 +149,9 @@ export default function HamiltonBasementGrantAd() {
                 By the time most people learn about the grant, it’s already too late to optimize.
               </p>
             </div>
-
           </div>
 
-          <p className="text-center mt-10 text-xl font-semibold">
+          <p className="mt-10 text-center text-xl font-semibold">
             This mistake can cost you tens of thousands.
 
             If you want a full breakdown of how the program works, read the{" "}
@@ -162,14 +159,12 @@ export default function HamiltonBasementGrantAd() {
               complete Hamilton grant guide
             </a>.
           </p>
-
         </div>
       </section>
 
       {/* EXAMPLE */}
       <section className="bg-slate-50">
         <div className="mx-auto max-w-4xl px-6 py-14 text-center md:px-8">
-
           <h2 className="text-2xl font-extrabold md:text-3xl">
             Real Example
           </h2>
@@ -179,7 +174,6 @@ export default function HamiltonBasementGrantAd() {
           </p>
 
           <div className="mt-8 rounded-2xl border bg-white p-8 shadow-sm">
-
             <p className="text-lg text-slate-700">
               A properly structured
             </p>
@@ -199,16 +193,13 @@ export default function HamiltonBasementGrantAd() {
             <p className="mt-3 text-sm text-slate-500">
               depending on eligible costs and approval
             </p>
-
           </div>
-
         </div>
       </section>
 
       {/* FINAL CTA */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8">
-
           <h2 className="text-3xl font-extrabold md:text-4xl">
             Don’t Risk Missing Out on $40,000
           </h2>
@@ -219,16 +210,14 @@ export default function HamiltonBasementGrantAd() {
 
           <div className="mt-8">
             <a
-              href="/match"
+              href="#eligibility-form"
               className="inline-flex rounded-xl bg-yellow-400 px-8 py-4 text-base font-bold text-slate-900 transition hover:opacity-90"
             >
               Check If I Qualify
             </a>
           </div>
-
         </div>
       </section>
-
     </main>
   );
 }

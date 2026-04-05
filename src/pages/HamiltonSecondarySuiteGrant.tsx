@@ -1,6 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import { CheckCircle, Home, ShieldCheck, FileText } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
+import HamiltonGrantForm from "../components/HamiltonGrantForm";
 
 export default function HamiltonSecondarySuiteGrant() {
     return (
@@ -42,7 +43,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
                         <div className="mt-8 flex flex-wrap gap-4">
                             <a
-                                href="/match"
+                                href="#eligibility-form"
                                 className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
                             >
                                 Check If My Home Qualifies
@@ -247,7 +248,7 @@ export default function HamiltonSecondarySuiteGrant() {
             </section>
 
             {/* CALCULATOR SECTION */}
-            <section className="bg-slate-50">
+            <section id="calculator" className="bg-slate-50">
                 <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
                     <div className="mb-8 text-center">
                         <h2 className="text-2xl font-extrabold md:text-3xl">
@@ -263,7 +264,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
                     <div className="mt-8 text-center">
                         <a
-                            href="/match"
+                            href="#eligibility-form"
                             className="inline-flex rounded-xl bg-green-600 px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
                         >
                             Get My Exact Eligibility
@@ -271,6 +272,9 @@ export default function HamiltonSecondarySuiteGrant() {
                     </div>
                 </div>
             </section>
+
+            {/* EMBEDDED FORM */}
+            <HamiltonGrantForm />
 
             {/* INTERNAL LINK / TOPIC AUTHORITY */}
             <section className="bg-white">
@@ -308,7 +312,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
                         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                             <a
-                                href="/match"
+                                href="#eligibility-form"
                                 className="inline-flex rounded-xl bg-yellow-400 px-8 py-4 text-base font-bold text-slate-900 transition hover:opacity-90"
                             >
                                 Check If I Qualify
