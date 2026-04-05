@@ -48,11 +48,6 @@ export default function HamiltonGrantForm() {
     };
 
     try {
-      // Track lead immediately on successful submit action
-      if (typeof window !== 'undefined' && (window as any).fbq) {
-        (window as any).fbq('track', 'Lead');
-      }
-
       await fetch(
         'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec',
         {
@@ -64,6 +59,14 @@ export default function HamiltonGrantForm() {
           body: JSON.stringify(payload),
         }
       );
+
+      if (typeof window !== 'undefined' && (window as any).fbq) {
+        (window as any).fbq('track', 'Lead', {
+          content_name: 'Hamilton Grant Form',
+          value: 1,
+          currency: 'CAD',
+        });
+      }
 
       alert(
         'You may qualify for up to $40,000. A representative from OntarioReno will be calling you shortly to review your eligibility and next steps.'
