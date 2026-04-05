@@ -48,6 +48,11 @@ export default function HamiltonGrantForm() {
     };
 
     try {
+      // Track lead immediately on successful submit action
+      if (typeof window !== 'undefined' && (window as any).fbq) {
+        (window as any).fbq('track', 'Lead');
+      }
+
       await fetch(
         'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec',
         {
@@ -60,12 +65,10 @@ export default function HamiltonGrantForm() {
         }
       );
 
-      // 🔥 TRACK LEAD (THIS IS CRITICAL)
-      if (typeof window !== "undefined" && (window as any).fbq) {
-        (window as any).fbq('track', 'Lead');
-      }
+      alert(
+        'You may qualify for up to $40,000. A representative from OntarioReno will be calling you shortly to review your eligibility and next steps.'
+      );
 
-      alert("You may qualify for up to $40,000. A representative from OntarioReno will be calling you shortly to review your eligibility and next steps.");
       setFormData({
         firstName: '',
         lastName: '',
@@ -92,7 +95,6 @@ export default function HamiltonGrantForm() {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col lg:flex-row">
-
           {/* LEFT PANEL */}
           <div className="bg-slate-900 text-white p-8 md:p-10 lg:w-2/5 flex flex-col justify-between">
             <div>
