@@ -118,6 +118,34 @@ export default function Home() {
   });
 
   const [turnstileToken, setTurnstileToken] = useState('');
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const turnstile = (window as any).turnstile;
+
+      if (
+        turnstile &&
+        document.getElementById('turnstile-container') &&
+        turnstileToken === ''
+      ) {
+        turnstile.render('#turnstile-container', {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => {
+            setTurnstileToken(token);
+          },
+          'expired-callback': () => {
+            setTurnstileToken('');
+          },
+          'error-callback': () => {
+            setTurnstileToken('');
+          },
+        });
+
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
   const guideFormLoadedAt = useRef(Date.now());
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -691,16 +719,6 @@ export default function Home() {
                     aria-hidden="true"
                   />
 
-                  <div className="flex justify-center">
-                    <div
-                      className="cf-turnstile"
-                      data-sitekey="0x4AAAAAAC1T5itPPClMtbD6"
-                      data-callback="onTurnstileSuccess"
-                      data-expired-callback="onTurnstileExpired"
-                      data-error-callback="onTurnstileError"
-                    />
-                  </div>
-
                   <button
                     type="submit"
                     disabled={guideSubmitting}
@@ -875,15 +893,7 @@ export default function Home() {
                     aria-hidden="true"
                   />
 
-                  <div className="flex justify-center">
-                    <div
-                      className="cf-turnstile"
-                      data-sitekey="0x4AAAAAAC1T5itPPClMtbD6"
-                      data-callback="onTurnstileSuccess"
-                      data-expired-callback="onTurnstileExpired"
-                      data-error-callback="onTurnstileError"
-                    />
-                  </div>
+                  <div id="turnstile-container" className="flex justify-center" />
 
                   <button
                     type="submit"
