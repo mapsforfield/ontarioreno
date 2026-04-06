@@ -14,8 +14,88 @@ import {
   Bath,
   Landmark,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
+
+const GUIDE_PDF_URL = '/guides/ontario-renovation-cost-guide-2026.pdf';
+const GUIDE_MIN_FILL_TIME_MS = 4000;
+const TURNSTILE_SITE_KEY = '0x4AAAAAAC1T5itPPClMtbD6';
+const GUIDE_ENDPOINT =
+  'https://script.google.com/macros/s/AKfycbx01lpcatHsLZzoS_anmr1NhnxV_3D9bgnh0MYmIMpBpbqWYot4rfpGDthUEyqZXRei/exec';
+
+const disposableEmailDomains = new Set([
+  'mailinator.com',
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'yopmail.com',
+  'sharklasers.com',
+  'trashmail.com',
+  'throwawaymail.com',
+  'getnada.com',
+  'temp-mail.org',
+]);
+
+const normalizePhone = (value: string) => value.replace(/\D/g, '');
+
+const formatPhoneInput = (value: string) => {
+  const digits = normalizePhone(value).slice(0, 10);
+
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const isLikelyValidPhone = (value: string) => {
+  const digits = normalizePhone(value);
+
+  if (digits.length !== 10) return false;
+  if (/^(\d)\1{9}$/.test(digits)) return false;
+  if (digits === '1234567890') return false;
+  if (digits === '0123456789') return false;
+  if (digits === '0000000000') return false;
+
+  const areaCode = digits.slice(0, 3);
+  const exchange = digits.slice(3, 6);
+
+  if (areaCode[0] === '0' || areaCode[0] === '1') return false;
+  if (exchange[0] === '0' || exchange[0] === '1') return false;
+
+  return true;
+};
+
+const isLikelyValidEmail = (email: string) => {
+  const cleaned = email.trim().toLowerCase();
+  const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned);
+
+  if (!basic) return false;
+
+  const domain = cleaned.split('@')[1];
+  if (!domain) return false;
+  if (disposableEmailDomains.has(domain)) return false;
+
+  return true;
+};
+
+const downloadGuidePdf = () => {
+  const link = document.createElement('a');
+  link.href = GUIDE_PDF_URL;
+  link.download = '2026-Ontario-Renovation-Cost-Guide.pdf';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+declare global {
+  interface Window {
+    onTurnstileSuccess?: (token: string) => void;
+    onTurnstileExpired?: () => void;
+    onTurnstileError?: () => void;
+    turnstile?: {
+      reset: (widget?: string | HTMLElement) => void;
+    };
+  }
+}
 
 export default function Home() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -25,6 +105,7 @@ export default function Home() {
     email: '',
     phone: '',
     address: '',
+    companyWebsite: '',
   });
 
   const [guideSubmitting, setGuideSubmitting] = useState(false);
@@ -36,17 +117,40 @@ export default function Home() {
     message: '',
   });
 
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const guideFormLoadedAt = useRef(Date.now());
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    window.onTurnstileSuccess = (token: string) => {
+      setTurnstileToken(token);
+    };
+
+    window.onTurnstileExpired = () => {
+      setTurnstileToken('');
+    };
+
+    window.onTurnstileError = () => {
+      setTurnstileToken('');
+    };
+
+    return () => {
+      delete window.onTurnstileSuccess;
+      delete window.onTurnstileExpired;
+      delete window.onTurnstileError;
+    };
+  }, []);
+
   const toggleFaq = (index: number) => {
     setActiveFaq(activeFaq === index ? null : index);
   };
 
-  const handleGuideChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleGuideChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
     setGuideForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === 'phone' ? formatPhoneInput(value) : value,
     }));
   };
 
@@ -55,15 +159,64 @@ export default function Home() {
 
     setGuideStatus({ type: null, message: '' });
 
-    if (
-      !guideForm.name.trim() ||
-      !guideForm.email.trim() ||
-      !guideForm.phone.trim() ||
-      !guideForm.address.trim()
-    ) {
+    const trimmedName = guideForm.name.trim();
+    const trimmedEmail = guideForm.email.trim().toLowerCase();
+    const trimmedAddress = guideForm.address.trim();
+    const normalizedPhone = normalizePhone(guideForm.phone);
+    const fillTimeMs = Date.now() - guideFormLoadedAt.current;
+
+    if (!trimmedName) {
       setGuideStatus({
         type: 'error',
-        message: 'Please fill in all fields before submitting.',
+        message: 'Please enter your first name.',
+      });
+      return;
+    }
+
+    if (!isLikelyValidEmail(trimmedEmail)) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please enter a valid email address.',
+      });
+      return;
+    }
+
+    if (!isLikelyValidPhone(normalizedPhone)) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please enter a valid phone number.',
+      });
+      return;
+    }
+
+    if (!trimmedAddress || trimmedAddress.length < 6) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please enter your project address.',
+      });
+      return;
+    }
+
+    if (guideForm.companyWebsite.trim() !== '') {
+      setGuideStatus({
+        type: 'error',
+        message: 'Submission blocked.',
+      });
+      return;
+    }
+
+    if (fillTimeMs < GUIDE_MIN_FILL_TIME_MS) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please take a moment to complete the form properly.',
+      });
+      return;
+    }
+
+    if (!turnstileToken) {
+      setGuideStatus({
+        type: 'error',
+        message: 'Please complete the verification first.',
       });
       return;
     }
@@ -71,42 +224,53 @@ export default function Home() {
     setGuideSubmitting(true);
 
     try {
-      const response = await fetch(
-        'https://script.google.com/macros/s/AKfycbx01lpcatHsLZzoS_anmr1NhnxV_3D9bgnh0MYmIMpBpbqWYot4rfpGDthUEyqZXRei/exec',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
-          },
-          body: JSON.stringify({
-            type: 'guide',
-            name: guideForm.name,
-            email: guideForm.email,
-            phone: guideForm.phone,
-            address: guideForm.address,
-          }),
-        }
-      );
+      const response = await fetch(GUIDE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          type: 'guide',
+          source: 'guide',
+          name: trimmedName,
+          email: trimmedEmail,
+          phone: normalizedPhone,
+          address: trimmedAddress,
+          honeypot: guideForm.companyWebsite.trim(),
+          fillTimeMs,
+          turnstileToken,
+          guidePdfUrl: `${window.location.origin}${GUIDE_PDF_URL}`,
+          userAgent: navigator.userAgent,
+          pageUrl: window.location.href,
+        }),
+      });
 
       const result = await response.json();
 
-      if (result.success) {
-        setGuideStatus({
-          type: 'success',
-          message: 'Success — your guide request was submitted.',
-        });
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Submission failed.');
+      }
 
-        setGuideForm({
-          name: '',
-          email: '',
-          phone: '',
-          address: '',
-        });
-      } else {
-        setGuideStatus({
-          type: 'error',
-          message: 'Something went wrong. Please try again.',
-        });
+      setGuideStatus({
+        type: 'success',
+        message: 'Success. Your guide is downloading now.',
+      });
+
+      downloadGuidePdf();
+
+      setGuideForm({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        companyWebsite: '',
+      });
+
+      setTurnstileToken('');
+      guideFormLoadedAt.current = Date.now();
+
+      if (window.turnstile && turnstileContainerRef.current) {
+        window.turnstile.reset(turnstileContainerRef.current);
       }
     } catch (error) {
       setGuideStatus({
@@ -388,7 +552,6 @@ export default function Home() {
 
       {/* Lead Capture Block */}
       <section className="relative overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
-        {/* Ambient background */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 
@@ -460,6 +623,8 @@ export default function Home() {
                     <input
                       name="name"
                       type="text"
+                      required
+                      autoComplete="given-name"
                       value={guideForm.name}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -474,6 +639,8 @@ export default function Home() {
                     <input
                       name="email"
                       type="email"
+                      required
+                      autoComplete="email"
                       value={guideForm.email}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -488,6 +655,8 @@ export default function Home() {
                     <input
                       name="phone"
                       type="tel"
+                      required
+                      autoComplete="tel"
                       value={guideForm.phone}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -502,10 +671,33 @@ export default function Home() {
                     <input
                       name="address"
                       type="text"
+                      required
+                      autoComplete="street-address"
                       value={guideForm.address}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="123 Main St, Hamilton"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    name="companyWebsite"
+                    value={guideForm.companyWebsite}
+                    onChange={handleGuideChange}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="hidden"
+                    aria-hidden="true"
+                  />
+
+                  <div className="flex justify-center">
+                    <div
+                      className="cf-turnstile"
+                      data-sitekey="0x4AAAAAAC1T5itPPClMtbD6"
+                      data-callback="onTurnstileSuccess"
+                      data-expired-callback="onTurnstileExpired"
+                      data-error-callback="onTurnstileError"
                     />
                   </div>
 
@@ -542,7 +734,6 @@ export default function Home() {
               columnGap: '40px',
             }}
           >
-            {/* Left content group: book + copy */}
             <div
               className="grid items-center"
               style={{
@@ -550,7 +741,6 @@ export default function Home() {
                 columnGap: '52px',
               }}
             >
-              {/* Book */}
               <div className="flex justify-center">
                 <img
                   src="/ontario-reno-cost-guide-3d-preview.png"
@@ -560,7 +750,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Copy */}
               <div className="max-w-[760px]">
                 <h2 className="tracking-[-0.035em] leading-[1.02]">
                   <span className="block text-[15px] font-medium uppercase tracking-[0.14em] text-blue-200 mb-5">
@@ -603,7 +792,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Form */}
             <div className="w-full max-w-[430px] justify-self-end">
               <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-9">
                 <h3 className="text-[1.9rem] leading-tight font-bold">Get Instant Access</h3>
@@ -619,6 +807,8 @@ export default function Home() {
                     <input
                       name="name"
                       type="text"
+                      required
+                      autoComplete="given-name"
                       value={guideForm.name}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -633,6 +823,8 @@ export default function Home() {
                     <input
                       name="email"
                       type="email"
+                      required
+                      autoComplete="email"
                       value={guideForm.email}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -647,6 +839,8 @@ export default function Home() {
                     <input
                       name="phone"
                       type="tel"
+                      required
+                      autoComplete="tel"
                       value={guideForm.phone}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
@@ -661,10 +855,33 @@ export default function Home() {
                     <input
                       name="address"
                       type="text"
+                      required
+                      autoComplete="street-address"
                       value={guideForm.address}
                       onChange={handleGuideChange}
                       className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
                       placeholder="123 Main St, Hamilton"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    name="companyWebsite"
+                    value={guideForm.companyWebsite}
+                    onChange={handleGuideChange}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="hidden"
+                    aria-hidden="true"
+                  />
+
+                  <div className="flex justify-center">
+                    <div
+                      className="cf-turnstile"
+                      data-sitekey="0x4AAAAAAC1T5itPPClMtbD6"
+                      data-callback="onTurnstileSuccess"
+                      data-expired-callback="onTurnstileExpired"
+                      data-error-callback="onTurnstileError"
                     />
                   </div>
 
