@@ -274,6 +274,7 @@ export default function Home() {
       });
 
       const result = await response.json();
+      console.log('Guide response:', result);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Submission failed.');
