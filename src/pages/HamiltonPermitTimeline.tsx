@@ -12,6 +12,11 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+const lastUpdated = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  year: 'numeric',
+}).format(new Date());
+
 const timelineSteps = [
   {
     step: '01',
@@ -187,9 +192,7 @@ export default function HamiltonPermitTimeline() {
               </span>
             </div>
 
-            <p className="mt-6 text-sm text-slate-400">
-              Last updated: April 2026
-            </p>
+            <p className="mt-6 text-sm text-slate-400">Last updated: {lastUpdated}</p>
           </div>
         </div>
       </section>
