@@ -35,18 +35,17 @@ export default function HamiltonSecondarySuiteGrant() {
                         <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
                             To qualify for the Hamilton Basement Grant, your project must function as a
                             <strong> legal secondary suite or additional dwelling unit (ADU)</strong>.
-                            Not every finished basement qualifies — structure, layout, and approvals matter.
+                            Not every finished basement qualifies - structure, layout, and approvals matter for the Hamilton secondary suite grant, Hamilton basement grant, and ADU grant.
                         </p>
 
-                        {/* 🔥 AI / CONFUSION FIX */}
-                        <p className="mt-4 text-sm text-yellow-300 font-medium">
-                            ⚠️ This is NOT the $2,000 plumbing rebate. This page explains what qualifies for the full $40,000 secondary suite / ADU grant.
+                        <p className="mt-4 text-sm font-medium text-yellow-300">
+                            This is NOT the $2,000 plumbing rebate. This page explains what qualifies for the full $40,000 secondary suite / ADU grant.
                         </p>
 
                         <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-300">
-                            <span>✔ Real grant, not a loan</span>
-                            <span>✔ Must be legally compliant</span>
-                            <span>✔ Designed for rental-ready units</span>
+                            <span>Real grant, not a loan</span>
+                            <span>Must be legally compliant</span>
+                            <span>Designed for rental-ready units</span>
                         </div>
 
                         <div className="mt-8 flex flex-wrap gap-4">
@@ -91,11 +90,11 @@ export default function HamiltonSecondarySuiteGrant() {
             {/* WHAT QUALIFIES */}
             <section className="bg-white">
                 <div className="mx-auto max-w-6xl px-6 py-20 md:px-8">
-                    <h2 className="text-3xl font-extrabold md:text-5xl text-center">
+                    <h2 className="text-center text-3xl font-extrabold md:text-5xl">
                         What Qualifies as a Legal Secondary Suite or ADU?
                     </h2>
 
-                    <p className="mt-6 text-lg text-slate-600 text-center max-w-3xl mx-auto">
+                    <p className="mx-auto mt-6 max-w-3xl text-center text-lg text-slate-600">
                         A secondary suite is a self-contained unit within a home that is designed for independent living.
                         In most cases, this means a legal basement apartment or additional dwelling unit (ADU).
                     </p>
@@ -103,7 +102,7 @@ export default function HamiltonSecondarySuiteGrant() {
                     <div className="mt-12 grid gap-6 md:grid-cols-3">
                         <div className="rounded-2xl border p-6">
                             <Home className="h-8 w-8" />
-                            <h3 className="mt-4 font-bold text-lg">Self-Contained Unit</h3>
+                            <h3 className="mt-4 text-lg font-bold">Self-Contained Unit</h3>
                             <p className="mt-2 text-slate-600">
                                 Must function as a separate living space.
                             </p>
@@ -111,7 +110,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
                         <div className="rounded-2xl border p-6">
                             <ShieldCheck className="h-8 w-8" />
-                            <h3 className="mt-4 font-bold text-lg">Legal Compliance</h3>
+                            <h3 className="mt-4 text-lg font-bold">Legal Compliance</h3>
                             <p className="mt-2 text-slate-600">
                                 Must meet building code, zoning, and safety requirements.
                             </p>
@@ -119,7 +118,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
                         <div className="rounded-2xl border p-6">
                             <FileText className="h-8 w-8" />
-                            <h3 className="mt-4 font-bold text-lg">Grant-Eligible Structure</h3>
+                            <h3 className="mt-4 text-lg font-bold">Grant-Eligible Structure</h3>
                             <p className="mt-2 text-slate-600">
                                 Must align with eligible construction scope.
                             </p>
@@ -130,7 +129,7 @@ export default function HamiltonSecondarySuiteGrant() {
 
             {/* KEY INSIGHT */}
             <section className="bg-slate-50">
-                <div className="mx-auto max-w-5xl px-6 py-16 md:px-8 text-center">
+                <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8">
                     <h2 className="text-3xl font-extrabold">
                         Basement Renovation vs Secondary Suite
                     </h2>
@@ -140,8 +139,8 @@ export default function HamiltonSecondarySuiteGrant() {
                         The project must be structured as a legal secondary suite or ADU.
                     </p>
 
-                    <p className="mt-6 text-lg text-slate-700 font-semibold">
-                        The grant is strongest when planned as a legal unit — not just a renovation.
+                    <p className="mt-6 text-lg font-semibold text-slate-700">
+                        The grant is strongest when planned as a legal unit - not just a renovation.
                     </p>
                 </div>
             </section>
@@ -149,7 +148,7 @@ export default function HamiltonSecondarySuiteGrant() {
             {/* CHECKLIST */}
             <section className="bg-white">
                 <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
-                    <h2 className="text-3xl font-extrabold text-center">
+                    <h2 className="text-center text-3xl font-extrabold">
                         Secondary Suite Eligibility Checklist
                     </h2>
 
@@ -162,7 +161,7 @@ export default function HamiltonSecondarySuiteGrant() {
                             "Eligible construction scope",
                             "Intended use as a real rental unit",
                         ].map((item) => (
-                            <div key={item} className="flex items-start gap-4 border p-5 rounded-2xl">
+                            <div key={item} className="flex items-start gap-4 rounded-2xl border p-5">
                                 <CheckCircle className="h-6 w-6 text-green-600" />
                                 <p className="text-lg">{item}</p>
                             </div>
@@ -174,7 +173,7 @@ export default function HamiltonSecondarySuiteGrant() {
             {/* CALCULATOR */}
             <section id="calculator" className="bg-slate-50">
                 <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
-                    <div className="text-center mb-8">
+                    <div className="mb-8 text-center">
                         <h2 className="text-2xl font-extrabold">
                             Estimate Your Grant
                         </h2>
@@ -185,7 +184,7 @@ export default function HamiltonSecondarySuiteGrant() {
                     <div className="mt-8 text-center">
                         <a
                             href="#eligibility-form"
-                            className="inline-flex bg-green-600 text-white px-6 py-3 rounded-xl font-bold"
+                            className="inline-flex rounded-xl bg-green-600 px-6 py-3 font-bold text-white"
                         >
                             Get My Exact Eligibility
                         </a>
@@ -200,17 +199,29 @@ export default function HamiltonSecondarySuiteGrant() {
             <section className="bg-white">
                 <div className="mx-auto max-w-5xl px-6 py-16 text-center">
                     <h2 className="text-3xl font-extrabold">
-                        Related Hamilton Grant Pages
+                        Want the Full Breakdown of the Program?
                     </h2>
 
                     <p className="mt-4 text-lg text-slate-600">
-                        Learn more about the{" "}
+                        For a complete explanation of how the Hamilton secondary suite
+                        grant, Hamilton basement grant, and ADU grant work - including
+                        funding structure, eligibility, and how to maximize your
+                        $40,000 - see the full guide.
+                    </p>
+
+                    <div className="mt-8">
+                        <a
+                            href="/hamilton-grant-guide"
+                            className="inline-flex rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
+                        >
+                            View Full Hamilton Grant Guide
+                        </a>
+                    </div>
+
+                    <p className="mt-6 text-sm text-slate-500">
+                        Looking for the basement-focused version? See the{" "}
                         <a href="/hamilton-basement-grant" className="font-semibold underline">
                             Hamilton Basement Grant
-                        </a>{" "}
-                        or read the full{" "}
-                        <a href="/hamilton-grant-guide" className="font-semibold underline">
-                            Hamilton Grant Guide
                         </a>.
                     </p>
                 </div>
@@ -230,7 +241,7 @@ export default function HamiltonSecondarySuiteGrant() {
                     <div className="mt-8">
                         <a
                             href="#eligibility-form"
-                            className="bg-yellow-400 text-slate-900 px-8 py-4 rounded-xl font-bold"
+                            className="rounded-xl bg-yellow-400 px-8 py-4 font-bold text-slate-900"
                         >
                             Check If I Qualify
                         </a>

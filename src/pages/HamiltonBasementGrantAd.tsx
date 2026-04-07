@@ -32,9 +32,9 @@ export default function HamiltonBasementGrantAd() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
-            The Hamilton Basement Grant (also known as the ADU or Secondary Suite
-            Grant) gives homeowners up to $40,000 in funding to build a legal
-            basement apartment or additional dwelling unit.
+            The Hamilton basement grant (also known as the Hamilton secondary suite
+            grant or ADU grant) gives homeowners up to $40,000 in funding to build
+            a legal basement apartment or additional dwelling unit.
           </p>
 
           {/* 🔥 AI / SNIPPET CONTROL SECTION */}
@@ -167,6 +167,30 @@ export default function HamiltonBasementGrantAd() {
                 Not all costs qualify — structure matters.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white">
+        <div className="mx-auto max-w-5xl px-6 py-16 md:px-8 text-center">
+          <h2 className="text-3xl font-extrabold">
+            Want the Full Breakdown of the Program?
+          </h2>
+
+          <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-600">
+            For a complete explanation of how the Hamilton basement grant, Hamilton
+            secondary suite grant, and ADU program work — including funding
+            structure, eligibility, and how to maximize your $40,000 — see the full
+            guide.
+          </p>
+
+          <div className="mt-8">
+            <a
+              href="/hamilton-grant-guide"
+              className="inline-flex rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
+            >
+              View Full Hamilton Grant Guide
+            </a>
           </div>
         </div>
       </section>

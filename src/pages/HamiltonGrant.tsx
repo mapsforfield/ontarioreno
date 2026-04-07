@@ -62,6 +62,20 @@ export default function HamiltonGrant() {
         </div>
       </section>
 
+      <section className="bg-white">
+        <div className="mx-auto max-w-5xl px-6 py-14 md:px-8">
+          <h2 className="text-2xl font-extrabold text-center md:text-3xl">
+            Hamilton Secondary Suite Grant & Basement Grant Overview
+          </h2>
+
+          <p className="mt-4 max-w-3xl mx-auto text-center text-lg text-slate-600">
+            The Hamilton secondary suite grant, Hamilton basement grant, and ADU grant
+            all refer to the same program offering up to <strong>$40,000</strong> to
+            help homeowners build a legal rental unit.
+          </p>
+        </div>
+      </section>
+
       {/* WHAT IS PROGRAM */}
       <section className="bg-white">
         <div className="mx-auto max-w-5xl px-6 py-14 md:px-8">
