@@ -145,7 +145,14 @@ export default function Basements() {
                 Final pricing depends heavily on layout, finish level, whether
                 a bathroom or kitchen is being added, and whether the project is
                 being built for personal use or as a legal income-generating
-                basement apartment.
+                basement apartment. If you want a more local pricing benchmark,
+                read our{" "}
+                <Link
+                  to="/basement-renovation-cost-hamilton"
+                  className="font-semibold underline underline-offset-4"
+                >
+                  Hamilton basement cost guide
+                </Link>.
 
                 For Hamilton homeowners, you can also read the{" "}
                 <Link

@@ -521,6 +521,16 @@ export default function Home() {
             <p className="text-lg text-slate-600">
               Comprehensive guides, cost breakdowns, and expert advice for Ontario&apos;s most popular home improvement projects.
             </p>
+            <p className="mt-4 text-base text-slate-600">
+              If you are planning in Hamilton, start with our{' '}
+              <Link
+                to="/basement-renovation-cost-hamilton"
+                className="font-semibold underline underline-offset-4"
+              >
+                basement renovation cost in Hamilton
+              </Link>{' '}
+              guide for a faster pricing reality check.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

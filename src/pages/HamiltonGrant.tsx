@@ -176,7 +176,14 @@ export default function HamiltonGrant() {
             >
               Hamilton Basement Grant
             </a>{" "}
-            including structure, eligibility, and real examples.
+            including structure, eligibility, and real examples. If you are
+            still comparing budget first, review our{" "}
+            <a
+              href="/basement-renovation-cost-hamilton"
+              className="font-semibold underline underline-offset-4"
+            >
+              basement renovation pricing in Hamilton
+            </a>.
           </p>
         </div>
       </section>
