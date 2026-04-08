@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
+import CitySelectorSection from '../components/CitySelectorSection';
 
 const GUIDE_PDF_URL = '/guides/ontario-renovation-cost-guide-2026.pdf';
 const GUIDE_MIN_FILL_TIME_MS = 4000;
@@ -588,6 +589,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <CitySelectorSection />
 
       {/* Lead Capture Block */}
       <section className="relative overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">

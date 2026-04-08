@@ -7,6 +7,7 @@ import KitchenRenovations from './pages/KitchenRenovations';
 import BathroomRenovations from './pages/BathroomRenovations';
 import Costs from './pages/Costs';
 import Match from './pages/Match';
+import Cities from './pages/Cities';
 import Financing from './pages/Financing';
 import HamiltonGrant from './pages/HamiltonGrant';
 import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="bathroom-renovations" element={<BathroomRenovations />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
+          <Route path="cities" element={<Cities />} />
           <Route path="financing" element={<Financing />} />
           <Route path="hamilton-grant-guide" element={<HamiltonGrant />} />
           <Route path="hamilton-secondary-suite-grant" element={<HamiltonSecondarySuiteGrant />} />
