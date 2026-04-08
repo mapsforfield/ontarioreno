@@ -56,7 +56,8 @@ export default function Navbar() {
     || location.pathname === '/cities';
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+    <>
+      <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           <div className="flex items-center">
@@ -217,11 +218,12 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+      </nav>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[90] bg-white md:hidden">
-          <div className="flex h-full min-h-0 flex-col overscroll-none">
-            <div className="border-b border-slate-200 bg-white/95 px-4 backdrop-blur-xl">
+        <div className="fixed inset-0 z-[120] bg-white md:hidden">
+          <div className="flex h-full min-h-0 flex-col overscroll-none bg-white">
+            <div className="border-b border-slate-200 bg-white px-4">
               <div className="mx-auto flex h-20 max-w-7xl items-center justify-between">
                 <Link
                   to="/"
@@ -345,6 +347,6 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+    </>
   );
 }
