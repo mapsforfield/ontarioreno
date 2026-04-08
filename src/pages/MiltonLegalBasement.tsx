@@ -1,0 +1,428 @@
+import { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  FileText,
+  Hammer,
+  Home,
+  ShieldCheck,
+} from 'lucide-react';
+
+const lastUpdated = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  year: 'numeric',
+}).format(new Date());
+
+const requirementSteps = [
+  {
+    step: '01',
+    title: 'Confirm the intended use',
+    detail:
+      'A legal basement in Milton needs to be planned as real code-compliant living space, not just a finished lower level.',
+  },
+  {
+    step: '02',
+    title: 'Review local rules early',
+    detail:
+      'Town of Milton permit expectations and broader Halton Region context can both affect how the project is structured.',
+  },
+  {
+    step: '03',
+    title: 'Prepare permit-ready drawings',
+    detail:
+      'Drawings need to show exits, room layout, fire separation, ventilation, plumbing, and the actual use of the unit.',
+  },
+  {
+    step: '04',
+    title: 'Submit for municipal review',
+    detail:
+      'A legal basement file is tested by the Town of Milton against the details shown in the package, not just the homeowner’s intention.',
+  },
+  {
+    step: '05',
+    title: 'Address revision comments',
+    detail:
+      'If the Town asks for updates, complete responses matter more than fast but partial replies.',
+  },
+  {
+    step: '06',
+    title: 'Build and inspect',
+    detail:
+      'The approved design still needs to be built correctly and pass the required inspections.',
+  },
+];
+
+const faqs = [
+  {
+    question: 'What makes a basement legal in Milton?',
+    answer:
+      'It needs permit approval, code-compliant design, and a layout that meets the Town of Milton review standard for the intended use.',
+  },
+  {
+    question: 'Is a legal basement the same as a legal second unit?',
+    answer:
+      'Not always, but that is what many homeowners mean. Once the basement is meant to function as an independent unit, the review path usually becomes more detailed.',
+  },
+  {
+    question: 'Do newer Milton homes make legal basement projects easier?',
+    answer:
+      'Sometimes. Newer unfinished basements can simplify layout and planning, but they do not remove permit or code requirements.',
+  },
+  {
+    question: 'Why does a legal basement project cost more?',
+    answer:
+      'Costs rise because code compliance, egress, fire separation, layout planning, and permit coordination all become more demanding.',
+  },
+  {
+    question: 'Where should I start if I am comparing cost, legality, and permits?',
+    answer:
+      'Start by comparing the Milton cost page, the Milton permit page, and your intended use before asking contractors for final pricing.',
+  },
+];
+
+export default function MiltonLegalBasement() {
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
+
+  return (
+    <div className="bg-slate-50 min-h-screen">
+      <Helmet>
+        <title>Legal Basement in Milton | OntarioReno</title>
+        <meta
+          name="description"
+          content="Learn what a legal basement in Milton usually requires, how Town of Milton permits affect the project, and what changes once a basement is planned as a second unit."
+        />
+        <link
+          rel="canonical"
+          href="https://ontarioreno.ca/legal-basement-milton"
+        />
+      </Helmet>
+
+      <section className="bg-slate-900 text-white">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center lg:px-8 lg:py-24">
+          <div className="max-w-4xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-medium text-blue-200 ring-1 ring-white/10">
+              <Clock3 className="h-4 w-4" />
+              Milton legal basement guide
+            </div>
+
+            <h1 className="mt-6 text-4xl font-bold leading-tight md:text-6xl">
+              Legal Basement in Milton
+            </h1>
+
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
+              A legal basement in Milton needs more than finishes. It usually means
+              permit approval, code-compliant design, and a layout that works under
+              Town of Milton review.
+            </p>
+
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-400">
+              This page explains what usually separates a finished basement from a
+              legal one, and how cost, permits, and Halton-area planning all start
+              connecting once the unit is meant to function independently.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+              <Link
+                to="/match"
+                className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
+              >
+                Find the right contractor
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+              <Link
+                to="/basement-permit-milton"
+                className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/10"
+              >
+                Review Milton permits
+              </Link>
+            </div>
+
+            <div className="mt-10 flex flex-wrap gap-6 text-sm font-medium text-slate-300">
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                Legal-suite focused
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                Town of Milton relevant
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                Built for homeowner planning
+              </span>
+            </div>
+
+            <p className="mt-6 text-sm text-slate-400">Last updated: {lastUpdated}</p>
+          </div>
+
+          <div className="flex items-center justify-center lg:justify-end lg:translate-y-4">
+            <div className="relative w-full max-w-[500px] rounded-[2rem] bg-white/6 p-4 ring-1 ring-white/10">
+              <div className="pointer-events-none absolute inset-6 rounded-[1.75rem] bg-black/10 blur-2xl" />
+              <div className="relative">
+                <div className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                  Typical Milton Basement Finish
+                </div>
+                <img
+                  src="/images/ontarioreno/finished-basement-milton.jpg"
+                  alt="Finished basement renovation in Milton Ontario"
+                  className="w-full max-w-[500px] rounded-[1.75rem] object-cover shadow-[0_32px_80px_rgba(15,23,42,0.14)]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+            <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">
+              Quick answer: what does a legal basement usually require?
+            </h2>
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
+              The closer the basement gets to a true independent unit, the more the project depends on permits, code detail, and local review.
+            </p>
+            <ul className="mt-6 space-y-3 text-slate-700">
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <span>Comparing cost first? Use the <Link to="/basement-renovation-cost-milton" className="font-semibold text-slate-900 underline underline-offset-4">Milton basement cost page</Link>.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <span>Need permit clarity? Review <Link to="/basement-permit-milton" className="font-semibold text-slate-900 underline underline-offset-4">basement permit Milton</Link>.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <span>Still planning the overall project? Start with <Link to="/basement-renovation-milton" className="font-semibold text-slate-900 underline underline-offset-4">basement renovation Milton</Link>.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-8">
+          <div className="space-y-8">
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h2 className="text-3xl font-bold text-slate-900">
+                Finished basement vs legal basement in Milton
+              </h2>
+              <div className="mt-8 grid gap-6 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 p-6">
+                  <div className="flex items-center gap-3">
+                    <Home className="h-6 w-6 text-slate-700" />
+                    <h3 className="text-xl font-bold text-slate-900">Finished basement</h3>
+                  </div>
+                  <p className="mt-4 text-slate-600 leading-7">
+                    A basement can feel complete for family use without meeting the higher standard expected for a legal second unit.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#1B3C6C]/20 bg-blue-50 p-6">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-6 w-6 text-[#1B3C6C]" />
+                    <h3 className="text-xl font-bold text-slate-900">Legal basement</h3>
+                  </div>
+                  <p className="mt-4 text-slate-700 leading-7">
+                    A legal basement usually needs a fuller permit package, stronger code detail, and clearer Town of Milton review documentation.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h2 className="text-3xl font-bold text-slate-900">
+                What legal basement planning usually includes
+              </h2>
+              <p className="mt-4 text-lg leading-8 text-slate-600">
+                Most legal-basement projects need permit-ready drawings, exit
+                planning, fire separation detail, layout clarity, and a stronger
+                review standard than a simple finished basement. If your first
+                concern is pricing, compare the{' '}
+                <Link
+                  to="/basement-renovation-cost-milton"
+                  className="font-semibold text-slate-900 underline underline-offset-4"
+                >
+                  basement renovation cost in Milton
+                </Link>{' '}
+                page before assuming the numbers will match a family-use finish.
+              </p>
+              <p className="mt-4 text-lg leading-8 text-slate-600">
+                If your next concern is approvals, the{' '}
+                <Link
+                  to="/basement-permit-milton"
+                  className="font-semibold text-slate-900 underline underline-offset-4"
+                >
+                  Milton permit page
+                </Link>{' '}
+                explains where Town of Milton review usually starts affecting the timeline.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-blue-200 bg-blue-50 p-8 shadow-sm">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+                Why scope matters
+              </p>
+              <h2 className="mt-3 text-3xl font-bold text-slate-900">
+                A legal basement changes both cost and permit strategy
+              </h2>
+              <p className="mt-4 text-lg leading-8 text-slate-700">
+                This is where many homeowners underestimate the jump from a simple
+                finished basement to a rental-ready unit. The stronger the legal
+                intent becomes, the more the project depends on correct drawings,
+                permit planning, and the right contractor fit.
+              </p>
+              <div className="mt-6">
+                <Link
+                  to="/legal-suites"
+                  className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-4 text-base font-bold text-white transition hover:bg-slate-800"
+                >
+                  Explore legal suites
+                </Link>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <img
+                src="/images/ontarioreno/downtown-milton.jpg"
+                alt="Downtown Milton Ontario streetscape"
+                className="w-full object-cover"
+              />
+            </div>
+          </div>
+
+          <aside className="space-y-6">
+            <div className="rounded-3xl bg-slate-900 p-8 text-white shadow-xl">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-200">
+                <Hammer className="h-7 w-7" />
+              </div>
+              <h3 className="mt-6 text-2xl font-bold">Need help structuring the project properly?</h3>
+              <p className="mt-4 text-sm leading-7 text-slate-300">
+                Legal basements move better when the scope, permit strategy, and contractor are aligned from the start.
+              </p>
+              <Link
+                to="/match"
+                className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
+              >
+                Start with contractor matching
+              </Link>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                <FileText className="h-6 w-6" />
+              </div>
+              <h3 className="mt-5 text-2xl font-bold text-slate-900">Milton cluster</h3>
+              <div className="mt-5 space-y-3 text-sm leading-7 text-slate-700">
+                <Link to="/basement-renovation-milton" className="block font-semibold underline underline-offset-4">
+                  Basement renovation Milton
+                </Link>
+                <Link to="/basement-renovation-cost-milton" className="block font-semibold underline underline-offset-4">
+                  Basement renovation cost Milton
+                </Link>
+                <Link to="/basement-permit-milton" className="block font-semibold underline underline-offset-4">
+                  Basement permit Milton
+                </Link>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="border-y border-slate-200 bg-white py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
+              Legal basement breakdown, step by step
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              Most legal-basement projects in Milton move through the same general approval sequence.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {requirementSteps.map((item) => (
+              <div
+                key={item.step}
+                className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm"
+              >
+                <div className="text-sm font-bold uppercase tracking-[0.2em] text-[#1B3C6C]">
+                  Step {item.step}
+                </div>
+                <h3 className="mt-3 text-xl font-bold text-slate-900">{item.title}</h3>
+                <p className="mt-3 text-slate-600 leading-7">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
+              Frequently asked questions
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              Direct answers about legal basement planning in Milton.
+            </p>
+          </div>
+
+          <div className="mt-10 space-y-4">
+            {faqs.map((faq, index) => {
+              const isOpen = activeFaq === index;
+              return (
+                <div
+                  key={faq.question}
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveFaq(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+                  >
+                    <span className="text-lg font-semibold text-slate-900">{faq.question}</span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {isOpen && <div className="px-6 pb-6 text-slate-600 leading-7">{faq.answer}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-900 py-20 text-white">
+        <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold md:text-5xl">
+            Plan legal basement work with the right assumptions
+          </h2>
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-300">
+            Legal basements are permit-heavy projects. The right scope and team can prevent expensive corrections later.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+            <Link
+              to="/match"
+              className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-8 py-4 text-base font-bold text-white transition hover:bg-blue-700"
+            >
+              Find the right team
+            </Link>
+            <Link
+              to="/basement-permit-milton"
+              className="inline-flex items-center justify-center rounded-xl border border-white/20 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10"
+            >
+              Review permits
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

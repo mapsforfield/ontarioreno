@@ -16,6 +16,10 @@ import HamiltonBasementPermitNeed from './pages/HamiltonBasementPermitNeed';
 import OntarioLegalBasementRequirements from './pages/OntarioLegalBasementRequirements';
 import HamiltonPermitDelayAvoidance from './pages/HamiltonPermitDelayAvoidance';
 import HamiltonBasementRenovationCost from './pages/HamiltonBasementRenovationCost';
+import MiltonBasementRenovation from './pages/MiltonBasementRenovation';
+import MiltonBasementRenovationCost from './pages/MiltonBasementRenovationCost';
+import MiltonLegalBasement from './pages/MiltonLegalBasement';
+import MiltonBasementPermit from './pages/MiltonBasementPermit';
 
 export default function App() {
   return (
@@ -37,6 +41,10 @@ export default function App() {
           <Route path="legal-basement-requirements-in-ontario" element={<OntarioLegalBasementRequirements />} />
           <Route path="how-to-avoid-building-permit-delays-in-hamilton" element={<HamiltonPermitDelayAvoidance />} />
           <Route path="basement-renovation-cost-hamilton" element={<HamiltonBasementRenovationCost />} />
+          <Route path="basement-renovation-milton" element={<MiltonBasementRenovation />} />
+          <Route path="basement-renovation-cost-milton" element={<MiltonBasementRenovationCost />} />
+          <Route path="legal-basement-milton" element={<MiltonLegalBasement />} />
+          <Route path="basement-permit-milton" element={<MiltonBasementPermit />} />
           <Route path="hamilton-basement-grant" element={<HamiltonBasementGrantAd />}
           />
         </Route>
