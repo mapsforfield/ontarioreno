@@ -12,6 +12,25 @@ export default function Navbar() {
   const location = useLocation();
 
   useEffect(() => {
+    if (!isOpen) {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     setIsOpen(false);
     setIsHubsOpen(false);
     setIsCitiesOpen(false);
@@ -200,99 +219,128 @@ export default function Navbar() {
       </div>
 
       {isOpen && (
-        <div className="border-t border-slate-200 bg-white px-4 pb-6 pt-3 shadow-lg md:hidden">
-          <div className="space-y-1">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Renovation hubs
+        <div className="fixed inset-0 z-[90] bg-white md:hidden">
+          <div className="flex h-full min-h-0 flex-col overscroll-none">
+            <div className="border-b border-slate-200 bg-white/95 px-4 backdrop-blur-xl">
+              <div className="mx-auto flex h-20 max-w-7xl items-center justify-between">
+                <Link
+                  to="/"
+                  className="flex items-center"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <img
+                    src="/logo.png"
+                    alt="OntarioReno Logo"
+                    className="h-10 w-auto object-contain"
+                  />
+                </Link>
+
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
+                  type="button"
+                  aria-label="Close menu"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
             </div>
 
-            {hubs.map((hub) => (
-              <Link
-                key={hub.name}
-                to={hub.href}
-                className={cn(
-                  'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
-                  location.pathname === hub.href
-                    ? 'bg-slate-50 text-[#1B3C6C]'
-                    : 'text-slate-700'
-                )}
-              >
-                {hub.name}
-              </Link>
-            ))}
-
-            <div className="my-3 h-px bg-slate-200" />
-
-            <button
-              type="button"
-              onClick={() => setIsMobileCitiesOpen((value) => !value)}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-50"
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#1B3C6C]" />
-                Cities
-              </span>
-              <ChevronDown
-                className={cn(
-                  'h-5 w-5 text-slate-500 transition-transform',
-                  isMobileCitiesOpen && 'rotate-180'
-                )}
-              />
-            </button>
-
-            {isMobileCitiesOpen && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="grid gap-2">
-                  {cityPreview.map((city) => (
-                    <Link
-                      key={city.name}
-                      to={city.href}
-                      className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
-                    >
-                      <span className="block text-base font-semibold text-slate-900">
-                        {city.name}
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-slate-500">
-                        {city.descriptor}
-                      </span>
-                    </Link>
-                  ))}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-3">
+              <div className="mx-auto max-w-7xl space-y-1">
+                <div className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Renovation hubs
                 </div>
 
-                <Link
-                  to="/cities"
-                  className="mt-3 inline-flex items-center gap-2 px-1 text-sm font-semibold text-slate-900 underline underline-offset-4"
+                {hubs.map((hub) => (
+                  <Link
+                    key={hub.name}
+                    to={hub.href}
+                    className={cn(
+                      'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      location.pathname === hub.href
+                        ? 'bg-slate-50 text-[#1B3C6C]'
+                        : 'text-slate-700'
+                    )}
+                  >
+                    {hub.name}
+                  </Link>
+                ))}
+
+                <div className="my-3 h-px bg-slate-200" />
+
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCitiesOpen((value) => !value)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-50"
                 >
-                  View all cities
-                  <ChevronDown className="h-4 w-4 -rotate-90" />
-                </Link>
-              </div>
-            )}
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-[#1B3C6C]" />
+                    Cities
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-5 w-5 text-slate-500 transition-transform',
+                      isMobileCitiesOpen && 'rotate-180'
+                    )}
+                  />
+                </button>
 
-            <div className="my-3 h-px bg-slate-200" />
+                {isMobileCitiesOpen && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid gap-2">
+                      {cityPreview.map((city) => (
+                        <Link
+                          key={city.name}
+                          to={city.href}
+                          className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
+                        >
+                          <span className="block text-base font-semibold text-slate-900">
+                            {city.name}
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">
+                            {city.descriptor}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
 
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.href}
-                className={cn(
-                  'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
-                  location.pathname === link.href
-                    ? 'bg-slate-50 text-[#1B3C6C]'
-                    : 'text-slate-700'
+                    <Link
+                      to="/cities"
+                      className="mt-3 inline-flex items-center gap-2 px-1 text-sm font-semibold text-slate-900 underline underline-offset-4"
+                    >
+                      View all cities
+                      <ChevronDown className="h-4 w-4 -rotate-90" />
+                    </Link>
+                  </div>
                 )}
-              >
-                {link.name}
-              </Link>
-            ))}
 
-            <div className="px-3 pt-3">
-              <Link
-                to="/match"
-                className="block w-full rounded-xl bg-[#5694CF] px-6 py-3 text-center text-base font-semibold text-white transition hover:bg-[#1B3C6C]"
-              >
-                Get Matched with Contractors
-              </Link>
+                <div className="my-3 h-px bg-slate-200" />
+
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.name}
+                    to={link.href}
+                    className={cn(
+                      'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      location.pathname === link.href
+                        ? 'bg-slate-50 text-[#1B3C6C]'
+                        : 'text-slate-700'
+                    )}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
+
+                <div className="px-3 pt-3">
+                  <Link
+                    to="/match"
+                    className="block w-full rounded-xl bg-[#5694CF] px-6 py-3 text-center text-base font-semibold text-white transition hover:bg-[#1B3C6C]"
+                  >
+                    Get Matched with Contractors
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
