@@ -20,6 +20,10 @@ import MiltonBasementRenovation from './pages/MiltonBasementRenovation';
 import MiltonBasementRenovationCost from './pages/MiltonBasementRenovationCost';
 import MiltonLegalBasement from './pages/MiltonLegalBasement';
 import MiltonBasementPermit from './pages/MiltonBasementPermit';
+import BurlingtonBasementRenovation from './pages/BurlingtonBasementRenovation';
+import BurlingtonBasementRenovationCost from './pages/BurlingtonBasementRenovationCost';
+import BurlingtonLegalBasement from './pages/BurlingtonLegalBasement';
+import BurlingtonBasementPermit from './pages/BurlingtonBasementPermit';
 
 export default function App() {
   return (
@@ -45,6 +49,10 @@ export default function App() {
           <Route path="basement-renovation-cost-milton" element={<MiltonBasementRenovationCost />} />
           <Route path="legal-basement-milton" element={<MiltonLegalBasement />} />
           <Route path="basement-permit-milton" element={<MiltonBasementPermit />} />
+          <Route path="basement-renovation-burlington" element={<BurlingtonBasementRenovation />} />
+          <Route path="basement-renovation-cost-burlington" element={<BurlingtonBasementRenovationCost />} />
+          <Route path="legal-basement-burlington" element={<BurlingtonLegalBasement />} />
+          <Route path="basement-permit-burlington" element={<BurlingtonBasementPermit />} />
           <Route path="hamilton-basement-grant" element={<HamiltonBasementGrantAd />}
           />
         </Route>
