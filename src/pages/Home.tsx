@@ -590,7 +590,9 @@ export default function Home() {
         </div>
       </section>
 
-      <CitySelectorSection />
+      <div className="hidden md:block">
+        <CitySelectorSection />
+      </div>
 
       {/* Lead Capture Block */}
       <section className="relative overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
