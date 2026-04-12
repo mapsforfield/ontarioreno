@@ -264,7 +264,7 @@ export default function BurlingtonBasementRenovationCost() {
               See my options
             </Link>
             <p className="mt-4 text-sm text-slate-400">
-              Takes less than a minute • No obligation
+              Takes less than a minute - No obligation
             </p>
           </div>
         </div>
@@ -272,3 +272,5 @@ export default function BurlingtonBasementRenovationCost() {
     </div>
   );
 }
+
+

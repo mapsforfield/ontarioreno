@@ -374,7 +374,7 @@ export default function Home() {
           </p>
 
           <p className="text-sm text-slate-400 mb-10 max-w-2xl">
-            We don’t sell renovations. We help you make the right decision before hiring anyone.
+            We don't sell renovations. We help you make the right decision before hiring anyone.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -422,7 +422,7 @@ export default function Home() {
                 </h2>
 
                 <p className="mt-4 text-base md:text-lg text-slate-700 leading-relaxed max-w-2xl">
-                  We’ve confirmed a City of Hamilton–backed basement grant and ADU incentive that can cover up to 70% of eligible construction costs for qualifying legal basement unit projects.
+                  We've confirmed a City of Hamilton-backed basement grant and ADU incentive that can cover up to 70% of eligible construction costs for qualifying legal basement unit projects.
 
                   If you're unsure what qualifies, see what counts as a{" "}
                   <Link
@@ -946,7 +946,7 @@ export default function Home() {
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            We help you identify the best-fit contractor for your project — based on scope, budget, and real track record. Not random referrals, and not whoever pays to be shown.
+            We help you identify the best-fit contractor for your project - based on scope, budget, and real track record. Not random referrals, and not whoever pays to be shown.
           </p>
           <Link
             to="/match"
@@ -978,7 +978,7 @@ export default function Home() {
               },
               {
                 q: "How do you choose which contractors to recommend?",
-                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to show you dozens of options — it’s to help point you toward the company that makes the most sense for your specific project."
+                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to show you dozens of options - it's to help point you toward the company that makes the most sense for your specific project."
               },
               {
                 q: "Do I really need a permit to finish my basement?",
@@ -1015,3 +1015,5 @@ export default function Home() {
     </div>
   );
 }
+
+

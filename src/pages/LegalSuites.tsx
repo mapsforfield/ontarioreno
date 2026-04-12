@@ -106,7 +106,7 @@ export default function LegalSuites() {
                   </h3>
                   <p className="text-slate-600 leading-relaxed">
                     The suite must have a safe way out. Bedroom windows often
-                    need to meet minimum egress requirements, and the unit’s exit
+                    need to meet minimum egress requirements, and the unit's exit
                     path must be continuous and compliant.
                   </p>
                 </div>
@@ -133,7 +133,7 @@ export default function LegalSuites() {
 
               <p className="text-slate-600 mb-6 leading-relaxed">
                 A legal basement apartment is much more expensive than a standard
-                basement finish because you are not just renovating — you are
+                basement finish because you are not just renovating - you are
                 creating a code-compliant second dwelling unit. In Ontario,
                 these projects usually range from <strong>$60,000 to $140,000+</strong>,
                 with many landing between <strong>$70,000 and $110,000</strong>
@@ -153,49 +153,49 @@ export default function LegalSuites() {
                       Framing, drywall, taping &amp; paint
                     </div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $22,000
+                      $12,000 - $22,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Electrical upgrades</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $5,000 – $12,000
+                      $5,000 - $12,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Plumbing</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $5,000 – $14,000
+                      $5,000 - $14,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Flooring &amp; finishes</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $6,000 – $14,000
+                      $6,000 - $14,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Full bathroom</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $22,000
+                      $12,000 - $22,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Kitchen installation</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $25,000
+                      $12,000 - $25,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Separate entrance</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $8,000 – $20,000
+                      $8,000 - $20,000
                     </div>
                   </div>
 
@@ -204,14 +204,14 @@ export default function LegalSuites() {
                       Fire separation / code compliance work
                     </div>
                     <div className="text-right font-semibold text-slate-900">
-                      $5,000 – $15,000
+                      $5,000 - $15,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Permits &amp; drawings</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $3,000 – $8,000+
+                      $3,000 - $8,000+
                     </div>
                   </div>
                 </div>
@@ -236,11 +236,11 @@ export default function LegalSuites() {
                     Common cost drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• No existing side / separate entrance</li>
-                    <li>• Low ceiling height or structural constraints</li>
-                    <li>• Full kitchen and bathroom additions</li>
-                    <li>• Electrical panel upgrades</li>
-                    <li>• Older plumbing or drainage changes</li>
+                    <li>No existing side / separate entrance</li>
+                    <li>Low ceiling height or structural constraints</li>
+                    <li>Full kitchen and bathroom additions</li>
+                    <li>Electrical panel upgrades</li>
+                    <li>Older plumbing or drainage changes</li>
                   </ul>
                 </div>
 
@@ -249,11 +249,11 @@ export default function LegalSuites() {
                     Legal-compliance drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• Fire separation requirements</li>
-                    <li>• Soundproofing between units</li>
-                    <li>• HVAC separation or mechanical revisions</li>
-                    <li>• Bedroom egress upgrades</li>
-                    <li>• Permit and design complexity</li>
+                    <li>Fire separation requirements</li>
+                    <li>Soundproofing between units</li>
+                    <li>HVAC separation or mechanical revisions</li>
+                    <li>Bedroom egress upgrades</li>
+                    <li>Permit and design complexity</li>
                   </ul>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export default function LegalSuites() {
               <p className="text-slate-600 mb-6 leading-relaxed">
                 Legal suites almost always require proper drawings, permits, and
                 inspections. This is not the type of project where guessing is
-                safe. Even when the basement already looks “mostly done,” legal
+                safe. Even when the basement already looks "mostly done," legal
                 conversion often reveals hidden work needed for fire separation,
                 egress, ventilation, and code compliance.
               </p>
@@ -340,7 +340,7 @@ export default function LegalSuites() {
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
                       <p className="text-sm text-slate-700">
-                        Existing basements are rarely “legal-ready”
+                        Existing basements are rarely "legal-ready"
                       </p>
                     </div>
 
@@ -369,7 +369,7 @@ export default function LegalSuites() {
                 </h3>
 
                 <p className="text-slate-400 mb-6">
-                  Tell us about your property and we’ll help identify the
+                  Tell us about your property and we'll help identify the
                   best-fit contractor based on project type, legal-suite scope,
                   and likely budget range.
                 </p>
@@ -417,7 +417,7 @@ export default function LegalSuites() {
                   to="/hamilton-basement-grant"
                   className="inline-flex text-sm font-semibold text-slate-900 underline underline-offset-4"
                 >
-                  See if you qualify →
+                  See if you qualify -{">"}
                 </Link>
               </div>
 
@@ -432,7 +432,7 @@ export default function LegalSuites() {
 
                 <p className="text-slate-600 text-sm leading-7 mb-5">
                   A proper legal-suite project starts with the right assumptions
-                  about zoning, permits, exits, and fire separation — not just a
+                  about zoning, permits, exits, and fire separation - not just a
                   contractor quote.
                 </p>
 
@@ -447,3 +447,7 @@ export default function LegalSuites() {
     </div>
   );
 }
+
+
+
+

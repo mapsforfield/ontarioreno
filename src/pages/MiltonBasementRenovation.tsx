@@ -285,7 +285,7 @@ export default function MiltonBasementRenovation() {
                 ))}
               </div>
               <p className="mt-6 text-lg leading-8 text-slate-600">
-                For broader basement planning, you can also compare the site’s main{' '}
+                For broader basement planning, you can also compare the site's main{' '}
                 <Link
                   to="/basements"
                   className="font-semibold text-slate-900 underline underline-offset-4"
@@ -477,3 +477,4 @@ export default function MiltonBasementRenovation() {
     </div>
   );
 }
+

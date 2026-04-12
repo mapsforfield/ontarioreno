@@ -23,10 +23,10 @@ export default function HamiltonGrantCalculator() {
 
   const message = useMemo(() => {
     if (fullGrantUnlocked) {
-      return "You’re in the ideal range — this project can unlock the full $40,000 grant.";
+      return "You're in the ideal range - this project can unlock the full $40,000 grant.";
     }
     if (totalCost >= 60000) {
-      return "You’re in a strong range, and a well-structured project can significantly increase your grant.";
+      return "You're in a strong range, and a well-structured project can significantly increase your grant.";
     }
     return "This project may qualify for less than the full incentive, but it can still reduce your real cost substantially.";
   }, [fullGrantUnlocked, totalCost]);
@@ -41,7 +41,7 @@ export default function HamiltonGrantCalculator() {
     <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm md:p-8">
       <div className="mb-8">
         <p className="text-base font-semibold text-slate-900 md:text-lg">
-          Move the slider to match your project — we’ll calculate everything for you.
+          Move the slider to match your project - we'll calculate everything for you.
         </p>
         <p className="mt-2 text-sm leading-7 text-slate-600 md:text-base">
           We use a typical estimate that about{" "}
@@ -92,7 +92,7 @@ export default function HamiltonGrantCalculator() {
 
       <div className="mt-10">
         <p className="text-base font-semibold text-slate-900 md:text-lg">
-          Here’s what your project could look like:
+          Here's what your project could look like:
         </p>
       </div>
 
@@ -155,3 +155,5 @@ export default function HamiltonGrantCalculator() {
     </div>
   );
 }
+
+

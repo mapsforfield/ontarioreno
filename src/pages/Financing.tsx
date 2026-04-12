@@ -518,7 +518,7 @@ export default function Financing() {
                 Check My Monthly Payment
               </Link>
               <p className="mt-4 text-sm leading-6 text-slate-400">
-                Takes less than a minute • No obligation
+                Takes less than a minute - No obligation
               </p>
             </div>
           </div>
@@ -527,3 +527,5 @@ export default function Financing() {
     </div>
   );
 }
+
+

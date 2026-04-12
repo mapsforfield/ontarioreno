@@ -40,7 +40,7 @@ const requirementSteps = [
     step: '04',
     title: 'Submit for municipal review',
     detail:
-      'A legal basement file is tested by the Town of Milton against the details shown in the package, not just the homeowner’s intention.',
+      "A legal basement file is tested by the Town of Milton against the details shown in the package, not just the homeowner's intention.",
   },
   {
     step: '05',
@@ -426,3 +426,5 @@ export default function MiltonLegalBasement() {
     </div>
   );
 }
+
+

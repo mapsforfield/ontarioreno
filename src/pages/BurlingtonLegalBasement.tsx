@@ -20,7 +20,7 @@ const lastUpdated = new Intl.DateTimeFormat('en-US', {
 const requirementSteps = [
   {
     step: '01',
-    title: 'Confirm the basement’s intended use',
+    title: "Confirm the basement's intended use",
     detail:
       'A legal basement in Burlington has to be planned as true code-compliant living space, not just a nicely finished lower level.',
   },
@@ -40,7 +40,7 @@ const requirementSteps = [
     step: '04',
     title: 'Submit for municipal review',
     detail:
-      'A legal basement application is reviewed against the drawings and details provided, not just the homeowner’s goal for the space.',
+      "A legal basement application is reviewed against the drawings and details provided, not just the homeowner's goal for the space.",
   },
   {
     step: '05',
@@ -478,3 +478,5 @@ export default function BurlingtonLegalBasement() {
     </div>
   );
 }
+
+

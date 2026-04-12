@@ -111,7 +111,7 @@ export default function HamiltonGrantForm() {
               </h2>
 
               <p className="text-slate-300 text-sm md:text-base leading-relaxed mb-8">
-                Answer a few quick questions and we’ll review your eligibility.
+                Answer a few quick questions and we'll review your eligibility.
               </p>
 
               <ul className="space-y-4 text-sm text-slate-300">
@@ -270,7 +270,7 @@ export default function HamiltonGrantForm() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]"
                 >
                   <option>ASAP</option>
-                  <option>1–3 Months</option>
+                  <option>1-3 Months</option>
                   <option>3+ Months</option>
                   <option>Just exploring</option>
                 </select>
@@ -292,3 +292,4 @@ export default function HamiltonGrantForm() {
     </section>
   );
 }
+

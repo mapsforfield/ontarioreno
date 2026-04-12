@@ -261,7 +261,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 Garden suite Ontario
               </p>
               <h3 className="mt-3 text-3xl font-bold text-slate-900">
-                $250K – $400K+
+                $250K - $400K+
               </h3>
               <p className="mt-4 leading-7 text-slate-600">
                 Most detached backyard units land here once site servicing,
@@ -282,7 +282,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 Laneway suite Ontario
               </p>
               <h3 className="mt-3 text-3xl font-bold text-slate-900">
-                $350K – $750K+
+                $350K - $750K+
               </h3>
               <p className="mt-4 leading-7 text-slate-600">
                 A true laneway build can run materially higher because of urban
@@ -313,7 +313,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
 
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5">
             <p className="text-lg font-bold text-amber-900">
-              Most homeowners underestimate costs by 30–50%
+              Most homeowners underestimate costs by 30-50%
             </p>
             <p className="mt-2 text-sm leading-6 text-amber-800">
               The gap usually comes from servicing, soft costs, site prep,
@@ -438,7 +438,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 </h2>
                 <p className="mt-3 text-lg leading-8 text-slate-600">
                   A realistic detached suite timeline is usually{' '}
-                  <strong>8–14 months total</strong> once feasibility,
+                  <strong>8-14 months total</strong> once feasibility,
                   municipal review, servicing coordination, and construction are
                   included.
                 </p>
@@ -525,3 +525,5 @@ export default function GardenSuitesLanewaySuitesOntario() {
     </div>
   );
 }
+
+

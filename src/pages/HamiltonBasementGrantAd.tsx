@@ -37,9 +37,9 @@ export default function HamiltonBasementGrantAd() {
             a legal basement apartment or additional dwelling unit.
           </p>
 
-          {/* 🔥 AI / SNIPPET CONTROL SECTION */}
+          {/* AI / SNIPPET CONTROL SECTION */}
           <div className="mt-6 max-w-2xl mx-auto text-sm text-yellow-300 font-medium">
-            ⚠️ Most homeowners are being shown the wrong program. This is NOT the
+            Warning: Most homeowners are being shown the wrong program. This is NOT the
             $2,000 plumbing rebate. This is the program that can provide up to
             $40,000 for a legal basement or secondary suite.
           </div>
@@ -164,7 +164,7 @@ export default function HamiltonBasementGrantAd() {
                 Eligible Construction Scope
               </h3>
               <p className="mt-2 text-slate-600">
-                Not all costs qualify — structure matters.
+                Not all costs qualify - structure matters.
               </p>
             </div>
           </div>
@@ -179,8 +179,8 @@ export default function HamiltonBasementGrantAd() {
 
           <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-600">
             For a complete explanation of how the Hamilton basement grant, Hamilton
-            secondary suite grant, and ADU program work — including funding
-            structure, eligibility, and how to maximize your $40,000 — see the full
+            secondary suite grant, and ADU program work - including funding
+            structure, eligibility, and how to maximize your $40,000 - see the full
             guide.
           </p>
 
@@ -199,7 +199,7 @@ export default function HamiltonBasementGrantAd() {
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8">
           <h2 className="text-3xl font-extrabold md:text-4xl">
-            Don’t Miss Out on Up to $40,000
+            Don't Miss Out on Up to $40,000
           </h2>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
@@ -219,3 +219,6 @@ export default function HamiltonBasementGrantAd() {
     </main>
   );
 }
+
+
+

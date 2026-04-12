@@ -83,7 +83,7 @@ export default function Match() {
           </h1>
 
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            We don’t just send you random contractors — we help identify the best-fit company based on your project, budget, and goals.
+            We don't just send you random contractors - we help identify the best-fit company based on your project, budget, and goals.
           </p>
 
           <p className="mt-4 text-sm text-slate-500">
@@ -122,7 +122,7 @@ export default function Match() {
 
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  <span>Guided toward the best fit — not whoever pays to be shown</span>
+                  <span>Guided toward the best fit - not whoever pays to be shown</span>
                 </li>
               </ul>
             </div>
@@ -276,3 +276,4 @@ export default function Match() {
     </div>
   );
 }
+

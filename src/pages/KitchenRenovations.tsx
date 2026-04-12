@@ -26,7 +26,7 @@ export default function KitchenRenovations() {
 
             <p className="text-xl text-slate-300 mb-8">
               Real pricing, smart planning, and what actually drives kitchen renovation
-              costs across Ontario — before you start collecting quotes.
+              costs across Ontario - before you start collecting quotes.
             </p>
 
             <Link
@@ -69,63 +69,63 @@ export default function KitchenRenovations() {
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Cabinetry</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $10,000 – $25,000+
+                      $10,000 - $25,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Countertops</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $3,500 – $10,000+
+                      $3,500 - $10,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Backsplash</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $1,500 – $4,500
+                      $1,500 - $4,500
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Flooring</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $3,000 – $8,000
+                      $3,000 - $8,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Electrical</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $3,000 – $8,000
+                      $3,000 - $8,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Plumbing</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $8,000
+                      $2,500 - $8,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Demolition & prep</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,000 – $5,000
+                      $2,000 - $5,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Painting & finishing</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,000 – $5,000
+                      $2,000 - $5,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Appliances</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $4,000 – $15,000+
+                      $4,000 - $15,000+
                     </div>
                   </div>
                 </div>
@@ -156,11 +156,11 @@ export default function KitchenRenovations() {
                     Common cost drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• Cabinet material and construction quality</li>
-                    <li>• Quartz, granite, or premium countertop choices</li>
-                    <li>• Moving sink, dishwasher, or gas lines</li>
-                    <li>• Electrical rewiring or panel upgrades</li>
-                    <li>• Built-in appliances and custom trim work</li>
+                    <li>Cabinet material and construction quality</li>
+                    <li>Quartz, granite, or premium countertop choices</li>
+                    <li>Moving sink, dishwasher, or gas lines</li>
+                    <li>Electrical rewiring or panel upgrades</li>
+                    <li>Built-in appliances and custom trim work</li>
                   </ul>
                 </div>
 
@@ -169,11 +169,11 @@ export default function KitchenRenovations() {
                     Scope-related drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• Removing walls or changing the footprint</li>
-                    <li>• Leveling floors or correcting framing issues</li>
-                    <li>• New lighting plan and added circuits</li>
-                    <li>• Venting changes for range hoods</li>
-                    <li>• Permit and design complexity</li>
+                    <li>Removing walls or changing the footprint</li>
+                    <li>Leveling floors or correcting framing issues</li>
+                    <li>New lighting plan and added circuits</li>
+                    <li>Venting changes for range hoods</li>
+                    <li>Permit and design complexity</li>
                   </ul>
                 </div>
               </div>
@@ -303,7 +303,7 @@ export default function KitchenRenovations() {
                 </h3>
 
                 <p className="text-slate-600 mb-6">
-                  Tell us about your kitchen project and we’ll help identify the
+                  Tell us about your kitchen project and we'll help identify the
                   best-fit contractor based on your scope, budget, and finish level.
                 </p>
 
@@ -332,7 +332,7 @@ export default function KitchenRenovations() {
                   In kitchen renovations, cheaper quotes often leave out appliance
                   installation, backsplash, finish carpentry, electrical upgrades,
                   plumbing relocation, waste removal, or project management. That is
-                  why some “budget” quotes rise sharply once work begins.
+                  why some "budget" quotes rise sharply once work begins.
                 </p>
               </div>
 
@@ -355,3 +355,5 @@ export default function KitchenRenovations() {
     </div>
   );
 }
+
+

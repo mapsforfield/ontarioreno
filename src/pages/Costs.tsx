@@ -372,7 +372,7 @@ export default function Costs() {
             Want pricing based on your actual project?
           </h2>
           <p className="text-lg text-slate-600 mb-8">
-            Tell us what you’re building and we’ll help point you toward the
+            Tell us what you're building and we'll help point you toward the
             right contractor for your scope, budget, and renovation type.
           </p>
 

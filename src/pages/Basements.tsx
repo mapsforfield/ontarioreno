@@ -77,28 +77,28 @@ export default function Basements() {
                       Framing, drywall, taping &amp; paint
                     </div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $22,000
+                      $12,000 - $22,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Electrical</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $4,000 – $10,000
+                      $4,000 - $10,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Plumbing</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $4,000 – $12,000
+                      $4,000 - $12,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Flooring</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $4,000 – $10,000
+                      $4,000 - $10,000
                     </div>
                   </div>
 
@@ -107,35 +107,35 @@ export default function Basements() {
                       Trim, doors &amp; finish carpentry
                     </div>
                     <div className="text-right font-semibold text-slate-900">
-                      $4,000 – $9,000
+                      $4,000 - $9,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Bathroom addition</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $22,000
+                      $12,000 - $22,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Kitchen for legal apartment</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $12,000 – $25,000
+                      $12,000 - $25,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Separate entrance</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $8,000 – $20,000
+                      $8,000 - $20,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Permits &amp; drawings</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $6,000+
+                      $2,500 - $6,000+
                     </div>
                   </div>
                 </div>
@@ -181,11 +181,11 @@ export default function Basements() {
                       Common cost drivers
                     </p>
                     <ul className="space-y-2 text-sm text-slate-700">
-                      <li>• Ceiling height and structural limitations</li>
-                      <li>• Adding a bathroom or full kitchen</li>
-                      <li>• Electrical panel upgrades</li>
-                      <li>• Waterproofing or moisture remediation</li>
-                      <li>• Separate entrance construction</li>
+                      <li>Ceiling height and structural limitations</li>
+                      <li>Adding a bathroom or full kitchen</li>
+                      <li>Electrical panel upgrades</li>
+                      <li>Waterproofing or moisture remediation</li>
+                      <li>Separate entrance construction</li>
                     </ul>
                   </div>
 
@@ -194,11 +194,11 @@ export default function Basements() {
                       Legal suite upgrades
                     </p>
                     <ul className="space-y-2 text-sm text-slate-700">
-                      <li>• Fire separation requirements</li>
-                      <li>• Soundproofing between units</li>
-                      <li>• Egress and window compliance</li>
-                      <li>• Dedicated HVAC / ventilation work</li>
-                      <li>• Permit and drawing complexity</li>
+                      <li>Fire separation requirements</li>
+                      <li>Soundproofing between units</li>
+                      <li>Egress and window compliance</li>
+                      <li>Dedicated HVAC / ventilation work</li>
+                      <li>Permit and drawing complexity</li>
                     </ul>
                   </div>
                 </div>
@@ -309,7 +309,7 @@ export default function Basements() {
                     Ready to get quotes?
                   </h3>
                   <p className="text-slate-600 mb-6">
-                    Tell us about your basement project and we’ll help identify
+                    Tell us about your basement project and we'll help identify
                     the best-fit contractor based on your scope, budget, and
                     project type.
                   </p>
@@ -349,7 +349,7 @@ export default function Basements() {
                     to="/hamilton-basement-grant"
                     className="inline-flex text-sm font-semibold text-slate-900 underline underline-offset-4"
                   >
-                    See if you qualify →
+                    See if you qualify -{">"}
                   </Link>
                 </div>
 
@@ -372,3 +372,8 @@ export default function Basements() {
     </div>
   );
 }
+
+
+
+
+

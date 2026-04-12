@@ -86,7 +86,7 @@ export default function LanewaySuiteCostOntario() {
     },
     {
       title: 'Mid-range projects',
-      range: 'Around $450,000–$600,000+',
+      range: 'Around $450,000-$600,000+',
       body: 'Where many serious laneway projects land once design, construction, utilities, approvals, and site complexity are fully accounted for.',
     },
     {
@@ -371,7 +371,7 @@ export default function LanewaySuiteCostOntario() {
                 <p className="mt-3 text-lg leading-8 text-slate-600">
                   Most projects move through feasibility, design and approvals,
                   then construction. In practice, total timelines often land
-                  around <strong>8–14 months</strong> or longer depending on
+                  around <strong>8-14 months</strong> or longer depending on
                   municipal review, site complexity, and how difficult the build
                   is to execute.
                 </p>
@@ -452,3 +452,5 @@ export default function LanewaySuiteCostOntario() {
     </div>
   );
 }
+
+

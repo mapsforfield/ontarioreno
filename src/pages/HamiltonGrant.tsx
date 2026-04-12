@@ -7,11 +7,11 @@ export default function HamiltonGrant() {
     <main className="bg-white text-slate-900">
       <Helmet>
         <title>
-          Hamilton Basement Grant Guide (2026) | $40,000 ADU & Secondary Suite Program
+          Hamilton $40,000 Basement Grant (2026) - Who Actually Qualifies?
         </title>
         <meta
           name="description"
-          content="Complete 2026 guide to the Hamilton Basement Grant. Learn eligibility, ADU and secondary suite rules, costs that qualify, and how to access up to $40,000."
+          content="Get up to $40,000 to build a legal basement suite in Hamilton. See who qualifies, real costs, and exactly how to apply step-by-step."
         />
         <link
           rel="canonical"
@@ -24,15 +24,15 @@ export default function HamiltonGrant() {
         <div className="mx-auto max-w-7xl px-6 py-16 md:px-8 md:py-24">
           <div className="max-w-4xl">
             <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-              Hamilton $40,000 Basement Grant (2026) – Who Actually Qualifies?
+              Hamilton $40,000 Basement Grant (2026) - Who Actually Qualifies?
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-              Hamilton homeowners can receive up to $40,000 in funding to build a legal basement suite through the city’s ADU and secondary suite programs.
+              Hamilton homeowners can receive up to $40,000 in funding to build a legal basement suite through the city's ADU and secondary suite programs.
             </p>
 
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-              This guide breaks down exactly who qualifies, what costs are covered, and how to apply step-by-step — based on real program rules and requirements.
+              This guide breaks down exactly who qualifies, what costs are covered, and how to apply step-by-step - based on real program rules and requirements.
             </p>
 
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
@@ -188,7 +188,7 @@ export default function HamiltonGrant() {
         <div className="mx-auto max-w-7xl px-6 py-16 md:px-8">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
             <h2 className="text-3xl font-extrabold">
-              Donâ€™t Miss Out on Up to $40,000
+              Don't Miss Out on Up to $40,000
             </h2>
 
             <p className="mt-4 text-lg text-slate-300">
@@ -209,3 +209,6 @@ export default function HamiltonGrant() {
     </main>
   );
 }
+
+
+

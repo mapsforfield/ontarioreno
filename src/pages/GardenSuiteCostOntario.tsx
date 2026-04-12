@@ -135,7 +135,7 @@ export default function GardenSuiteCostOntario() {
     },
     {
       title: 'Mid-range projects',
-      range: 'Around $300,000–$400,000+',
+      range: 'Around $300,000-$400,000+',
       body: 'Where many serious garden suite projects land once design, servicing, construction, and approvals are priced properly.',
     },
     {
@@ -736,7 +736,7 @@ export default function GardenSuiteCostOntario() {
                 <p className="mt-3 text-lg leading-8 text-slate-600">
                   Most projects move through feasibility and planning, then
                   design and permits, then construction. In practice, total
-                  timelines often land around <strong>8–14 months</strong>{' '}
+                  timelines often land around <strong>8-14 months</strong>{' '}
                   depending on the site, municipality, and overall complexity.
                 </p>
               </div>
@@ -816,3 +816,5 @@ export default function GardenSuiteCostOntario() {
     </div>
   );
 }
+
+

@@ -69,7 +69,7 @@ export default function BathroomRenovations() {
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Demolition & prep</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $1,500 – $4,000
+                      $1,500 - $4,000
                     </div>
                   </div>
 
@@ -78,56 +78,56 @@ export default function BathroomRenovations() {
                       Waterproofing & shower prep
                     </div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $6,000
+                      $2,500 - $6,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Tile supply & installation</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $5,000 – $14,000+
+                      $5,000 - $14,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Vanity & countertop</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $7,000+
+                      $2,500 - $7,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Toilet, tub, shower fixtures</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $8,000+
+                      $2,500 - $8,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Plumbing changes</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $2,500 – $8,000
+                      $2,500 - $8,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Electrical & lighting</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $1,500 – $5,000
+                      $1,500 - $5,000
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Glass / shower enclosure</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $1,500 – $5,000+
+                      $1,500 - $5,000+
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">Painting & finishing</div>
                     <div className="text-right font-semibold text-slate-900">
-                      $1,500 – $4,000
+                      $1,500 - $4,000
                     </div>
                   </div>
                 </div>
@@ -158,11 +158,11 @@ export default function BathroomRenovations() {
                     Common cost drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• Tile size, type, and installation complexity</li>
-                    <li>• Custom shower builds and waterproofing</li>
-                    <li>• Vanity, countertop, and fixture upgrades</li>
-                    <li>• Plumbing relocation</li>
-                    <li>• Glass enclosures and premium hardware</li>
+                    <li>Tile size, type, and installation complexity</li>
+                    <li>Custom shower builds and waterproofing</li>
+                    <li>Vanity, countertop, and fixture upgrades</li>
+                    <li>Plumbing relocation</li>
+                    <li>Glass enclosures and premium hardware</li>
                   </ul>
                 </div>
 
@@ -171,11 +171,11 @@ export default function BathroomRenovations() {
                     Scope-related drivers
                   </p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    <li>• Rot, mold, or subfloor repair discovered after demo</li>
-                    <li>• Electrical corrections and added lighting</li>
-                    <li>• In-floor heating systems</li>
-                    <li>• Niche details, benches, and custom trim</li>
-                    <li>• Permit and design complexity</li>
+                    <li>Rot, mold, or subfloor repair discovered after demo</li>
+                    <li>Electrical corrections and added lighting</li>
+                    <li>In-floor heating systems</li>
+                    <li>Niche details, benches, and custom trim</li>
+                    <li>Permit and design complexity</li>
                   </ul>
                 </div>
               </div>
@@ -191,7 +191,7 @@ export default function BathroomRenovations() {
                   Some quotes look attractive because they exclude waterproofing
                   details, fixture allowances, glass, tile prep, hidden plumbing
                   work, waste removal, or finish-level assumptions. Bathrooms are
-                  one of the easiest places for “extras” to show up if the quote
+                  one of the easiest places for "extras" to show up if the quote
                   is not detailed.
                 </p>
               </div>
@@ -306,7 +306,7 @@ export default function BathroomRenovations() {
                 </h3>
 
                 <p className="text-slate-600 mb-6">
-                  Tell us about your bathroom project and we’ll help identify the
+                  Tell us about your bathroom project and we'll help identify the
                   best-fit contractor based on your scope, budget, and finish
                   level.
                 </p>
@@ -336,7 +336,7 @@ export default function BathroomRenovations() {
                   In bathroom renovations, cheaper quotes often understate
                   waterproofing, tile prep, plumbing changes, niche work, shower
                   glass, ventilation corrections, or fixture allowances. That is
-                  why many “budget” bathrooms become much more expensive once
+                  why many "budget" bathrooms become much more expensive once
                   construction begins.
                 </p>
               </div>
@@ -360,3 +360,5 @@ export default function BathroomRenovations() {
     </div>
   );
 }
+
+
