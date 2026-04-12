@@ -4,6 +4,11 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Basements from './pages/Basements';
 import LegalSuites from './pages/LegalSuites';
+import GardenSuitesLanewaySuitesOntario from './pages/GardenSuitesLanewaySuitesOntario';
+import GardenSuiteCostOntario from './pages/GardenSuiteCostOntario';
+import GardenSuitePermitsOntario from './pages/GardenSuitePermitsOntario';
+import LanewaySuiteCostOntario from './pages/LanewaySuiteCostOntario';
+import LanewaySuitePermitsOntario from './pages/LanewaySuitePermitsOntario';
 import KitchenRenovations from './pages/KitchenRenovations';
 import BathroomRenovations from './pages/BathroomRenovations';
 import Costs from './pages/Costs';
@@ -60,6 +65,26 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="basements" element={<Basements />} />
           <Route path="legal-suites" element={<LegalSuites />} />
+          <Route
+            path="garden-suites-laneway-suites-ontario"
+            element={<GardenSuitesLanewaySuitesOntario />}
+          />
+          <Route
+            path="garden-suite-cost-ontario"
+            element={<GardenSuiteCostOntario />}
+          />
+          <Route
+            path="garden-suite-permits-ontario"
+            element={<GardenSuitePermitsOntario />}
+          />
+          <Route
+            path="laneway-suite-cost-ontario"
+            element={<LanewaySuiteCostOntario />}
+          />
+          <Route
+            path="laneway-suite-permits-ontario"
+            element={<LanewaySuitePermitsOntario />}
+          />
           <Route path="kitchen-renovations" element={<KitchenRenovations />} />
           <Route path="bathroom-renovations" element={<BathroomRenovations />} />
           <Route path="costs" element={<Costs />} />
