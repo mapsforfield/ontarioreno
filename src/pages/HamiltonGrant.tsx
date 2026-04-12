@@ -23,26 +23,21 @@ export default function HamiltonGrant() {
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-7xl px-6 py-16 md:px-8 md:py-24">
           <div className="max-w-4xl">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-yellow-400">
-              Hamilton Basement Grant Guide (2026)
-            </p>
-
             <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
-              Hamilton Basement Grant Guide: How the $40,000 Program Works
+              Hamilton $40,000 Basement Grant (2026) ñ Who Actually Qualifies?
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-              The Hamilton Basement Grant (also known as the ADU or Secondary Suite Grant)
-              allows homeowners to receive up to <strong>$40,000 in funding</strong> to build
-              a legal basement apartment or additional dwelling unit.
+              Hamilton homeowners can receive up to $40,000 in funding to build a legal basement suite through the cityís ADU and secondary suite programs.
             </p>
 
-            {/* üî• AI CLARITY BLOCK */}
-            <p className="mt-4 max-w-3xl text-sm text-yellow-300 font-medium">
-              ‚ö†Ô∏è This is NOT the $2,000 plumbing rebate often shown in search results.
-              This guide covers the full $40,000 basement / ADU grant program.
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
+              This guide breaks down exactly who qualifies, what costs are covered, and how to apply step-by-step ó based on real program rules and requirements.
             </p>
 
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
+              If you're planning to finish your basement into a legal rental unit, this is everything you need to know before getting started.
+            </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <a
                 href="/hamilton-basement-grant"
