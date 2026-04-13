@@ -55,11 +55,11 @@ export default function GardenSuitesLanewaySuitesOntario() {
     <div className="min-h-screen bg-slate-50">
       <Helmet>
         <title>
-          Garden Suites & Laneway Homes in Ontario (2026 Guide) | OntarioReno
+          Garden Suites & Laneway Homes Ontario (2026 Guide + Costs)
         </title>
         <meta
           name="description"
-          content="Learn what a garden suite Ontario project or laneway suite Ontario build really costs in 2026. Understand permits, eligibility, timelines, and real garden suite cost Ontario expectations."
+          content="Learn how garden suites and laneway homes work in Ontario, including costs, permits, and what most homeowners get wrong before building."
         />
         <link
           rel="canonical"
@@ -89,7 +89,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 to="/match"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-4 text-lg font-bold text-white transition-all hover:bg-blue-500"
               >
-                Check If Your Property Qualifies
+                Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
@@ -192,14 +192,14 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 to="/match"
                 className="mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-4 font-semibold text-white transition hover:bg-slate-800"
               >
-                Check If Your Property Qualifies
+                Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
               <h3 className="text-2xl font-bold text-slate-900">
-                What qualifies fastest
+                What Makes a Property Easier to Approve
               </h3>
               <div className="mt-6 space-y-5">
                 <div>
@@ -266,7 +266,22 @@ export default function GardenSuitesLanewaySuitesOntario() {
               <p className="mt-4 leading-7 text-slate-600">
                 Most detached backyard units land here once site servicing,
                 design, permits, foundation work, and actual construction are
-                included. For a deeper breakdown, see the full{' '}
+                included. If you want to understand the approval side before
+                budgeting further, review the{' '}
+                <Link
+                  to="/garden-suite-permits-ontario"
+                  className="font-semibold underline underline-offset-4"
+                >
+                  garden suite permits Ontario
+                </Link>{' '}
+                guide.
+              </p>
+              <p className="mt-4 leading-7 text-slate-600">
+                Some smaller builds can start in the low-$200Ks.
+              </p>
+              <p className="mt-4 leading-7 text-slate-600">
+                Most real projects fall between $260K-$350K. For a deeper
+                breakdown, see the full{' '}
                 <Link
                   to="/garden-suite-cost-ontario"
                   className="font-semibold underline underline-offset-4"
@@ -313,7 +328,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
 
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5">
             <p className="text-lg font-bold text-amber-900">
-              Most homeowners underestimate costs by 30-50%
+              Most homeowners underestimate total project cost by 30-50%
             </p>
             <p className="mt-2 text-sm leading-6 text-amber-800">
               The gap usually comes from servicing, soft costs, site prep,
@@ -510,7 +525,7 @@ export default function GardenSuitesLanewaySuitesOntario() {
                 to="/match"
                 className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-8 py-4 text-lg font-bold text-white transition hover:bg-slate-800"
               >
-                Get Started
+                Check My Property
               </Link>
               <Link
                 to="/garden-suite-cost-ontario"

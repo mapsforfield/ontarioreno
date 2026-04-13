@@ -40,6 +40,7 @@ export default function Navbar() {
   const navLinks = [
     { name: 'Grants', href: '/hamilton-grant-guide' },
     { name: 'Cost Guides', href: '/costs' },
+    { name: 'Garden Suites', href: '/garden-suites-laneway-suites-ontario' },
     { name: 'Contractor Match', href: '/match' },
   ];
 

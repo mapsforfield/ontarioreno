@@ -44,7 +44,7 @@ export default function GardenSuiteCostOntario() {
   const [size, setSize] = useState(700);
   const [finishLevel, setFinishLevel] = useState<'Basic' | 'Mid-Range' | 'Higher-End'>('Mid-Range');
   const [accessDifficulty, setAccessDifficulty] = useState<'Easy access' | 'Moderate access' | 'Tight / difficult access'>('Moderate access');
-  const [servicingComplexity, setServicingComplexity] = useState<'Straightforward / short run' | 'Moderate trenching / coordination' | 'Complex servicing / long run / upgrades likely'>('Moderate trenching / coordination');
+  const [servicingComplexity, setServicingComplexity] = useState<'Straightforward servicing' | 'Moderate servicing' | 'Complex servicing'>('Moderate servicing');
   const [siteComplexity, setSiteComplexity] = useState<'Straightforward' | 'Some complexity' | 'Higher complexity'>('Some complexity');
 
   const costBreakdownItems = [
@@ -206,9 +206,9 @@ export default function GardenSuiteCostOntario() {
           ? 10000
           : 30000;
     const servicingAdjustment =
-      servicingComplexity === 'Straightforward / short run'
+      servicingComplexity === 'Straightforward servicing'
         ? 5000
-        : servicingComplexity === 'Moderate trenching / coordination'
+        : servicingComplexity === 'Moderate servicing'
           ? 25000
           : 50000;
     const siteComplexityAdjustment =
@@ -242,8 +242,8 @@ export default function GardenSuiteCostOntario() {
       ...(finishLevel === 'Higher-End' ? ['Higher-end finishes'] : []),
       ...(accessDifficulty === 'Moderate access' ? ['Moderate access'] : []),
       ...(accessDifficulty === 'Tight / difficult access' ? ['Difficult access'] : []),
-      ...(servicingComplexity === 'Moderate trenching / coordination' ? ['Moderate servicing'] : []),
-      ...(servicingComplexity === 'Complex servicing / long run / upgrades likely' ? ['Complex servicing'] : []),
+      ...(servicingComplexity === 'Moderate servicing' ? ['Moderate servicing'] : []),
+      ...(servicingComplexity === 'Complex servicing' ? ['Complex servicing'] : []),
       ...(siteComplexity === 'Some complexity' ? ['Approval complexity'] : []),
       ...(siteComplexity === 'Higher complexity' ? ['Higher site complexity'] : []),
     ].slice(0, 4);
@@ -269,11 +269,11 @@ export default function GardenSuiteCostOntario() {
     <div className="min-h-screen bg-slate-50">
       <Helmet>
         <title>
-          Garden Suite Cost in Ontario (2026 Real Price Guide) | OntarioReno
+          Garden Suite Cost Ontario (2026 Real Prices + Calculator)
         </title>
         <meta
           name="description"
-          content="Learn the real cost of building a garden suite in Ontario, including design, permits, servicing, construction, hidden costs, and what drives price. Updated for 2026."
+          content="See real garden suite costs in Ontario, including a live calculator, cost breakdown, hidden expenses, and what most projects actually cost."
         />
         <link
           rel="canonical"
@@ -309,14 +309,14 @@ export default function GardenSuiteCostOntario() {
                 to="/match"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-4 text-lg font-bold text-white transition-all hover:bg-blue-500"
               >
-                Get a Real Cost Estimate
+                Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
-                to="/match"
+                to="/garden-suite-permits-ontario"
                 className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-white/20"
               >
-                Check If Your Property Qualifies
+                View Permit Guide
               </Link>
             </div>
           </div>
@@ -339,13 +339,21 @@ export default function GardenSuiteCostOntario() {
               complex builds can go materially higher. That is one reason a
               realistic <strong>garden suite price Ontario</strong>{' '}
               conversation needs to be tied to the actual property, not just
-              the unit size.
+              the unit size. For a broader starting point, compare this against
+              our{' '}
+              <Link
+                to="/garden-suites-laneway-suites-ontario"
+                className="font-semibold underline underline-offset-4"
+              >
+                garden suites and laneway homes overview
+              </Link>
+              .
             </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-16 md:py-20">
+      <section id="calculator" className="bg-white py-16 md:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-8 shadow-[0_24px_70px_rgba(15,23,42,0.06)] md:p-10">
             <SectionHeading
@@ -453,16 +461,16 @@ export default function GardenSuiteCostOntario() {
                         onChange={(event) =>
                           setServicingComplexity(
                             event.target.value as
-                              | 'Straightforward / short run'
-                              | 'Moderate trenching / coordination'
-                              | 'Complex servicing / long run / upgrades likely'
+                              | 'Straightforward servicing'
+                              | 'Moderate servicing'
+                              | 'Complex servicing'
                           )
                         }
                         className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-slate-100"
                       >
-                        <option>Straightforward / short run</option>
-                        <option>Moderate trenching / coordination</option>
-                        <option>Complex servicing / long run / upgrades likely</option>
+                        <option>Straightforward servicing</option>
+                        <option>Moderate servicing</option>
+                        <option>Complex servicing</option>
                       </select>
                     </div>
 
@@ -579,6 +587,9 @@ export default function GardenSuiteCostOntario() {
                 </div>
 
                 <p className="mt-6 text-sm leading-7 text-slate-300">
+                  Most Ontario garden suite projects fall between $250K-$400K+.
+                </p>
+                <p className="mt-3 text-sm leading-7 text-slate-300">
                   Most projects land between <strong>$250,000 and $400,000+</strong>,
                   and many full real-world projects fall closer to{' '}
                   <strong>$260,000 to $350,000</strong>. Some smaller or
@@ -587,7 +598,14 @@ export default function GardenSuiteCostOntario() {
                 </p>
                 <p className="mt-3 text-sm leading-7 text-slate-300">
                   Lower contractor quotes are often build-only and may not
-                  include permits, servicing, design, or site-related costs.
+                  include{' '}
+                  <Link
+                    to="/garden-suite-permits-ontario"
+                    className="font-semibold underline underline-offset-4"
+                  >
+                    permits
+                  </Link>
+                  , servicing, design, or site-related costs.
                   This tool reflects a fuller all-in planning range.
                 </p>
 
@@ -660,7 +678,14 @@ export default function GardenSuiteCostOntario() {
                 garden suites and laneway homes guide
               </Link>{' '}
               before assuming a backyard build is automatically the lower-cost
-              option.
+              option. If approvals are still unclear, review the{' '}
+              <Link
+                to="/garden-suite-permits-ontario"
+                className="font-semibold underline underline-offset-4"
+              >
+                permit path
+              </Link>{' '}
+              before you lock in a budget expectation.
             </p>
           </div>
         </div>
@@ -798,7 +823,7 @@ export default function GardenSuiteCostOntario() {
               approval reality.
             </h2>
             <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-              If you want a realistic number before early ideas turn into bad
+              If you want a realistic number before early ideas turn into costly
               decisions, OntarioReno can help you pressure-test the project
               early.
             </p>
@@ -807,7 +832,7 @@ export default function GardenSuiteCostOntario() {
                 to="/match"
                 className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-8 py-4 text-lg font-bold text-white transition hover:bg-slate-800"
               >
-                Get My Estimate
+                Check My Property
               </Link>
             </div>
           </div>

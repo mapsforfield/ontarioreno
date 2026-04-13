@@ -135,10 +135,10 @@ export default function GardenSuitePermitsOntario() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Garden Suite Permits in Ontario (2026 Guide) | OntarioReno</title>
+        <title>Garden Suite Permits Ontario (2026 Rules + Approval Guide)</title>
         <meta
           name="description"
-          content="Learn how garden suite permits work in Ontario, including zoning, setbacks, servicing, drawings, approvals, and common delays. Updated for 2026."
+          content="Understand garden suite permits in Ontario, including zoning, approvals, drawings, timelines, and common reasons projects get delayed."
         />
         <link
           rel="canonical"
@@ -160,9 +160,7 @@ export default function GardenSuitePermitsOntario() {
             </h1>
 
             <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-300">
-              A garden suite is not just a backyard structure. It is a real
-              residential structure that requires proper approvals, drawings,
-              servicing, and code compliance before construction starts.
+              A garden suite is a fully regulated residential structure that requires proper approvals, drawings, servicing, and code compliance before construction begins.
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
@@ -170,14 +168,14 @@ export default function GardenSuitePermitsOntario() {
                 to="/match"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-4 text-lg font-bold text-white transition-all hover:bg-blue-500"
               >
-                Check If Your Property Qualifies
+                Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 to="/garden-suite-cost-ontario"
                 className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-white/20"
               >
-                See Garden Suite Costs
+                View Garden Suite Costs
               </Link>
             </div>
           </div>
@@ -208,6 +206,9 @@ export default function GardenSuitePermitsOntario() {
                   </Link>{' '}
                   before moving into drawings or submissions.
                 </p>
+                <p className="mt-4 text-lg leading-8 text-slate-700">
+                  Permit requirements are also one of the reasons real garden suite projects often land in the $250K-$400K+ range. Approvals, servicing, and compliance are a core part of the total project, not an optional add-on.
+                </p>
               </div>
             </div>
           </div>
@@ -217,7 +218,7 @@ export default function GardenSuitePermitsOntario() {
       <section className="bg-white py-16 md:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionHeading
-            title="What Municipalities Review"
+            title="What Municipalities Review for Garden Suite Permits"
             description="A backyard suite permit Ontario review is really a full-property review. Municipalities are checking whether the lot, the servicing, and the building all work together as a real additional dwelling unit."
           />
 
@@ -311,7 +312,15 @@ export default function GardenSuitePermitsOntario() {
                 Toronto rules are also not identical to other Ontario cities.
                 A detached backyard suite permit Ontario pathway still depends
                 on the local municipality, the lot, and the practical servicing
-                constraints attached to that property.
+                constraints attached to that property. If you want the broader
+                planning context first, start with our{' '}
+                <Link
+                  to="/garden-suites-laneway-suites-ontario"
+                  className="font-semibold underline underline-offset-4"
+                >
+                  garden suites and laneway homes overview
+                </Link>
+                .
               </p>
             </div>
 
