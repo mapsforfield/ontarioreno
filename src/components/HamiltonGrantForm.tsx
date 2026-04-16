@@ -14,6 +14,10 @@ export default function HamiltonGrantForm() {
     locatedInHamilton: 'Yes',
     projectType: 'Legal Secondary Suite',
     timeline: 'ASAP',
+    basementStatus: 'Fully unfinished',
+    separateEntrance: 'Yes',
+    ceilingHeightOk: 'Yes',
+    permitStatus: "Haven't applied yet",
     callPreference: 'Today',
     callDate: '',
     callWindow: 'Afternoon (12–5)',
@@ -40,6 +44,16 @@ export default function HamiltonGrantForm() {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const basementDetails =
+      formData.projectType === 'Legal Secondary Suite'
+        ? [
+            `Basement Status: ${formData.basementStatus}`,
+            `Separate Entrance: ${formData.separateEntrance}`,
+            `Ceiling Height: ${formData.ceilingHeightOk}`,
+            `Permit Status: ${formData.permitStatus}`,
+          ]
+        : [];
+
     const callTimingDetails = [
       `Call Preference: ${formData.callPreference}`,
       ...(formData.callPreference === 'Another Day' && formData.callDate
@@ -64,6 +78,7 @@ export default function HamiltonGrantForm() {
         `Located In Hamilton: ${formData.locatedInHamilton}`,
         `Planning: ${formData.projectType}`,
         `Timeline: ${formData.timeline}`,
+        ...basementDetails,
         ...callTimingDetails,
         `Lead Source: Hamilton Grant Form`,
       ].join(' | '),
@@ -104,6 +119,10 @@ export default function HamiltonGrantForm() {
         locatedInHamilton: 'Yes',
         projectType: 'Legal Secondary Suite',
         timeline: 'ASAP',
+        basementStatus: 'Fully unfinished',
+        separateEntrance: 'Yes',
+        ceilingHeightOk: 'Yes',
+        permitStatus: "Haven't applied yet",
         callPreference: 'Today',
         callDate: '',
         callWindow: 'Afternoon (12–5)',
@@ -299,6 +318,77 @@ export default function HamiltonGrantForm() {
                   <option>Just exploring</option>
                 </select>
               </div>
+
+              {formData.projectType === 'Legal Secondary Suite' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      What best describes the basement right now?
+                    </label>
+                    <select
+                      name="basementStatus"
+                      value={formData.basementStatus}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]"
+                    >
+                      <option>Fully unfinished</option>
+                      <option>Partially finished</option>
+                      <option>Fully finished</option>
+                      <option>Not sure</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Is there already a separate entrance?
+                    </label>
+                    <select
+                      name="separateEntrance"
+                      value={formData.separateEntrance}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]"
+                    >
+                      <option>Yes</option>
+                      <option>No</option>
+                      <option>Not sure</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Does the basement have at least 1.95 m (6&apos; 4¾&quot;) of
+                      ceiling height?
+                    </label>
+                    <select
+                      name="ceilingHeightOk"
+                      value={formData.ceilingHeightOk}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]"
+                    >
+                      <option>Yes</option>
+                      <option>No</option>
+                      <option>Not sure</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      What is the permit status?
+                    </label>
+                    <select
+                      name="permitStatus"
+                      value={formData.permitStatus}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]"
+                    >
+                      <option>Haven&apos;t applied yet</option>
+                      <option>Waiting for permit approval</option>
+                      <option>Permit already approved</option>
+                      <option>Not sure</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div className="pt-2 border-t border-slate-100">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
