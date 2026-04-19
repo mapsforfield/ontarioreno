@@ -374,6 +374,13 @@ export default function Financing() {
                     Financing may be available through established providers such as Financeit, depending on the contractor and project.
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
+                    If you want a deeper breakdown of payment flexibility, no-prepayment-penalty structure, and smarter payoff planning, see our{' '}
+                    <Link to="/open-loan-financing" className="font-medium text-[#1B3C6C] hover:underline">
+                      open loan financing guide
+                    </Link>
+                    .
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">
                     It also helps to compare monthly payments against overall{' '}
                     <Link to="/costs" className="font-medium text-[#1B3C6C] hover:underline">
                       renovation costs

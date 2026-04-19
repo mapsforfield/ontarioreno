@@ -15,6 +15,7 @@ import Costs from './pages/Costs';
 import Match from './pages/Match';
 import Cities from './pages/Cities';
 import Financing from './pages/Financing';
+import OpenLoanFinancing from './pages/OpenLoanFinancing';
 import HamiltonGrant from './pages/HamiltonGrant';
 import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
 import HamiltonSecondarySuiteGrant from './pages/HamiltonSecondarySuiteGrant';
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="match" element={<Match />} />
           <Route path="cities" element={<Cities />} />
           <Route path="financing" element={<Financing />} />
+          <Route path="open-loan-financing" element={<OpenLoanFinancing />} />
           <Route path="hamilton-grant-guide" element={<HamiltonGrant />} />
           <Route path="hamilton-secondary-suite-grant" element={<HamiltonSecondarySuiteGrant />} />
           <Route path="hamilton-building-permit-timeline" element={<HamiltonPermitTimeline />} />
