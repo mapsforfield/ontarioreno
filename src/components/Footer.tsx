@@ -117,7 +117,7 @@ export default function Footer() {
                 to="/match"
                 className="inline-flex items-center gap-2 font-medium text-white transition-colors hover:text-[#5694CF]"
               >
-                Get Matched <ArrowRight className="h-4 w-4" />
+                Review My Project <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

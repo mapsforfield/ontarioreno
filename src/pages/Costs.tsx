@@ -380,7 +380,7 @@ export default function Costs() {
             to="/match"
             className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all"
           >
-            Get Matched <ArrowRight className="w-5 h-5 ml-2" />
+            Review My Project <ArrowRight className="w-5 h-5 ml-2" />
           </Link>
         </div>
       </div>

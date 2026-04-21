@@ -205,7 +205,7 @@ export default function Navbar() {
               to="/match"
               className={cn(buttonStyles.primary, 'rounded-full px-6 py-2.5 text-sm shadow-sm')}
             >
-              Get Matched
+              Review My Project
             </Link>
           </div>
 
@@ -341,7 +341,7 @@ export default function Navbar() {
                     to="/match"
                     className={cn(buttonStyles.primary, 'w-full px-6 py-3 text-center text-base')}
                   >
-                    Get Matched with Contractors
+                    Review My Project
                   </Link>
                 </div>
               </div>

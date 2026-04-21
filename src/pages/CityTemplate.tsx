@@ -52,7 +52,7 @@ export default function CityToronto() {
               <ShieldCheck className="w-10 h-10 text-purple-600 mb-4" />
               <h3 className="text-xl font-bold text-slate-900 mb-3">Vetted Pros</h3>
               <p className="text-slate-600 text-sm mb-4">We've pre-screened hundreds of Toronto contractors, verifying their City of Toronto Municipal Licensing & Standards (MLS) license.</p>
-              <Link to="/match" className="text-purple-600 font-semibold text-sm hover:underline">Get Matched</Link>
+              <Link to="/match" className="text-purple-600 font-semibold text-sm hover:underline">Review My Project</Link>
             </div>
           </div>
 
