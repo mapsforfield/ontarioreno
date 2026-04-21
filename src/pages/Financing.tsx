@@ -7,6 +7,7 @@ import {
   Wallet,
   Wrench,
 } from 'lucide-react';
+import { buttonStyles } from '../lib/uiStyles';
 
 const paymentExamples = [
   {
@@ -108,10 +109,6 @@ export default function Financing() {
               right contractor if it makes sense.
             </p>
 
-            <p className="mt-4 max-w-xl text-base leading-7 text-slate-700">
-              Most homeowners are surprised how affordable renovations can actually be.
-            </p>
-
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-500">
               We help you understand your options first, then connect you with
               the right contractor if it makes sense.
@@ -120,7 +117,7 @@ export default function Financing() {
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
               <Link
                 to="/match"
-                className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white shadow-[0_16px_32px_rgba(27,60,108,0.18)] transition hover:bg-blue-700 hover:shadow-[0_20px_40px_rgba(27,60,108,0.22)]"
+                className={buttonStyles.primary}
               >
                 See My Options
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -223,10 +220,8 @@ export default function Financing() {
               These Ontario renovation financing examples help homeowners think in monthly terms instead of total sticker shock.
             </p>
             <p className="mx-auto mt-2 max-w-3xl text-sm leading-7 text-slate-500">
-              These are typical scenarios designed to help you estimate what a realistic payment range could look like.
-            </p>
-            <p className="mx-auto mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              These examples help you understand what real monthly payments typically look like, not just total project cost.
+              Illustrative scenarios only. Actual approval and terms depend on
+              borrower profile, project scope, and lender review.
             </p>
           </div>
 
@@ -520,7 +515,7 @@ export default function Financing() {
             <div className="mt-10">
               <Link
                 to="/match"
-                className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-9 py-4 text-base font-bold text-white shadow-[0_16px_32px_rgba(27,60,108,0.22)] transition hover:bg-blue-700 hover:shadow-[0_20px_40px_rgba(27,60,108,0.26)]"
+                className={buttonStyles.primary}
               >
                 Check My Monthly Payment
               </Link>

@@ -3,10 +3,9 @@ import { Mail, MapPin, ArrowRight } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-900 text-slate-300 py-16 border-t border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          {/* Brand */}
+    <footer className="border-t border-slate-800 bg-slate-900 py-16 text-slate-300">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-6">
             <Link to="/" className="flex items-center text-white">
               <img
@@ -20,7 +19,7 @@ export default function Footer() {
                 href="https://www.facebook.com/profile.php?id=61573361066338"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-[#1B3C6C] transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 transition-colors hover:bg-[#1B3C6C]"
               >
                 <span className="text-xs font-bold">FB</span>
               </a>
@@ -29,116 +28,86 @@ export default function Footer() {
                 href="https://www.instagram.com/ontarioreno.ca?igsh=MXhtNmVlcjV1dHBwdg%3D%3D&utm_source=qr"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-[#1B3C6C] transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 transition-colors hover:bg-[#1B3C6C]"
               >
                 <span className="text-xs font-bold">IG</span>
               </a>
             </div>
           </div>
 
-          {/* Renovation Hubs */}
           <div>
-            <h3 className="text-white font-semibold mb-6">Renovation Hubs</h3>
+            <h3 className="mb-6 font-semibold text-white">Renovation Hubs</h3>
             <ul className="space-y-4 text-sm">
               <li>
-                <Link
-                  to="/basements"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/basements" className="transition-colors hover:text-[#5694CF]">
                   Basement Finishing
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/legal-suites"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/legal-suites" className="transition-colors hover:text-[#5694CF]">
                   Legal Secondary Suites
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/kitchen-renovations"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/kitchen-renovations" className="transition-colors hover:text-[#5694CF]">
                   Kitchen Renovations
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/bathroom-renovations"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/bathroom-renovations" className="transition-colors hover:text-[#5694CF]">
                   Bathroom Renovations
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/costs"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/costs" className="transition-colors hover:text-[#5694CF]">
                   2026 Cost Guides
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Popular Resources */}
           <div>
-            <h3 className="text-white font-semibold mb-6">Popular Resources</h3>
+            <h3 className="mb-6 font-semibold text-white">Popular Resources</h3>
             <ul className="space-y-4 text-sm">
               <li>
-                <Link
-                  to="/hamilton-grant-guide"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/hamilton-grant-guide" className="transition-colors hover:text-[#5694CF]">
                   Hamilton Grant Guide
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/hamilton-basement-grant"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/hamilton-basement-grant" className="transition-colors hover:text-[#5694CF]">
                   Hamilton Grant Calculator
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/match"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/match" className="transition-colors hover:text-[#5694CF]">
                   Find the Right Contractor
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/costs"
-                  className="hover:text-[#5694CF] transition-colors"
-                >
+                <Link to="/costs" className="transition-colors hover:text-[#5694CF]">
                   Ontario Pricing Data
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Contact */}
           <div>
-            <h3 className="text-white font-semibold mb-6">Contact</h3>
+            <h3 className="mb-6 font-semibold text-white">Contact</h3>
 
             <ul className="space-y-4 text-sm">
               <li className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-slate-500" />
                 <a
                   href="mailto:info@ontarioreno.ca"
-                  className="hover:text-[#5694CF] transition-colors"
+                  className="transition-colors hover:text-[#5694CF]"
                 >
                   info@ontarioreno.ca
                 </a>
               </li>
 
               <li className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-slate-500 mt-0.5" />
+                <MapPin className="mt-0.5 h-4 w-4 text-slate-500" />
                 <span>Serving homeowners across Ontario, Canada.</span>
               </li>
             </ul>
@@ -146,7 +115,7 @@ export default function Footer() {
             <div className="mt-6">
               <Link
                 to="/match"
-                className="inline-flex items-center gap-2 text-white font-medium hover:text-[#5694CF] transition-colors"
+                className="inline-flex items-center gap-2 font-medium text-white transition-colors hover:text-[#5694CF]"
               >
                 Get Matched <ArrowRight className="h-4 w-4" />
               </Link>
@@ -154,17 +123,17 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-slate-800 text-sm text-slate-500 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-slate-800 pt-8 text-sm text-slate-500 md:flex-row">
           <p>
-            © {new Date().getFullYear()} OntarioReno. All rights reserved. Not a
-            contracting company.
+            &copy; {new Date().getFullYear()} OntarioReno. All rights reserved.
+            Not a contracting company.
           </p>
 
           <div className="flex space-x-6">
-            <Link to="#" className="hover:text-white transition-colors">
+            <Link to="#" className="transition-colors hover:text-white">
               Privacy Policy
             </Link>
-            <Link to="#" className="hover:text-white transition-colors">
+            <Link to="#" className="transition-colors hover:text-white">
               Terms of Service
             </Link>
           </div>

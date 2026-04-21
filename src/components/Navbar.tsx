@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, MapPin, Menu, Sparkles, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { cityDirectory, featuredCities } from '../lib/cities';
+import { buttonStyles } from '../lib/uiStyles';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -202,7 +203,7 @@ export default function Navbar() {
 
             <Link
               to="/match"
-              className="rounded-full bg-[#5694CF] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1B3C6C] hover:shadow-md"
+              className={cn(buttonStyles.primary, 'rounded-full px-6 py-2.5 text-sm shadow-sm')}
             >
               Get Matched
             </Link>
@@ -338,7 +339,7 @@ export default function Navbar() {
                 <div className="px-3 pt-3">
                   <Link
                     to="/match"
-                    className="block w-full rounded-xl bg-[#5694CF] px-6 py-3 text-center text-base font-semibold text-white transition hover:bg-[#1B3C6C]"
+                    className={cn(buttonStyles.primary, 'w-full px-6 py-3 text-center text-base')}
                   >
                     Get Matched with Contractors
                   </Link>

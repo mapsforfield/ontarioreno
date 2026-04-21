@@ -587,11 +587,9 @@ export default function GardenSuiteCostOntario() {
                 </div>
 
                 <p className="mt-6 text-sm leading-7 text-slate-300">
-                  Most Ontario garden suite projects fall between $250K-$400K+.
-                </p>
-                <p className="mt-3 text-sm leading-7 text-slate-300">
-                  Most projects land between <strong>$250,000 and $400,000+</strong>,
-                  and many full real-world projects fall closer to{' '}
+                  Most garden suite projects land between{' '}
+                  <strong>$250,000 and $400,000+</strong>, and many full
+                  real-world projects fall closer to{' '}
                   <strong>$260,000 to $350,000</strong>. Some smaller or
                   simplified builds can start in the low-$200Ks, but that is
                   less common once full scope is accounted for.

@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { buttonStyles, formStyles } from '../lib/uiStyles';
+import { cn } from '../lib/utils';
 
 export default function Match() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({
+    type: null,
+    message: '',
+  });
 
   const [formData, setFormData] = useState({
     projectType: 'Basement Finishing',
@@ -38,6 +47,7 @@ export default function Match() {
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    setSubmitStatus({ type: null, message: '' });
     setIsSubmitting(true);
 
     const payload = {
@@ -63,26 +73,34 @@ export default function Match() {
         }
       );
 
-      alert('Submitted successfully!');
+      setSubmitStatus({
+        type: 'success',
+        message:
+          'Thanks. Your project details were received. We will review the scope and follow up with the best next step.',
+      });
     } catch (error) {
-      alert('REAL ERROR: ' + error);
       console.error(error);
+      setSubmitStatus({
+        type: 'error',
+        message:
+          'Something went wrong while submitting. Please try again or email info@ontarioreno.ca.',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen py-12">
+    <div className="min-h-screen bg-slate-50 py-10 sm:py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* HERO */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+        <div className="mb-8 text-center sm:mb-12">
+          <h1 className="mb-4 text-3xl font-bold tracking-[-0.03em] text-slate-900 sm:text-4xl">
             Find the Right Contractor for Your Project
           </h1>
 
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
             We don't just send you random contractors - we help identify the best-fit company based on your project, budget, and goals.
           </p>
 
@@ -91,10 +109,10 @@ export default function Match() {
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col md:flex-row">
+        <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl md:flex-row">
 
           {/* LEFT PANEL */}
-          <div className="bg-slate-900 text-white p-8 md:w-2/5 flex flex-col justify-between">
+          <div className="flex flex-col justify-between bg-slate-900 p-6 text-white sm:p-8 md:w-2/5">
             <div>
               <div className="flex items-center gap-2 text-[#5694CF] font-bold mb-8">
                 <ShieldCheck className="w-6 h-6" /> OntarioReno Verified
@@ -129,7 +147,39 @@ export default function Match() {
           </div>
 
           {/* FORM */}
-          <div className="p-8 md:p-12 md:w-3/5">
+          <div className="p-6 sm:p-8 md:w-3/5 md:p-12">
+            {submitStatus.type === 'success' ? (
+              <div className="flex min-h-[420px] flex-col justify-center">
+                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <h2 className="mt-6 text-3xl font-bold tracking-[-0.03em] text-slate-900">
+                  Your request is in.
+                </h2>
+                <p className="mt-4 text-base leading-7 text-slate-600">
+                  {submitStatus.message}
+                </p>
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="font-semibold text-slate-900">What happens next</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    We check the project type, budget, location, and timeline so
+                    the contractor conversation starts with better fit, not a
+                    random directory-style referral.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(1);
+                    setSubmitStatus({ type: null, message: '' });
+                  }}
+                  className={cn(buttonStyles.secondary, 'mt-6 w-full')}
+                >
+                  Submit another project
+                </button>
+              </div>
+            ) : (
+              <>
 
             {/* PROGRESS */}
             <div className="mb-8">
@@ -152,7 +202,7 @@ export default function Match() {
                 <div className="space-y-6">
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className={formStyles.label}>
                       What type of project are you planning?
                     </label>
 
@@ -160,7 +210,7 @@ export default function Match() {
                       name="projectType"
                       value={formData.projectType}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                      className={formStyles.field}
                     >
                       <option>Basement Finishing</option>
                       <option>Legal Secondary Suite</option>
@@ -171,7 +221,7 @@ export default function Match() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className={formStyles.label}>
                       What is your estimated budget?
                     </label>
 
@@ -179,7 +229,7 @@ export default function Match() {
                       name="budget"
                       value={formData.budget}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                      className={formStyles.field}
                     >
                       <option>Under $25,000</option>
                       <option>$25,000 - $50,000</option>
@@ -191,7 +241,7 @@ export default function Match() {
 
                   <button
                     onClick={nextStep}
-                    className="w-full bg-[#1B3C6C] text-white font-bold py-4 rounded-xl flex justify-center items-center gap-2 mt-8"
+                    className={cn(buttonStyles.primary, 'mt-8 w-full')}
                   >
                     Continue <ArrowRight className="w-5 h-5" />
                   </button>
@@ -202,14 +252,14 @@ export default function Match() {
               {step === 2 && (
                 <div className="space-y-6">
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <input
                       type="text"
                       name="firstName"
                       placeholder="First Name"
                       value={formData.firstName}
                       onChange={handleChange}
-                      className="px-4 py-3 rounded-xl border border-slate-200"
+                      className={formStyles.field}
                     />
 
                     <input
@@ -218,7 +268,7 @@ export default function Match() {
                       placeholder="Last Name"
                       value={formData.lastName}
                       onChange={handleChange}
-                      className="px-4 py-3 rounded-xl border border-slate-200"
+                      className={formStyles.field}
                     />
                   </div>
 
@@ -228,7 +278,7 @@ export default function Match() {
                     placeholder="Email Address"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                    className={formStyles.field}
                   />
 
                   <input
@@ -237,7 +287,7 @@ export default function Match() {
                     placeholder="Phone Number"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                    className={formStyles.field}
                   />
 
                   <input
@@ -246,13 +296,19 @@ export default function Match() {
                     placeholder="Postal Code (e.g. M4B 1B3)"
                     value={formData.postalCode}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 uppercase"
+                    className={cn(formStyles.field, 'uppercase')}
                   />
 
-                  <div className="flex gap-4 mt-8">
+                  {submitStatus.type === 'error' && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                      {submitStatus.message}
+                    </div>
+                  )}
+
+                  <div className="mt-8 flex gap-4">
                     <button
                       onClick={prevStep}
-                      className="w-1/3 bg-slate-100 py-4 rounded-xl"
+                      className={cn(buttonStyles.secondary, 'w-1/3 px-4')}
                     >
                       Back
                     </button>
@@ -260,7 +316,7 @@ export default function Match() {
                     <button
                       onClick={handleSubmit}
                       disabled={isSubmitting}
-                      className="w-2/3 bg-emerald-600 text-white font-bold py-4 rounded-xl"
+                      className={cn(buttonStyles.primary, 'w-2/3 px-4')}
                     >
                       {isSubmitting ? 'Submitting...' : 'Get My Best-Fit Contractor'}
                     </button>
@@ -270,6 +326,8 @@ export default function Match() {
               )}
 
             </form>
+              </>
+            )}
           </div>
         </div>
       </div>

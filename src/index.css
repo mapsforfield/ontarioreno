@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@layer base {
+  input:not([type='range']):not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    @apply outline-none transition duration-200 focus:border-[#1B3C6C] focus:ring-4 focus:ring-blue-100;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100;
+  }
+}
+
 /* SLIDER STYLING */
 
 .slider-blue::-webkit-slider-thumb {

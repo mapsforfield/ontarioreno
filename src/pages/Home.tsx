@@ -17,6 +17,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import CitySelectorSection from '../components/CitySelectorSection';
+import { buttonStyles } from '../lib/uiStyles';
 
 const GUIDE_PDF_URL = '/guides/ontario-renovation-cost-guide-2026.pdf';
 const GUIDE_MIN_FILL_TIME_MS = 4000;
@@ -359,17 +360,17 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 flex flex-col items-start">
+        <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-start px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-32">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1B3C6C]/20 border border-blue-500/30 text-blue-300 font-medium text-sm mb-8 backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4" />
             <span>Ontario&apos;s Independent Homeowner Guide</span>
           </div>
 
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 max-w-3xl leading-tight">
+          <h1 className="mb-6 max-w-3xl text-4xl font-bold leading-tight tracking-[-0.04em] sm:text-5xl lg:text-7xl">
             Plan Your Renovation with <span className="text-[#5694CF]">Confidence.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 mb-4 max-w-2xl leading-relaxed">
+          <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
             We help Ontario homeowners understand real costs, avoid expensive mistakes, and choose the right contractor for their project.
           </p>
 
@@ -380,13 +381,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link
               to="/match"
-              className="bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-blue-600/25 flex items-center justify-center gap-2"
+              className={buttonStyles.primary}
             >
               Find the Right Contractor <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               to="/costs"
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-xl font-semibold text-lg transition-all backdrop-blur-sm flex items-center justify-center"
+              className={buttonStyles.ghostDark}
             >
               View 2026 Cost Guides
             </Link>

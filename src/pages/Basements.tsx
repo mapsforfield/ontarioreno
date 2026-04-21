@@ -7,27 +7,28 @@ import {
   Calculator,
   Hammer,
 } from 'lucide-react';
+import { buttonStyles } from '../lib/uiStyles';
 
 export default function Basements() {
   return (
     <div className="bg-slate-50 min-h-screen">
       {/* Hero */}
-      <section className="bg-slate-900 text-white py-20">
+      <section className="bg-slate-900 py-14 text-white sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/20 text-blue-300 text-sm font-medium mb-6">
               <Home className="w-4 h-4" /> Ontario Renovation Hub
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+            <h1 className="mb-5 text-4xl font-bold leading-tight tracking-[-0.03em] md:text-6xl">
               The Ultimate Guide to Finishing Your Basement in Ontario
             </h1>
-            <p className="text-xl text-slate-300 mb-8">
+            <p className="mb-8 text-lg leading-8 text-slate-300 sm:text-xl">
               Everything you need to know about costs, permits, layouts, and
               hiring the right contractor for your basement project.
             </p>
             <Link
               to="/match"
-              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2"
+              className={buttonStyles.primary}
             >
               Find Basement Contractors <ArrowRight className="w-5 h-5" />
             </Link>
