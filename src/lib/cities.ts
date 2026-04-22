@@ -24,6 +24,14 @@ export const cityDirectory: CityEntry[] = [
     featured: true,
   },
   {
+    name: 'St. Catharines',
+    href: '/st-catharines',
+    descriptor: 'ADU grants, costs, and legal suites',
+    summary:
+      'Strong starting point for homeowners comparing St. Catharines ADU grants, realistic costs, and legal suite requirements.',
+    featured: true,
+  },
+  {
     name: 'Brampton',
     href: '/basement-renovation-brampton',
     descriptor: 'Family basements and second-unit planning',

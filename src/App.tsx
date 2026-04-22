@@ -32,6 +32,11 @@ import BurlingtonBasementRenovation from './pages/BurlingtonBasementRenovation';
 import BurlingtonBasementRenovationCost from './pages/BurlingtonBasementRenovationCost';
 import BurlingtonLegalBasement from './pages/BurlingtonLegalBasement';
 import BurlingtonBasementPermit from './pages/BurlingtonBasementPermit';
+import BurlingtonAruIncentiveProgram from './pages/BurlingtonAruIncentiveProgram';
+import StCatharines from './pages/StCatharines';
+import StCatharinesAduGrant from './pages/StCatharinesAduGrant';
+import StCatharinesAduCost from './pages/StCatharinesAduCost';
+import StCatharinesAduPermits from './pages/StCatharinesAduPermits';
 import MississaugaBasementRenovation from './pages/MississaugaBasementRenovation';
 import MississaugaBasementRenovationCost from './pages/MississaugaBasementRenovationCost';
 import MississaugaLegalBasement from './pages/MississaugaLegalBasement';
@@ -108,6 +113,11 @@ export default function App() {
           <Route path="basement-renovation-cost-burlington" element={<BurlingtonBasementRenovationCost />} />
           <Route path="legal-basement-burlington" element={<BurlingtonLegalBasement />} />
           <Route path="basement-permit-burlington" element={<BurlingtonBasementPermit />} />
+          <Route path="burlington-aru-incentive-program" element={<BurlingtonAruIncentiveProgram />} />
+          <Route path="st-catharines" element={<StCatharines />} />
+          <Route path="st-catharines-adu-grant" element={<StCatharinesAduGrant />} />
+          <Route path="st-catharines-adu-cost" element={<StCatharinesAduCost />} />
+          <Route path="st-catharines-adu-permits" element={<StCatharinesAduPermits />} />
           <Route path="basement-renovation-mississauga" element={<MississaugaBasementRenovation />} />
           <Route path="basement-renovation-cost-mississauga" element={<MississaugaBasementRenovationCost />} />
           <Route path="legal-basement-mississauga" element={<MississaugaLegalBasement />} />
