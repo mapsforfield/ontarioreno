@@ -47,6 +47,7 @@ export default function Navbar() {
   const hubs = [
     { name: 'Basement Finishing', href: '/basements' },
     { name: 'Legal Secondary Suites', href: '/legal-suites' },
+    { name: 'Garden Suites', href: '/garden-suites-laneway-suites-ontario' },
     { name: 'Kitchen Renovations', href: '/kitchen-renovations' },
     { name: 'Bathroom Renovations', href: '/bathroom-renovations' },
   ];
