@@ -25,6 +25,42 @@ const TURNSTILE_SITE_KEY = '0x4AAAAAAC1T5itPPClMtbD6';
 const GUIDE_ENDPOINT =
   'https://script.google.com/macros/s/AKfycbx01lpcatHsLZzoS_anmr1NhnxV_3D9bgnh0MYmIMpBpbqWYot4rfpGDthUEyqZXRei/exec';
 
+const featuredPrograms = [
+  {
+    eyebrow: 'Featured Grant',
+    title: 'Hamilton Basement Grant',
+    highlight: 'Up to $40,000',
+    description:
+      'The strongest current funding-focused entry point for legal basement and secondary suite planning.',
+    primaryLabel: 'See My Estimated Grant',
+    primaryHref: '/hamilton-basement-grant',
+    secondaryLabel: 'Full Hamilton Guide',
+    secondaryHref: '/hamilton-grant-guide',
+  },
+  {
+    eyebrow: 'Featured City',
+    title: 'St. Catharines ADU Guides',
+    highlight: 'Grant, cost, and permit path',
+    description:
+      'A complete ADU planning cluster covering funding structure, realistic costs, and legal requirements.',
+    primaryLabel: 'Explore St. Catharines',
+    primaryHref: '/st-catharines',
+    secondaryLabel: 'Grant Guide',
+    secondaryHref: '/st-catharines-adu-grant',
+  },
+  {
+    eyebrow: 'Featured Incentive',
+    title: 'Burlington ARU Incentive',
+    highlight: 'Program overview',
+    description:
+      'Useful for homeowners comparing Burlington incentive support with broader basement and legal-suite planning.',
+    primaryLabel: 'View Burlington Guide',
+    primaryHref: '/burlington-aru-incentive-program',
+    secondaryLabel: 'Burlington Cost Guide',
+    secondaryHref: '/basement-renovation-cost-burlington',
+  },
+];
+
 const disposableEmailDomains = new Set([
   'mailinator.com',
   'tempmail.com',
@@ -120,16 +156,21 @@ export default function Home() {
   });
 
   const [turnstileToken, setTurnstileToken] = useState('');
+  const desktopTurnstileRef = useRef<HTMLDivElement | null>(null);
+  const mobileTurnstileRef = useRef<HTMLDivElement | null>(null);
+  const desktopTurnstileWidgetId = useRef<string | null>(null);
+  const mobileTurnstileWidgetId = useRef<string | null>(null);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const turnstile = (window as any).turnstile;
 
-      if (
-        turnstile &&
-        document.getElementById('turnstile-container') &&
-        turnstileToken === ''
-      ) {
-        turnstile.render('#turnstile-container', {
+      if (!turnstile) {
+        return;
+      }
+
+      if (desktopTurnstileRef.current && !desktopTurnstileWidgetId.current) {
+        desktopTurnstileWidgetId.current = turnstile.render(desktopTurnstileRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
           callback: (token: string) => {
             setTurnstileToken(token);
@@ -141,15 +182,32 @@ export default function Home() {
             setTurnstileToken('');
           },
         });
+      }
 
+      if (mobileTurnstileRef.current && !mobileTurnstileWidgetId.current) {
+        mobileTurnstileWidgetId.current = turnstile.render(mobileTurnstileRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => {
+            setTurnstileToken(token);
+          },
+          'expired-callback': () => {
+            setTurnstileToken('');
+          },
+          'error-callback': () => {
+            setTurnstileToken('');
+          },
+        });
+      }
+
+      if (desktopTurnstileWidgetId.current && mobileTurnstileWidgetId.current) {
         clearInterval(interval);
       }
     }, 200);
 
     return () => clearInterval(interval);
   }, []);
+
   const guideFormLoadedAt = useRef(Date.now());
-  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     window.onTurnstileSuccess = (token: string) => {
@@ -300,8 +358,14 @@ export default function Home() {
       setTurnstileToken('');
       guideFormLoadedAt.current = Date.now();
 
-      if (window.turnstile && turnstileContainerRef.current) {
-        window.turnstile.reset(turnstileContainerRef.current);
+      if (window.turnstile) {
+        if (desktopTurnstileWidgetId.current) {
+          window.turnstile.reset(desktopTurnstileWidgetId.current);
+        }
+
+        if (mobileTurnstileWidgetId.current) {
+          window.turnstile.reset(mobileTurnstileWidgetId.current);
+        }
       }
     } catch (error) {
       setGuideStatus({
@@ -316,22 +380,22 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <Helmet>
-        <title>Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching</title>
+        <title>Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews</title>
 
         <meta
           name="description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
         />
 
         <link rel="canonical" href="https://ontarioreno.ca/" />
 
         <meta
           property="og:title"
-          content="Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching"
+          content="Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews"
         />
         <meta
           property="og:description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
         />
         <meta property="og:url" content="https://ontarioreno.ca/" />
         <meta property="og:type" content="website" />
@@ -339,11 +403,11 @@ export default function Home() {
 
         <meta
           name="twitter:title"
-          content="Ontario Reno | Ontario Renovation Guides, Costs & Contractor Matching"
+          content="Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews"
         />
         <meta
           name="twitter:description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and find the best-fit contractor for your project."
+          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
         />
         <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
       </Helmet>
@@ -371,7 +435,7 @@ export default function Home() {
           </h1>
 
           <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-            We help Ontario homeowners understand real costs, avoid expensive mistakes, and choose the right contractor for their project.
+            We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
           </p>
 
           <p className="text-sm text-slate-400 mb-10 max-w-2xl">
@@ -383,7 +447,7 @@ export default function Home() {
               to="/match"
               className={buttonStyles.primary}
             >
-              Find the Right Contractor <ArrowRight className="w-5 h-5" />
+              Review My Project <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               to="/costs"
@@ -407,72 +471,62 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Grant Opportunity */}
+      {/* Featured Programs */}
       <section className="border-b border-yellow-100 bg-gradient-to-r from-yellow-50 via-amber-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
           <div className="rounded-3xl border border-yellow-200/80 bg-white/80 backdrop-blur-sm shadow-sm px-6 py-8 md:px-8 md:py-9">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-              <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full bg-yellow-100 text-yellow-900 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em]">
-                  <Landmark className="w-4 h-4" />
-                  Confirmed Hamilton Basement Grant
-                </div>
-
-                <h2 className="mt-4 text-2xl md:text-4xl font-bold text-slate-900 leading-tight">
-                  Hamilton Homeowners May Qualify for Up to $40,000 Through the Hamilton Basement Grant
-                </h2>
-
-                <p className="mt-4 text-base md:text-lg text-slate-700 leading-relaxed max-w-2xl">
-                  We've confirmed a City of Hamilton-backed basement grant and ADU incentive that can cover up to 70% of eligible construction costs for qualifying legal basement unit projects.
-
-                  If you're unsure what qualifies, see what counts as a{" "}
-                  <Link
-                    to="/hamilton-secondary-suite-grant"
-                    className="font-semibold underline underline-offset-4"
-                  >
-                    legal secondary suite in Hamilton
-                  </Link>.
-                </p>
-
-                <div className="mt-5 flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600">
-                  <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Up to $40,000 available
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Not a loan
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Legal basement unit focus
-                  </span>
-                </div>
-
-                <p className="mt-4 text-sm text-slate-600 max-w-2xl">
-                  Looking for the Hamilton basement grant guide? Start with a quick estimate or read the full breakdown of eligible costs, approvals, and how the program works.
-                </p>
-
-                <p className="mt-3 text-xs md:text-sm text-slate-500">
-                  Subject to approval, eligibility, and available funding.
-                </p>
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-yellow-100 text-yellow-900 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em]">
+                <Landmark className="w-4 h-4" />
+                Featured Ontario Programs
               </div>
+              <h2 className="mt-4 text-2xl md:text-4xl font-bold text-slate-900 leading-tight">
+                Start with the strongest city guides and funding pages.
+              </h2>
+              <p className="mt-4 max-w-2xl text-base md:text-lg text-slate-700 leading-relaxed">
+                Hamilton remains the strongest current grant-led market on the site, but you can also move directly into St. Catharines ADU planning and Burlington incentive research without digging through the full directory.
+              </p>
+            </div>
 
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:min-w-[280px]">
-                <Link
-                  to="/hamilton-basement-grant"
-                  className="inline-flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-6 py-4 font-semibold transition-all shadow-sm"
+            <div className="mt-8 grid gap-4 lg:grid-cols-3">
+              {featuredPrograms.map((program, index) => (
+                <div
+                  key={program.title}
+                  className={cn(
+                    'flex h-full flex-col rounded-2xl border p-6 shadow-sm',
+                    index === 0
+                      ? 'border-yellow-200 bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_100%)]'
+                      : 'border-slate-200 bg-white'
+                  )}
                 >
-                  See My Estimated Grant
-                </Link>
-
-                <Link
-                  to="/hamilton-grant-guide"
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 px-6 py-4 font-semibold transition-all"
-                >
-                  Read Full Grant Guide
-                </Link>
-              </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {program.eyebrow}
+                  </p>
+                  <h3 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-slate-900">
+                    {program.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold text-[#1B3C6C]">
+                    {program.highlight}
+                  </p>
+                  <p className="mt-4 text-sm leading-7 text-slate-600">
+                    {program.description}
+                  </p>
+                  <div className="mt-auto pt-6 flex flex-col gap-3">
+                    <Link
+                      to={program.primaryHref}
+                      className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition-all hover:bg-slate-800"
+                    >
+                      {program.primaryLabel}
+                    </Link>
+                    <Link
+                      to={program.secondaryHref}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-900 transition-all hover:bg-slate-50"
+                    >
+                      {program.secondaryLabel}
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -508,7 +562,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-3">Best-Fit Contractor Matching</h3>
               <p className="text-slate-600 leading-relaxed">
-                Skip the directory scrolling. We help identify the right contractor for your project based on scope, budget, and track record.
+                Start with a project review that helps narrow the right next step based on scope, budget, and track record instead of random directory browsing.
               </p>
             </div>
           </div>
@@ -736,6 +790,11 @@ export default function Home() {
                     aria-hidden="true"
                   />
 
+                  <div
+                    ref={mobileTurnstileRef}
+                    className="flex justify-center"
+                  />
+
                   <button
                     type="submit"
                     disabled={guideSubmitting}
@@ -750,6 +809,12 @@ export default function Home() {
                         }`}
                     >
                       {guideStatus.message}
+                    </p>
+                  )}
+
+                  {!turnstileToken && (
+                    <p className="text-xs text-center text-slate-500">
+                      Complete the verification above to download the guide.
                     </p>
                   )}
 
@@ -910,7 +975,7 @@ export default function Home() {
                     aria-hidden="true"
                   />
 
-                  <div id="turnstile-container" className="flex justify-center" />
+                  <div ref={desktopTurnstileRef} className="flex justify-center" />
 
                   <button
                     type="submit"
@@ -929,6 +994,12 @@ export default function Home() {
                     </p>
                   )}
 
+                  {!turnstileToken && (
+                    <p className="text-xs text-center text-slate-500">
+                      Complete the verification above to download the guide.
+                    </p>
+                  )}
+
                   <p className="text-xs text-slate-400 text-center pt-2">
                     We respect your privacy. Unsubscribe anytime.
                   </p>
@@ -939,7 +1010,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Contractor Matching CTA */}
+      {/* Project Review CTA */}
       <section className="py-20 bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="w-20 h-20 bg-[#1B3C6C]/20 rounded-full flex items-center justify-center mx-auto mb-8">
@@ -947,13 +1018,13 @@ export default function Home() {
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            We help you identify the best-fit contractor for your project - based on scope, budget, and real track record. Not random referrals, and not whoever pays to be shown.
+            Start with a clear project review built around scope, budget, and real track record. No random referrals, and no marketplace-style noise.
           </p>
           <Link
             to="/match"
             className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-600/25"
           >
-            Find the Right Contractor
+            Review My Project
           </Link>
           <p className="mt-6 text-sm text-slate-500">100% free for homeowners. No obligation to hire.</p>
         </div>
@@ -975,11 +1046,11 @@ export default function Home() {
               },
               {
                 q: "How much does it cost to use your matching service?",
-                a: "Our matching service is 100% free for homeowners. We may earn a referral fee from contractors in our network, but our positioning is based on project fit, not random placement or homeowner-facing bias."
+                a: "Our project review process is 100% free for homeowners. We may earn a referral fee from contractors in our network, but our positioning is based on project fit, not random placement or homeowner-facing bias."
               },
               {
-                q: "How do you choose which contractors to recommend?",
-                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to show you dozens of options - it's to help point you toward the company that makes the most sense for your specific project."
+                q: "How does the project review process work?",
+                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to flood you with options. It is to help point you toward the next step that makes the most sense for your specific project."
               },
               {
                 q: "Do I really need a permit to finish my basement?",
