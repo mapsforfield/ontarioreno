@@ -59,7 +59,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/92 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           <div className="flex items-center">
@@ -81,7 +81,7 @@ export default function Navbar() {
               <button
                 type="button"
                 className={cn(
-                  'flex items-center gap-1.5 py-8 text-sm font-semibold transition-colors',
+                  'flex items-center gap-1.5 py-8 text-sm font-semibold tracking-[-0.01em] transition-colors',
                   hubs.some((hub) => location.pathname === hub.href)
                     ? 'text-[#1B3C6C]'
                     : 'text-slate-600 hover:text-[#1B3C6C]'
@@ -93,18 +93,19 @@ export default function Navbar() {
 
               <div
                 className={cn(
-                  'absolute left-0 top-full w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_22px_50px_rgba(15,23,42,0.08)] transition duration-200',
+                  'absolute left-0 top-full w-72 rounded-[1.35rem] border border-slate-200/80 bg-white/98 p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_20px_44px_rgba(15,23,42,0.09)] backdrop-blur-sm transition duration-200',
                   isHubsOpen
                     ? 'visible translate-y-0 opacity-100'
                     : 'invisible translate-y-2 opacity-0'
                 )}
               >
-                {hubs.map((hub) => (
+                {hubs.map((hub, index) => (
                   <Link
                     key={hub.name}
                     to={hub.href}
                     className={cn(
-                      'block rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      'block rounded-[1rem] px-4 py-3 text-sm font-medium tracking-[-0.01em] transition-colors hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      index === 2 && 'mt-1 border-t border-slate-200/80 pt-4',
                       location.pathname === hub.href
                         ? 'bg-slate-50 text-[#1B3C6C]'
                         : 'text-slate-700'
@@ -124,7 +125,7 @@ export default function Navbar() {
               <button
                 type="button"
                 className={cn(
-                  'flex items-center gap-1.5 py-8 text-sm font-semibold transition-colors',
+                  'flex items-center gap-1.5 py-8 text-sm font-semibold tracking-[-0.01em] transition-colors',
                   isCitiesActive ? 'text-[#1B3C6C]' : 'text-slate-600 hover:text-[#1B3C6C]'
                 )}
               >
@@ -134,14 +135,14 @@ export default function Navbar() {
 
               <div
                 className={cn(
-                  'absolute left-1/2 top-full w-[420px] -translate-x-1/2 rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-[0_28px_60px_rgba(15,23,42,0.12)] transition duration-200',
+                  'absolute left-1/2 top-full w-[420px] -translate-x-1/2 rounded-[1.6rem] border border-slate-200/80 bg-white/98 p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_24px_56px_rgba(15,23,42,0.11)] backdrop-blur-sm transition duration-200',
                   isCitiesOpen
                     ? 'visible translate-y-0 opacity-100'
                     : 'invisible translate-y-2 opacity-0'
                 )}
               >
-                <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4">
-                  <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+                  <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 pb-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Featured cities
@@ -150,7 +151,7 @@ export default function Navbar() {
                         Start with your local guide
                       </h3>
                     </div>
-                    <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
+                    <div className="rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
                       {cityDirectory.length} cities
                     </div>
                   </div>
@@ -160,7 +161,7 @@ export default function Navbar() {
                       <Link
                         key={city.name}
                         to={city.href}
-                        className="group rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
+                        className="group rounded-[1rem] border border-slate-200/80 bg-white px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
@@ -175,7 +176,7 @@ export default function Navbar() {
                     ))}
                   </div>
 
-                  <div className="mt-4 border-t border-slate-200 pt-4">
+                  <div className="mt-4 border-t border-slate-200/80 pt-4">
                     <Link
                       to="/cities"
                       className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900 underline underline-offset-4"
@@ -193,7 +194,7 @@ export default function Navbar() {
                 key={link.name}
                 to={link.href}
                 className={cn(
-                  'text-sm font-semibold text-slate-600 transition-colors hover:text-[#1B3C6C]',
+                  'text-sm font-semibold tracking-[-0.01em] text-slate-600 transition-colors hover:text-[#1B3C6C]',
                   location.pathname === link.href && 'text-[#1B3C6C]'
                 )}
               >
@@ -212,7 +213,7 @@ export default function Navbar() {
           <div className="flex items-center md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
+              className="rounded-[0.95rem] p-2.5 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
               type="button"
             >
               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -225,7 +226,7 @@ export default function Navbar() {
       {isOpen && (
         <div className="fixed inset-0 z-[120] bg-white md:hidden">
           <div className="flex h-full min-h-0 flex-col overscroll-none bg-white">
-            <div className="border-b border-slate-200 bg-white px-4">
+            <div className="border-b border-slate-200/80 bg-white px-4">
               <div className="mx-auto flex h-20 max-w-7xl items-center justify-between">
                 <Link
                   to="/"
@@ -241,7 +242,7 @@ export default function Navbar() {
 
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
+                  className="rounded-[0.95rem] p-2.5 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
                   type="button"
                   aria-label="Close menu"
                 >
@@ -271,12 +272,12 @@ export default function Navbar() {
                   </Link>
                 ))}
 
-                <div className="my-3 h-px bg-slate-200" />
+                <div className="my-3 h-px bg-slate-200/80" />
 
                 <button
                   type="button"
                   onClick={() => setIsMobileCitiesOpen((value) => !value)}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-50"
+                  className="flex w-full items-center justify-between rounded-[1rem] px-3 py-3 text-left text-base font-semibold tracking-[-0.01em] text-slate-900 transition hover:bg-slate-50"
                 >
                   <span className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-[#1B3C6C]" />
@@ -291,13 +292,13 @@ export default function Navbar() {
                 </button>
 
                 {isMobileCitiesOpen && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/90 p-3">
                     <div className="grid gap-2">
                       {cityPreview.map((city) => (
                         <Link
                           key={city.name}
                           to={city.href}
-                          className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
+                          className="rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]"
                         >
                           <span className="block text-base font-semibold text-slate-900">
                             {city.name}
@@ -319,14 +320,14 @@ export default function Navbar() {
                   </div>
                 )}
 
-                <div className="my-3 h-px bg-slate-200" />
+                <div className="my-3 h-px bg-slate-200/80" />
 
                 {navLinks.map((link) => (
                   <Link
                     key={link.name}
                     to={link.href}
                     className={cn(
-                      'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      'block rounded-[1rem] px-3 py-3 text-base font-medium tracking-[-0.01em] transition hover:bg-slate-50 hover:text-[#1B3C6C]',
                       location.pathname === link.href
                         ? 'bg-slate-50 text-[#1B3C6C]'
                         : 'text-slate-700'
