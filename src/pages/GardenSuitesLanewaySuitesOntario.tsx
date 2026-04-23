@@ -154,16 +154,13 @@ export default function GardenSuitesLanewaySuitesOntario() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-8 shadow-sm">
-              <div className="flex h-full min-h-[320px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-center">
-                <MapPinned className="h-10 w-10 text-slate-400" />
-                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Diagram space
-                </p>
-                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
-                  Reserved for a future visual showing backyard access,
-                  laneway-facing lots, and the difference in site conditions.
-                </p>
+            <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-5 shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                <img
+                  src="/images/garden-suite.jpg"
+                  alt="Detached garden suite in an Ontario backyard"
+                  className="h-full min-h-[320px] w-full object-cover"
+                />
               </div>
             </div>
           </div>
