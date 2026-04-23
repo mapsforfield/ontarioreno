@@ -27,7 +27,7 @@ const GUIDE_ENDPOINT =
 
 const featuredPrograms = [
   {
-    eyebrow: 'Featured Grant',
+    eyebrow: 'Grant Program',
     title: 'Hamilton Basement Grant',
     highlight: 'Up to $40,000',
     description:
@@ -38,7 +38,7 @@ const featuredPrograms = [
     secondaryHref: '/hamilton-grant-guide',
   },
   {
-    eyebrow: 'Featured City',
+    eyebrow: 'City Guide',
     title: 'St. Catharines ADU Guides',
     highlight: 'Grant, cost, and permit path',
     description:
@@ -49,7 +49,7 @@ const featuredPrograms = [
     secondaryHref: '/st-catharines-adu-grant',
   },
   {
-    eyebrow: 'Featured Incentive',
+    eyebrow: 'Incentive Guide',
     title: 'Burlington ARU Incentive',
     highlight: 'Program overview',
     description:
@@ -156,10 +156,34 @@ export default function Home() {
   });
 
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [isDesktopGuideLayout, setIsDesktopGuideLayout] = useState(false);
+  const [turnstileStatus, setTurnstileStatus] = useState<
+    'idle' | 'rendered' | 'verified' | 'expired' | 'error'
+  >('idle');
   const desktopTurnstileRef = useRef<HTMLDivElement | null>(null);
   const mobileTurnstileRef = useRef<HTMLDivElement | null>(null);
   const desktopTurnstileWidgetId = useRef<string | null>(null);
   const mobileTurnstileWidgetId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    const syncGuideLayout = (event?: MediaQueryListEvent) => {
+      const matches = event ? event.matches : mediaQuery.matches;
+      setIsDesktopGuideLayout(matches);
+    };
+
+    syncGuideLayout();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncGuideLayout);
+      return () => mediaQuery.removeEventListener('change', syncGuideLayout);
+    }
+
+    mediaQuery.addListener(syncGuideLayout);
+    return () => mediaQuery.removeListener(syncGuideLayout);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -169,43 +193,71 @@ export default function Home() {
         return;
       }
 
-      if (desktopTurnstileRef.current && !desktopTurnstileWidgetId.current) {
-        desktopTurnstileWidgetId.current = turnstile.render(desktopTurnstileRef.current, {
+      const activeRef = isDesktopGuideLayout
+        ? desktopTurnstileRef.current
+        : mobileTurnstileRef.current;
+      const activeWidgetIdRef = isDesktopGuideLayout
+        ? desktopTurnstileWidgetId
+        : mobileTurnstileWidgetId;
+      const activeLayoutLabel = isDesktopGuideLayout ? 'desktop' : 'mobile';
+
+      if (activeRef && !activeWidgetIdRef.current) {
+        console.log(`[Turnstile] render requested for ${activeLayoutLabel} guide form`);
+        activeWidgetIdRef.current = turnstile.render(activeRef, {
           sitekey: TURNSTILE_SITE_KEY,
           callback: (token: string) => {
+            console.log(`[Turnstile] success callback fired on ${activeLayoutLabel} guide form`);
+            console.log('[Turnstile] token received', {
+              layout: activeLayoutLabel,
+              tokenLength: token?.length ?? 0,
+            });
             setTurnstileToken(token);
+            setTurnstileStatus('verified');
           },
           'expired-callback': () => {
+            console.log(`[Turnstile] token expired on ${activeLayoutLabel} guide form`);
             setTurnstileToken('');
+            setTurnstileStatus('expired');
           },
           'error-callback': () => {
+            console.log(`[Turnstile] widget error on ${activeLayoutLabel} guide form`);
             setTurnstileToken('');
+            setTurnstileStatus('error');
           },
         });
+        setTurnstileStatus('rendered');
       }
 
-      if (mobileTurnstileRef.current && !mobileTurnstileWidgetId.current) {
-        mobileTurnstileWidgetId.current = turnstile.render(mobileTurnstileRef.current, {
-          sitekey: TURNSTILE_SITE_KEY,
-          callback: (token: string) => {
-            setTurnstileToken(token);
-          },
-          'expired-callback': () => {
-            setTurnstileToken('');
-          },
-          'error-callback': () => {
-            setTurnstileToken('');
-          },
-        });
-      }
-
-      if (desktopTurnstileWidgetId.current && mobileTurnstileWidgetId.current) {
+      if (activeWidgetIdRef.current) {
         clearInterval(interval);
       }
     }, 200);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isDesktopGuideLayout]);
+
+  useEffect(() => {
+    console.log('[Turnstile] active guide form layout', isDesktopGuideLayout ? 'desktop' : 'mobile');
+  }, [isDesktopGuideLayout]);
+
+  const resetTurnstile = () => {
+    if (!window.turnstile) return;
+
+    const activeWidgetId = isDesktopGuideLayout
+      ? desktopTurnstileWidgetId.current
+      : mobileTurnstileWidgetId.current;
+
+    console.log('[Turnstile] manual reset requested', {
+      layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
+      hasWidget: Boolean(activeWidgetId),
+    });
+
+    if (activeWidgetId) {
+      window.turnstile.reset(activeWidgetId);
+      setTurnstileToken('');
+      setTurnstileStatus('rendered');
+    }
+  };
 
   const guideFormLoadedAt = useRef(Date.now());
 
@@ -244,6 +296,12 @@ export default function Home() {
 
   const handleGuideSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    console.log('[Turnstile] submit clicked', {
+      layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
+      hasToken: Boolean(turnstileToken),
+      tokenLength: turnstileToken.length,
+    });
 
     setGuideStatus({ type: null, message: '' });
 
@@ -302,6 +360,9 @@ export default function Home() {
     }
 
     if (!turnstileToken) {
+      console.log('[Turnstile] submit blocked due to missing token', {
+        layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
+      });
       setGuideStatus({
         type: 'error',
         message: 'Please complete the verification first.',
@@ -356,18 +417,16 @@ export default function Home() {
       });
 
       setTurnstileToken('');
+      setTurnstileStatus('rendered');
       guideFormLoadedAt.current = Date.now();
 
       if (window.turnstile) {
-        if (desktopTurnstileWidgetId.current) {
-          window.turnstile.reset(desktopTurnstileWidgetId.current);
-        }
-
-        if (mobileTurnstileWidgetId.current) {
-          window.turnstile.reset(mobileTurnstileWidgetId.current);
-        }
+        resetTurnstile();
       }
     } catch (error) {
+      console.log('[Turnstile] submit failed after verification', {
+        layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
+      });
       setGuideStatus({
         type: 'error',
         message: 'Something went wrong. Please try again.',
@@ -481,10 +540,10 @@ export default function Home() {
                 Featured Ontario Programs
               </div>
               <h2 className="mt-4 text-2xl md:text-4xl font-bold text-slate-900 leading-tight">
-                Start with the strongest city guides and funding pages.
+                Explore Ontario&apos;s top basement grant and ADU programs
               </h2>
               <p className="mt-4 max-w-2xl text-base md:text-lg text-slate-700 leading-relaxed">
-                Hamilton remains the strongest current grant-led market on the site, but you can also move directly into St. Catharines ADU planning and Burlington incentive research without digging through the full directory.
+                Hamilton currently offers the strongest grant opportunity, while St. Catharines and Burlington provide valuable guidance for planning legal basement and secondary suite projects.
               </p>
             </div>
 
@@ -797,7 +856,7 @@ export default function Home() {
 
                   <button
                     type="submit"
-                    disabled={guideSubmitting}
+                    disabled={guideSubmitting || !turnstileToken}
                     className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
                   >
                     {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
@@ -814,8 +873,20 @@ export default function Home() {
 
                   {!turnstileToken && (
                     <p className="text-xs text-center text-slate-500">
-                      Complete the verification above to download the guide.
+                      {turnstileStatus === 'expired' || turnstileStatus === 'error'
+                        ? 'Verification needs to be completed again before you can download the guide.'
+                        : 'Complete the verification above to download the guide.'}
                     </p>
+                  )}
+
+                  {(turnstileStatus === 'expired' || turnstileStatus === 'error') && (
+                    <button
+                      type="button"
+                      onClick={resetTurnstile}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Retry Verification
+                    </button>
                   )}
 
                   <p className="text-xs text-slate-400 text-center pt-2">
@@ -979,7 +1050,7 @@ export default function Home() {
 
                   <button
                     type="submit"
-                    disabled={guideSubmitting}
+                    disabled={guideSubmitting || !turnstileToken}
                     className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
                   >
                     {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
@@ -996,8 +1067,20 @@ export default function Home() {
 
                   {!turnstileToken && (
                     <p className="text-xs text-center text-slate-500">
-                      Complete the verification above to download the guide.
+                      {turnstileStatus === 'expired' || turnstileStatus === 'error'
+                        ? 'Verification needs to be completed again before you can download the guide.'
+                        : 'Complete the verification above to download the guide.'}
                     </p>
+                  )}
+
+                  {(turnstileStatus === 'expired' || turnstileStatus === 'error') && (
+                    <button
+                      type="button"
+                      onClick={resetTurnstile}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Retry Verification
+                    </button>
                   )}
 
                   <p className="text-xs text-slate-400 text-center pt-2">
