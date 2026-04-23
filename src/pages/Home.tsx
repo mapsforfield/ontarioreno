@@ -709,7 +709,7 @@ export default function Home() {
       </div>
 
       {/* Lead Capture Block */}
-      <section className="relative overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
+      <section className="relative overflow-visible xl:overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 
