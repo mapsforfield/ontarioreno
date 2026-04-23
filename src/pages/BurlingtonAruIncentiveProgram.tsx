@@ -265,25 +265,25 @@ export default function BurlingtonAruIncentiveProgram() {
       </Helmet>
 
       <section className="bg-slate-900 text-white">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:px-8 lg:py-24">
-          <div className="max-w-4xl">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:px-8 lg:py-20">
+          <div className="max-w-[52rem]">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-medium text-blue-200 ring-1 ring-white/10">
               <Landmark className="h-4 w-4" />
               Burlington ARU incentive guide
             </div>
 
-            <h1 className="mt-6 text-4xl font-bold leading-tight tracking-[-0.03em] md:text-6xl">
+            <h1 className="mt-5 text-4xl font-bold leading-[1.02] tracking-[-0.035em] md:text-6xl">
               Burlington ARU Incentive Program
             </h1>
 
-            <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-300">
+            <p className="mt-5 max-w-3xl text-xl leading-8 text-slate-300">
               Up to $70,000 to $95,000 may be available for affordable rental
               additional residential units in Burlington, but the best-known
               funding stream was structured as a no-interest forgivable loan
               tied to 10 years of affordability compliance.
             </p>
 
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-400">
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-400">
               This page explains the Burlington ARU incentive program in plain
               language for homeowners comparing a Burlington basement apartment
               incentive, Burlington garage conversion incentive, or Burlington
@@ -291,7 +291,7 @@ export default function BurlingtonAruIncentiveProgram() {
               approval remains subject to City review and program terms.
             </p>
 
-            <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="mt-5 max-w-3xl rounded-[1rem] border border-white/10 bg-white/[0.045] p-4.5">
               <div className="flex items-start gap-3">
                 <CalendarClock className="mt-1 h-5 w-5 shrink-0 text-blue-200" />
                 <p className="text-sm leading-7 text-slate-200">
@@ -304,7 +304,7 @@ export default function BurlingtonAruIncentiveProgram() {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/match"
                 className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
@@ -320,40 +320,29 @@ export default function BurlingtonAruIncentiveProgram() {
               </Link>
             </div>
 
-            <p className="mt-6 text-sm text-slate-400">
+            <p className="mt-4 text-sm text-slate-400">
               Last updated: {lastUpdated}
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.28)] backdrop-blur-sm">
-            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(15,23,42,0.4)_100%)] p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
-                What homeowners miss
-              </p>
-              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.03em] text-white">
-                This is funding support with a long-term rent commitment.
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-slate-300">
-                Burlington&apos;s ARU forgivable loan can be meaningful, but it
-                is not a simple Burlington basement grant with no restrictions.
-                The tradeoff is upfront funding support now in exchange for
-                capped affordable rents over a 10-year term.
-              </p>
-              <div className="mt-6 grid gap-3">
-                {[
-                  'No interest',
-                  'Annual verification',
-                  'Title registration',
-                  'Repayment risk if terms are broken',
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
+          <div className="rounded-[1rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] p-5 shadow-[0_10px_24px_rgba(2,6,23,0.14)] backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200/90">
+              What homeowners miss
+            </p>
+            <h2 className="mt-3 text-[1.6rem] font-bold leading-tight tracking-[-0.03em] text-white">
+              This is funding support with a long-term rent commitment.
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Burlington&apos;s ARU forgivable loan can be meaningful, but it
+              is not a simple Burlington basement grant with no restrictions.
+              The tradeoff is upfront funding support now in exchange for
+              capped affordable rents over a 10-year term.
+            </p>
+            <div className="mt-4 space-y-2.5 text-sm leading-7 text-slate-300">
+              <p>No interest.</p>
+              <p>Annual verification.</p>
+              <p>Title registration.</p>
+              <p>Repayment risk if terms are broken.</p>
             </div>
           </div>
         </div>

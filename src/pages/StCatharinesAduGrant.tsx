@@ -184,18 +184,18 @@ export default function StCatharinesAduGrant() {
       </Helmet>
 
       <section className="bg-slate-900 text-white">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:px-8 lg:py-24">
-          <div className="max-w-4xl">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:px-8 lg:py-20">
+          <div className="max-w-[52rem]">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-medium text-blue-200 ring-1 ring-white/10">
               <Landmark className="h-4 w-4" />
               St. Catharines ADU grant guide
             </div>
 
-            <h1 className="mt-6 text-4xl font-bold leading-tight tracking-[-0.03em] md:text-6xl">
+            <h1 className="mt-5 text-4xl font-bold leading-[1.02] tracking-[-0.035em] md:text-6xl">
               St. Catharines ADU Grant Program
             </h1>
 
-            <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-300">
+            <p className="mt-5 max-w-3xl text-xl leading-8 text-slate-300">
               The St. Catharines ADU grant can cover up to 70% of eligible
               costs, with up to $40,000 for interior units and up to $80,000
               for exterior units. For the broader planning picture, start with
@@ -209,7 +209,7 @@ export default function StCatharinesAduGrant() {
               .
             </p>
 
-            <div className="mt-6 rounded-3xl border border-amber-300/30 bg-amber-500/10 p-5">
+            <div className="mt-5 max-w-3xl rounded-[1rem] border border-amber-300/20 bg-amber-500/[0.07] p-4.5">
               <div className="flex items-start gap-3">
                 <CircleAlert className="mt-1 h-5 w-5 shrink-0 text-amber-200" />
                 <p className="text-sm leading-7 text-slate-100">
@@ -222,7 +222,7 @@ export default function StCatharinesAduGrant() {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/match"
                 className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
@@ -238,26 +238,24 @@ export default function StCatharinesAduGrant() {
               </Link>
             </div>
 
-            <p className="mt-6 text-sm text-slate-400">
+            <p className="mt-4 text-sm text-slate-400">
               Last updated: {lastUpdated}
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.28)] backdrop-blur-sm">
-            <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(15,23,42,0.42)_100%)] p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
-                Grant positioning
-              </p>
-              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.03em] text-white">
-                Meaningful funding, but still a competitive municipal program.
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-slate-300">
-                This page is designed to help homeowners quickly understand if
-                the St. Catharines basement grant or garden suite grant path is
-                realistically worth pursuing before spending time on the wrong
-                assumptions.
-              </p>
-            </div>
+          <div className="rounded-[1rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] p-5 shadow-[0_10px_24px_rgba(2,6,23,0.14)] backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200/90">
+              Grant positioning
+            </p>
+            <h2 className="mt-3 text-[1.6rem] font-bold leading-tight tracking-[-0.03em] text-white">
+              Meaningful funding, but still a competitive municipal program.
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              This page is designed to help homeowners quickly understand if
+              the St. Catharines basement grant or garden suite grant path is
+              realistically worth pursuing before spending time on the wrong
+              assumptions.
+            </p>
           </div>
         </div>
       </section>

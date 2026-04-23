@@ -576,13 +576,13 @@ export default function Home() {
                   <div className="mt-auto pt-6 flex flex-col gap-3">
                     <Link
                       to={program.primaryHref}
-                      className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition-all hover:bg-slate-800"
+                      className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_10px_22px_rgba(15,23,42,0.14)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_14px_26px_rgba(15,23,42,0.18)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                     >
                       {program.primaryLabel}
                     </Link>
                     <Link
                       to={program.secondaryHref}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-900 transition-all hover:bg-slate-50"
+                      className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_10px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_26px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
                     >
                       {program.secondaryLabel}
                     </Link>
@@ -778,7 +778,7 @@ export default function Home() {
 
                 <form className="mt-7 space-y-4" onSubmit={handleGuideSubmit}>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       First Name
                     </label>
                     <input
@@ -788,13 +788,13 @@ export default function Home() {
                       autoComplete="given-name"
                       value={guideForm.name}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="John"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Email Address
                     </label>
                     <input
@@ -804,13 +804,13 @@ export default function Home() {
                       autoComplete="email"
                       value={guideForm.email}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="john@example.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Phone Number
                     </label>
                     <input
@@ -820,13 +820,13 @@ export default function Home() {
                       autoComplete="tel"
                       value={guideForm.phone}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="(416) 123-4567"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Project Address
                     </label>
                     <input
@@ -836,7 +836,7 @@ export default function Home() {
                       autoComplete="street-address"
                       value={guideForm.address}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="123 Main St, Hamilton"
                     />
                   </div>
@@ -860,7 +860,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={guideSubmitting || !turnstileToken}
-                    className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
+                    className="w-full mt-2 rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] py-[0.95rem] text-white font-semibold tracking-[-0.015em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
                   </button>
@@ -886,7 +886,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={resetTurnstile}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      className="w-full rounded-[0.74rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-[0.78rem] text-sm font-semibold tracking-[-0.015em] text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_10px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_26px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
                     >
                       Retry Verification
                     </button>
@@ -974,7 +974,7 @@ export default function Home() {
 
                 <form className="mt-7 space-y-4" onSubmit={handleGuideSubmit}>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       First Name
                     </label>
                     <input
@@ -984,13 +984,13 @@ export default function Home() {
                       autoComplete="given-name"
                       value={guideForm.name}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="John"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Email Address
                     </label>
                     <input
@@ -1000,13 +1000,13 @@ export default function Home() {
                       autoComplete="email"
                       value={guideForm.email}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="john@example.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Phone Number
                     </label>
                     <input
@@ -1016,13 +1016,13 @@ export default function Home() {
                       autoComplete="tel"
                       value={guideForm.phone}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="(416) 123-4567"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold tracking-[-0.012em] text-slate-700 mb-1.5">
                       Project Address
                     </label>
                     <input
@@ -1032,7 +1032,7 @@ export default function Home() {
                       autoComplete="street-address"
                       value={guideForm.address}
                       onChange={handleGuideChange}
-                      className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                      className="w-full rounded-[0.78rem] border border-slate-300/85 bg-[linear-gradient(180deg,#fcfdff_0%,#f8fafc_100%)] px-4 py-[0.92rem] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_8px_18px_rgba(15,23,42,0.04)] outline-none transition duration-200 placeholder:text-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100/80"
                       placeholder="123 Main St, Hamilton"
                     />
                   </div>
@@ -1053,7 +1053,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={guideSubmitting || !turnstileToken}
-                    className="w-full mt-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-4 transition-colors"
+                    className="w-full mt-2 rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] py-[0.95rem] text-white font-semibold tracking-[-0.015em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {guideSubmitting ? 'Submitting...' : 'Send Me The Guide'}
                   </button>
@@ -1079,7 +1079,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={resetTurnstile}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      className="w-full rounded-[0.74rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-[0.78rem] text-sm font-semibold tracking-[-0.015em] text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_10px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_26px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
                     >
                       Retry Verification
                     </button>

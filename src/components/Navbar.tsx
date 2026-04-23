@@ -9,7 +9,9 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isHubsOpen, setIsHubsOpen] = useState(false);
   const [isCitiesOpen, setIsCitiesOpen] = useState(false);
+  const [isGrantsOpen, setIsGrantsOpen] = useState(false);
   const [isMobileCitiesOpen, setIsMobileCitiesOpen] = useState(false);
+  const [isMobileGrantsOpen, setIsMobileGrantsOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -35,11 +37,12 @@ export default function Navbar() {
     setIsOpen(false);
     setIsHubsOpen(false);
     setIsCitiesOpen(false);
+    setIsGrantsOpen(false);
     setIsMobileCitiesOpen(false);
+    setIsMobileGrantsOpen(false);
   }, [location.pathname]);
 
   const navLinks = [
-    { name: 'Grants', href: '/hamilton-grant-guide' },
     { name: 'Cost Guides', href: '/costs' },
     { name: 'Garden Suites', href: '/garden-suites-laneway-suites-ontario' },
   ];
@@ -52,10 +55,17 @@ export default function Navbar() {
     { name: 'Bathroom Renovations', href: '/bathroom-renovations' },
   ];
 
+  const grantLinks = [
+    { name: 'Hamilton Secondary Suite Grant', href: '/hamilton-grant-guide' },
+    { name: 'St. Catharines ADU Grant', href: '/st-catharines-adu-grant' },
+    { name: 'Burlington ARU Incentive Program', href: '/burlington-aru-incentive-program' },
+  ];
+
   const cityPreview = useMemo(() => featuredCities.slice(0, 6), []);
 
   const isCitiesActive = cityDirectory.some((city) => location.pathname === city.href)
     || location.pathname === '/cities';
+  const isGrantsActive = grantLinks.some((grant) => location.pathname === grant.href);
 
   return (
     <>
@@ -189,6 +199,49 @@ export default function Navbar() {
               </div>
             </div>
 
+            <div
+              className="relative"
+              onMouseEnter={() => setIsGrantsOpen(true)}
+              onMouseLeave={() => setIsGrantsOpen(false)}
+            >
+              <button
+                type="button"
+                className={cn(
+                  'flex items-center gap-1.5 py-8 text-sm font-semibold tracking-[-0.01em] transition-colors',
+                  isGrantsActive ? 'text-[#1B3C6C]' : 'text-slate-600 hover:text-[#1B3C6C]'
+                )}
+              >
+                Grants
+                <ChevronDown className="h-4 w-4" />
+              </button>
+
+              <div
+                className={cn(
+                  'absolute left-1/2 top-full -translate-y-px w-[340px] -translate-x-1/2 rounded-[0.8rem] border border-slate-200/60 bg-[linear-gradient(180deg,rgba(252,253,254,0.985)_0%,rgba(248,250,252,0.985)_100%)] p-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.045),0_18px_34px_rgba(15,23,42,0.04)] backdrop-blur-md transition duration-150',
+                  isGrantsOpen
+                    ? 'visible translate-y-0 opacity-100'
+                    : 'invisible translate-y-2 opacity-0'
+                )}
+              >
+                {grantLinks.map((grant, index) => (
+                  <Link
+                    key={grant.name}
+                    to={grant.href}
+                    className={cn(
+                      'block rounded-[0.55rem] px-4 py-3 text-sm leading-6 tracking-[-0.01em] text-slate-700 transition-[background-color,color] duration-150 hover:bg-white/55 hover:text-[#1B3C6C] focus-visible:bg-white/55 focus-visible:text-[#1B3C6C]',
+                      index === 0 && 'font-semibold text-slate-900/95 hover:bg-slate-50/65 focus-visible:bg-slate-50/65',
+                      index > 0 && 'font-medium',
+                      location.pathname === grant.href
+                        ? 'bg-slate-50 text-[#1B3C6C]'
+                        : 'text-slate-700'
+                    )}
+                  >
+                    {grant.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
             {navLinks.map((link) => (
               <Link
                 key={link.name}
@@ -204,7 +257,7 @@ export default function Navbar() {
 
             <Link
               to="/match"
-              className={cn(buttonStyles.primary, 'rounded-full px-6 py-2.5 text-sm shadow-sm')}
+              className={cn(buttonStyles.primary, 'px-6 py-[0.82rem] text-sm')}
             >
               Review My Project
             </Link>
@@ -322,6 +375,41 @@ export default function Navbar() {
 
                 <div className="my-3 h-px bg-slate-200/80" />
 
+                <button
+                  type="button"
+                  onClick={() => setIsMobileGrantsOpen((value) => !value)}
+                  className="flex w-full items-center justify-between rounded-[1rem] px-3 py-3 text-left text-base font-semibold tracking-[-0.01em] text-slate-900 transition hover:bg-slate-50"
+                >
+                  <span>Grants</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-5 w-5 text-slate-500 transition-transform',
+                      isMobileGrantsOpen && 'rotate-180'
+                    )}
+                  />
+                </button>
+
+                {isMobileGrantsOpen && (
+                  <div className="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/90 p-3">
+                    <div className="grid gap-2">
+                      {grantLinks.map((grant) => (
+                        <Link
+                          key={grant.name}
+                          to={grant.href}
+                          className={cn(
+                            'rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]',
+                            location.pathname === grant.href && 'border-slate-200 bg-slate-50 text-[#1B3C6C]'
+                          )}
+                        >
+                          {grant.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="my-3 h-px bg-slate-200/80" />
+
                 {navLinks.map((link) => (
                   <Link
                     key={link.name}
@@ -340,7 +428,7 @@ export default function Navbar() {
                 <div className="px-3 pt-3">
                   <Link
                     to="/match"
-                    className={cn(buttonStyles.primary, 'w-full px-6 py-3 text-center text-base')}
+                    className={cn(buttonStyles.primary, 'w-full px-6 py-[0.92rem] text-center text-base')}
                   >
                     Review My Project
                   </Link>
