@@ -475,7 +475,7 @@ export default function Home() {
       </Helmet>
 
       {/* Hero Section */}
-      <section className="relative bg-slate-900 text-white overflow-hidden">
+      <section className="relative overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0 z-0 opacity-40">
           <img
             src="/hero.jpg"
@@ -485,59 +485,59 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
         </div>
-
-        <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-start px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-32">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1B3C6C]/20 border border-blue-500/30 text-blue-300 font-medium text-sm mb-8 backdrop-blur-sm">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Ontario&apos;s Independent Homeowner Guide</span>
-          </div>
-
-          <h1 className="mb-6 max-w-3xl text-4xl font-bold leading-tight tracking-[-0.04em] sm:text-5xl lg:text-7xl">
-            Plan Your Renovation with <span className="text-[#5694CF]">Confidence.</span>
-          </h1>
-
-          <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-            We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
-          </p>
-
-          <p className="text-sm text-slate-400 mb-10 max-w-2xl">
-            We don't sell renovations. We help you make the right decision before hiring anyone.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link
-              to="/match"
-              className={buttonStyles.primary}
-            >
-              Review My Project <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              to="/costs"
-              className={buttonStyles.ghostDark}
-            >
-              View 2026 Cost Guides
-            </Link>
-          </div>
-
-          <div className="mt-12 flex flex-wrap items-center gap-6 text-sm text-slate-400 font-medium">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
+          <div className="max-w-4xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-[#1B3C6C]/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Ontario&apos;s Independent Homeowner Guide</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
+
+            <h1 className="mb-6 mt-8 max-w-3xl text-4xl font-bold leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl">
+              Plan Your Renovation with <span className="text-[#7FB0E0]">Confidence.</span>
+            </h1>
+
+            <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
+              We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
+            </p>
+
+            <p className="mb-10 max-w-2xl text-sm text-slate-400">
+              We don't sell renovations. We help you make the right decision before hiring anyone.
+            </p>
+
+            <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
+              <Link
+                to="/match"
+                className={buttonStyles.primary}
+              >
+                Review My Project <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/costs"
+                className={buttonStyles.ghostDark}
+              >
+                View 2026 Cost Guides
+              </Link>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
+
+            <div className="mt-12 flex flex-wrap items-center gap-6 text-sm font-medium text-slate-400">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Featured Programs */}
-      <section className="border-b border-yellow-100 bg-gradient-to-r from-yellow-50 via-amber-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
-          <div className="rounded-3xl border border-yellow-200/80 bg-white/80 backdrop-blur-sm shadow-sm px-6 py-8 md:px-8 md:py-9">
-            <div className="max-w-3xl">
+      <section className="border-b border-yellow-100 bg-[linear-gradient(180deg,#fffaf0_0%,#fffdf8_48%,#ffffff_100%)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+          <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full bg-yellow-100 text-yellow-900 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em]">
                 <Landmark className="w-4 h-4" />
                 Featured Ontario Programs
@@ -548,84 +548,94 @@ export default function Home() {
               <p className="mt-4 max-w-2xl text-base md:text-lg text-slate-700 leading-relaxed">
                 Hamilton currently offers the strongest grant opportunity, while St. Catharines and Burlington provide valuable guidance for planning legal basement and secondary suite projects.
               </p>
-            </div>
+          </div>
 
-            <div className="mt-8 grid gap-4 lg:grid-cols-3">
-              {featuredPrograms.map((program, index) => (
-                <div
-                  key={program.title}
-                  className={cn(
-                    'flex h-full flex-col rounded-2xl border p-6 shadow-sm',
-                    index === 0
-                      ? 'border-yellow-200 bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_100%)]'
-                      : 'border-slate-200 bg-white'
-                  )}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    {program.eyebrow}
-                  </p>
-                  <h3 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-slate-900">
-                    {program.title}
-                  </h3>
-                  <p className="mt-2 text-sm font-semibold text-[#1B3C6C]">
-                    {program.highlight}
-                  </p>
-                  <p className="mt-4 text-sm leading-7 text-slate-600">
-                    {program.description}
-                  </p>
-                  <div className="mt-auto pt-6 flex flex-col gap-3">
-                    <Link
-                      to={program.primaryHref}
-                      className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_10px_22px_rgba(15,23,42,0.14)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_14px_26px_rgba(15,23,42,0.18)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
-                    >
-                      {program.primaryLabel}
-                    </Link>
-                    <Link
-                      to={program.secondaryHref}
-                      className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_10px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_26px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-                    >
-                      {program.secondaryLabel}
-                    </Link>
-                  </div>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {featuredPrograms.map((program, index) => (
+              <div
+                key={program.title}
+                className={cn(
+                  'flex h-full flex-col rounded-[1.35rem] border p-6 shadow-[0_12px_28px_rgba(15,23,42,0.05)]',
+                  index === 0
+                    ? 'border-yellow-200 bg-[linear-gradient(180deg,#fffdf4_0%,#ffffff_100%)]'
+                    : 'border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)]'
+                )}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {program.eyebrow}
+                </p>
+                <h3 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-slate-900">
+                  {program.title}
+                </h3>
+                <p className="mt-2 text-sm font-semibold text-[#1B3C6C]">
+                  {program.highlight}
+                </p>
+                <p className="mt-4 text-sm leading-7 text-slate-600">
+                  {program.description}
+                </p>
+                <div className="mt-auto pt-6 flex flex-col gap-3">
+                  <Link
+                    to={program.primaryHref}
+                    className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_10px_22px_rgba(15,23,42,0.14)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_14px_26px_rgba(15,23,42,0.18)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
+                  >
+                    {program.primaryLabel}
+                  </Link>
+                  <Link
+                    to={program.secondaryHref}
+                    className="inline-flex items-center justify-center rounded-[0.74rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-[0.78rem] font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_1px_2px_rgba(15,23,42,0.03),0_10px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_26px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                  >
+                    {program.secondaryLabel}
+                  </Link>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Authority / Trust Section */}
-      <section className="py-16 bg-white border-b border-slate-100">
+      <section className="border-b border-slate-100 bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-100">
-            <div className="p-6">
-              <div className="mx-auto w-16 h-16 bg-blue-50 text-[#1B3C6C] rounded-2xl flex items-center justify-center mb-6">
-                <FileText className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">Permit & Code Clarity</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Stop guessing. We break down Ontario building codes and municipal permit requirements into plain English.
+          <div className="grid gap-10 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-14">
+            <div className="max-w-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
+                Why homeowners use OntarioReno
               </p>
+              <h2 className="mt-4 text-3xl font-bold tracking-[-0.03em] text-slate-900">
+                More clarity before quotes, permits, and pricing decisions.
+              </h2>
             </div>
 
-            <div className="p-6">
-              <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
-                <Calculator className="w-8 h-8" />
+            <div className="grid gap-0 md:grid-cols-3 md:divide-x md:divide-slate-200/80">
+              <div className="border-t border-slate-200/80 pt-6 md:border-t-0 md:px-7 md:pt-0 md:first:pl-0 md:last:pr-0">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[1rem] bg-blue-50 text-[#1B3C6C]">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Permit & Code Clarity</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Stop guessing. We break down Ontario building codes and municipal permit requirements into plain English.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">Transparent Pricing</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Access real, localized cost data for basements, kitchens, and legal suites across the GTA and beyond.
-              </p>
-            </div>
 
-            <div className="p-6">
-              <div className="mx-auto w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6">
-                <Users className="w-8 h-8" />
+              <div className="border-t border-slate-200/80 pt-6 md:border-t-0 md:px-7 md:pt-0 md:first:pl-0 md:last:pr-0">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[1rem] bg-emerald-50 text-emerald-600">
+                  <Calculator className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Transparent Pricing</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Access real, localized cost data for basements, kitchens, and legal suites across the GTA and beyond.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">Best-Fit Contractor Matching</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Start with a project review that helps narrow the right next step based on scope, budget, and track record instead of random directory browsing.
-              </p>
+
+              <div className="border-t border-slate-200/80 pt-6 md:border-t-0 md:px-7 md:pt-0 md:first:pl-0 md:last:pr-0">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[1rem] bg-sky-50 text-sky-700">
+                  <Users className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Best-Fit Contractor Matching</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Start with a project review that helps narrow the right next step based on scope, budget, and track record instead of random directory browsing.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1097,22 +1107,26 @@ export default function Home() {
       </section>
 
       {/* Project Review CTA */}
-      <section className="py-20 bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="w-20 h-20 bg-[#1B3C6C]/20 rounded-full flex items-center justify-center mx-auto mb-8">
-            <Hammer className="w-10 h-10 text-[#5694CF]" />
+      <section className="bg-slate-900 py-20 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="w-16 h-16 bg-[#1B3C6C]/24 rounded-full flex items-center justify-center mb-7 mx-auto">
+              <Hammer className="w-8 h-8 text-[#7FB0E0]" />
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-[-0.04em]">Ready to start your project?</h2>
+            <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+              Start with a clear project review built around scope, budget, and real track record. No random referrals, and no marketplace-style noise.
+            </p>
+            <div className="flex flex-col items-center gap-4">
+              <Link
+                to="/match"
+                className={buttonStyles.primary}
+              >
+                Review My Project
+              </Link>
+              <p className="text-sm text-slate-400">100% free for homeowners. No obligation to hire.</p>
+            </div>
           </div>
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to start your project?</h2>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            Start with a clear project review built around scope, budget, and real track record. No random referrals, and no marketplace-style noise.
-          </p>
-          <Link
-            to="/match"
-            className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-600/25"
-          >
-            Review My Project
-          </Link>
-          <p className="mt-6 text-sm text-slate-500">100% free for homeowners. No obligation to hire.</p>
         </div>
       </section>
 
