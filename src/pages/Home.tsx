@@ -156,7 +156,10 @@ export default function Home() {
   });
 
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [isDesktopGuideLayout, setIsDesktopGuideLayout] = useState(false);
+  const [isDesktopGuideLayout, setIsDesktopGuideLayout] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 1280px)').matches;
+  });
   const [turnstileStatus, setTurnstileStatus] = useState<
     'idle' | 'rendered' | 'verified' | 'expired' | 'error'
   >('idle');
@@ -714,8 +717,8 @@ export default function Home() {
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 
         <div className="relative z-10 max-w-[1800px] mx-auto px-6 lg:px-10 xl:px-14">
-          {/* Mobile / tablet */}
-          <div className="xl:hidden flex flex-col items-center text-center gap-8">
+          {!isDesktopGuideLayout ? (
+          <div className="flex flex-col items-center text-center gap-8">
             <div className="relative isolate flex justify-center">
               <img
                 src="/ontario-reno-cost-guide-3d-preview.png"
@@ -896,10 +899,9 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {/* Desktop */}
+          ) : (
           <div
-            className="hidden xl:grid items-center justify-center"
+            className="grid items-center justify-center"
             style={{
               gridTemplateColumns: '980px 430px',
               columnGap: '40px',
@@ -1090,6 +1092,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
 
