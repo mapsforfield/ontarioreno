@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import {
   Calculator,
   ArrowRight,
+  CreditCard,
   Info,
   Home,
   ShieldCheck,
@@ -10,6 +11,8 @@ import {
   Landmark,
   CheckCircle2,
 } from 'lucide-react';
+import { buttonStyles } from '../lib/uiStyles';
+import { cn } from '../lib/utils';
 
 export default function Costs() {
   return (
@@ -28,6 +31,17 @@ export default function Costs() {
           <p className="text-xl text-slate-600 leading-relaxed">
             Real price ranges based on recent Ontario projects, so you can set
             better expectations before speaking with a contractor.
+          </p>
+          <p className="mt-4 text-base leading-7 text-slate-500">
+            If the project cost feels bigger than expected, it may also help to
+            compare{' '}
+            <Link
+              to="/financing"
+              className="font-semibold text-slate-900 underline underline-offset-4"
+            >
+              renovation financing options
+            </Link>{' '}
+            in monthly terms before ruling the project out.
           </p>
         </div>
 
@@ -361,6 +375,60 @@ export default function Costs() {
                   These ranges are meant to help you anchor your expectations
                   before you start comparing contractors or narrowing scope.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto mt-10">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-6 md:px-8 md:py-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+                  <CreditCard className="w-4 h-4" />
+                  Financing Options
+                </div>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900 md:text-3xl">
+                  Cost is one number. Monthly fit is another.
+                </h2>
+                <p className="mt-4 text-base leading-7 text-slate-700">
+                  If the project range feels bigger than expected, it may help
+                  to compare what basement, kitchen, bathroom, or legal-suite
+                  work could look like as a monthly payment instead of judging
+                  the full sticker price alone.
+                </p>
+                <p className="mt-4 text-sm leading-7 text-slate-600">
+                  Explore the{' '}
+                  <Link
+                    to="/financing"
+                    className="font-semibold text-slate-900 underline underline-offset-4"
+                  >
+                    Ontario renovation financing page
+                  </Link>{' '}
+                  for payment examples, then go deeper into the{' '}
+                  <Link
+                    to="/open-loan-financing"
+                    className="font-semibold text-slate-900 underline underline-offset-4"
+                  >
+                    open loan financing guide
+                  </Link>{' '}
+                  if you want to understand flexibility and payoff strategy.
+                </p>
+              </div>
+
+              <div className="flex w-full flex-col gap-3 md:w-auto md:min-w-[240px]">
+                <Link
+                  to="/financing"
+                  className={cn(buttonStyles.primary, 'w-full justify-center')}
+                >
+                  See Financing Options
+                </Link>
+                <Link
+                  to="/open-loan-financing"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                >
+                  Open Loan Guide
+                </Link>
               </div>
             </div>
           </div>

@@ -94,11 +94,31 @@ export default function HamiltonBasementRenovationCost() {
           </div>
 
           <div className="flex items-center justify-center lg:justify-end">
-            <img
-              src="/images/ontarioreno/hamilton-city.jpg"
-              alt="Hamilton Ontario skyline and surrounding residential neighborhoods"
-              className="aspect-[5/4] w-full rounded-[2rem] object-cover shadow-[0_30px_80px_rgba(15,23,42,0.18)]"
-            />
+            <div className="relative w-full">
+              <div className="absolute left-5 top-5 z-10 rounded-[1.2rem] border border-white/55 bg-white/92 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur-sm">
+                <div className="flex items-center gap-4">
+                  <img
+                    src="/images/hamilton-logo.png"
+                    alt="Hamilton logo"
+                    className="h-14 w-auto object-contain"
+                  />
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Local market
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-700">
+                      Hamilton project context
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <img
+                src="/images/ontarioreno/hamilton-city.jpg"
+                alt="Hamilton Ontario skyline and surrounding residential neighborhoods"
+                className="aspect-[5/4] w-full rounded-[2rem] object-cover shadow-[0_30px_80px_rgba(15,23,42,0.18)]"
+              />
+            </div>
           </div>
         </div>
       </section>

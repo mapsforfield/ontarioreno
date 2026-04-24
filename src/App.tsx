@@ -16,6 +16,7 @@ import Match from './pages/Match';
 import Cities from './pages/Cities';
 import Financing from './pages/Financing';
 import OpenLoanFinancing from './pages/OpenLoanFinancing';
+import GrantEligibilityCalculator from './pages/GrantEligibilityCalculator';
 import HamiltonGrant from './pages/HamiltonGrant';
 import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
 import HamiltonSecondarySuiteGrant from './pages/HamiltonSecondarySuiteGrant';
@@ -29,10 +30,17 @@ import MiltonBasementRenovationCost from './pages/MiltonBasementRenovationCost';
 import MiltonLegalBasement from './pages/MiltonLegalBasement';
 import MiltonBasementPermit from './pages/MiltonBasementPermit';
 import BurlingtonBasementRenovation from './pages/BurlingtonBasementRenovation';
+import BarrieBasementRenovation from './pages/BarrieBasementRenovation';
 import BurlingtonBasementRenovationCost from './pages/BurlingtonBasementRenovationCost';
 import BurlingtonLegalBasement from './pages/BurlingtonLegalBasement';
 import BurlingtonBasementPermit from './pages/BurlingtonBasementPermit';
 import BurlingtonAruIncentiveProgram from './pages/BurlingtonAruIncentiveProgram';
+import BarrieSecondarySuiteFunding from './pages/BarrieSecondarySuiteFunding';
+import BarrieBasementApartmentPermits from './pages/BarrieBasementApartmentPermits';
+import BarrieGardenSuites from './pages/BarrieGardenSuites';
+import BarrieAruPermitRebate from './pages/BarrieAruPermitRebate';
+import BarrieSecondarySuiteCosts from './pages/BarrieSecondarySuiteCosts';
+import BarrieAruEligibility from './pages/BarrieAruEligibility';
 import StCatharines from './pages/StCatharines';
 import StCatharinesAduGrant from './pages/StCatharinesAduGrant';
 import StCatharinesAduCost from './pages/StCatharinesAduCost';
@@ -98,6 +106,7 @@ export default function App() {
           <Route path="cities" element={<Cities />} />
           <Route path="financing" element={<Financing />} />
           <Route path="open-loan-financing" element={<OpenLoanFinancing />} />
+          <Route path="grant-eligibility-calculator" element={<GrantEligibilityCalculator />} />
           <Route path="hamilton-grant-guide" element={<HamiltonGrant />} />
           <Route path="hamilton-secondary-suite-grant" element={<HamiltonSecondarySuiteGrant />} />
           <Route path="hamilton-building-permit-timeline" element={<HamiltonPermitTimeline />} />
@@ -110,10 +119,17 @@ export default function App() {
           <Route path="legal-basement-milton" element={<MiltonLegalBasement />} />
           <Route path="basement-permit-milton" element={<MiltonBasementPermit />} />
           <Route path="basement-renovation-burlington" element={<BurlingtonBasementRenovation />} />
+          <Route path="basement-renovation-barrie" element={<BarrieBasementRenovation />} />
           <Route path="basement-renovation-cost-burlington" element={<BurlingtonBasementRenovationCost />} />
           <Route path="legal-basement-burlington" element={<BurlingtonLegalBasement />} />
           <Route path="basement-permit-burlington" element={<BurlingtonBasementPermit />} />
           <Route path="burlington-aru-incentive-program" element={<BurlingtonAruIncentiveProgram />} />
+          <Route path="barrie-secondary-suite-funding" element={<BarrieSecondarySuiteFunding />} />
+          <Route path="barrie-basement-apartment-permits" element={<BarrieBasementApartmentPermits />} />
+          <Route path="barrie-garden-suites" element={<BarrieGardenSuites />} />
+          <Route path="barrie-aru-permit-rebate" element={<BarrieAruPermitRebate />} />
+          <Route path="barrie-secondary-suite-costs" element={<BarrieSecondarySuiteCosts />} />
+          <Route path="barrie-aru-eligibility" element={<BarrieAruEligibility />} />
           <Route path="st-catharines" element={<StCatharines />} />
           <Route path="st-catharines-adu-grant" element={<StCatharinesAduGrant />} />
           <Route path="st-catharines-adu-cost" element={<StCatharinesAduCost />} />

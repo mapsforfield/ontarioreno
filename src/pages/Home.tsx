@@ -486,49 +486,86 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
         </div>
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-          <div className="max-w-4xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-[#1B3C6C]/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Ontario&apos;s Independent Homeowner Guide</span>
+          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">
+            <div className="max-w-4xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-[#1B3C6C]/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Ontario&apos;s Independent Homeowner Guide</span>
+              </div>
+
+              <h1 className="mb-6 mt-8 max-w-3xl text-4xl font-bold leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl">
+                Plan Your Renovation with <span className="text-[#7FB0E0]">Confidence.</span>
+              </h1>
+
+              <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
+                We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
+              </p>
+
+              <p className="mb-10 max-w-2xl text-sm text-slate-400">
+                We don't sell renovations. We help you make the right decision before hiring anyone.
+              </p>
+
+              <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
+                <Link
+                  to="/match"
+                  className={buttonStyles.primary}
+                >
+                  Review My Project <ArrowRight className="w-5 h-5" />
+                </Link>
+                <Link
+                  to="/costs"
+                  className={buttonStyles.ghostDark}
+                >
+                  View 2026 Cost Guides
+                </Link>
+              </div>
+
+              <div className="mt-12 flex flex-wrap items-center gap-6 text-sm font-medium text-slate-400">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
+                </div>
+              </div>
             </div>
 
-            <h1 className="mb-6 mt-8 max-w-3xl text-4xl font-bold leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl">
-              Plan Your Renovation with <span className="text-[#7FB0E0]">Confidence.</span>
-            </h1>
-
-            <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-              We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
-            </p>
-
-            <p className="mb-10 max-w-2xl text-sm text-slate-400">
-              We don't sell renovations. We help you make the right decision before hiring anyone.
-            </p>
-
-            <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
+            <div className="hidden lg:block">
               <Link
-                to="/match"
-                className={buttonStyles.primary}
+                to="/#cost-guide"
+                className="group relative block rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.03)_100%)] p-7 shadow-[0_28px_70px_rgba(2,6,23,0.26)] backdrop-blur-sm transition duration-200 hover:border-white/18 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)]"
               >
-                Review My Project <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link
-                to="/costs"
-                className={buttonStyles.ghostDark}
-              >
-                View 2026 Cost Guides
-              </Link>
-            </div>
+                <div className="absolute inset-x-10 top-10 h-48 rounded-full bg-[#4A8DDA]/18 blur-3xl" />
+                <div className="absolute inset-x-16 top-[7.25rem] h-32 rounded-full bg-[#7FB0E0]/22 blur-2xl" />
 
-            <div className="mt-12 flex flex-wrap items-center gap-6 text-sm font-medium text-slate-400">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
-              </div>
+                <div className="relative flex justify-center">
+                  <img
+                    src="/ontario-reno-cost-guide-3d-preview.png"
+                    alt="2026 Ontario Renovation Cost Guide booklet preview"
+                    className="relative z-10 h-auto w-[250px] object-contain drop-shadow-[0_26px_36px_rgba(2,6,23,0.34)] transition duration-200 group-hover:-translate-y-1"
+                    loading="eager"
+                  />
+                </div>
+
+                <div className="relative mt-5 border-t border-white/10 pt-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200">
+                    Free planning guide
+                  </p>
+                  <h2 className="mt-3 text-2xl font-bold leading-tight tracking-[-0.03em] text-white">
+                    2026 Ontario Renovation Cost Guide
+                  </h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">
+                    See how to price basements, kitchens, legal suites, and permit costs before your first quote.
+                  </p>
+                  <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white">
+                    Get the free guide
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </div>
+              </Link>
             </div>
           </div>
         </div>
@@ -641,6 +678,66 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="bg-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[2.15rem] border border-slate-900/10 bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] shadow-[0_28px_80px_rgba(15,23,42,0.20)]">
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_360px]">
+              <div className="px-8 py-10 text-white md:px-10 md:py-12">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-4 py-2 text-sm font-semibold text-blue-200">
+                  <Calculator className="h-4 w-4" />
+                  Renovation financing
+                </div>
+                <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
+                  Need a clearer path to monthly renovation financing?
+                </h2>
+                <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+                  Explore monthly payment examples, then go deeper into our
+                  open-loan financing guide if you want the full picture on
+                  payment flexibility, faster payoff strategy, and how the math
+                  actually works.
+                </p>
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <Link
+                    to="/open-loan-financing"
+                    className={buttonStyles.primary}
+                  >
+                    Explore Open Loan Financing <ArrowRight className="w-5 h-5" />
+                  </Link>
+                  <Link
+                    to="/financing"
+                    className={buttonStyles.ghostDark}
+                  >
+                    View Financing Options
+                  </Link>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 bg-white/6 px-8 py-10 text-white backdrop-blur-sm md:px-10 lg:border-l lg:border-t-0">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
+                  Why it matters
+                </p>
+                <div className="mt-6 space-y-4">
+                  {[
+                    'See the monthly lens before ruling a project out',
+                    'Understand open-loan flexibility beyond the headline payment',
+                    'Compare financing fit before finalizing scope or budget',
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 w-5 h-5 shrink-0 text-blue-200" />
+                      <p className="text-sm leading-7 text-slate-200">{item}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-6 text-sm leading-7 text-slate-300">
+                  This is the easiest way to understand whether financing changes
+                  what feels realistic for your renovation.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Renovation Categories */}
       <section className="py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -722,7 +819,10 @@ export default function Home() {
       </div>
 
       {/* Lead Capture Block */}
-      <section className="relative overflow-visible xl:overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white">
+      <section
+        id="cost-guide"
+        className="relative overflow-visible xl:overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white"
+      >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 

@@ -130,6 +130,24 @@ export default function StCatharines() {
 
           <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.28)] backdrop-blur-sm">
             <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(15,23,42,0.4)_100%)] p-6">
+              <div className="mb-6 rounded-[1.2rem] border border-white/10 bg-white/92 px-5 py-4 shadow-[0_14px_36px_rgba(2,6,23,0.14)]">
+                <div className="flex items-center justify-between gap-4">
+                  <img
+                    src="/images/st-catharines-logo.png"
+                    alt="St. Catharines logo"
+                    className="h-10 w-auto object-contain sm:h-12"
+                  />
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Local market
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-700">
+                      St. Catharines context
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
                 City hub purpose
               </p>

@@ -116,10 +116,10 @@ export default function Financing() {
 
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/open-loan-financing#calculator-placeholder"
                 className={buttonStyles.primary}
               >
-                See My Options
+                Financing Calculator
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <a
@@ -395,6 +395,66 @@ export default function Financing() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white pb-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[2.15rem] border border-slate-900/10 bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] shadow-[0_28px_80px_rgba(15,23,42,0.20)]">
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_380px]">
+              <div className="px-8 py-10 text-white md:px-10 md:py-12">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
+                  Open loan financing
+                </p>
+                <h2 className="mt-4 max-w-3xl text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
+                  Want the deeper version of how renovation financing really works?
+                </h2>
+                <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+                  Our open-loan financing guide breaks down the part most
+                  homeowners miss: why the required monthly payment is only the
+                  starting point, how extra payments change the math, and why a
+                  flexible exit path matters.
+                </p>
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <Link
+                    to="/open-loan-financing"
+                    className={buttonStyles.primary}
+                  >
+                    Explore Open Loan Financing
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                  <Link
+                    to="/match"
+                    className="inline-flex items-center justify-center rounded-[0.8rem] border border-white/18 bg-white/8 px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition duration-200 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
+                  >
+                    Review My Project
+                  </Link>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 bg-white/6 px-8 py-10 text-white backdrop-blur-sm md:px-10 lg:border-l lg:border-t-0">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
+                  Inside the guide
+                </p>
+                <div className="mt-6 space-y-4">
+                  {[
+                    'How open loans differ from standard monthly-payment thinking',
+                    'Why no-prepayment-penalty flexibility changes the decision',
+                    'How to think about payoff strategy instead of just rate',
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-200" />
+                      <p className="text-sm leading-7 text-slate-200">{item}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-6 text-sm leading-7 text-slate-300">
+                  If monthly affordability is only part of the question, this
+                  is the page that gives the fuller picture.
+                </p>
               </div>
             </div>
           </div>

@@ -8,8 +8,10 @@ import { buttonStyles } from '../lib/uiStyles';
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isHubsOpen, setIsHubsOpen] = useState(false);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isCitiesOpen, setIsCitiesOpen] = useState(false);
   const [isGrantsOpen, setIsGrantsOpen] = useState(false);
+  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [isMobileCitiesOpen, setIsMobileCitiesOpen] = useState(false);
   const [isMobileGrantsOpen, setIsMobileGrantsOpen] = useState(false);
   const location = useLocation();
@@ -36,15 +38,16 @@ export default function Navbar() {
   useEffect(() => {
     setIsOpen(false);
     setIsHubsOpen(false);
+    setIsToolsOpen(false);
     setIsCitiesOpen(false);
     setIsGrantsOpen(false);
+    setIsMobileToolsOpen(false);
     setIsMobileCitiesOpen(false);
     setIsMobileGrantsOpen(false);
   }, [location.pathname]);
 
   const navLinks = [
     { name: 'Cost Guides', href: '/costs' },
-    { name: 'Garden Suites', href: '/garden-suites-laneway-suites-ontario' },
   ];
 
   const hubs = [
@@ -53,12 +56,20 @@ export default function Navbar() {
     { name: 'Garden Suites', href: '/garden-suites-laneway-suites-ontario' },
     { name: 'Kitchen Renovations', href: '/kitchen-renovations' },
     { name: 'Bathroom Renovations', href: '/bathroom-renovations' },
+    { name: 'Renovation Financing', href: '/financing' },
   ];
 
   const grantLinks = [
     { name: 'Hamilton Secondary Suite Grant', href: '/hamilton-grant-guide' },
+    { name: 'Barrie Secondary Suite Funding', href: '/barrie-secondary-suite-funding' },
     { name: 'St. Catharines ADU Grant', href: '/st-catharines-adu-grant' },
     { name: 'Burlington ARU Incentive Program', href: '/burlington-aru-incentive-program' },
+  ];
+
+  const calculatorLinks = [
+    { name: 'Financing Calculator', href: '/open-loan-financing#calculator-placeholder' },
+    { name: 'Grant Eligibility Calculator', href: '/grant-eligibility-calculator' },
+    { name: 'Garden Suite Calculator', href: '/garden-suite-cost-ontario#calculator' },
   ];
 
   const cityPreview = useMemo(() => featuredCities.slice(0, 6), []);
@@ -66,6 +77,9 @@ export default function Navbar() {
   const isCitiesActive = cityDirectory.some((city) => location.pathname === city.href)
     || location.pathname === '/cities';
   const isGrantsActive = grantLinks.some((grant) => location.pathname === grant.href);
+  const isCalculatorsActive = calculatorLinks.some(
+    (tool) => location.pathname === tool.href.split('#')[0]
+  );
 
   return (
     <>
@@ -114,11 +128,15 @@ export default function Navbar() {
                     key={hub.name}
                     to={hub.href}
                     className={cn(
-                      'block rounded-[1rem] px-4 py-3 text-sm font-medium tracking-[-0.01em] transition-colors hover:bg-slate-50 hover:text-[#1B3C6C]',
+                      'block rounded-[1rem] px-4 py-3 text-sm font-medium tracking-[-0.01em] transition-colors',
                       index === 2 && 'mt-1 border-t border-slate-200/80 pt-4',
-                      location.pathname === hub.href
-                        ? 'bg-slate-50 text-[#1B3C6C]'
-                        : 'text-slate-700'
+                      hub.href === '/financing'
+                        ? location.pathname === hub.href
+                          ? 'mt-2 bg-[#1B3C6C] text-white shadow-[0_12px_24px_rgba(27,60,108,0.18)]'
+                          : 'mt-2 bg-[#2b5a96] text-white shadow-[0_12px_24px_rgba(27,60,108,0.16)] hover:bg-[#3163a3]'
+                        : location.pathname === hub.href
+                          ? 'bg-slate-50 text-[#1B3C6C] hover:bg-slate-50'
+                          : 'text-slate-700 hover:bg-slate-50 hover:text-[#1B3C6C]'
                     )}
                   >
                     {hub.name}
@@ -256,6 +274,56 @@ export default function Navbar() {
             ))}
 
             <Link
+              to="/garden-suites-laneway-suites-ontario"
+              className={cn(
+                'text-sm font-semibold tracking-[-0.01em] text-slate-600 transition-colors hover:text-[#1B3C6C]',
+                location.pathname === '/garden-suites-laneway-suites-ontario' && 'text-[#1B3C6C]'
+              )}
+            >
+              Garden Suites
+            </Link>
+
+            <div
+              className="relative"
+              onMouseEnter={() => setIsToolsOpen(true)}
+              onMouseLeave={() => setIsToolsOpen(false)}
+            >
+              <button
+                type="button"
+                className={cn(
+                  'flex items-center gap-1.5 py-8 text-sm font-semibold tracking-[-0.01em] transition-colors',
+                  isCalculatorsActive ? 'text-[#1B3C6C]' : 'text-slate-600 hover:text-[#1B3C6C]'
+                )}
+              >
+                Tools
+                <ChevronDown className="h-4 w-4" />
+              </button>
+
+              <div
+                className={cn(
+                  'absolute left-1/2 top-full w-[336px] -translate-x-1/2 rounded-[1rem] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(252,253,254,0.99)_0%,rgba(247,250,252,0.985)_100%)] p-2 shadow-[0_10px_24px_rgba(15,23,42,0.05),0_20px_40px_rgba(15,23,42,0.05)] backdrop-blur-sm transition duration-150',
+                  isToolsOpen
+                    ? 'visible translate-y-0 opacity-100'
+                    : 'invisible translate-y-2 opacity-0'
+                )}
+              >
+                {calculatorLinks.map((tool, index) => (
+                  <Link
+                    key={tool.name}
+                    to={tool.href}
+                    className={cn(
+                      'block rounded-[0.75rem] px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition-[background-color,color] duration-150 hover:bg-white/65 hover:text-[#1B3C6C] focus-visible:bg-white/65 focus-visible:text-[#1B3C6C]',
+                      index === 0 && 'font-semibold text-slate-900',
+                      location.pathname === tool.href.split('#')[0] && 'bg-slate-50 text-[#1B3C6C]'
+                    )}
+                  >
+                    {tool.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <Link
               to="/match"
               className={cn(buttonStyles.primary, 'px-6 py-[0.82rem] text-sm')}
             >
@@ -315,10 +383,14 @@ export default function Navbar() {
                     key={hub.name}
                     to={hub.href}
                     className={cn(
-                      'block rounded-xl px-3 py-3 text-base font-medium transition hover:bg-slate-50 hover:text-[#1B3C6C]',
-                      location.pathname === hub.href
-                        ? 'bg-slate-50 text-[#1B3C6C]'
-                        : 'text-slate-700'
+                      'block rounded-xl px-3 py-3 text-base font-medium transition',
+                      hub.href === '/financing'
+                        ? location.pathname === hub.href
+                          ? 'mt-2 bg-[#1B3C6C] text-white shadow-[0_12px_24px_rgba(27,60,108,0.18)]'
+                          : 'mt-2 bg-[#2b5a96] text-white shadow-[0_12px_24px_rgba(27,60,108,0.16)] hover:bg-[#3163a3]'
+                        : location.pathname === hub.href
+                          ? 'bg-slate-50 text-[#1B3C6C] hover:bg-slate-50'
+                          : 'text-slate-700 hover:bg-slate-50 hover:text-[#1B3C6C]'
                     )}
                   >
                     {hub.name}
@@ -424,6 +496,53 @@ export default function Navbar() {
                     {link.name}
                   </Link>
                 ))}
+
+                <Link
+                  to="/garden-suites-laneway-suites-ontario"
+                  className={cn(
+                    'block rounded-[1rem] px-3 py-3 text-base font-medium tracking-[-0.01em] transition hover:bg-slate-50 hover:text-[#1B3C6C]',
+                    location.pathname === '/garden-suites-laneway-suites-ontario'
+                      ? 'bg-slate-50 text-[#1B3C6C]'
+                      : 'text-slate-700'
+                  )}
+                >
+                  Garden Suites
+                </Link>
+
+                <div className="my-3 h-px bg-slate-200/80" />
+
+                <button
+                  type="button"
+                  onClick={() => setIsMobileToolsOpen((value) => !value)}
+                  className="flex w-full items-center justify-between rounded-[1rem] px-3 py-3 text-left text-base font-semibold tracking-[-0.01em] text-slate-900 transition hover:bg-slate-50"
+                >
+                  <span>Tools</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-5 w-5 text-slate-500 transition-transform',
+                      isMobileToolsOpen && 'rotate-180'
+                    )}
+                  />
+                </button>
+
+                {isMobileToolsOpen && (
+                  <div className="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/90 p-3">
+                    <div className="grid gap-2">
+                      {calculatorLinks.map((tool) => (
+                        <Link
+                          key={tool.name}
+                          to={tool.href}
+                          className={cn(
+                            'rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]',
+                            location.pathname === tool.href.split('#')[0] && 'border-slate-200 bg-slate-50 text-[#1B3C6C]'
+                          )}
+                        >
+                          {tool.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="px-3 pt-3">
                   <Link

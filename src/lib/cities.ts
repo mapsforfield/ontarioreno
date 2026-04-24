@@ -48,6 +48,14 @@ export const cityDirectory: CityEntry[] = [
     featured: true,
   },
   {
+    name: 'Barrie',
+    href: '/basement-renovation-barrie',
+    descriptor: 'Basements, funding, and ARU planning',
+    summary:
+      'Built for Barrie homeowners comparing basement finishing, secondary suites, funding programs, and ARU planning.',
+    featured: true,
+  },
+  {
     name: 'Milton',
     href: '/basement-renovation-milton',
     descriptor: 'Newer homes and unfinished basements',

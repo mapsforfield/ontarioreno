@@ -286,7 +286,10 @@ export default function StCatharinesAduGrant() {
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-16 md:py-20">
+      <section
+        id="calculator"
+        className="bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-16 md:py-20"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">

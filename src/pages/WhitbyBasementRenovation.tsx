@@ -165,14 +165,33 @@ export default function WhitbyBasementRenovation() {
             <div className="relative w-full max-w-[500px] rounded-[2rem] bg-white/6 p-4 ring-1 ring-white/10">
               <div className="pointer-events-none absolute inset-6 rounded-[1.75rem] bg-black/10 blur-2xl" />
               <div className="relative">
-                <div className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                  Typical Whitby Basement Finish
+                <div className="mb-4 rounded-[1.3rem] border border-white/55 bg-white/92 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <img
+                      src="/images/whitby-logo.png"
+                      alt="Whitby logo"
+                      className="h-11 w-auto object-contain sm:h-12"
+                    />
+                    <div className="text-right">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Local market
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-slate-700">
+                        Whitby project context
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <img
-                  src="/images/ontarioreno/bright-finished-whitby-basement.jpg"
-                  alt="Finished basement renovation in Whitby Ontario"
-                  className="w-full max-w-[500px] rounded-[1.75rem] object-cover shadow-[0_32px_80px_rgba(15,23,42,0.14)]"
-                />
+                <div className="relative">
+                  <div className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                    Typical Whitby Basement Finish
+                  </div>
+                  <img
+                    src="/images/ontarioreno/bright-finished-whitby-basement.jpg"
+                    alt="Finished basement renovation in Whitby Ontario"
+                    className="w-full max-w-[500px] rounded-[1.75rem] object-cover shadow-[0_32px_80px_rgba(15,23,42,0.14)]"
+                  />
+                </div>
               </div>
             </div>
           </div>

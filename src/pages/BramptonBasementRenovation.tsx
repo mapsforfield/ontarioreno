@@ -163,14 +163,38 @@ export default function BramptonBasementRenovation() {
             <div className="relative w-full max-w-[500px] rounded-[2rem] bg-white/6 p-4 ring-1 ring-white/10">
               <div className="pointer-events-none absolute inset-6 rounded-[1.75rem] bg-black/10 blur-2xl" />
               <div className="relative">
-                <div className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-                  Typical Brampton Basement Finish
+                <div className="mb-4 rounded-[1.3rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.92)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur-sm">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Local market
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          Brampton project context
+                        </p>
+                      </div>
+                    </div>
+                    <div className="overflow-hidden rounded-[1rem] border border-slate-200/80 bg-white px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_8px_20px_rgba(15,23,42,0.05)]">
+                      <img
+                        src="/images/brampton-city.png"
+                        alt="Brampton logo"
+                        className="h-14 w-auto object-contain sm:h-16"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <img
-                  src="/images/ontarioreno/brampton-finished-basement.jpg"
-                  alt="Finished basement renovation in Brampton Ontario"
-                  className="w-full max-w-[500px] rounded-[1.75rem] object-cover shadow-[0_32px_80px_rgba(15,23,42,0.14)]"
-                />
+
+                <div className="relative">
+                  <div className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+                    Typical Brampton Basement Finish
+                  </div>
+                  <img
+                    src="/images/ontarioreno/brampton-finished-basement.jpg"
+                    alt="Finished basement renovation in Brampton Ontario"
+                    className="w-full max-w-[500px] rounded-[1.75rem] object-cover shadow-[0_32px_80px_rgba(15,23,42,0.14)]"
+                  />
+                </div>
               </div>
             </div>
           </div>

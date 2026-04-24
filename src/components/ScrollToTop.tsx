@@ -6,7 +6,29 @@ export default function ScrollToTop() {
   const navigationType = useNavigationType();
 
   useEffect(() => {
-    if (hash || navigationType === 'POP') {
+    if (hash) {
+      const elementId = hash.replace('#', '');
+      let attempts = 0;
+
+      const scrollToHashTarget = () => {
+        const target = document.getElementById(elementId);
+
+        if (target) {
+          target.scrollIntoView({ block: 'start', behavior: 'auto' });
+          return;
+        }
+
+        if (attempts < 10) {
+          attempts += 1;
+          window.requestAnimationFrame(scrollToHashTarget);
+        }
+      };
+
+      window.requestAnimationFrame(scrollToHashTarget);
+      return;
+    }
+
+    if (navigationType === 'POP') {
       return;
     }
 
