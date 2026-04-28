@@ -132,7 +132,7 @@ export default function BurlingtonBasementRenovation() {
                 to="/match"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
-                Find the right contractor
+                Start Project Review
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
@@ -385,7 +385,7 @@ export default function BurlingtonBasementRenovation() {
                   to="/match"
                   className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-6 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                 >
-                  Find the right contractor
+                  Start Project Review
                 </Link>
               </div>
             </div>
@@ -407,7 +407,7 @@ export default function BurlingtonBasementRenovation() {
                 to="/match"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start with contractor matching
+                Start project review
               </Link>
             </div>
 

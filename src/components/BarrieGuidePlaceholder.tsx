@@ -58,7 +58,7 @@ export default function BarrieGuidePlaceholder({
                 to="/match"
                 className={cn(buttonStyles.ghostDark, 'w-full sm:w-auto')}
               >
-                Review My Project
+                Start Project Review
               </Link>
             </div>
           </div>

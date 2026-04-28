@@ -17,6 +17,8 @@ import Cities from './pages/Cities';
 import Financing from './pages/Financing';
 import OpenLoanFinancing from './pages/OpenLoanFinancing';
 import GrantEligibilityCalculator from './pages/GrantEligibilityCalculator';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import HamiltonGrant from './pages/HamiltonGrant';
 import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
 import HamiltonSecondarySuiteGrant from './pages/HamiltonSecondarySuiteGrant';
@@ -107,6 +109,8 @@ export default function App() {
           <Route path="financing" element={<Financing />} />
           <Route path="open-loan-financing" element={<OpenLoanFinancing />} />
           <Route path="grant-eligibility-calculator" element={<GrantEligibilityCalculator />} />
+          <Route path="privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="terms-of-service" element={<TermsOfService />} />
           <Route path="hamilton-grant-guide" element={<HamiltonGrant />} />
           <Route path="hamilton-secondary-suite-grant" element={<HamiltonSecondarySuiteGrant />} />
           <Route path="hamilton-building-permit-timeline" element={<HamiltonPermitTimeline />} />

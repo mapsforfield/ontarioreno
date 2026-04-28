@@ -81,7 +81,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/match" className="transition-colors hover:text-[#5694CF]">
-                  Find the Right Contractor
+                  Start Project Review
                 </Link>
               </li>
               <li>
@@ -117,7 +117,7 @@ export default function Footer() {
                 to="/match"
                 className="inline-flex items-center gap-2 font-medium text-white transition-colors hover:text-[#5694CF]"
               >
-                Review My Project <ArrowRight className="h-4 w-4" />
+                Start Project Review <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -126,14 +126,14 @@ export default function Footer() {
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-slate-800 pt-8 text-sm text-slate-500 md:flex-row">
           <p>
             &copy; {new Date().getFullYear()} OntarioReno. All rights reserved.
-            Not a contracting company.
+            Renovation planning and project guidance for homeowners across Ontario.
           </p>
 
           <div className="flex space-x-6">
-            <Link to="#" className="transition-colors hover:text-white">
+            <Link to="/privacy-policy" className="transition-colors hover:text-white">
               Privacy Policy
             </Link>
-            <Link to="#" className="transition-colors hover:text-white">
+            <Link to="/terms-of-service" className="transition-colors hover:text-white">
               Terms of Service
             </Link>
           </div>

@@ -498,11 +498,11 @@ export default function Home() {
               </h1>
 
               <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-                We help Ontario homeowners understand real costs, avoid expensive mistakes, and review the right path before hiring for their project.
+                OntarioReno helps homeowners understand renovation costs, permit requirements, project feasibility, and the right next steps before moving forward.
               </p>
 
               <p className="mb-10 max-w-2xl text-sm text-slate-400">
-                We don't sell renovations. We help you make the right decision before hiring anyone.
+                Independent guidance for Ontario homeowners planning basements, legal suites, permits, grants, and renovation costs.
               </p>
 
               <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
@@ -510,13 +510,13 @@ export default function Home() {
                   to="/match"
                   className={buttonStyles.primary}
                 >
-                  Review My Project <ArrowRight className="w-5 h-5" />
+                  Start Project Review <ArrowRight className="w-5 h-5" />
                 </Link>
                 <Link
                   to="/costs"
                   className={buttonStyles.ghostDark}
                 >
-                  View 2026 Cost Guides
+                  Explore Renovation Costs
                 </Link>
               </div>
 
@@ -566,6 +566,75 @@ export default function Home() {
                   </div>
                 </div>
               </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-100 bg-slate-50 py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-16">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+                <FileText className="h-4 w-4" />
+                How OntarioReno Works
+              </div>
+              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.03em] text-slate-900 md:text-4xl">
+                Get clarity before committing to a renovation
+              </h2>
+              <p className="mt-4 text-base leading-8 text-slate-600 md:text-lg">
+                OntarioReno helps Ontario homeowners understand renovation costs, permit requirements, project feasibility, and the right next steps before moving forward.
+              </p>
+              <p className="mt-4 text-base leading-8 text-slate-500 md:text-lg">
+                Most homeowners make decisions based on incomplete information — which leads to costly mistakes later.
+              </p>
+              <p className="mt-5 max-w-lg text-sm leading-7 text-slate-500 sm:text-base">
+                Built to help homeowners make informed renovation decisions before moving forward.
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="absolute bottom-10 left-5 top-10 hidden w-px bg-[#1B3C6C]/10 md:block" />
+              {[
+                {
+                  step: '01',
+                  title: 'Review Your Project',
+                  description:
+                    'Share the basics of your renovation, property, budget, and timeline.',
+                },
+                {
+                  step: '02',
+                  title: 'Avoid Costly Planning Mistakes',
+                  description:
+                    'Identify cost, permit, and design decisions that commonly lead to delays, rework, or budget overruns.',
+                },
+                {
+                  step: '03',
+                  title: 'Choose the Right Next Step',
+                  description:
+                    'Determine the appropriate next step based on your scope, location, and project requirements.',
+                },
+              ].map((item, index, array) => (
+                <div
+                  key={item.step}
+                  className={cn(
+                    'relative flex items-start gap-5 py-8 sm:gap-6',
+                    index !== array.length - 1 && 'border-b border-slate-100/70'
+                  )}
+                >
+                  <div className="relative z-10 mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1B3C6C] text-sm font-bold text-white">
+                    {item.step}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xl font-extrabold leading-tight tracking-[-0.01em] text-slate-900">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-7 text-slate-600 sm:text-base">
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -668,9 +737,9 @@ export default function Home() {
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[1rem] bg-sky-50 text-sky-700">
                   <Users className="h-6 w-6" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">Best-Fit Contractor Matching</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Project Review & Next-Step Guidance</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Start with a project review that helps narrow the right next step based on scope, budget, and track record instead of random directory browsing.
+                  Get project guidance, understand your next steps, and move forward with the right renovation path.
                 </p>
               </div>
             </div>
@@ -1003,7 +1072,7 @@ export default function Home() {
                   )}
 
                   <p className="text-xs text-slate-400 text-center pt-2">
-                    We respect your privacy. Unsubscribe anytime.
+                    Your information is used to send the guide and support your project planning. Unsubscribe anytime.
                   </p>
                 </form>
               </div>
@@ -1196,7 +1265,7 @@ export default function Home() {
                   )}
 
                   <p className="text-xs text-slate-400 text-center pt-2">
-                    We respect your privacy. Unsubscribe anytime.
+                    Your information is used to send the guide and support your project planning. Unsubscribe anytime.
                   </p>
                 </form>
               </div>
@@ -1222,7 +1291,7 @@ export default function Home() {
                 to="/match"
                 className={buttonStyles.primary}
               >
-                Review My Project
+                Start Project Review
               </Link>
               <p className="text-sm text-slate-400">100% free for homeowners. No obligation to hire.</p>
             </div>

@@ -24,13 +24,13 @@ export default function Basements() {
             </h1>
             <p className="mb-8 text-lg leading-8 text-slate-300 sm:text-xl">
               Everything you need to know about costs, permits, layouts, and
-              hiring the right contractor for your basement project.
+              the right renovation path for your basement project.
             </p>
             <Link
               to="/match"
               className={buttonStyles.primary}
             >
-              Find Basement Contractors <ArrowRight className="w-5 h-5" />
+              Start Project Review <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -312,15 +312,15 @@ export default function Basements() {
                     Ready to get quotes?
                   </h3>
                   <p className="text-slate-600 mb-6">
-                    Tell us about your basement project and we'll help identify
-                    the best-fit contractor based on your scope, budget, and
-                    project type.
+                    Tell us about your basement project and we&apos;ll help
+                    review your requirements, understand your next steps, and
+                    move forward with the right renovation path.
                   </p>
                   <Link
                     to="/match"
                     className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors"
                   >
-                    Find the Right Contractor
+                    Start Project Review
                   </Link>
                   <p className="text-xs text-center text-slate-400 mt-4">
                     100% free. No obligation to hire.

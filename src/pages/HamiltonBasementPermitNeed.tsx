@@ -299,7 +299,7 @@ export default function HamiltonBasementPermitNeed() {
                       to="/match"
                       className="font-semibold text-slate-900 underline underline-offset-4"
                     >
-                      OntarioReno&apos;s contractor match
+                      OntarioReno&apos;s project review
                     </Link>
                     .
                   </p>
@@ -351,7 +351,7 @@ export default function HamiltonBasementPermitNeed() {
                   to="/match"
                   className="font-semibold text-slate-900 underline underline-offset-4"
                 >
-                  OntarioReno&apos;s contractor match
+                  OntarioReno&apos;s project review
                 </Link>
                 .
               </p>
@@ -379,7 +379,7 @@ export default function HamiltonBasementPermitNeed() {
                 to="/match"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start With Contractor Matching
+                Start Project Review
               </Link>
             </div>
 

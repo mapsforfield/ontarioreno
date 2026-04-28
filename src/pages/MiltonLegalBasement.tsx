@@ -130,7 +130,7 @@ export default function MiltonLegalBasement() {
                 to="/match"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
-                Find the right contractor
+                Start Project Review
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
@@ -307,7 +307,7 @@ export default function MiltonLegalBasement() {
                 to="/match"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start with contractor matching
+                Start project review
               </Link>
             </div>
 

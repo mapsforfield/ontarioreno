@@ -800,7 +800,7 @@ export default function Match() {
             Start with a proper project review.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
-            We review your project before recommending the right next steps.
+            This project review helps determine your renovation scope, requirements, and the right next step based on your property and goals.
           </p>
         </div>
 
@@ -816,16 +816,16 @@ export default function Match() {
                 Designed to prevent bad renovation decisions.
               </h2>
               <p className="mt-4 text-sm leading-7 text-slate-300">
-                We assess your project first — so you don’t waste time on the
-                wrong quotes.
+                We assess your project first so you do not waste time moving in
+                the wrong direction.
               </p>
 
               <div className="mt-7 space-y-3.5">
                 {[
-                  'Understand your project before quotes begin',
+                  'Understand your project before major decisions begin',
                   'Identify permit and feasibility risks early',
                   'Align budget and financing realistically',
-                  'Move toward the right in-home assessment',
+                  'Move toward the appropriate next step',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
@@ -836,6 +836,19 @@ export default function Match() {
             </aside>
 
             <main className="p-6 sm:p-8 lg:p-10">
+              <div className="mb-8">
+                <p className="text-sm leading-7 text-slate-500">
+                  This structured intake helps us understand your project before recommending the right next step.
+                </p>
+                <div className="mt-4 flex flex-col gap-2 text-sm font-medium text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                  <span>Submit your project details</span>
+                  <span className="hidden text-slate-300 sm:inline">&bull;</span>
+                  <span>Review key requirements and constraints</span>
+                  <span className="hidden text-slate-300 sm:inline">&bull;</span>
+                  <span>Determine the appropriate next step</span>
+                </div>
+              </div>
+
               {renderStep()}
 
               {submitStatus.type === 'error' && (
@@ -843,6 +856,10 @@ export default function Match() {
                   {submitStatus.message}
                 </div>
               )}
+
+              <p className="mt-6 text-sm leading-7 text-slate-500">
+                Your information is used to review your project and determine the appropriate next step based on your requirements. You may be contacted regarding your project based on the details you provide.
+              </p>
 
               <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
@@ -875,7 +892,7 @@ export default function Match() {
                     disabled={isSubmitting}
                     className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
                   >
-                    {isSubmitting ? 'Reviewing...' : 'Review My Project'}
+                    {isSubmitting ? 'Reviewing...' : 'Start Project Review'}
                     <ArrowRight className="h-5 w-5" />
                   </button>
                 )}
@@ -887,3 +904,6 @@ export default function Match() {
     </div>
   );
 }
+
+
+

@@ -331,7 +331,7 @@ export default function MiltonBasementPermit() {
                 to="/match"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start with contractor matching
+                Start project review
               </Link>
             </div>
 

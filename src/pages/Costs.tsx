@@ -440,15 +440,16 @@ export default function Costs() {
             Want pricing based on your actual project?
           </h2>
           <p className="text-lg text-slate-600 mb-8">
-            Tell us what you're building and we'll help point you toward the
-            right contractor for your scope, budget, and renovation type.
+            Tell us what you're building and we'll help you understand your
+            next steps and move forward with the right renovation path for your
+            scope, budget, and renovation type.
           </p>
 
           <Link
             to="/match"
             className="inline-flex items-center justify-center bg-[#1B3C6C] hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all"
           >
-            Review My Project <ArrowRight className="w-5 h-5 ml-2" />
+            Start Project Review <ArrowRight className="w-5 h-5 ml-2" />
           </Link>
         </div>
       </div>

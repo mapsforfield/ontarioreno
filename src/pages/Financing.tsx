@@ -104,14 +104,13 @@ export default function Financing() {
             </h1>
 
             <p className="mt-7 max-w-xl text-xl leading-8 text-slate-600">
-              See what monthly payments could look like for basement, kitchen,
-              bathroom, and legal suite projects and get connected with the
-              right contractor if it makes sense.
+              Get project guidance, understand your next steps, and move
+              forward with the right renovation path.
             </p>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-500">
-              We help you understand your options first, then connect you with
-              the right contractor if it makes sense.
+              We help you review your project requirements first, then
+              coordinate the appropriate next step if financing makes sense.
             </p>
 
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -191,10 +190,10 @@ export default function Financing() {
                   Step 3
                 </div>
                 <h3 className="mt-3.5 text-[1.3rem] font-bold leading-snug text-slate-900">
-                  Get connected with the right contractor
+                  Request a project review
                 </h3>
                 <p className="mt-2.5 text-slate-600 leading-6.5">
-                  Get connected with a contractor and plan that fit your budget.
+                  Get project guidance and a plan that fits your budget.
                 </p>
               </div>
             </div>
@@ -430,7 +429,7 @@ export default function Financing() {
                     to="/match"
                     className="inline-flex items-center justify-center rounded-[0.8rem] border border-white/18 bg-white/8 px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition duration-200 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
                   >
-                    Review My Project
+                    Start Project Review
                   </Link>
                 </div>
               </div>

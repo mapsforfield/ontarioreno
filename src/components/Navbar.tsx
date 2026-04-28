@@ -327,7 +327,7 @@ export default function Navbar() {
               to="/match"
               className={cn(buttonStyles.primary, 'px-6 py-[0.82rem] text-sm')}
             >
-              Review My Project
+              Start Project Review
             </Link>
           </div>
 
@@ -549,7 +549,7 @@ export default function Navbar() {
                     to="/match"
                     className={cn(buttonStyles.primary, 'w-full px-6 py-[0.92rem] text-center text-base')}
                   >
-                    Review My Project
+                    Start Project Review
                   </Link>
                 </div>
               </div>

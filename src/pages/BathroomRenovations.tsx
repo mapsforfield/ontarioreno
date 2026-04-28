@@ -26,14 +26,14 @@ export default function BathroomRenovations() {
 
             <p className="text-xl text-slate-300 mb-8">
               Real bathroom pricing, smart planning, and what actually drives
-              renovation costs across Ontario before you commit to a contractor.
+              renovation costs across Ontario before you lock in your next step.
             </p>
 
             <Link
               to="/match"
               className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2"
             >
-              Find Bathroom Contractors <ArrowRight className="w-5 h-5" />
+              Start Project Review <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -306,16 +306,16 @@ export default function BathroomRenovations() {
                 </h3>
 
                 <p className="text-slate-600 mb-6">
-                  Tell us about your bathroom project and we'll help identify the
-                  best-fit contractor based on your scope, budget, and finish
-                  level.
+                  Tell us about your bathroom project and we&apos;ll help review
+                  your requirements, understand your next steps, and move
+                  forward with the right renovation path.
                 </p>
 
                 <Link
                   to="/match"
                   className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors"
                 >
-                  Find the Right Contractor
+                  Start Project Review
                 </Link>
 
                 <p className="text-xs text-center text-slate-400 mt-4">

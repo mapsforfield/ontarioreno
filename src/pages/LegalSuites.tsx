@@ -42,7 +42,7 @@ export default function LegalSuites() {
               to="/match"
               className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2"
             >
-              Find Specialized Contractors <ArrowRight className="w-5 h-5" />
+              Start Project Review <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -369,16 +369,16 @@ export default function LegalSuites() {
                 </h3>
 
                 <p className="text-slate-400 mb-6">
-                  Tell us about your property and we'll help identify the
-                  best-fit contractor based on project type, legal-suite scope,
-                  and likely budget range.
+                  Tell us about your property and we&apos;ll help review your
+                  project requirements, understand your next steps, and move
+                  forward with the right renovation path.
                 </p>
 
                 <Link
                   to="/match"
                   className="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-colors"
                 >
-                  Find the Right Contractor
+                  Start Project Review
                 </Link>
 
                 <p className="text-xs text-center text-slate-500 mt-4">

@@ -24,10 +24,10 @@ export default function CityToronto() {
             Toronto Home Renovation Guide
           </h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10">
-            Navigate Toronto building permits, understand local costs, and find the city's best vetted contractors for your next project.
+            Navigate Toronto building permits, understand local costs, and move forward with the right renovation path for your next project.
           </p>
           <Link to="/match" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2 shadow-lg">
-            Find Toronto Contractors <ArrowRight className="w-5 h-5" />
+            Start Project Review <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </section>
@@ -50,9 +50,9 @@ export default function CityToronto() {
             </div>
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
               <ShieldCheck className="w-10 h-10 text-purple-600 mb-4" />
-              <h3 className="text-xl font-bold text-slate-900 mb-3">Vetted Pros</h3>
-              <p className="text-slate-600 text-sm mb-4">We've pre-screened hundreds of Toronto contractors, verifying their City of Toronto Municipal Licensing & Standards (MLS) license.</p>
-              <Link to="/match" className="text-purple-600 font-semibold text-sm hover:underline">Review My Project</Link>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Project Review</h3>
+              <p className="text-slate-600 text-sm mb-4">Start with project guidance that helps you understand your next step before committing to scope, pricing, or permits.</p>
+              <Link to="/match" className="text-purple-600 font-semibold text-sm hover:underline">Start Project Review</Link>
             </div>
           </div>
 
