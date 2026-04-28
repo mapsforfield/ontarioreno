@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator,
@@ -10,40 +11,229 @@ import {
   Bath,
   Landmark,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
 
 export default function Costs() {
+  const [revealPosition, setRevealPosition] = useState(58);
+
+  const updateRevealPosition = (clientX: number, element: HTMLDivElement) => {
+    const bounds = element.getBoundingClientRect();
+    const rawPercent = ((clientX - bounds.left) / bounds.width) * 100;
+    const clampedPercent = Math.min(92, Math.max(8, rawPercent));
+    setRevealPosition(clampedPercent);
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const container = event.currentTarget;
+    container.setPointerCapture(event.pointerId);
+    updateRevealPosition(event.clientX, container);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.buttons & 1) !== 1 && event.pointerType !== 'touch') return;
+    updateRevealPosition(event.clientX, event.currentTarget);
+  };
+
   return (
-    <div className="bg-slate-50 min-h-screen py-16 md:py-20">
+    <div className="bg-slate-50 min-h-screen py-10 md:py-14">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero */}
-        <div className="text-center max-w-4xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-6">
-            <Calculator className="w-4 h-4" /> 2026 Ontario Pricing
+        <section className="mx-auto mb-16 max-w-[1320px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="md:hidden">
+            <div className="select-none px-5 pb-3 pt-5 text-slate-900">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
+                <Calculator className="h-4 w-4" />
+                2026 Ontario Pricing
+              </div>
+
+              <h1 className="mt-4 max-w-[12ch] text-[2.35rem] font-bold leading-[0.96] tracking-[-0.04em] text-slate-950">
+                Ontario Renovation Cost Guides
+              </h1>
+
+              <p className="mt-4 max-w-sm text-[15px] leading-7 text-slate-600">
+                Real price ranges based on actual Ontario projects so you can
+                set better expectations before speaking with a contractor.
+              </p>
+
+              <div className="mt-7 flex flex-col gap-3">
+                <Link to="/match" className={cn(buttonStyles.primary, 'w-full justify-center')}>
+                  Start Project Review
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+                <Link
+                  to="/costs#cost-breakdown"
+                  className={cn(buttonStyles.secondary, 'w-full justify-center')}
+                >
+                  See Cost Breakdown
+                </Link>
+              </div>
+
+              <div className="mt-6 grid grid-cols-3 gap-2 text-[11px] font-medium text-slate-600 sm:gap-2.5 sm:text-[12px]">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-slate-400" />
+                  Ontario-based cost ranges
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-slate-400" />
+                  Permit &amp; scope-aware pricing
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-slate-400" />
+                  Built from real project data
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 pb-4 pt-3">
+              <div
+                className="relative h-[292px] select-none overflow-hidden rounded-xl border border-slate-200 bg-slate-100 touch-none"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+              >
+                <div className="absolute inset-0">
+                  <img
+                    src="/images/before-image-hero.jpg"
+                    alt="Before basement renovation"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    clipPath: `inset(0 0 0 ${revealPosition}%)`,
+                  }}
+                >
+                  <img
+                    src="/images/after-image-hero.jpg"
+                    alt="Finished legal basement apartment"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+
+                <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/20 to-transparent" />
+
+                <div className="pointer-events-none absolute left-3 top-3 z-20 rounded-full border border-white/70 bg-white/88 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600 backdrop-blur-sm">
+                  Drag to compare
+                </div>
+
+                <div
+                  className="absolute inset-y-0 z-20"
+                  style={{ left: `${revealPosition}%`, transform: 'translateX(-50%)' }}
+                >
+                  <div className="relative h-full w-px bg-white/85 shadow-[0_0_24px_rgba(255,255,255,0.18)]" />
+                  <div className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 select-none items-center justify-center rounded-full border border-white/85 bg-white/96 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.16)] cursor-ew-resize">
+                    <ChevronLeft className="h-2.5 w-2.5" />
+                    <ChevronRight className="h-2.5 w-2.5" />
+                  </div>
+                </div>
+
+                <div className="pointer-events-none absolute bottom-3 right-3 z-20 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-right shadow-[0_10px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm">
+                  <p className="text-[12px] font-medium tracking-[0.02em] text-slate-700">
+                    Typical Finished Result
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
-            Ontario Renovation Cost Guides
-          </h1>
+          <div
+            className="relative hidden min-h-[560px] select-none overflow-hidden touch-none md:block"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+          >
+            <div className="absolute inset-0">
+              <img
+                src="/images/before-image-hero.jpg"
+                alt="Before basement renovation"
+                className="h-full w-full object-cover"
+              />
+            </div>
 
-          <p className="text-xl text-slate-600 leading-relaxed">
-            Real price ranges based on recent Ontario projects, so you can set
-            better expectations before speaking with a contractor.
-          </p>
-          <p className="mt-4 text-base leading-7 text-slate-500">
-            If the project cost feels bigger than expected, it may also help to
-            compare{' '}
-            <Link
-              to="/financing"
-              className="font-semibold text-slate-900 underline underline-offset-4"
+            <div
+              className="absolute inset-0"
+              style={{
+                clipPath: `inset(0 0 0 ${revealPosition}%)`,
+              }}
             >
-              renovation financing options
-            </Link>{' '}
-            in monthly terms before ruling the project out.
-          </p>
-        </div>
+              <img
+                src="/images/after-image-hero.jpg"
+                alt="Finished legal basement apartment"
+                className="h-full w-full object-cover"
+              />
+            </div>
+
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-transparent" />
+
+            <div
+              className="absolute inset-y-0 z-20"
+              style={{ left: `${revealPosition}%`, transform: 'translateX(-50%)' }}
+            >
+              <div className="relative h-full w-px bg-white/80 shadow-[0_0_24px_rgba(255,255,255,0.18)]" />
+              <div className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 select-none items-center justify-center rounded-full border border-white/85 bg-white/96 text-slate-700 shadow-[0_12px_28px_rgba(15,23,42,0.18)] cursor-ew-resize">
+                <ChevronLeft className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </div>
+
+            <div className="absolute inset-0 z-30 flex items-center p-10 lg:p-12">
+              <div className="flex h-full max-w-xl flex-col pb-16 text-white">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-blue-100 backdrop-blur-sm">
+                  <Calculator className="h-4 w-4" />
+                  2026 Ontario Pricing
+                </div>
+
+                <h1 className="mt-6 max-w-lg text-5xl font-bold leading-[1.02] tracking-[-0.04em] lg:text-6xl">
+                  Ontario Renovation Cost Guides
+                </h1>
+
+                <p className="mt-6 max-w-lg text-xl leading-8 text-slate-200">
+                  Real price ranges based on actual Ontario projects so you
+                  can set better expectations before speaking with a
+                  contractor.
+                </p>
+
+                <div className="mt-10 flex flex-row gap-4">
+                  <Link to="/match" className={buttonStyles.primary}>
+                    Start Project Review
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                  <Link
+                    to="/costs#cost-breakdown"
+                    className={buttonStyles.ghostDark}
+                  >
+                    See Cost Breakdown
+                  </Link>
+                </div>
+
+                <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-3 pt-10 text-[13px] font-medium text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-slate-400" />
+                    Ontario-based cost ranges
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-slate-400" />
+                    Permit &amp; scope-aware pricing
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-slate-400" />
+                    Built from real project data
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pointer-events-none absolute bottom-6 right-6 z-20 rounded-full border border-white/70 bg-white/90 px-4 py-2.5 text-right shadow-[0_10px_24px_rgba(15,23,42,0.10)] backdrop-blur-sm">
+              <p className="text-sm font-medium tracking-[0.02em] text-slate-700">
+                Typical Finished Result
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* Disclaimer */}
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 mb-10 flex gap-4 items-start max-w-5xl mx-auto">
@@ -83,7 +273,7 @@ export default function Costs() {
         </div>
 
         {/* Pricing Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div id="cost-breakdown" className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto scroll-mt-28">
           {/* Card 1 */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-8">
