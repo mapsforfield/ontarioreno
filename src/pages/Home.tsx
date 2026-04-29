@@ -580,7 +580,7 @@ export default function Home() {
                 How OntarioReno Works
               </div>
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.03em] text-slate-900 md:text-4xl">
-                Get clarity before committing to a renovation
+                Avoid costly renovation mistakes before committing.
               </h2>
               <p className="mt-4 text-base leading-8 text-slate-600 md:text-lg">
                 OntarioReno helps Ontario homeowners understand renovation costs, permit requirements, project feasibility, and the right next steps before moving forward.
