@@ -15,6 +15,13 @@ import Costs from './pages/Costs';
 import Match from './pages/Match';
 import Cities from './pages/Cities';
 import Financing from './pages/Financing';
+import HomeEquityRenovationsOntario from './pages/HomeEquityRenovationsOntario';
+import HelocVsRefinanceForRenovations from './pages/HelocVsRefinanceForRenovations';
+import HelocForLegalBasementApartment from './pages/HelocForLegalBasementApartment';
+import GardenSuiteFinancingOntario from './pages/GardenSuiteFinancingOntario';
+import HelocVsRenovationFinancing from './pages/HelocVsRenovationFinancing';
+import PhasedRenovationFinancing from './pages/PhasedRenovationFinancing';
+import GrantsAndIncentivesWithHomeEquity from './pages/GrantsAndIncentivesWithHomeEquity';
 import OpenLoanFinancing from './pages/OpenLoanFinancing';
 import GrantEligibilityCalculator from './pages/GrantEligibilityCalculator';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -82,6 +89,10 @@ export default function App() {
           <Route path="basements" element={<Basements />} />
           <Route path="legal-suites" element={<LegalSuites />} />
           <Route
+            path="garden-suites"
+            element={<GardenSuitesLanewaySuitesOntario />}
+          />
+          <Route
             path="garden-suites-laneway-suites-ontario"
             element={<GardenSuitesLanewaySuitesOntario />}
           />
@@ -107,6 +118,34 @@ export default function App() {
           <Route path="match" element={<Match />} />
           <Route path="cities" element={<Cities />} />
           <Route path="financing" element={<Financing />} />
+          <Route
+            path="financing/home-equity-renovations-ontario"
+            element={<HomeEquityRenovationsOntario />}
+          />
+          <Route
+            path="financing/heloc-vs-refinance-for-renovations"
+            element={<HelocVsRefinanceForRenovations />}
+          />
+          <Route
+            path="financing/heloc-for-legal-basement-apartment"
+            element={<HelocForLegalBasementApartment />}
+          />
+          <Route
+            path="financing/garden-suite-financing-ontario"
+            element={<GardenSuiteFinancingOntario />}
+          />
+          <Route
+            path="financing/heloc-vs-contractor-financing"
+            element={<HelocVsRenovationFinancing />}
+          />
+          <Route
+            path="financing/phased-renovation-financing"
+            element={<PhasedRenovationFinancing />}
+          />
+          <Route
+            path="financing/grants-and-incentives-with-home-equity"
+            element={<GrantsAndIncentivesWithHomeEquity />}
+          />
           <Route path="open-loan-financing" element={<OpenLoanFinancing />} />
           <Route path="grant-eligibility-calculator" element={<GrantEligibilityCalculator />} />
           <Route path="privacy-policy" element={<PrivacyPolicy />} />

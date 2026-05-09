@@ -99,13 +99,13 @@ export default function Financing() {
               Ontario renovation financing
             </div>
 
-            <h1 className="mt-7 max-w-2xl text-5xl font-bold tracking-[-0.04em] leading-[0.96] text-slate-900 md:text-7xl">
+            <h1 className="mt-7 max-w-2xl text-5xl font-bold leading-[0.96] tracking-[-0.04em] text-slate-900 md:text-7xl">
               Ontario Renovation Financing
             </h1>
 
             <p className="mt-7 max-w-xl text-xl leading-8 text-slate-600">
-              Get project guidance, understand your next steps, and move
-              forward with the right renovation path.
+              Get project guidance, understand your next steps, and move forward
+              with the right renovation path.
             </p>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-500">
@@ -123,20 +123,20 @@ export default function Financing() {
               </Link>
               <a
                 href="#how-it-works"
-                className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.03),0_12px_24px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_28px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.03),0_12px_24px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_28px_rgba(15,23,42,0.06)] active:translate-y-[1px] active:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
               >
                 How It Works
               </a>
             </div>
           </div>
 
-          <div className="flex items-center justify-center lg:justify-end">
-            <img
-              src="/images/ontarioreno/modern-wide-angle-basement.jpg"
-              alt="Finished basement renovation with an open layout and modern lighting"
-              className="aspect-[5/4] w-full rounded-[2rem] object-cover shadow-[0_30px_80px_rgba(15,23,42,0.14)]"
-            />
-          </div>
+            <div className="flex items-center justify-center lg:justify-end">
+              <img
+                src="/images/financing-planning.png"
+                alt="Ontario homeowners reviewing renovation planning together at a table"
+                className="aspect-[5/4] w-full rounded-[2rem] object-cover object-center shadow-[0_30px_80px_rgba(15,23,42,0.14)]"
+              />
+            </div>
         </div>
       </section>
 
@@ -145,13 +145,20 @@ export default function Financing() {
           <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
             Most homeowners don&apos;t pay for renovations upfront anymore
           </h2>
-            <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-              Most renovations today are not paid upfront. They are structured
-              into manageable monthly payments, which is one reason bigger
-              projects often become possible sooner than homeowners expect,
-              especially for <Link to="/basements" className="font-medium text-[#1B3C6C] hover:underline">basement renovation projects</Link>.
-            </p>
-          </div>
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
+            Most renovations today are not paid upfront. They are structured
+            into manageable monthly payments, which is one reason bigger
+            projects often become possible sooner than homeowners expect,
+            especially for{' '}
+            <Link
+              to="/basements"
+              className="font-medium text-[#1B3C6C] hover:underline"
+            >
+              basement renovation projects
+            </Link>
+            .
+          </p>
+        </div>
       </section>
 
       <section id="how-it-works" className="bg-white py-20">
@@ -168,8 +175,9 @@ export default function Financing() {
                 <h3 className="mt-3.5 text-[1.3rem] font-bold leading-snug text-slate-900">
                   Share what you are planning
                 </h3>
-                <p className="mt-2.5 text-slate-600 leading-6.5">
-                  Tell us about your scope, budget range, and project type so you can start with the right context.
+                <p className="mt-2.5 leading-6.5 text-slate-600">
+                  Tell us about your scope, budget range, and project type so
+                  you can start with the right context.
                 </p>
               </div>
 
@@ -180,8 +188,9 @@ export default function Financing() {
                 <h3 className="mt-3.5 text-[1.3rem] font-bold leading-snug text-slate-900">
                   See possible monthly payment options
                 </h3>
-                <p className="mt-2.5 text-slate-600 leading-6.5">
-                  Explore what monthly payment options could look like before deciding what feels workable.
+                <p className="mt-2.5 leading-6.5 text-slate-600">
+                  Explore what monthly payment options could look like before
+                  deciding what feels workable.
                 </p>
               </div>
 
@@ -192,7 +201,7 @@ export default function Financing() {
                 <h3 className="mt-3.5 text-[1.3rem] font-bold leading-snug text-slate-900">
                   Request a project review
                 </h3>
-                <p className="mt-2.5 text-slate-600 leading-6.5">
+                <p className="mt-2.5 leading-6.5 text-slate-600">
                   Get project guidance and a plan that fits your budget.
                 </p>
               </div>
@@ -216,7 +225,8 @@ export default function Financing() {
               Monthly payment examples
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-              These Ontario renovation financing examples help homeowners think in monthly terms instead of total sticker shock.
+              These Ontario renovation financing examples help homeowners think
+              in monthly terms instead of total sticker shock.
             </p>
             <p className="mx-auto mt-2 max-w-3xl text-sm leading-7 text-slate-500">
               Illustrative scenarios only. Actual approval and terms depend on
@@ -233,7 +243,7 @@ export default function Financing() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {example.title}
                 </p>
-                <p className="mt-4 text-[2.25rem] font-bold tracking-[-0.03em] leading-none text-slate-900 md:text-[2.5rem]">
+                <p className="mt-4 text-[2.25rem] font-bold leading-none tracking-[-0.03em] text-slate-900 md:text-[2.5rem]">
                   {example.amount}
                 </p>
                 <p className="mt-4 text-sm leading-6 text-slate-700">
@@ -251,7 +261,63 @@ export default function Financing() {
               </div>
             ))}
           </div>
-        </div>
+
+          <div className="mt-10">
+            <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-7 shadow-[0_18px_44px_rgba(15,23,42,0.05)] md:p-8">
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <div className="max-w-3xl">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
+                    Larger-project planning
+                  </p>
+                  <h2 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-slate-900 md:text-3xl">
+                    Using home equity for larger renovations
+                  </h2>
+                  <p className="mt-4 text-base leading-7 text-slate-600">
+                    For larger projects like legal basement apartments, garden
+                    suites, additions, or major remodels, home equity may
+                    become part of the planning conversation. Learn how to judge
+                    whether the renovation itself justifies using equity before
+                    committing.
+                  </p>
+                </div>
+
+                  <div className="flex lg:justify-end">
+                    <Link
+                      to="/financing/home-equity-renovations-ontario"
+                      className={buttonStyles.secondary}
+                    >
+                      Read the Home Equity Guide
+                    </Link>
+                  </div>
+                </div>
+
+                <p className="mt-5 text-sm leading-7 text-slate-500">
+                  Related guides:{' '}
+                  <Link
+                    to="/financing/heloc-vs-refinance-for-renovations"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    HELOC vs refinance
+                  </Link>
+                  ,{' '}
+                  <Link
+                    to="/financing/heloc-vs-contractor-financing"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    HELOC vs renovation financing
+                  </Link>
+                  , and{' '}
+                  <Link
+                    to="/financing/phased-renovation-financing"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    phased renovation financing
+                  </Link>
+                  .
+                </p>
+              </div>
+            </div>
+          </div>
       </section>
 
       <section className="bg-white py-20">
@@ -266,7 +332,9 @@ export default function Financing() {
                 How renovation financing works
               </h2>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-                Most people look at home renovation financing in Ontario like a car loan or mortgage. That is where the misunderstanding starts.
+                Most people look at home renovation financing in Ontario like a
+                car loan or mortgage. That is where the misunderstanding
+                starts.
               </p>
             </div>
 
@@ -330,7 +398,9 @@ export default function Financing() {
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-400/15 text-sm font-semibold text-blue-200">
                             {index + 1}
                           </div>
-                          <p className="text-base leading-7 text-slate-200">{point}</p>
+                          <p className="text-base leading-7 text-slate-200">
+                            {point}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -362,21 +432,33 @@ export default function Financing() {
                     This is where most homeowners misunderstand financing.
                   </p>
                   <p className="text-base font-medium leading-7 text-slate-700">
-                    Open-loan financing changes the conversation. The minimum payment is only the starting point, extra payments can reduce principal sooner, and basement income may create a very different exit path than most homeowners assume.
+                    Open-loan financing changes the conversation. The minimum
+                    payment is only the starting point, extra payments can
+                    reduce principal sooner, and basement income may create a
+                    very different exit path than most homeowners assume.
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Financing may be available through established providers such as Financeit, depending on the contractor and project.
+                    Financing may be available through established providers
+                    such as Financeit, depending on the contractor and project.
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
-                    If you want a deeper breakdown of payment flexibility, no-prepayment-penalty structure, and smarter payoff planning, see our{' '}
-                    <Link to="/open-loan-financing" className="font-medium text-[#1B3C6C] hover:underline">
+                    If you want a deeper breakdown of payment flexibility,
+                    no-prepayment-penalty structure, and smarter payoff
+                    planning, see our{' '}
+                    <Link
+                      to="/open-loan-financing"
+                      className="font-medium text-[#1B3C6C] hover:underline"
+                    >
                       open loan financing guide
                     </Link>
                     .
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
                     It also helps to compare monthly payments against overall{' '}
-                    <Link to="/costs" className="font-medium text-[#1B3C6C] hover:underline">
+                    <Link
+                      to="/costs"
+                      className="font-medium text-[#1B3C6C] hover:underline"
+                    >
                       renovation costs
                     </Link>{' '}
                     before deciding what feels realistic.
@@ -389,8 +471,12 @@ export default function Financing() {
                       key={pillar.title}
                       className="border-l border-slate-200 pl-4 sm:border-l-0 sm:border-t sm:pt-4 lg:border-l lg:border-t-0 lg:pt-0"
                     >
-                      <p className="text-base font-semibold text-slate-900">{pillar.title}</p>
-                      <p className="mt-2 text-sm leading-7 text-slate-600">{pillar.body}</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {pillar.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">
+                        {pillar.body}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -409,7 +495,8 @@ export default function Financing() {
                   Open loan financing
                 </p>
                 <h2 className="mt-4 max-w-3xl text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
-                  Want the deeper version of how renovation financing really works?
+                  Want the deeper version of how renovation financing really
+                  works?
                 </h2>
                 <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
                   Our open-loan financing guide breaks down the part most
@@ -446,7 +533,9 @@ export default function Financing() {
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-200" />
-                      <p className="text-sm leading-7 text-slate-200">{item}</p>
+                      <p className="text-sm leading-7 text-slate-200">
+                        {item}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -467,15 +556,42 @@ export default function Financing() {
               What can be financed
             </h2>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-              Financing can make projects like these possible sooner and feel more manageable than most homeowners expect.
+              Financing can make projects like these possible sooner and feel
+              more manageable than most homeowners expect.
             </p>
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-              It can be a practical way to balance project scope, monthly affordability, and timing without feeling forced into an all-cash decision, whether you are planning <Link to="/basements" className="font-medium text-[#1B3C6C] hover:underline">basement renovations</Link>, <Link to="/kitchen-renovations" className="font-medium text-[#1B3C6C] hover:underline">kitchen renovations</Link>, or <Link to="/bathroom-renovations" className="font-medium text-[#1B3C6C] hover:underline">bathroom renovations</Link>.
+              It can be a practical way to balance project scope, monthly
+              affordability, and timing without feeling forced into an all-cash
+              decision, whether you are planning{' '}
+              <Link
+                to="/basements"
+                className="font-medium text-[#1B3C6C] hover:underline"
+              >
+                basement renovations
+              </Link>
+              ,{' '}
+              <Link
+                to="/kitchen-renovations"
+                className="font-medium text-[#1B3C6C] hover:underline"
+              >
+                kitchen renovations
+              </Link>
+              , or{' '}
+              <Link
+                to="/bathroom-renovations"
+                className="font-medium text-[#1B3C6C] hover:underline"
+              >
+                bathroom renovations
+              </Link>
+              .
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {financeableProjects.map((project) => (
-                <div key={project} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div
+                  key={project}
+                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                >
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <p className="text-base font-medium text-slate-800">
                     {project === 'Basement renovations' && (
@@ -489,12 +605,18 @@ export default function Financing() {
                       </Link>
                     )}
                     {project === 'Kitchens' && (
-                      <Link to="/kitchen-renovations" className="hover:underline">
+                      <Link
+                        to="/kitchen-renovations"
+                        className="hover:underline"
+                      >
                         kitchen renovations
                       </Link>
                     )}
                     {project === 'Bathrooms' && (
-                      <Link to="/bathroom-renovations" className="hover:underline">
+                      <Link
+                        to="/bathroom-renovations"
+                        className="hover:underline"
+                      >
                         bathroom renovations
                       </Link>
                     )}
@@ -529,8 +651,10 @@ export default function Financing() {
                 <h3 className="mt-4 text-xl font-bold text-slate-900">
                   Do I need full cash upfront?
                 </h3>
-                <p className="mt-3 text-slate-600 leading-7">
-                  No - you do not always need the full renovation cost in cash upfront, and many homeowners use monthly-payment financing instead.
+                <p className="mt-3 leading-7 text-slate-600">
+                  No - you do not always need the full renovation cost in cash
+                  upfront, and many homeowners use monthly-payment financing
+                  instead.
                 </p>
               </div>
 
@@ -541,8 +665,9 @@ export default function Financing() {
                 <h3 className="mt-4 text-xl font-bold text-slate-900">
                   Can I explore options first?
                 </h3>
-                <p className="mt-3 text-slate-600 leading-7">
-                  Yes. The goal is to understand possible options before committing, not to force a project into the wrong structure.
+                <p className="mt-3 leading-7 text-slate-600">
+                  Yes. The goal is to understand possible options before
+                  committing, not to force a project into the wrong structure.
                 </p>
               </div>
 
@@ -553,8 +678,9 @@ export default function Financing() {
                 <h3 className="mt-4 text-xl font-bold text-slate-900">
                   Can projects be structured around a budget?
                 </h3>
-                <p className="mt-3 text-slate-600 leading-7">
-                  Often, yes. Scope, priorities, and project timing can usually be discussed with budget reality in mind.
+                <p className="mt-3 leading-7 text-slate-600">
+                  Often, yes. Scope, priorities, and project timing can usually
+                  be discussed with budget reality in mind.
                 </p>
               </div>
             </div>
@@ -566,16 +692,16 @@ export default function Financing() {
         <div className="mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
           <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(30,41,59,0.55)_0%,rgba(15,23,42,0.85)_100%)] px-8 py-12 shadow-[0_24px_70px_rgba(0,0,0,0.25)] md:px-12 md:py-14">
             <h2 className="text-3xl font-bold tracking-[-0.03em] md:text-5xl">
-              Don&apos;t rule your renovation out before seeing what your monthly payment could look like
+              Don&apos;t rule your renovation out before seeing what your
+              monthly payment could look like
             </h2>
             <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-              Monthly payment options can make a basement, kitchen, bathroom, or legal suite project feel more manageable without forcing a rushed decision.
+              Monthly payment options can make a basement, kitchen, bathroom,
+              or legal suite project feel more manageable without forcing a
+              rushed decision.
             </p>
             <div className="mt-10">
-              <Link
-                to="/match"
-                className={buttonStyles.primary}
-              >
+              <Link to="/match" className={buttonStyles.primary}>
                 Check My Monthly Payment
               </Link>
               <p className="mt-4 text-sm leading-6 text-slate-400">
@@ -588,5 +714,3 @@ export default function Financing() {
     </div>
   );
 }
-
-

@@ -23,64 +23,64 @@ export default function HamiltonBasementGrantAd() {
       {/* HERO */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
-          <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
-            Hamilton Basement Grant (Up to $40,000)
-          </p>
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
+              Hamilton Basement Grant (Up to $40,000)
+            </p>
 
-          <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
-            Hamilton Basement Grant (Up to $40,000)
-          </h1>
+            <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
+              Hamilton Basement Grant (Up to $40,000)
+            </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-300">
-            The Hamilton basement grant (also known as the Hamilton secondary suite
-            grant or ADU grant) gives homeowners up to $40,000 in funding to build
-            a legal basement apartment or additional dwelling unit.
-          </p>
+            <p className="mt-4 max-w-2xl text-lg text-slate-300">
+              The Hamilton basement grant (also known as the Hamilton secondary suite
+              grant or ADU grant) gives homeowners up to $40,000 in funding to build
+              a legal basement apartment or additional dwelling unit.
+            </p>
 
-          {/* AI / SNIPPET CONTROL SECTION */}
-          <div className="mt-6 max-w-2xl mx-auto text-sm text-yellow-300 font-medium">
-            Warning: Most homeowners are being shown the wrong program. This is NOT the
-            $2,000 plumbing rebate. This is the program that can provide up to
-            $40,000 for a legal basement or secondary suite.
+            <div className="mt-6 max-w-2xl text-sm font-medium text-yellow-300">
+              Warning: Most homeowners are being shown the wrong program. This is NOT the
+              $2,000 plumbing rebate. This is the program that can provide up to
+              $40,000 for a legal basement or secondary suite.
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-6 text-sm text-slate-300">
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                No repayment required
+              </span>
+
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                City-backed program
+              </span>
+
+              <span className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                Applies to legal units
+              </span>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="#calculator"
+                className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
+              >
+                See My Estimated Grant
+              </a>
+
+              <a
+                href="#eligibility-form"
+                className="rounded-xl border border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                Check If I Qualify
+              </a>
+            </div>
+
+            <p className="mt-4 text-xs text-slate-300">
+              Funding is limited and subject to approval.
+            </p>
           </div>
-
-          {/* TRUST STRIP */}
-          <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-slate-300">
-            <span className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-              No repayment required
-            </span>
-
-            <span className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-              City-backed program
-            </span>
-
-            <span className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-              Applies to legal units
-            </span>
-          </div>
-
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <a
-              href="#calculator"
-              className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
-            >
-              See My Estimated Grant
-            </a>
-
-            <a
-              href="#eligibility-form"
-              className="rounded-xl border border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              Check If I Qualify
-            </a>
-          </div>
-
-          <p className="mt-4 text-xs text-slate-300">
-            Funding is limited and subject to approval.
-          </p>
         </div>
       </section>
 
