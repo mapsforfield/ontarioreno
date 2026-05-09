@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -325,7 +325,7 @@ function SegmentedControl({
               key={option}
               type="button"
               onClick={() => onChange(option)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+              className={`max-w-full min-w-0 whitespace-normal break-words rounded-full border px-4 py-2 text-center text-sm font-medium leading-5 transition ${
                 isActive
                   ? 'border-slate-900 bg-slate-900 text-white shadow-[0_10px_22px_rgba(15,23,42,0.12)]'
                   : 'border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.94)_100%)] text-slate-600 hover:border-slate-300 hover:text-slate-900'
@@ -420,6 +420,28 @@ export default function HomeEquityRenovationsOntario() {
   const [showFitPreview, setShowFitPreview] = useState(false);
   const [fitResult, setFitResult] = useState<FitResult | null>(null);
   const [fitValidationMessage, setFitValidationMessage] = useState('');
+  const fitResultRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showFitPreview || !fitResult || typeof window === 'undefined') return;
+    if (window.innerWidth >= 1024) return;
+
+    const timer = window.setTimeout(() => {
+      const target = fitResultRef.current;
+      if (!target) return;
+
+      const headerOffset = 92;
+      const top =
+        target.getBoundingClientRect().top + window.scrollY - headerOffset;
+
+      window.scrollTo({
+        top: Math.max(top, 0),
+        behavior: 'smooth',
+      });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [showFitPreview, fitResult]);
 
   const updateFitField = <K extends keyof FitCalculatorState>(
     key: K,
@@ -732,7 +754,7 @@ export default function HomeEquityRenovationsOntario() {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#f4f7fb_34%,#f7f9fc_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f4f7fb_34%,#f7f9fc_100%)]">
       <Helmet>
         <title>Using Home Equity for Renovations in Ontario | OntarioReno</title>
         <meta
@@ -767,8 +789,8 @@ export default function HomeEquityRenovationsOntario() {
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
         </div>
 
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,0.96fr)_minmax(380px,0.92fr)] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
-          <div className="relative z-10">
+          <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,0.96fr)_minmax(380px,0.92fr)] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
+          <div className="relative z-10 min-w-0">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100/90 bg-white/80 px-4 py-2 text-sm font-medium text-[#1B3C6C] backdrop-blur-sm">
               <Scale className="h-4 w-4" />
               Ontario homeowner planning guide
@@ -810,7 +832,7 @@ export default function HomeEquityRenovationsOntario() {
             </div>
           </div>
 
-            <div className="relative z-10">
+            <div className="relative z-10 min-w-0">
               <div className="relative mx-auto w-full max-w-[380px] lg:max-w-[580px]">
                 <div className="pointer-events-none absolute inset-x-[8%] bottom-4 h-28 rounded-full bg-slate-300/18 blur-3xl" />
 
@@ -834,7 +856,7 @@ export default function HomeEquityRenovationsOntario() {
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between px-2 text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:text-[0.68rem]">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-2 text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:justify-between sm:text-[0.68rem]">
                 <span>Architectural planning</span>
                 <span>Ontario renovation authority</span>
               </div>
@@ -845,7 +867,7 @@ export default function HomeEquityRenovationsOntario() {
       {/* Minimal Transition Strip */}
       <section className="border-y border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0.74)_100%)] backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          <div className="flex max-w-full items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 pr-4 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-500 [scrollbar-width:none] [-ms-overflow-style:none]">
             <span className="text-slate-400">Decision map</span>
             {mapNavItems.map((item, index) => (
               <div key={item.title} className="flex items-center gap-3">
@@ -907,9 +929,9 @@ export default function HomeEquityRenovationsOntario() {
       </section>
 
       {/* Editorial statement */}
-      <section id="home-equity-guide" className="scroll-mt-24 bg-white py-16 lg:py-32">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)] lg:items-end lg:gap-10 lg:px-8">
-          <div>
+      <section id="home-equity-guide" className="scroll-mt-24 overflow-hidden bg-white py-16 lg:py-32">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)] lg:items-end lg:gap-10 lg:px-8">
+          <div className="relative z-10">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
               The real question
             </p>
@@ -936,14 +958,14 @@ export default function HomeEquityRenovationsOntario() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-[320px] lg:-ml-4 lg:max-w-none">
+          <div className="pointer-events-none relative mt-6 mx-auto w-full max-w-[210px] opacity-95 sm:mt-7 sm:max-w-[250px] lg:mt-0 lg:mx-auto lg:w-full lg:max-w-none lg:opacity-100 lg:-ml-4">
             <div className="relative overflow-hidden">
               <img
                 src="/images/heloc-image.png"
                 alt="Illustration of a hand placing a coin into a house, representing home equity planning for renovations"
-                className="mx-auto w-full max-w-[300px] object-contain md:max-w-[380px]"
+                className="mx-auto w-full object-contain lg:max-w-[380px]"
               />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white via-white/82 to-transparent sm:h-32" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white via-white/82 to-transparent sm:h-24 lg:h-32" />
             </div>
           </div>
         </div>
@@ -976,14 +998,14 @@ export default function HomeEquityRenovationsOntario() {
             </div>
           </aside>
 
-          <div className="space-y-8 md:space-y-10 lg:space-y-12">
-            <div className="lg:hidden">
-              <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="min-w-0 w-full max-w-full space-y-8 md:space-y-10 lg:space-y-12">
+            <div className="w-full min-w-0 max-w-full lg:hidden">
+              <div className="flex w-full max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-1 pr-4 [scrollbar-width:none] [-ms-overflow-style:none]">
                 {mapNavItems.slice(0, 4).map((item) => (
                   <a
                     key={item.title}
                     href={item.href}
-                    className="min-w-[180px] rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3"
+                    className="block max-w-[78vw] min-w-[170px] shrink-0 rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 sm:min-w-[180px]"
                   >
                     <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       {item.step}
@@ -993,29 +1015,29 @@ export default function HomeEquityRenovationsOntario() {
                 ))}
               </div>
             </div>
-            <div className="max-w-3xl">
+            <div className="min-w-0 w-full max-w-3xl">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
                 A practical path
               </p>
-              <h2 className="mt-3 text-[2rem] font-bold leading-[1.04] tracking-[-0.035em] text-slate-950 md:text-[2.9rem] lg:text-[3.6rem]">
+              <h2 className="mt-3 break-words text-[2rem] font-bold leading-[1.04] tracking-[-0.035em] text-slate-950 md:text-[2.9rem] lg:text-[3.6rem]">
                 Deciding whether equity belongs in the renovation
               </h2>
-              <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.06rem]">
+              <p className="mt-4 max-w-2xl break-words text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.06rem]">
                 Move through the renovation in order: define the project, pressure-test feasibility,
                 check the long-term logic, and only then compare financing paths.
               </p>
             </div>
 
-            <section id="define-the-renovation" className="scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
-              <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <div className="px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
+            <section id="define-the-renovation" className="w-full max-w-full scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
+              <div className="grid w-full min-w-0 max-w-full gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="min-w-0 px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1B3C6C]">
                     Step 1
                   </p>
-                  <h3 className="mt-4 max-w-2xl text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
+                  <h3 className="mt-4 max-w-2xl break-words text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
                     Define the renovation
                   </h3>
-                  <div className="mt-5 max-w-2xl space-y-4 text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
+                  <div className="mt-5 max-w-2xl min-w-0 space-y-4 break-words text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
                     <p>
                       Before financing is even on the table, the renovation needs
                       a real shape. What is being built? What may need to be
@@ -1044,7 +1066,7 @@ export default function HomeEquityRenovationsOntario() {
                   </div>
                 </div>
 
-                  <div className="mt-0 border-t border-slate-200 px-5 py-5 lg:mt-0 lg:border-l lg:border-t-0 lg:py-10 lg:pl-8 lg:pr-6">
+                  <div className="mt-0 min-w-0 border-t border-slate-200 px-5 py-5 lg:mt-0 lg:border-l lg:border-t-0 lg:py-10 lg:pl-8 lg:pr-6">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                       What to pin down first
                     </p>
@@ -1067,33 +1089,33 @@ export default function HomeEquityRenovationsOntario() {
 
             <section
               id="test-feasibility"
-              className="relative scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.14),transparent_28%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] text-white"
+              className="relative w-full max-w-full scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.14),transparent_28%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] text-white"
             >
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 <div className="absolute left-[14%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/8 to-transparent" />
               </div>
-              <div className="grid gap-0 lg:grid-cols-[360px_minmax(0,1fr)]">
-                <div className="border-b border-white/10 px-5 py-6 lg:border-b-0 lg:border-r lg:border-white/10 lg:py-10">
+              <div className="grid w-full min-w-0 max-w-full gap-0 lg:grid-cols-[360px_minmax(0,1fr)]">
+                <div className="min-w-0 border-b border-white/10 px-5 py-6 lg:border-b-0 lg:border-r lg:border-white/10 lg:py-10">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-200">
                     Step 2
                   </p>
                   <div className="mt-6">
-                    <p className="text-lg font-semibold leading-8 text-white">
+                    <p className="break-words text-lg font-semibold leading-8 text-white">
                       Feasibility is where the renovation starts becoming real.
                     </p>
-                    <p className="mt-4 max-w-[18rem] text-sm leading-7 text-slate-300">
+                    <p className="mt-4 max-w-full text-sm leading-7 text-slate-300 lg:max-w-[18rem]">
                       Permit-heavy work, basement code upgrades, zoning questions,
                       servicing, and compliance obligations all live here.
                     </p>
                   </div>
                 </div>
 
-                <div className="px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
-                  <h3 className="max-w-2xl text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-white md:text-[2.2rem] lg:text-[2.75rem]">
+                <div className="min-w-0 px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
+                  <h3 className="max-w-2xl break-words text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-white md:text-[2.2rem] lg:text-[2.75rem]">
                     Test feasibility
                   </h3>
-                  <div className="mt-5 max-w-2xl space-y-4 text-[0.98rem] leading-7 text-slate-300 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
+                  <div className="mt-5 max-w-2xl min-w-0 space-y-4 break-words text-[0.98rem] leading-7 text-slate-300 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
                     <p>
                       Many Ontario projects start feeling expensive only after the
                       permit path becomes clearer. That is especially true for{' '}
@@ -1118,7 +1140,7 @@ export default function HomeEquityRenovationsOntario() {
                       early.
                     </p>
                   </div>
-                  <div className="mt-6 border-l border-white/12 pl-4">
+                  <div className="mt-6 min-w-0 border-l border-white/12 pl-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">
                       Pressure test
                     </p>
@@ -1132,16 +1154,16 @@ export default function HomeEquityRenovationsOntario() {
               </div>
             </section>
 
-            <section id="value-income-logic" className="scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
-              <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_380px]">
-                <div className="px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
+            <section id="value-income-logic" className="w-full max-w-full scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
+              <div className="grid w-full min-w-0 max-w-full gap-0 lg:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="min-w-0 px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1B3C6C]">
                     Step 3
                   </p>
-                  <h3 className="mt-4 max-w-2xl text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
+                  <h3 className="mt-4 max-w-2xl break-words text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
                     Check value or income logic
                   </h3>
-                  <div className="mt-5 max-w-2xl space-y-4 text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
+                  <div className="mt-5 max-w-2xl min-w-0 space-y-4 break-words text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
                     <p>
                       Home equity tends to make more sense when the renovation has
                       a clear long-term purpose. That may be household function,
@@ -1162,7 +1184,7 @@ export default function HomeEquityRenovationsOntario() {
                   </div>
                 </div>
 
-                  <div className="mt-0 border-t border-slate-200 px-5 py-5 lg:mt-0 lg:border-l lg:border-t-0 lg:py-10 lg:pl-8 lg:pr-6">
+                  <div className="mt-0 min-w-0 border-t border-slate-200 px-5 py-5 lg:mt-0 lg:border-l lg:border-t-0 lg:py-10 lg:pl-8 lg:pr-6">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Stronger signals
                     </p>
@@ -1182,15 +1204,15 @@ export default function HomeEquityRenovationsOntario() {
               </div>
             </section>
 
-            <section id="choose-the-financing-path" className="scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
-              <div className="px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
+            <section id="choose-the-financing-path" className="w-full max-w-full scroll-mt-24 overflow-hidden rounded-[1.75rem] bg-white/74 ring-1 ring-slate-200/75 lg:rounded-none lg:bg-transparent lg:ring-0">
+              <div className="min-w-0 px-5 py-6 md:px-8 md:py-8 lg:px-10 lg:py-11">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1B3C6C]">
                   Step 4
                 </p>
-                <h3 className="mt-4 max-w-3xl text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
+                <h3 className="mt-4 max-w-3xl break-words text-[1.7rem] font-bold leading-[1.08] tracking-[-0.03em] text-slate-950 md:text-[2.2rem] lg:text-[2.75rem]">
                   Choose the financing path last
                 </h3>
-                <div className="mt-5 max-w-3xl space-y-4 text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
+                <div className="mt-5 max-w-3xl min-w-0 space-y-4 break-words text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8 lg:text-[1.05rem]">
                   <p>
                     Once the renovation has shape, feasibility, and believable
                     value logic, then it becomes useful to compare whether a
@@ -1233,11 +1255,11 @@ export default function HomeEquityRenovationsOntario() {
       <section className="relative bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] py-16 lg:py-28">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-slate-100/60 to-transparent" />
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl">
+          <div className="min-w-0 max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
               Project fit
             </p>
-            <h2 className="mt-4 max-w-3xl text-[2rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.65rem]">
+            <h2 className="mt-4 max-w-3xl break-words text-[2rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.65rem]">
               Some projects justify equity more naturally
             </h2>
             <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8">
@@ -1247,7 +1269,7 @@ export default function HomeEquityRenovationsOntario() {
             </p>
           </div>
 
-          <div className="mt-8 grid gap-7 lg:mt-12 lg:gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="mt-8 grid w-full min-w-0 max-w-full gap-7 lg:mt-12 lg:gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <div className="px-1 py-1 md:px-2">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#1B3C6C]">
                 Stronger fit
@@ -1255,7 +1277,7 @@ export default function HomeEquityRenovationsOntario() {
               <div className="mt-4 space-y-4 lg:mt-6 lg:space-y-5">
                 {projectFitStrong.map((item) => (
                   <article key={item.title} className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0 lg:pt-5">
-                    <h3 className="text-[1.38rem] font-bold leading-[1.1] tracking-[-0.03em] text-slate-950 md:text-[1.55rem] lg:text-[1.65rem]">
+                    <h3 className="break-words text-[1.38rem] font-bold leading-[1.1] tracking-[-0.03em] text-slate-950 md:text-[1.55rem] lg:text-[1.65rem]">
                       {item.title}
                     </h3>
                     <p className="mt-2.5 max-w-xl text-[0.94rem] leading-6 text-slate-600 md:text-[0.98rem] md:leading-7">{item.body}</p>
@@ -1292,13 +1314,13 @@ export default function HomeEquityRenovationsOntario() {
         <section className="relative bg-[linear-gradient(180deg,#eff4f8_0%,#edf2f7_100%)] py-16 lg:pt-28 lg:pb-24">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="mt-2 rounded-[2.2rem] bg-white/74 px-5 pt-6 pb-5 ring-1 ring-slate-200/80 md:px-8 md:pt-8 md:pb-7">
+            <div className="mt-2 w-full max-w-full rounded-[2.2rem] bg-white/74 px-5 pt-6 pb-5 ring-1 ring-slate-200/80 md:px-8 md:pt-8 md:pb-7">
               <div className="border-b border-slate-200/80 pb-6 md:pb-8">
-                <div className="max-w-3xl">
+                <div className="min-w-0 max-w-3xl">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
                     Financing path selector
                 </p>
-                  <h2 className="mt-4 max-w-3xl text-[2rem] font-bold leading-[1.05] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.45rem]">
+                  <h2 className="mt-4 max-w-3xl break-words text-[2rem] font-bold leading-[1.05] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.45rem]">
                     Compare the main financing paths
                   </h2>
                   <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8">
@@ -1308,14 +1330,14 @@ export default function HomeEquityRenovationsOntario() {
                 </div>
               </div>
 
-            <div className="mt-6 grid gap-5 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:gap-8">
-                <article className="self-start rounded-[1.6rem] bg-white/62 px-4 py-4 ring-1 ring-slate-200/72 md:px-6 md:py-6 lg:border-r lg:border-slate-200/70 lg:pr-8">
-                <div className="flex items-start justify-between gap-5">
-                  <div>
+            <div className="mt-6 grid w-full min-w-0 max-w-full gap-5 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:gap-8">
+                <article className="min-w-0 self-start rounded-[1.6rem] bg-white/62 px-4 py-4 ring-1 ring-slate-200/72 md:px-6 md:py-6 lg:border-r lg:border-slate-200/70 lg:pr-8">
+                <div className="flex min-w-0 items-start justify-between gap-5">
+                  <div className="min-w-0">
                     <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#1B3C6C]">
                       Primary path
                     </p>
-                    <h3 className="mt-3 text-[1.7rem] font-bold leading-[1.06] tracking-[-0.035em] text-slate-950 md:text-[2.1rem] lg:text-[2.4rem]">
+                    <h3 className="mt-3 break-words text-[1.7rem] font-bold leading-[1.06] tracking-[-0.035em] text-slate-950 md:text-[2.1rem] lg:text-[2.4rem]">
                       {helocPath.title}
                     </h3>
                   </div>
@@ -1324,7 +1346,7 @@ export default function HomeEquityRenovationsOntario() {
                   </div>
                 </div>
 
-                <div className="mt-5 max-w-2xl space-y-3 text-[0.94rem] leading-7 text-slate-600 md:text-[0.98rem] md:leading-8">
+                <div className="mt-5 max-w-2xl min-w-0 space-y-3 break-words text-[0.94rem] leading-7 text-slate-600 md:text-[0.98rem] md:leading-8">
                   <p>{helocPath.body}</p>
                   <p>
                     It tends to be the cleanest comparison point when the renovation
@@ -1333,7 +1355,7 @@ export default function HomeEquityRenovationsOntario() {
                   </p>
                 </div>
 
-                  <div className="mt-5 grid gap-4 border-t border-slate-200/78 pt-4 md:mt-7 md:gap-5 md:pt-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                  <div className="mt-5 grid w-full min-w-0 max-w-full gap-4 border-t border-slate-200/78 pt-4 md:mt-7 md:gap-5 md:pt-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Usually best for
@@ -1362,15 +1384,15 @@ export default function HomeEquityRenovationsOntario() {
                 </Link>
               </article>
 
-                <aside className="rounded-[1.5rem] bg-white/48 px-4 pt-4 pb-3 ring-1 ring-slate-200/68 md:px-5 md:pt-5 md:pb-4 lg:px-6 lg:pt-6 lg:pb-5">
+                <aside className="min-w-0 w-full max-w-full rounded-[1.5rem] bg-white/48 px-4 pt-4 pb-3 ring-1 ring-slate-200/68 md:px-5 md:pt-5 md:pb-4 lg:px-6 lg:pt-6 lg:pb-5">
                   <div className="divide-y divide-slate-200/72">
                     <article className="pb-5 md:pb-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
+                    <div className="flex min-w-0 items-start justify-between gap-4">
+                      <div className="min-w-0">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">
                           Secondary path
                         </p>
-                        <h3 className="mt-2 text-[1.28rem] font-semibold tracking-[-0.03em] text-slate-950 md:text-[1.45rem]">
+                        <h3 className="mt-2 break-words text-[1.28rem] font-semibold tracking-[-0.03em] text-slate-950 md:text-[1.45rem]">
                           {refinancePath.title}
                         </h3>
                       </div>
@@ -1407,8 +1429,8 @@ export default function HomeEquityRenovationsOntario() {
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/94 text-slate-600 ring-1 ring-slate-200/88">
                           <Icon className="h-4.5 w-4.5" />
                         </div>
-                        <div>
-                          <h3 className="text-[1.08rem] font-semibold tracking-[-0.02em] text-slate-950 md:text-[1.15rem]">
+                        <div className="min-w-0">
+                          <h3 className="break-words text-[1.08rem] font-semibold tracking-[-0.02em] text-slate-950 md:text-[1.15rem]">
                             {path.title}
                           </h3>
                           <p className="mt-2.5 text-sm leading-6 text-slate-600 md:mt-3 md:leading-7">
@@ -1448,11 +1470,11 @@ export default function HomeEquityRenovationsOntario() {
         </div>
 
         <div className="mx-auto max-w-[1360px] px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl">
+          <div className="min-w-0 max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
               Planning tool
             </p>
-            <h2 className="mt-4 text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-slate-950 md:text-[3rem] lg:text-[3.7rem]">
+            <h2 className="mt-4 break-words text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-slate-950 md:text-[3rem] lg:text-[3.7rem]">
               HELOC Renovation Fit Calculator
             </h2>
             <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-600 md:text-[1.08rem] md:leading-8">
@@ -1469,30 +1491,30 @@ export default function HomeEquityRenovationsOntario() {
             }`}
           >
             <div
-              className={`relative ${
+              className={`relative min-w-0 ${
                 showFitPreview ? 'w-full' : 'w-full max-w-[760px]'
               }`}
             >
               <div className="absolute left-0 top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent lg:block" />
-              <div className="pl-0 lg:pl-10">
-                  <div className="relative rounded-[1.7rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.98),rgba(255,255,255,0.95)_36%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_58%,rgba(242,246,250,0.98)_100%)] px-5 py-5 shadow-[0_34px_78px_rgba(15,23,42,0.15)] ring-1 ring-slate-300/85 backdrop-blur-[2px] md:rounded-[2rem] md:px-8 md:py-8">
+              <div className="min-w-0 pl-0 lg:pl-10">
+                  <div className="relative rounded-[1.7rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.98),rgba(255,255,255,0.95)_36%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_58%,rgba(242,246,250,0.98)_100%)] px-4 py-4 shadow-[0_34px_78px_rgba(15,23,42,0.15)] ring-1 ring-slate-300/85 backdrop-blur-[2px] md:rounded-[2rem] md:px-8 md:py-8">
                     <div className="pointer-events-none absolute inset-0 rounded-[1.7rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.46)_0%,transparent_22%,rgba(148,163,184,0.045)_100%)] md:rounded-[2rem]" />
-                  <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
                     <div className="min-w-0">
                       <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
                         Guided assessment
                       </p>
-                      <h3 className="mt-2 text-[1.38rem] font-bold tracking-[-0.03em] text-slate-950 md:text-[1.65rem]">
+                      <h3 className="mt-1.5 text-[1.28rem] font-bold tracking-[-0.03em] text-slate-950 md:mt-2 md:text-[1.65rem]">
                         {currentFitStep === 1 && 'Step 1: Property Context'}
                         {currentFitStep === 2 && 'Step 2: Renovation Context'}
                         {currentFitStep === 3 && 'Step 3: Planning Risk'}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 md:gap-2">
                       {[1, 2, 3].map((step) => (
                         <div
                           key={step}
-                          className={`h-2.5 w-10 rounded-full transition ${
+                          className={`h-2.5 w-8 rounded-full transition md:w-10 ${
                             currentFitStep === step
                               ? 'bg-slate-900 shadow-[0_6px_14px_rgba(15,23,42,0.18)]'
                               : currentFitStep > step
@@ -1504,15 +1526,15 @@ export default function HomeEquityRenovationsOntario() {
                     </div>
                   </div>
 
-                    <div className="mt-6 md:mt-8">
+                    <div className="mt-5 md:mt-8">
                     {currentFitStep === 1 && (
-                      <div className="space-y-5">
+                      <div className="space-y-4 md:space-y-5">
                         <p className="max-w-xl text-sm leading-6 text-slate-600 md:leading-7">
                           Start with the home and the project budget. This gives the
                           assessment the property context before renovation fit is judged.
                         </p>
 
-                        <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+                        <div className="grid gap-3.5 md:grid-cols-2 md:gap-5">
                           <label className="block">
                             <span className="text-sm font-semibold tracking-[-0.01em] text-slate-900">
                               Estimated home value
@@ -1525,7 +1547,7 @@ export default function HomeEquityRenovationsOntario() {
                                 updateFitField('homeValue', event.target.value)
                               }
                               placeholder="$950,000"
-                                className="mt-2.5 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3"
+                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -1544,7 +1566,7 @@ export default function HomeEquityRenovationsOntario() {
                                 )
                               }
                               placeholder="$420,000"
-                                className="mt-2.5 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3"
+                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -1563,7 +1585,7 @@ export default function HomeEquityRenovationsOntario() {
                                 )
                               }
                               placeholder="$180,000"
-                                className="mt-2.5 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3"
+                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -1571,7 +1593,7 @@ export default function HomeEquityRenovationsOntario() {
                             <span className="text-sm font-semibold tracking-[-0.01em] text-slate-900">
                               Estimated HELOC interest rate
                             </span>
-                            <div className="mt-2.5 relative max-w-full sm:max-w-[220px] md:mt-3">
+                            <div className="mt-2 relative max-w-full sm:max-w-[220px] md:mt-3">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -1580,7 +1602,7 @@ export default function HomeEquityRenovationsOntario() {
                                   updateFitField('helocRate', event.target.value)
                                 }
                                 placeholder="6.4"
-                                  className="w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 pr-10 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28"
+                                  className="w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 pr-10 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:py-3.5"
                               />
                               <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-medium text-slate-400">
                                 %
@@ -1589,7 +1611,7 @@ export default function HomeEquityRenovationsOntario() {
                           </label>
                         </div>
 
-                        <div className="pt-2">
+                        <div className="pt-1">
                           <button
                             type="button"
                             onClick={() => setCurrentFitStep(2)}
@@ -1603,13 +1625,13 @@ export default function HomeEquityRenovationsOntario() {
                     )}
 
                     {currentFitStep === 2 && (
-                      <div className="space-y-5">
+                      <div className="space-y-4 md:space-y-5">
                         <p className="max-w-xl text-sm leading-6 text-slate-600 md:leading-7">
                           Add the project type and how long it needs to matter.
                           This keeps the tool renovation-first instead of purely financial.
                         </p>
 
-                        <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+                        <div className="grid gap-3.5 md:grid-cols-2 md:gap-5">
                           <label className="block">
                             <span className="text-sm font-semibold tracking-[-0.01em] text-slate-900">
                               Renovation type
@@ -1622,7 +1644,7 @@ export default function HomeEquityRenovationsOntario() {
                                   event.target.value
                                 )
                               }
-                                className="mt-2.5 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3"
+                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
                             >
                               {renovationTypeOptions.map((option) => (
                                 <option key={option} value={option}>
@@ -1644,7 +1666,7 @@ export default function HomeEquityRenovationsOntario() {
                                   event.target.value
                                 )
                               }
-                                className="mt-2.5 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3.5 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3"
+                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
                             >
                               {ownershipTimelineOptions.map((option) => (
                                 <option key={option} value={option}>
@@ -1664,7 +1686,7 @@ export default function HomeEquityRenovationsOntario() {
                           }
                         />
 
-                        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                        <div className="flex flex-col gap-3 pt-1 sm:flex-row">
                           <button
                             type="button"
                             onClick={() => {
@@ -1689,13 +1711,13 @@ export default function HomeEquityRenovationsOntario() {
                     )}
 
                     {currentFitStep === 3 && (
-                      <div className="space-y-5">
+                      <div className="space-y-4 md:space-y-5">
                         <p className="max-w-xl text-sm leading-6 text-slate-600 md:leading-7">
                           Finish with the factors that most often change a renovation
                           from a clear fit into something that needs closer review.
                         </p>
 
-                        <div className="space-y-5">
+                        <div className="space-y-4 md:space-y-5">
                           <SegmentedControl
                             label="Scope clarity"
                             options={scopeClarityOptions}
@@ -1724,7 +1746,7 @@ export default function HomeEquityRenovationsOntario() {
                           />
                         </div>
 
-                        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                        <div className="flex flex-col gap-3 pt-1 sm:flex-row">
                           <button
                             type="button"
                             onClick={() => {
@@ -1765,17 +1787,17 @@ export default function HomeEquityRenovationsOntario() {
             </div>
 
             {showFitPreview && fitResult && (
-              <div className="relative w-full">
-                  <div className="rounded-[1.7rem] border border-slate-300/82 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.995),rgba(251,252,254,0.98)_40%),linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,248,252,0.985)_100%)] px-5 py-5 shadow-[0_36px_88px_rgba(15,23,42,0.16)] ring-1 ring-white/58 md:rounded-[2rem] md:px-8 md:py-8">
-                  <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] lg:gap-8">
-                    <div>
+              <div ref={fitResultRef} className="relative min-w-0 w-full scroll-mt-24">
+                  <div className="rounded-[1.7rem] border border-slate-300/82 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.995),rgba(251,252,254,0.98)_40%),linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,248,252,0.985)_100%)] px-4 py-4 shadow-[0_36px_88px_rgba(15,23,42,0.16)] ring-1 ring-white/58 transition-all duration-300 ease-out md:rounded-[2rem] md:px-8 md:py-8">
+                  <div className="grid w-full min-w-0 max-w-full gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] lg:gap-8">
+                    <div className="min-w-0">
                       <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
                         Result preview
                       </p>
                       <p className="mt-4 inline-flex rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-semibold text-slate-900">
                         {fitResult.fitLabel}
                       </p>
-                      <h3 className="mt-4 text-[1.9rem] font-bold leading-[1.04] tracking-[-0.04em] text-slate-950 md:text-[2.8rem]">
+                      <h3 className="mt-4 break-words text-[1.9rem] font-bold leading-[1.04] tracking-[-0.04em] text-slate-950 md:text-[2.8rem]">
                         {fitResult.fitLabel}
                       </h3>
                       <p className="mt-3 max-w-xl text-[0.98rem] leading-7 text-slate-600 md:mt-4 md:text-[1rem] md:leading-8">
@@ -1786,8 +1808,8 @@ export default function HomeEquityRenovationsOntario() {
                         <p className="text-sm font-semibold tracking-[-0.01em] text-slate-900">
                           Renovation Fit Spectrum
                         </p>
-                          <div className="mt-3 w-full rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(248,250,252,0.92)_100%)] p-2.5 ring-1 ring-slate-200/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] md:mt-4 md:rounded-[1.6rem] md:p-3">
-                          <div className="grid w-full grid-cols-[1fr_1.14fr_1fr] gap-2">
+                          <div className="mt-3 w-full max-w-full overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(248,250,252,0.92)_100%)] p-2.5 ring-1 ring-slate-200/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] md:mt-4 md:rounded-[1.6rem] md:p-3">
+                          <div className="grid w-full min-w-0 grid-cols-[1fr_1.14fr_1fr] gap-2">
                             {[
                               {
                                 label: 'Caution',
@@ -1804,7 +1826,7 @@ export default function HomeEquityRenovationsOntario() {
                             ].map((band) => (
                               <div
                                 key={band.label}
-                                className={`flex min-h-[52px] min-w-0 items-center justify-center rounded-[0.95rem] px-2 py-3 text-center text-[0.74rem] font-semibold whitespace-nowrap transition md:min-h-[56px] md:rounded-[1rem] md:text-[0.8rem] ${
+                                className={`flex min-h-[52px] min-w-0 items-center justify-center rounded-[0.95rem] px-1.5 py-3 text-center text-[0.72rem] font-semibold leading-tight transition md:min-h-[56px] md:rounded-[1rem] md:px-2 md:text-[0.8rem] md:whitespace-nowrap ${
                                   band.active
                                     ? 'bg-slate-900 text-white'
                                     : 'bg-slate-100/85 text-slate-500'
@@ -1818,7 +1840,7 @@ export default function HomeEquityRenovationsOntario() {
                       </div>
                     </div>
 
-                    <div className="space-y-6 lg:border-l lg:border-slate-200/80 lg:pl-8 lg:space-y-7">
+                  <div className="min-w-0 space-y-5 lg:border-l lg:border-slate-200/80 lg:pl-8 lg:space-y-7">
                       <div>
                         <p className="text-sm font-semibold tracking-[-0.01em] text-slate-900">
                           What strengthens this project
@@ -1849,12 +1871,12 @@ export default function HomeEquityRenovationsOntario() {
                     </div>
                   </div>
 
-                <div className="mt-6 rounded-[1.45rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.82),rgba(244,247,250,0.92)_34%),linear-gradient(180deg,rgba(241,246,250,0.96)_0%,rgba(235,241,246,0.98)_100%)] px-4 py-4 ring-1 ring-slate-200/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] md:mt-8 md:rounded-[1.6rem] md:px-6 md:py-5">
+                <div className="mt-5 rounded-[1.3rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.82),rgba(244,247,250,0.92)_34%),linear-gradient(180deg,rgba(241,246,250,0.96)_0%,rgba(235,241,246,0.98)_100%)] px-3.5 py-3.5 ring-1 ring-slate-200/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] md:mt-8 md:rounded-[1.6rem] md:px-6 md:py-5">
                     <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
                       Supporting numbers
                     </p>
-                    <div className="mt-4 space-y-3 md:mt-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                        <div className="rounded-xl border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,249,252,0.74)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:py-4">
+                    <div className="mt-4 space-y-2.5 md:mt-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                        <div className="rounded-lg border border-slate-200/38 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(247,249,252,0.68)_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:px-4 md:py-4">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Total estimated equity
                         </p>
@@ -1862,7 +1884,7 @@ export default function HomeEquityRenovationsOntario() {
                           {formatCadCurrency(fitResult.totalEstimatedEquity)}
                         </p>
                       </div>
-                        <div className="rounded-xl border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,249,252,0.74)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:py-4">
+                        <div className="rounded-lg border border-slate-200/38 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(247,249,252,0.68)_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:px-4 md:py-4">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Estimated usable equity
                         </p>
@@ -1873,7 +1895,7 @@ export default function HomeEquityRenovationsOntario() {
                           Based on a simplified 80% loan-to-value planning assumption. This is not an approval estimate.
                         </p>
                       </div>
-                        <div className="rounded-xl border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,249,252,0.74)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:py-4">
+                        <div className="rounded-lg border border-slate-200/38 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(247,249,252,0.68)_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:px-4 md:py-4">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Carrying cost
                         </p>
@@ -1884,7 +1906,7 @@ export default function HomeEquityRenovationsOntario() {
                           This is carrying-cost context only, not a full repayment plan.
                         </p>
                       </div>
-                        <div className="rounded-xl border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,249,252,0.74)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:py-4">
+                        <div className="rounded-lg border border-slate-200/38 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(247,249,252,0.68)_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:rounded-2xl md:px-4 md:py-4">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Budget pressure
                         </p>
@@ -1903,7 +1925,7 @@ export default function HomeEquityRenovationsOntario() {
                           </>
                         )}
                       </div>
-                        <div className="rounded-xl border border-slate-200/42 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,249,252,0.74)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:col-span-2 md:rounded-2xl md:py-4">
+                        <div className="rounded-lg border border-slate-200/38 bg-[linear-gradient(180deg,rgba(255,255,255,0.52)_0%,rgba(247,249,252,0.68)_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] md:col-span-2 md:rounded-2xl md:px-4 md:py-4">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Estimated draw amount
                         </p>
@@ -1914,17 +1936,17 @@ export default function HomeEquityRenovationsOntario() {
                     </div>
                   </div>
 
-                  <div className="mt-6 border-t border-slate-200/80 pt-5 md:mt-8 md:pt-6">
+                  <div className="mt-5 border-t border-slate-200/80 pt-4 md:mt-8 md:pt-6">
                     <div className="grid gap-3 md:grid-cols-2">
                       <Link
                         to="/match"
-                        className={`${buttonStyles.primary} whitespace-nowrap`}
+                        className={buttonStyles.primary}
                       >
                         {fitResult.primaryCtaLabel}
                       </Link>
                       <Link
                         to="/costs"
-                        className={`${buttonStyles.secondary} whitespace-nowrap`}
+                        className={buttonStyles.secondary}
                       >
                         {fitResult.secondaryCtaLabel}
                       </Link>
@@ -1952,12 +1974,12 @@ export default function HomeEquityRenovationsOntario() {
           <div className="absolute right-[12%] top-16 h-48 w-48 rounded-full bg-blue-300/6 blur-3xl" />
         </div>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] lg:items-start lg:gap-10">
-            <div className="max-w-3xl">
+          <div className="grid w-full min-w-0 max-w-full gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] lg:items-start lg:gap-10">
+            <div className="min-w-0 max-w-3xl">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
                 Ontario-specific advantage
               </p>
-              <h2 className="mt-4 max-w-4xl text-[2rem] font-bold leading-[1.05] tracking-[-0.045em] text-white md:text-[3.1rem] lg:text-[3.9rem]">
+              <h2 className="mt-4 max-w-4xl break-words text-[2rem] font-bold leading-[1.05] tracking-[-0.045em] text-white md:text-[3.1rem] lg:text-[3.9rem]">
                 Ontario projects make the equity decision more layered
               </h2>
               <div className="mt-5 max-w-2xl space-y-4 text-[0.98rem] leading-7 text-slate-300 md:mt-8 md:text-[1.05rem] md:leading-8">
@@ -2009,7 +2031,7 @@ export default function HomeEquityRenovationsOntario() {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
             Before you commit
           </p>
-          <h2 className="mt-4 max-w-3xl text-[2rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.55rem]">
+          <h2 className="mt-4 max-w-3xl break-words text-[2rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[3rem] lg:text-[3.55rem]">
             Confirm these before using equity
           </h2>
 
@@ -2033,7 +2055,7 @@ export default function HomeEquityRenovationsOntario() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
               OntarioReno method
             </p>
-            <h2 className="mt-4 max-w-3xl text-[1.95rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[2.8rem] lg:text-[3.35rem]">
+            <h2 className="mt-4 max-w-3xl break-words text-[1.95rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[2.8rem] lg:text-[3.35rem]">
               Review the renovation before financing takes over
             </h2>
             <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-600 md:text-[1.02rem] md:leading-8">
@@ -2070,7 +2092,7 @@ export default function HomeEquityRenovationsOntario() {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
             Frequently asked questions
           </p>
-          <h2 className="mt-4 max-w-3xl text-[1.95rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[2.75rem] lg:text-[3.1rem]">
+          <h2 className="mt-4 max-w-3xl break-words text-[1.95rem] font-bold leading-[1.06] tracking-[-0.04em] text-slate-950 md:text-[2.75rem] lg:text-[3.1rem]">
             Questions before using home equity
           </h2>
 
@@ -2081,7 +2103,7 @@ export default function HomeEquityRenovationsOntario() {
                 className="group px-0 py-4 md:py-5"
               >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-left">
-                  <span className="max-w-3xl text-[0.98rem] font-semibold leading-7 tracking-[-0.02em] text-slate-950 md:text-[1.12rem]">
+                  <span className="max-w-3xl break-words text-[0.98rem] font-semibold leading-7 tracking-[-0.02em] text-slate-950 md:text-[1.12rem]">
                     {item.question}
                   </span>
                   <span className="mt-1 text-sm font-semibold text-slate-400 transition group-open:rotate-45">
@@ -2109,7 +2131,7 @@ export default function HomeEquityRenovationsOntario() {
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-blue-200/80">
               Next step
             </p>
-            <h2 className="mx-auto mt-4 max-w-4xl text-[2rem] font-bold leading-[1.05] tracking-[-0.04em] text-white md:text-[3rem] lg:text-[3.7rem]">
+            <h2 className="mx-auto mt-4 max-w-4xl break-words text-[2rem] font-bold leading-[1.05] tracking-[-0.04em] text-white md:text-[3rem] lg:text-[3.7rem]">
               Plan the renovation before you commit the equity
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-[0.98rem] leading-7 text-slate-300 md:mt-6 md:text-[1.08rem] md:leading-8">
