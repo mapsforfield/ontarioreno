@@ -1459,7 +1459,10 @@ export default function HomeEquityRenovationsOntario() {
       </section>
 
       {/* HELOC renovation fit calculator */}
-      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_76%_18%,rgba(115,136,166,0.32),transparent_28%),radial-gradient(circle_at_16%_84%,rgba(247,236,220,0.72),transparent_30%),linear-gradient(180deg,#e7eef6_0%,#dde7f0_46%,#e8eff6_100%)] py-16 lg:py-32">
+      <section
+        id="calculator"
+        className="relative overflow-hidden bg-[radial-gradient(circle_at_76%_18%,rgba(115,136,166,0.32),transparent_28%),radial-gradient(circle_at_16%_84%,rgba(247,236,220,0.72),transparent_30%),linear-gradient(180deg,#e7eef6_0%,#dde7f0_46%,#e8eff6_100%)] py-16 scroll-mt-24 lg:py-32 lg:scroll-mt-28"
+      >
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/85 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-slate-200/55 to-transparent" />

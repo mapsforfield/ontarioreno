@@ -115,7 +115,7 @@ export default function Navbar() {
     {
       label: 'Planning Tools',
       items: [
-        { name: 'HELOC Fit Calculator', href: '/financing/home-equity-renovations-ontario' },
+        { name: 'HELOC Fit Calculator', href: '/financing/home-equity-renovations-ontario#calculator' },
         { name: 'Garden Suite Calculator', href: '/garden-suite-cost-ontario#calculator' },
       ],
     },
@@ -126,7 +126,7 @@ export default function Navbar() {
   ];
 
   const toolLinks = [
-    { name: 'HELOC Fit Calculator', href: '/financing/home-equity-renovations-ontario' },
+    { name: 'HELOC Fit Calculator', href: '/financing/home-equity-renovations-ontario#calculator' },
     { name: 'Grant Eligibility Calculator', href: '/grant-eligibility-calculator' },
     { name: 'Garden Suite Calculator', href: '/garden-suite-cost-ontario#calculator' },
   ];
