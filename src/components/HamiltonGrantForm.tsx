@@ -128,9 +128,12 @@ export default function HamiltonGrantForm() {
   };
 
   return (
-    <section id="eligibility-form" className="bg-slate-50 py-16 scroll-mt-24">
+    <section className="bg-slate-50 py-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col lg:flex-row">
+        <div
+          id="eligibility-form"
+          className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col scroll-mt-20 lg:flex-row md:scroll-mt-24"
+        >
           <div className="bg-slate-900 text-white p-8 md:p-10 lg:w-2/5 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 text-[#5694CF] font-bold mb-8">

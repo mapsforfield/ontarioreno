@@ -1,7 +1,7 @@
 import { Helmet } from "react-helmet-async";
+import { ArrowRight, Calculator, CheckCircle2, FileText } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
-import { CheckCircle } from "lucide-react";
 
 export default function HamiltonBasementGrantAd() {
   return (
@@ -22,58 +22,139 @@ export default function HamiltonBasementGrantAd() {
 
       {/* HERO */}
       <section className="bg-slate-900 text-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center md:px-8 md:py-20">
+        <div className="relative overflow-hidden bg-slate-950 md:hidden">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[50vh] min-h-[430px] max-h-[520px]">
+            <img
+              src="/images/mobile-hero.jpg"
+              alt=""
+              aria-hidden="true"
+              loading="eager"
+              fetchPriority="high"
+              className="ml-auto mr-[-3%] h-full w-[82%] object-cover object-right-top"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.992)_0%,rgba(2,6,23,0.978)_30%,rgba(2,6,23,0.86)_48%,rgba(2,6,23,0.4)_72%,rgba(2,6,23,0.1)_100%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-56 bg-[linear-gradient(180deg,rgba(2,6,23,0)_0%,rgba(2,6,23,0.42)_28%,rgba(2,6,23,0.86)_62%,rgba(2,6,23,1)_100%)]" />
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 top-[26rem] bottom-0 bg-[linear-gradient(180deg,rgba(2,6,23,0)_0%,rgba(2,6,23,0.74)_20%,rgba(2,6,23,0.96)_42%,rgba(2,6,23,1)_62%,rgba(2,6,23,1)_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_26%_34%,rgba(2,6,23,0.22)_0%,rgba(2,6,23,0.16)_18%,rgba(2,6,23,0.08)_30%,rgba(2,6,23,0)_50%),radial-gradient(circle_at_34%_48%,rgba(2,6,23,0.12)_0%,rgba(2,6,23,0.06)_18%,rgba(2,6,23,0)_38%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_52%,rgba(2,6,23,0.16)_0%,rgba(2,6,23,0.1)_18%,rgba(2,6,23,0.04)_30%,rgba(2,6,23,0)_46%)]" />
+
+          <div className="relative mx-auto max-w-7xl px-5 pb-7 pt-6">
+            <div className="max-w-[22.5rem]">
+              <p className="text-[0.76rem] font-semibold uppercase tracking-[0.16em] text-yellow-300/95">
+                Hamilton Basement Grant (Up to $40,000)
+              </p>
+
+              <h1 className="mt-4 text-[3rem] font-extrabold leading-[0.9] tracking-[-0.055em] text-white">
+                Hamilton Basement Grant (Up to $40,000)
+              </h1>
+
+              <p className="mt-4 max-w-[19.25rem] text-[1rem] leading-[1.58] text-slate-200">
+                The Hamilton basement grant (also known as the Hamilton secondary suite
+                grant or ADU grant) gives homeowners up to $40,000 in funding to build
+                a legal basement apartment or additional dwelling unit.
+              </p>
+
+              <div className="mt-4 max-w-[20rem] text-[0.92rem] font-medium leading-7 text-yellow-200">
+                Warning: Most homeowners are being shown the wrong program. This is NOT the
+                $2,000 plumbing rebate. This is the program that can provide up to
+                $40,000 for a legal basement or secondary suite.
+              </div>
+
+              <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
+                {[
+                  "No repayment required",
+                  "City-backed program",
+                  "Applies to legal units",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-3 py-3">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-400/65 bg-emerald-500/8 text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                    <p className="text-[0.98rem] leading-7 text-slate-200">{item}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-1.5 space-y-2.5">
+                <a
+                  href="#eligibility-form"
+                  className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <FileText className="h-5 w-5 shrink-0" />
+                    <span>Check If I Qualify</span>
+                  </span>
+                  <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
+                </a>
+
+                <a
+                  href="#calculator"
+                  className="flex w-full items-center rounded-2xl border border-white/18 bg-white/6 px-5 py-4 text-[1.02rem] font-semibold text-white/95 backdrop-blur-sm transition hover:bg-white/10"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Calculator className="h-5 w-5 shrink-0" />
+                    <span>See My Estimated Grant</span>
+                  </span>
+                  <ArrowRight className="ml-auto h-5 w-5 shrink-0 text-white/70" />
+                </a>
+              </div>
+
+              <p className="mt-4 text-xs text-slate-300">
+                Funding is limited and subject to approval.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto hidden max-w-7xl px-6 py-16 md:block md:px-8 md:py-24">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-wide text-yellow-400">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-yellow-300/95">
               Hamilton Basement Grant (Up to $40,000)
             </p>
 
-            <h1 className="mt-4 text-3xl font-extrabold leading-tight md:text-5xl">
+            <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-6xl">
               Hamilton Basement Grant (Up to $40,000)
             </h1>
 
-            <p className="mt-4 max-w-2xl text-lg text-slate-300">
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
               The Hamilton basement grant (also known as the Hamilton secondary suite
               grant or ADU grant) gives homeowners up to $40,000 in funding to build
               a legal basement apartment or additional dwelling unit.
             </p>
 
-            <div className="mt-6 max-w-2xl text-sm font-medium text-yellow-300">
+            <div className="mt-5 max-w-3xl text-base font-medium leading-8 text-yellow-200 md:text-lg">
               Warning: Most homeowners are being shown the wrong program. This is NOT the
               $2,000 plumbing rebate. This is the program that can provide up to
               $40,000 for a legal basement or secondary suite.
             </div>
 
             <div className="mt-6 flex flex-wrap gap-6 text-sm text-slate-300">
-              <span className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-                No repayment required
-              </span>
-
-              <span className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-                City-backed program
-              </span>
-
-              <span className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-                Applies to legal units
-              </span>
+              {[
+                "No repayment required",
+                "City-backed program",
+                "Applies to legal units",
+              ].map((item) => (
+                <span key={item} className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  {item}
+                </span>
+              ))}
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-wrap gap-4">
               <a
-                href="#calculator"
+                href="#eligibility-form"
                 className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
               >
-                See My Estimated Grant
+                Check If I Qualify
               </a>
 
               <a
-                href="#eligibility-form"
-                className="rounded-xl border border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                href="#calculator"
+                className="rounded-xl border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
               >
-                Check If I Qualify
+                See My Estimated Grant
               </a>
             </div>
 
