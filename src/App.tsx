@@ -78,6 +78,7 @@ import OshawaBasementRenovation from './pages/OshawaBasementRenovation';
 import OshawaBasementRenovationCost from './pages/OshawaBasementRenovationCost';
 import OshawaLegalBasement from './pages/OshawaLegalBasement';
 import OshawaBasementPermit from './pages/OshawaBasementPermit';
+import ContractorPartners from './pages/ContractorPartners';
 
 export default function App() {
   return (
@@ -201,6 +202,7 @@ export default function App() {
           <Route path="basement-renovation-cost-oshawa" element={<OshawaBasementRenovationCost />} />
           <Route path="legal-basement-oshawa" element={<OshawaLegalBasement />} />
           <Route path="basement-permit-oshawa" element={<OshawaBasementPermit />} />
+          <Route path="contractor-partners" element={<ContractorPartners />} />
           <Route path="hamilton-basement-grant" element={<HamiltonBasementGrantAd />}
           />
         </Route>
