@@ -1,9 +1,52 @@
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, ArrowRight } from 'lucide-react';
 
-export default function Footer() {
+type FooterProps = {
+  compactOnMobile?: boolean;
+};
+
+export default function Footer({ compactOnMobile = false }: FooterProps) {
   return (
-    <footer className="border-t border-slate-800 bg-slate-900 py-16 text-slate-300">
+    <>
+      {compactOnMobile && (
+        <footer className="border-t border-white/10 bg-[#07101d] px-4 py-9 text-slate-300 md:hidden">
+          <div className="mx-auto max-w-md">
+            <div className="flex items-center justify-between gap-4">
+              <Link to="/" className="flex items-center text-white">
+                <img
+                  src="/logo-white.png?v=2"
+                  alt="OntarioReno"
+                  className="h-7 w-auto object-contain"
+                />
+              </Link>
+              <a
+                href="mailto:info@ontarioreno.ca"
+                className="text-sm font-medium text-slate-300 transition-colors hover:text-white"
+              >
+                info@ontarioreno.ca
+              </a>
+            </div>
+
+            <p className="mt-7 text-sm leading-6 text-slate-400">
+              Ontario renovation opportunity and fulfillment network.
+            </p>
+
+            <div className="mt-7 flex items-center justify-between gap-4 border-t border-white/10 pt-6 text-xs text-slate-500">
+              <p>&copy; {new Date().getFullYear()} OntarioReno</p>
+              <div className="flex gap-4">
+                <Link to="/privacy-policy" className="transition-colors hover:text-white">
+                  Privacy
+                </Link>
+                <Link to="/terms-of-service" className="transition-colors hover:text-white">
+                  Terms
+                </Link>
+              </div>
+            </div>
+          </div>
+        </footer>
+      )}
+
+      <footer className={`${compactOnMobile ? 'hidden md:block' : ''} border-t border-slate-800 bg-slate-900 py-16 text-slate-300`}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-6">
@@ -139,6 +182,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
-    </footer>
+      </footer>
+    </>
   );
 }

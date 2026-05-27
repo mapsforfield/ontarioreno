@@ -7,6 +7,7 @@ export default function Layout() {
 
   const hideFooterRoutes = ['/hamilton-basement-grant'];
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
+  const useCompactMobileFooter = location.pathname === '/contractor-partners';
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900">
@@ -14,7 +15,7 @@ export default function Layout() {
       <main className="flex-grow">
         <Outlet />
       </main>
-      {!shouldHideFooter && <Footer />}
+      {!shouldHideFooter && <Footer compactOnMobile={useCompactMobileFooter} />}
     </div>
   );
 }
