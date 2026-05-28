@@ -140,13 +140,21 @@ export default function Navbar() {
   const isToolsActive = toolLinks.some(
     (tool) => location.pathname === tool.href.split('#')[0]
   );
+  const isContractorPartnersPage = location.pathname === '/contractor-partners';
 
   const sectionLabelClassName =
     'px-2 pb-1 text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-slate-400/85';
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/92 backdrop-blur-xl">
+      <nav
+        className={cn(
+          'sticky top-0 z-50 bg-white backdrop-blur-xl',
+          isContractorPartnersPage
+            ? 'border-b border-transparent shadow-none'
+            : 'border-b border-slate-200/70 bg-white/92'
+        )}
+      >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-[4.65rem] items-center justify-between">
           <div className="flex items-center">

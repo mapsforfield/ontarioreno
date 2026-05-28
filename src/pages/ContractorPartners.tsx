@@ -1,4 +1,4 @@
-import { FormEvent, useEffect } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
@@ -7,22 +7,26 @@ const pipelineCards = [
   {
     title: 'New homeowner inquiry',
     body: 'Basement apartment project',
-    className: 'left-3 top-52 w-[10.75rem] sm:left-8 sm:top-10 sm:w-[13rem]',
+    step: '01',
+    className: 'left-4 top-[12.8rem] w-[12rem] sm:left-6 sm:top-[10rem] sm:w-[13.5rem]',
   },
   {
     title: 'Consultation booked',
-    body: 'Thursday • 6:30 PM',
-    className: 'right-3 top-80 w-[11.25rem] sm:right-7 sm:top-32 sm:w-[12.5rem]',
+    body: 'Thursday, 6:30 PM',
+    step: '02',
+    className: 'right-4 top-[19.6rem] w-[12rem] sm:right-5 sm:top-[16.6rem] sm:w-[13.5rem]',
   },
   {
     title: 'Project reviewed',
     body: 'Budget range confirmed',
-    className: 'left-4 bottom-28 w-[10.75rem] sm:left-10 sm:bottom-24 sm:w-[12.75rem]',
+    step: '03',
+    className: 'left-4 top-[26.5rem] w-[12rem] sm:left-8 sm:top-[23.15rem] sm:w-[13.5rem]',
   },
   {
     title: 'Contractor fulfillment partner',
     body: 'Ready for assignment',
-    className: 'right-4 bottom-8 w-[12rem] sm:right-8 sm:bottom-8 sm:w-[13.5rem]',
+    step: '04',
+    className: 'right-4 top-[33.4rem] w-[13rem] sm:right-6 sm:top-[29.7rem] sm:w-[14.25rem]',
   },
 ];
 
@@ -107,6 +111,11 @@ const credibilityPoints = [
 ];
 
 export default function ContractorPartners() {
+  const [visiblePipelineCards, setVisiblePipelineCards] = useState(
+    pipelineCards.map(() => false)
+  );
+  const pipelineCardRefs = useRef<Array<HTMLDivElement | null>>([]);
+
   useEffect(() => {
     const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     const previousThemeColor = themeMeta?.getAttribute('content');
@@ -118,6 +127,51 @@ export default function ContractorPartners() {
         themeMeta?.setAttribute('content', previousThemeColor);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) {
+      setVisiblePipelineCards(pipelineCards.map(() => true));
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+
+          const index = Number(
+            (entry.target as HTMLElement).dataset.pipelineCardIndex
+          );
+
+          setVisiblePipelineCards((current) => {
+            if (current[index]) {
+              return current;
+            }
+
+            const next = [...current];
+            next[index] = true;
+            return next;
+          });
+
+          observer.unobserve(entry.target);
+        });
+      },
+      {
+        rootMargin: '0px 0px -12% 0px',
+        threshold: 0.28,
+      }
+    );
+
+    pipelineCardRefs.current.forEach((card) => {
+      if (card) {
+        observer.observe(card);
+      }
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -157,7 +211,7 @@ export default function ContractorPartners() {
             </p>
             <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl sm:leading-9">
               We manage homeowner demand, qualification, consultation, and sales
-              — then work with contractor partners who can fulfill the project.
+              -- then work with contractor partners who can fulfill the project.
             </p>
             <a
               href="#partner-application"
@@ -171,8 +225,8 @@ export default function ContractorPartners() {
             </p>
           </div>
 
-          <div className="relative mx-auto mt-2 min-h-[540px] w-full max-w-[520px] self-end sm:min-h-[580px] lg:mt-0 lg:max-w-none">
-            <div className="absolute inset-x-1 bottom-0 top-24 overflow-hidden rounded-t-[2rem] border border-white/18 bg-[#0d1729] shadow-[0_30px_80px_rgba(0,0,0,0.34)] sm:inset-x-5 sm:top-12 sm:rounded-t-[2.5rem]">
+          <div className="relative mx-auto mt-2 min-h-[660px] w-full max-w-[520px] self-end sm:min-h-[650px] lg:mt-0 lg:max-w-none">
+            <div className="absolute inset-x-[-1.5rem] bottom-0 top-24 overflow-hidden rounded-t-[2rem] border border-white/18 bg-[#0d1729] shadow-[0_30px_80px_rgba(0,0,0,0.34)] sm:inset-x-0 sm:top-12 sm:rounded-t-[2.5rem] lg:inset-x-[-1rem]">
               <img
                 src="/images/financing-planning.png"
                 alt=""
@@ -182,30 +236,43 @@ export default function ContractorPartners() {
               <div className="absolute inset-0 bg-[url('/images/blueprint-hero.png')] bg-cover bg-center opacity-[0.16] mix-blend-screen" />
             </div>
 
-            <div className="absolute left-1/2 top-0 z-40 w-[15.75rem] -translate-x-1/2 rounded-[1.45rem] border border-white/75 bg-white/95 p-4 text-center shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-md sm:w-[19rem] sm:p-6">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1B3C6C] text-white shadow-[0_12px_24px_rgba(27,60,108,0.24)]">
+            <div className="absolute left-1/2 top-0 z-40 w-[15.5rem] -translate-x-1/2 rounded-[1.45rem] border border-white/80 bg-white/96 p-4 text-center shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-md sm:w-[18.5rem] sm:p-6">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#1B3C6C] text-white shadow-[0_12px_24px_rgba(27,60,108,0.24)] sm:h-11 sm:w-11">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
-              <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-[#8d6b2a]">
+              <p className="mt-4 text-[0.68rem] font-bold uppercase tracking-[0.2em] text-[#8d6b2a] sm:text-xs">
                 OntarioReno Reviewed
               </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.045em] text-[#08111f]">
+              <h2 className="mt-2 text-[1.35rem] font-bold leading-tight tracking-[-0.045em] text-[#08111f] sm:text-2xl">
                 Qualified Project Opportunity
               </h2>
             </div>
 
-            {pipelineCards.map((card) => (
+            <div className="absolute bottom-14 left-1/2 top-[12rem] z-20 w-px -translate-x-1/2 bg-gradient-to-b from-white/0 via-white/40 to-white/0" />
+
+            {pipelineCards.map((card, index) => (
               <div
                 key={card.title}
-                className={`absolute z-30 rounded-[0.95rem] border border-white/75 bg-white/94 px-3 py-2.5 shadow-[0_18px_52px_rgba(0,0,0,0.26)] backdrop-blur-md sm:rounded-[1rem] sm:px-4 sm:py-3 ${card.className}`}
+                ref={(node) => {
+                  pipelineCardRefs.current[index] = node;
+                }}
+                data-pipeline-card-index={index}
+                className={`absolute z-30 origin-bottom rounded-[1rem] border border-white/80 bg-white/95 px-3.5 py-3 shadow-[0_18px_52px_rgba(0,0,0,0.26)] backdrop-blur-md transition-all duration-300 ease-[cubic-bezier(0.18,0.86,0.32,1.2)] will-change-transform motion-reduce:transition-none sm:rounded-[1.15rem] sm:px-4 sm:py-3.5 ${visiblePipelineCards[index] ? 'translate-y-0 scale-100 opacity-100 blur-0' : 'translate-y-5 scale-[0.93] opacity-0 blur-[1px]'} ${card.className}`}
+                style={{
+                  transitionDelay: visiblePipelineCards[index]
+                    ? `${index * 60}ms`
+                    : '0ms',
+                }}
               >
-                <div className="flex items-start gap-2.5">
-                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#2b5a96] ring-4 ring-blue-100" />
-                  <div>
-                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-[0.72rem]">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[0.62rem] font-bold text-[#2b5a96] ring-1 ring-blue-100">
+                    {card.step}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[0.62rem] font-bold uppercase leading-4 tracking-[0.14em] text-slate-500 sm:text-[0.7rem]">
                       {card.title}
                     </p>
-                    <p className="mt-1 text-xs font-bold leading-5 tracking-[-0.02em] text-slate-950 sm:text-sm">
+                    <p className="mt-1.5 text-[0.82rem] font-bold leading-5 tracking-[-0.02em] text-slate-950 sm:text-sm">
                       {card.body}
                     </p>
                   </div>
