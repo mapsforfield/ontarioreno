@@ -20,7 +20,7 @@ const pipelineCards = [
     title: 'Project reviewed',
     body: 'Budget range confirmed',
     step: '03',
-    className: 'left-4 top-[27.2rem] w-[12rem] sm:left-8 sm:top-[23.9rem] sm:w-[13.5rem] lg:top-[27.05rem]',
+    className: 'left-4 top-[27.0125rem] w-[12rem] sm:left-8 sm:top-[23.9rem] sm:w-[13.5rem] lg:top-[27.05rem]',
   },
   {
     title: 'Project ready',
