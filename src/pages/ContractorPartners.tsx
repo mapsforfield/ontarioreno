@@ -1,4 +1,4 @@
-import { FormEvent } from 'react';
+import { FormEvent, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
@@ -91,6 +91,19 @@ const credibilityPoints = [
 ];
 
 export default function ContractorPartners() {
+  useEffect(() => {
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previousThemeColor = themeMeta?.getAttribute('content');
+
+    themeMeta?.setAttribute('content', '#0d1729');
+
+    return () => {
+      if (previousThemeColor) {
+        themeMeta?.setAttribute('content', previousThemeColor);
+      }
+    };
+  }, []);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
   };
@@ -103,6 +116,8 @@ export default function ContractorPartners() {
           name="description"
           content="OntarioReno reviews select Ontario renovation contractors for a managed homeowner opportunity and project fulfillment network."
         />
+        <meta name="theme-color" content="#0d1729" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="canonical" href="https://ontarioreno.ca/contractor-partners" />
       </Helmet>
 
@@ -121,8 +136,10 @@ export default function ContractorPartners() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
               OntarioReno Contractor Partners
             </p>
-            <h1 className="mt-6 text-[3.55rem] font-bold leading-[0.93] tracking-[-0.07em] text-white sm:text-7xl lg:text-[6.15rem]">
-              Need More Renovation Jobs?
+            <h1 className="mt-6 text-[3.45rem] font-bold leading-[0.93] tracking-[-0.07em] text-white sm:text-7xl lg:text-[6.15rem]">
+              <span className="block">Need More</span>
+              <span className="block">Renovation</span>
+              <span className="block">Jobs?</span>
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-200 sm:text-[1.3rem] sm:leading-9">
               OntarioReno is building a contractor partner network for serious

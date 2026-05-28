@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight, Landmark } from 'lucide-react';
 import HamiltonGrantCalculator from '../components/HamiltonGrantCalculator';
@@ -51,7 +51,7 @@ const calculatorContent: Record<
     eyebrow: string;
     title: string;
     description: string;
-    component: JSX.Element;
+    component: ReactNode;
   }
 > = {
   hamilton: {

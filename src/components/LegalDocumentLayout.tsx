@@ -2,8 +2,8 @@ import { Helmet } from 'react-helmet-async';
 
 type LegalSection = {
   title: string;
-  paragraphs?: string[];
-  bullets?: string[];
+  paragraphs?: readonly string[];
+  bullets?: readonly string[];
 };
 
 type LegalDocumentLayoutProps = {
@@ -14,7 +14,7 @@ type LegalDocumentLayoutProps = {
   eyebrow: string;
   intro: string;
   lastUpdated: string;
-  sections: LegalSection[];
+  sections: readonly LegalSection[];
 };
 
 export default function LegalDocumentLayout({
