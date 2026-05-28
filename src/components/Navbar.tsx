@@ -155,19 +155,37 @@ export default function Navbar() {
             : 'border-b border-slate-200/70 bg-white/92 backdrop-blur-xl'
         )}
       >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-[4.65rem] items-center justify-between">
+      <div
+        className={cn(
+          'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8',
+          isContractorPartnersPage && 'xl:px-10'
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-[4.65rem] items-center justify-between',
+            isContractorPartnersPage && 'lg:h-[5.15rem] xl:h-[5.35rem]'
+          )}
+        >
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <img
                 src="/logo.png"
                 alt="OntarioReno Logo"
-                className="h-10 w-auto object-contain"
+                className={cn(
+                  'h-10 w-auto object-contain',
+                  isContractorPartnersPage && 'lg:h-11 xl:h-12'
+                )}
               />
             </Link>
           </div>
 
-          <div className="hidden items-center gap-8 md:flex">
+          <div
+            className={cn(
+              'hidden items-center gap-8 md:flex',
+              isContractorPartnersPage && 'lg:gap-9 xl:gap-10'
+            )}
+          >
             <div
               className="relative"
               onMouseEnter={() => setIsHubsOpen(true)}
