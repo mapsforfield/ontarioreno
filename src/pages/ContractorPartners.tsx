@@ -125,7 +125,7 @@ export default function ContractorPartners() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fbfaf6]">
+    <div className="min-h-screen bg-white">
       <Helmet>
         <title>Contractor Partners | Get More Renovation Jobs | OntarioReno</title>
         <meta
@@ -137,51 +137,52 @@ export default function ContractorPartners() {
         <link rel="canonical" href="https://ontarioreno.ca/contractor-partners" />
       </Helmet>
 
-      <section className="bg-[#fbfaf6] px-3 pb-10 pt-4 sm:px-5 sm:pb-14 lg:px-8 lg:pt-7">
-        <div className="relative isolate mx-auto grid max-w-7xl overflow-hidden rounded-[2.25rem] bg-[#dbe8ec] px-6 pb-0 pt-12 shadow-[0_28px_80px_rgba(28,49,72,0.16)] sm:rounded-[3rem] sm:px-10 sm:pt-16 lg:min-h-[760px] lg:grid-cols-[minmax(0,0.94fr)_minmax(460px,1fr)] lg:items-center lg:gap-10 lg:px-14 lg:py-16 xl:px-18">
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_16%_12%,rgba(255,255,255,0.82),transparent_32%),radial-gradient(circle_at_78%_18%,rgba(74,123,157,0.16),transparent_36%),linear-gradient(135deg,rgba(255,255,255,0.5),rgba(255,255,255,0)_46%)]" />
-          <div className="pointer-events-none absolute -bottom-36 -right-24 -z-10 h-[28rem] w-[28rem] rounded-full bg-white/32 blur-3xl" />
+      <section className="bg-white px-3 pb-10 pt-4 sm:px-5 sm:pb-14 lg:px-8 lg:pt-7">
+        <div className="relative isolate mx-auto grid max-w-7xl overflow-hidden rounded-[2.25rem] bg-[#0d1729] px-6 pb-0 pt-12 text-white shadow-[0_32px_90px_rgba(5,12,24,0.28)] sm:rounded-[3rem] sm:px-10 sm:pt-16 lg:min-h-[760px] lg:grid-cols-[minmax(0,0.94fr)_minmax(460px,1fr)] lg:items-center lg:gap-10 lg:px-14 lg:py-16 xl:px-18">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_14%_12%,rgba(73,132,184,0.28),transparent_33%),radial-gradient(circle_at_78%_16%,rgba(188,158,91,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0)_42%)]" />
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(13,23,41,0)_48%,rgba(4,9,18,0.72)_100%)]" />
+          <div className="pointer-events-none absolute -bottom-36 -right-24 -z-10 h-[28rem] w-[28rem] rounded-full bg-[#2b5a96]/30 blur-3xl" />
           <div className="relative z-10 max-w-[760px] pb-10 lg:pb-0">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#1B3C6C] sm:text-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-200 sm:text-sm">
               OntarioReno Contractor Partners
             </p>
-            <h1 className="mt-6 text-[3.95rem] font-bold leading-[0.88] tracking-[-0.075em] text-[#08111f] sm:text-7xl lg:text-[5.9rem] xl:text-[6.55rem]">
+            <h1 className="mt-6 text-[3.95rem] font-bold leading-[0.88] tracking-[-0.075em] text-white sm:text-7xl lg:text-[5.9rem] xl:text-[6.55rem]">
               <span className="block">Need More</span>
               <span className="block">Renovation</span>
               <span className="block">Jobs?</span>
             </h1>
-            <p className="mt-8 max-w-2xl text-lg font-medium leading-8 text-[#263747] sm:text-[1.28rem] sm:leading-9">
+            <p className="mt-8 max-w-2xl text-lg font-medium leading-8 text-slate-100 sm:text-[1.28rem] sm:leading-9">
               OntarioReno is building a contractor partner network for serious
               renovation companies across Ontario.
             </p>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#33495b] sm:text-xl sm:leading-9">
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl sm:leading-9">
               We manage homeowner demand, qualification, consultation, and sales
               — then work with contractor partners who can fulfill the project.
             </p>
             <a
               href="#partner-application"
-              className="mt-10 inline-flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-[1.15rem] bg-[#1B3C6C] px-8 py-4 text-base font-bold tracking-[-0.015em] text-white shadow-[0_18px_36px_rgba(27,60,108,0.22)] transition hover:bg-[#15345f] hover:shadow-[0_22px_44px_rgba(27,60,108,0.26)] sm:w-auto sm:rounded-[1.25rem] sm:text-[1.03rem]"
+              className="mt-10 inline-flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-[1.15rem] bg-[#2f69ad] px-8 py-4 text-base font-bold tracking-[-0.015em] text-white shadow-[0_18px_38px_rgba(47,105,173,0.28)] ring-1 ring-white/10 transition hover:bg-[#3677c2] hover:shadow-[0_22px_48px_rgba(47,105,173,0.34)] sm:w-auto sm:rounded-[1.25rem] sm:text-[1.03rem]"
             >
               Request Contractor Review
               <ArrowRight className="h-5 w-5" />
             </a>
-            <p className="mt-5 max-w-xl text-sm font-semibold leading-7 text-[#51697b] sm:text-base">
+            <p className="mt-5 max-w-xl text-sm font-semibold leading-7 text-blue-100 sm:text-base">
               Limited partner spots available by service area and project category.
             </p>
           </div>
 
           <div className="relative mx-auto mt-2 min-h-[540px] w-full max-w-[520px] self-end sm:min-h-[580px] lg:mt-0 lg:max-w-none">
-            <div className="absolute inset-x-1 bottom-0 top-24 overflow-hidden rounded-t-[2rem] border border-white/55 bg-[#0d1729] shadow-[0_30px_80px_rgba(11,27,43,0.24)] sm:inset-x-5 sm:top-12 sm:rounded-t-[2.5rem]">
+            <div className="absolute inset-x-1 bottom-0 top-24 overflow-hidden rounded-t-[2rem] border border-white/18 bg-[#0d1729] shadow-[0_30px_80px_rgba(0,0,0,0.34)] sm:inset-x-5 sm:top-12 sm:rounded-t-[2.5rem]">
               <img
                 src="/images/financing-planning.png"
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover object-center opacity-88"
+                className="absolute inset-0 h-full w-full object-cover object-center opacity-82"
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(219,232,236,0.04)_0%,rgba(13,23,41,0.18)_28%,rgba(13,23,41,0.72)_100%)]" />
-              <div className="absolute inset-0 bg-[url('/images/blueprint-hero.png')] bg-cover bg-center opacity-[0.12] mix-blend-screen" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(13,23,41,0.08)_0%,rgba(13,23,41,0.34)_34%,rgba(4,9,18,0.78)_100%)]" />
+              <div className="absolute inset-0 bg-[url('/images/blueprint-hero.png')] bg-cover bg-center opacity-[0.16] mix-blend-screen" />
             </div>
 
-            <div className="absolute left-1/2 top-0 z-40 w-[15.75rem] -translate-x-1/2 rounded-[1.45rem] border border-white/75 bg-white/92 p-4 text-center shadow-[0_24px_60px_rgba(15,40,62,0.18)] backdrop-blur-md sm:w-[19rem] sm:p-6">
+            <div className="absolute left-1/2 top-0 z-40 w-[15.75rem] -translate-x-1/2 rounded-[1.45rem] border border-white/75 bg-white/95 p-4 text-center shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-md sm:w-[19rem] sm:p-6">
               <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1B3C6C] text-white shadow-[0_12px_24px_rgba(27,60,108,0.24)]">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
@@ -196,7 +197,7 @@ export default function ContractorPartners() {
             {pipelineCards.map((card) => (
               <div
                 key={card.title}
-                className={`absolute z-30 rounded-[0.95rem] border border-white/75 bg-white/90 px-3 py-2.5 shadow-[0_16px_40px_rgba(15,40,62,0.15)] backdrop-blur-md sm:rounded-[1rem] sm:px-4 sm:py-3 ${card.className}`}
+                className={`absolute z-30 rounded-[0.95rem] border border-white/75 bg-white/94 px-3 py-2.5 shadow-[0_18px_52px_rgba(0,0,0,0.26)] backdrop-blur-md sm:rounded-[1rem] sm:px-4 sm:py-3 ${card.className}`}
               >
                 <div className="flex items-start gap-2.5">
                   <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#2b5a96] ring-4 ring-blue-100" />
