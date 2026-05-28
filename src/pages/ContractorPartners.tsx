@@ -179,7 +179,7 @@ export default function ContractorPartners() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#fbfaf7]">
       <Helmet>
         <title>Contractor Partners | Get More Renovation Jobs | OntarioReno</title>
         <meta
@@ -191,7 +191,7 @@ export default function ContractorPartners() {
         <link rel="canonical" href="https://ontarioreno.ca/contractor-partners" />
       </Helmet>
 
-      <section className="bg-white px-3 pb-10 pt-4 sm:px-5 sm:pb-14 lg:px-8 lg:pt-7">
+      <section className="-mt-px bg-[#fbfaf7] px-3 pb-10 pt-0 sm:px-5 sm:pb-14 sm:pt-3 lg:px-8 lg:pt-5">
         <div className="relative isolate mx-auto grid max-w-7xl overflow-hidden rounded-[2.25rem] bg-[#0d1729] px-6 pb-0 pt-12 text-white shadow-[0_32px_90px_rgba(5,12,24,0.28)] sm:rounded-[3rem] sm:px-10 sm:pt-16 lg:min-h-[760px] lg:grid-cols-[minmax(0,0.94fr)_minmax(460px,1fr)] lg:items-center lg:gap-10 lg:px-14 lg:py-16 xl:px-18">
           <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_14%_12%,rgba(73,132,184,0.28),transparent_33%),radial-gradient(circle_at_78%_16%,rgba(188,158,91,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0)_42%)]" />
           <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(13,23,41,0)_48%,rgba(4,9,18,0.72)_100%)]" />
@@ -200,27 +200,22 @@ export default function ContractorPartners() {
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-200 sm:text-sm">
               OntarioReno Contractor Partners
             </p>
-            <h1 className="mt-6 text-[3.95rem] font-bold leading-[0.88] tracking-[-0.075em] text-white sm:text-7xl lg:text-[5.9rem] xl:text-[6.55rem]">
+            <h1 className="mt-6 text-[3.72rem] font-bold leading-[0.84] tracking-[-0.068em] text-white sm:text-7xl sm:leading-[0.86] lg:text-[5.9rem] xl:text-[6.55rem]">
               <span className="block">Need More</span>
-              <span className="block">Renovation</span>
-              <span className="block">Jobs?</span>
+              <span className="block">Renovation Jobs?</span>
             </h1>
-            <p className="mt-8 max-w-2xl text-lg font-medium leading-8 text-slate-100 sm:text-[1.28rem] sm:leading-9">
-              OntarioReno is building a contractor partner network for serious
-              renovation companies across Ontario.
-            </p>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl sm:leading-9">
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:mt-8 sm:text-xl sm:leading-9">
               We manage homeowner demand, qualification, consultation, and sales
-              -- then work with contractor partners who can fulfill the project.
+              before assigning projects to contractor partners.
             </p>
             <a
               href="#partner-application"
-              className="mt-10 inline-flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-[1.15rem] bg-[#2f69ad] px-8 py-4 text-base font-bold tracking-[-0.015em] text-white shadow-[0_18px_38px_rgba(47,105,173,0.28)] ring-1 ring-white/10 transition hover:bg-[#3677c2] hover:shadow-[0_22px_48px_rgba(47,105,173,0.34)] sm:w-auto sm:rounded-[1.25rem] sm:text-[1.03rem]"
+              className="mt-7 inline-flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-[1.15rem] bg-[#2f69ad] px-8 py-4 text-base font-bold tracking-[-0.015em] text-white shadow-[0_18px_38px_rgba(47,105,173,0.28)] ring-1 ring-white/10 transition hover:bg-[#3677c2] hover:shadow-[0_22px_48px_rgba(47,105,173,0.34)] sm:mt-8 sm:w-auto sm:rounded-[1.25rem] sm:text-[1.03rem]"
             >
               Request Contractor Review
               <ArrowRight className="h-5 w-5" />
             </a>
-            <p className="mt-5 max-w-xl text-sm font-semibold leading-7 text-blue-100 sm:text-base">
+            <p className="mt-4 max-w-xl text-sm font-semibold leading-7 text-blue-100 sm:mt-5 sm:text-base">
               Limited partner spots available by service area and project category.
             </p>
           </div>

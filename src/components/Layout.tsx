@@ -15,7 +15,11 @@ export default function Layout() {
     useCompactMobileFooter && isContractorBannerVisible;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900">
+    <div
+      className={`min-h-screen flex flex-col font-sans text-slate-900 ${
+        useCompactMobileFooter ? 'bg-[#fbfaf7]' : 'bg-slate-50'
+      }`}
+    >
       {shouldShowContractorBanner && (
         <div
           className="relative z-[70] border-b border-white/10 bg-[#0d1729] text-white shadow-[0_12px_28px_rgba(3,7,18,0.18)]"

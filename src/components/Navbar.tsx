@@ -149,10 +149,10 @@ export default function Navbar() {
     <>
       <nav
         className={cn(
-          'sticky top-0 z-50 bg-white backdrop-blur-xl',
+          isContractorPartnersPage ? 'relative z-0' : 'sticky top-0 z-50',
           isContractorPartnersPage
-            ? 'border-b border-transparent shadow-none'
-            : 'border-b border-slate-200/70 bg-white/92'
+            ? 'bg-[#fbfaf7] shadow-none [transform:none] [will-change:auto]'
+            : 'border-b border-slate-200/70 bg-white/92 backdrop-blur-xl'
         )}
       >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
