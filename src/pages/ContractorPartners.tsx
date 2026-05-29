@@ -3,6 +3,9 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
 
+const LEAD_SUBMISSION_ENDPOINT =
+  'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec';
+
 const pipelineCards = [
   {
     title: 'New homeowner inquiry',
@@ -114,6 +117,9 @@ export default function ContractorPartners() {
   const [visiblePipelineCards, setVisiblePipelineCards] = useState(
     pipelineCards.map(() => false)
   );
+  const [submitStatus, setSubmitStatus] = useState<
+    'idle' | 'submitting' | 'success' | 'error'
+  >('idle');
   const pipelineCardRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
@@ -196,8 +202,45 @@ export default function ContractorPartners() {
     return () => observer.disconnect();
   }, []);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSubmitStatus('submitting');
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const value = (field: string) =>
+      String(formData.get(field) ?? '').trim();
+
+    const payload = {
+      sheetTab: 'Contractors',
+      'Company Name': value('companyName'),
+      'Contact Name': value('contactName'),
+      Phone: value('phone'),
+      Email: value('email'),
+      Website: value('website'),
+      'Service Area': value('serviceArea'),
+      'Main Renovation Work': value('projectTypes'),
+      'Average Project Size': value('averageProjectSize'),
+      'Offers Financing': value('offersFinancing'),
+      Message: value('message'),
+    };
+
+    try {
+      await fetch(LEAD_SUBMISSION_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      setSubmitStatus('success');
+      form.reset();
+    } catch (error) {
+      console.error(error);
+      setSubmitStatus('error');
+    }
   };
 
   return (
@@ -521,12 +564,30 @@ export default function ContractorPartners() {
               </fieldset>
             </div>
             <div className="border-t border-slate-200/80 bg-slate-50/80 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-7 lg:p-8">
-              <p className="text-sm leading-6 text-slate-500">
-                OntarioReno reviews contractor fit based on service area, project
-                category, capacity, financing readiness, and operational standards.
-              </p>
-              <button type="submit" className={`${buttonStyles.primary} mt-5 shrink-0 sm:mt-0`}>
-                Submit For Contractor Review
+              <div>
+                <p className="text-sm leading-6 text-slate-500">
+                  OntarioReno reviews contractor fit based on service area, project
+                  category, capacity, financing readiness, and operational standards.
+                </p>
+                {submitStatus === 'success' && (
+                  <p className="mt-3 rounded-[0.9rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800" aria-live="polite">
+                    Your contractor review request has been submitted. OntarioReno will contact you if there is a fit.
+                  </p>
+                )}
+                {submitStatus === 'error' && (
+                  <p className="mt-3 rounded-[0.9rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800" aria-live="polite">
+                    Something went wrong. Please try again or contact OntarioReno directly.
+                  </p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={submitStatus === 'submitting'}
+                className={`${buttonStyles.primary} mt-5 shrink-0 disabled:cursor-not-allowed disabled:opacity-70 sm:mt-0`}
+              >
+                {submitStatus === 'submitting'
+                  ? 'Submitting...'
+                  : 'Submit For Contractor Review'}
                 <ArrowRight className="h-5 w-5" />
               </button>
             </div>
