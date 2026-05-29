@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
 
 const LEAD_SUBMISSION_ENDPOINT =
-  'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec';
+  'https://script.google.com/macros/s/AKfycbx2g4kyC1_ZHzOCvzwgxK2Q49FX51upXb3TVI9kUxRUICl4TM-PiDb3DQVLQhGH76U/exec';
 
 const pipelineCards = [
   {
@@ -212,17 +212,16 @@ export default function ContractorPartners() {
       String(formData.get(field) ?? '').trim();
 
     const payload = {
-      sheetTab: 'Contractors',
-      'Company Name': value('companyName'),
-      'Contact Name': value('contactName'),
-      Phone: value('phone'),
-      Email: value('email'),
-      Website: value('website'),
-      'Service Area': value('serviceArea'),
-      'Main Renovation Work': value('projectTypes'),
-      'Average Project Size': value('averageProjectSize'),
-      'Offers Financing': value('offersFinancing'),
-      Message: value('message'),
+      companyName: value('companyName'),
+      contactName: value('contactName'),
+      phone: value('phone'),
+      email: value('email'),
+      website: value('website'),
+      serviceArea: value('serviceArea'),
+      projectTypes: value('projectTypes'),
+      averageProjectSize: value('averageProjectSize'),
+      offersFinancing: value('offersFinancing'),
+      message: value('message'),
     };
 
     try {
