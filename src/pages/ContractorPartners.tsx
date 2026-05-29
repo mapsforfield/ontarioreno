@@ -3,6 +3,12 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
+
 const LEAD_SUBMISSION_ENDPOINT =
   'https://script.google.com/macros/s/AKfycbx2g4kyC1_ZHzOCvzwgxK2Q49FX51upXb3TVI9kUxRUICl4TM-PiDb3DQVLQhGH76U/exec';
 
@@ -233,6 +239,10 @@ export default function ContractorPartners() {
         },
         body: JSON.stringify(payload),
       });
+
+      if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+        window.fbq('track', 'Lead');
+      }
 
       setSubmitStatus('success');
       form.reset();
