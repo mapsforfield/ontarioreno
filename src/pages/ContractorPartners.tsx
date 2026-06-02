@@ -123,9 +123,13 @@ export default function ContractorPartners() {
   const [visiblePipelineCards, setVisiblePipelineCards] = useState(
     pipelineCards.map(() => false)
   );
-  const [submitStatus, setSubmitStatus] = useState<
-    'idle' | 'submitting' | 'success' | 'error'
-  >('idle');
+  const [submitStatus, setSubmitStatus] = useState<{
+    formId: 'compact' | 'full' | null;
+    type: 'idle' | 'submitting' | 'success' | 'error';
+  }>({
+    formId: null,
+    type: 'idle',
+  });
   const pipelineCardRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
@@ -208,9 +212,12 @@ export default function ContractorPartners() {
     return () => observer.disconnect();
   }, []);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+    formId: 'compact' | 'full'
+  ) => {
     event.preventDefault();
-    setSubmitStatus('submitting');
+    setSubmitStatus({ formId, type: 'submitting' });
 
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -244,11 +251,11 @@ export default function ContractorPartners() {
         window.fbq('track', 'Lead');
       }
 
-      setSubmitStatus('success');
+      setSubmitStatus({ formId, type: 'success' });
       form.reset();
     } catch (error) {
       console.error(error);
-      setSubmitStatus('error');
+      setSubmitStatus({ formId, type: 'error' });
     }
   };
 
@@ -348,6 +355,79 @@ export default function ContractorPartners() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#fbfaf7] px-4 pb-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[1.75rem] border border-slate-200/75 bg-white/85 shadow-[0_22px_70px_rgba(15,23,42,0.075)] backdrop-blur lg:rounded-[2rem]">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,0.72fr)_minmax(520px,1fr)]">
+            <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 sm:p-7 lg:border-b-0 lg:border-r lg:p-9">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8d6b2a]">
+                Contractor Review
+              </p>
+              <h2 className="mt-3 text-2xl font-bold tracking-[-0.035em] text-slate-950 sm:text-3xl">
+                Want OntarioReno To Review Your Company?
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Start with the basics. If there is a fit, we&apos;ll follow up
+                to discuss category, area, and capacity.
+              </p>
+            </div>
+
+            <form
+              onSubmit={(event) => handleSubmit(event, 'compact')}
+              className="p-5 sm:p-7 lg:p-8"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label>
+                  <span className={formStyles.label}>Company name</span>
+                  <input className={formStyles.field} type="text" name="companyName" />
+                </label>
+                <label>
+                  <span className={formStyles.label}>Contact name</span>
+                  <input className={formStyles.field} type="text" name="contactName" />
+                </label>
+                <label>
+                  <span className={formStyles.label}>Phone</span>
+                  <input className={formStyles.field} type="tel" name="phone" />
+                </label>
+                <label>
+                  <span className={formStyles.label}>Email</span>
+                  <input className={formStyles.field} type="email" name="email" />
+                </label>
+                <label>
+                  <span className={formStyles.label}>Service area</span>
+                  <input className={formStyles.field} type="text" name="serviceArea" placeholder="Cities or regions" />
+                </label>
+                <label>
+                  <span className={formStyles.label}>Main renovation work</span>
+                  <input className={formStyles.field} type="text" name="projectTypes" placeholder="Basements, kitchens, ADUs..." />
+                </label>
+              </div>
+
+              {submitStatus.formId === 'compact' && submitStatus.type === 'success' && (
+                <p className="mt-5 rounded-[0.9rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800" aria-live="polite">
+                  Your contractor review request has been submitted. OntarioReno will contact you if there is a fit.
+                </p>
+              )}
+              {submitStatus.formId === 'compact' && submitStatus.type === 'error' && (
+                <p className="mt-5 rounded-[0.9rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800" aria-live="polite">
+                  Something went wrong. Please try again or contact OntarioReno directly.
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitStatus.type === 'submitting'}
+                className={`${buttonStyles.primary} mt-5 w-full justify-center disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto`}
+              >
+                {submitStatus.formId === 'compact' && submitStatus.type === 'submitting'
+                  ? 'Submitting...'
+                  : 'Submit For Contractor Review'}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </form>
           </div>
         </div>
       </section>
@@ -497,7 +577,7 @@ export default function ContractorPartners() {
           </div>
 
           <form
-            onSubmit={handleSubmit}
+            onSubmit={(event) => handleSubmit(event, 'full')}
             className="mt-9 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfd_100%)] shadow-[0_24px_70px_rgba(15,23,42,0.08)]"
           >
             <div className="space-y-8 p-5 sm:p-7 lg:p-8">
@@ -578,12 +658,12 @@ export default function ContractorPartners() {
                   OntarioReno reviews contractor fit based on service area, project
                   category, capacity, financing readiness, and operational standards.
                 </p>
-                {submitStatus === 'success' && (
+                {submitStatus.formId === 'full' && submitStatus.type === 'success' && (
                   <p className="mt-3 rounded-[0.9rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800" aria-live="polite">
                     Your contractor review request has been submitted. OntarioReno will contact you if there is a fit.
                   </p>
                 )}
-                {submitStatus === 'error' && (
+                {submitStatus.formId === 'full' && submitStatus.type === 'error' && (
                   <p className="mt-3 rounded-[0.9rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800" aria-live="polite">
                     Something went wrong. Please try again or contact OntarioReno directly.
                   </p>
@@ -591,10 +671,10 @@ export default function ContractorPartners() {
               </div>
               <button
                 type="submit"
-                disabled={submitStatus === 'submitting'}
+                disabled={submitStatus.type === 'submitting'}
                 className={`${buttonStyles.primary} mt-5 shrink-0 disabled:cursor-not-allowed disabled:opacity-70 sm:mt-0`}
               >
-                {submitStatus === 'submitting'
+                {submitStatus.formId === 'full' && submitStatus.type === 'submitting'
                   ? 'Submitting...'
                   : 'Submit For Contractor Review'}
                 <ArrowRight className="h-5 w-5" />

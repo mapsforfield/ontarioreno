@@ -149,7 +149,7 @@ export default function Navbar() {
     <>
       <nav
         className={cn(
-          isContractorPartnersPage ? 'relative z-0' : 'sticky top-0 z-50',
+          isContractorPartnersPage ? 'relative z-[80]' : 'sticky top-0 z-50',
           isContractorPartnersPage
             ? 'bg-[#fbfaf7] shadow-none [transform:none] [will-change:auto]'
             : 'border-b border-slate-200/70 bg-white/92 backdrop-blur-xl'
