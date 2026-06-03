@@ -286,14 +286,14 @@ export default function ContractorPartners() {
               <span className="block">Renovation Jobs?</span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:mt-8 sm:text-xl sm:leading-9 lg:max-w-[46rem] xl:max-w-[50rem]">
-              We manage homeowner demand, qualification, consultation, and sales
-              before assigning projects to contractor partners.
+              We have homeowners ready to move forward on renovation projects.
+              We need contractors with available capacity to close them.
             </p>
             <a
               href="#partner-application"
               className="mt-7 inline-flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-[1.15rem] bg-[#2f69ad] px-8 py-4 text-base font-bold tracking-[-0.015em] text-white shadow-[0_18px_38px_rgba(47,105,173,0.28)] ring-1 ring-white/10 transition hover:bg-[#3677c2] hover:shadow-[0_22px_48px_rgba(47,105,173,0.34)] sm:mt-8 sm:w-auto sm:rounded-[1.25rem] sm:text-[1.03rem] lg:min-h-[4.35rem] lg:px-10 lg:py-5 lg:text-[1.08rem] xl:px-11"
             >
-              Request Contractor Review
+              Claim Your Spot
               <ArrowRight className="h-5 w-5" />
             </a>
             <p className="mt-4 max-w-xl text-sm font-semibold leading-7 text-blue-100 sm:mt-5 sm:text-base">
@@ -385,6 +385,15 @@ export default function ContractorPartners() {
                   <input className={formStyles.field} type="text" name="companyName" />
                 </label>
                 <label>
+                  <span className={formStyles.label}>Do you offer financing?</span>
+                  <select className={formStyles.field} name="offersFinancing" defaultValue="">
+                    <option value="" disabled>Select an option</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                    <option value="in-progress">In progress</option>
+                  </select>
+                </label>
+                <label>
                   <span className={formStyles.label}>Contact name</span>
                   <input className={formStyles.field} type="text" name="contactName" />
                 </label>
@@ -424,7 +433,7 @@ export default function ContractorPartners() {
               >
                 {submitStatus.formId === 'compact' && submitStatus.type === 'submitting'
                   ? 'Submitting...'
-                  : 'Submit For Contractor Review'}
+                  : 'Claim Your Spot'}
                 <ArrowRight className="h-5 w-5" />
               </button>
             </form>
@@ -558,7 +567,7 @@ export default function ContractorPartners() {
                 Selective contractor review
               </p>
               <h2 className="mt-4 text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl lg:text-5xl">
-                Request Contractor Review
+                Claim Your Spot
               </h2>
               <p className="mt-5 text-base leading-8 text-slate-600 sm:text-lg">
                 Tell us about your company. If there is a fit, OntarioReno will
@@ -594,6 +603,15 @@ export default function ContractorPartners() {
                   <label>
                     <span className={formStyles.label}>Company name</span>
                     <input className={formStyles.field} type="text" name="companyName" />
+                  </label>
+                  <label>
+                    <span className={formStyles.label}>Do you offer financing?</span>
+                    <select className={formStyles.field} name="offersFinancing" defaultValue="">
+                      <option value="" disabled>Select an option</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="in-progress">In progress</option>
+                    </select>
                   </label>
                   <label>
                     <span className={formStyles.label}>Contact name</span>
@@ -636,15 +654,6 @@ export default function ContractorPartners() {
                     <span className={formStyles.label}>Average project size</span>
                     <input className={formStyles.field} type="text" name="averageProjectSize" placeholder="e.g. $50K-$90K" />
                   </label>
-                  <label>
-                    <span className={formStyles.label}>Do you offer financing?</span>
-                    <select className={formStyles.field} name="offersFinancing" defaultValue="">
-                      <option value="" disabled>Select an option</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                      <option value="in-progress">In progress</option>
-                    </select>
-                  </label>
                   <label className="sm:col-span-2">
                     <span className={formStyles.label}>Message</span>
                     <textarea className={`${formStyles.field} min-h-28 resize-y`} name="message" />
@@ -676,7 +685,7 @@ export default function ContractorPartners() {
               >
                 {submitStatus.formId === 'full' && submitStatus.type === 'submitting'
                   ? 'Submitting...'
-                  : 'Submit For Contractor Review'}
+                  : 'Claim Your Spot'}
                 <ArrowRight className="h-5 w-5" />
               </button>
             </div>
@@ -696,13 +705,13 @@ export default function ContractorPartners() {
             Contractor Partner Review
           </p>
           <h2 className="mt-5 text-4xl font-bold leading-tight tracking-[-0.055em] text-white sm:text-5xl lg:text-[3.7rem]">
-            Can Your Company Handle More Work?
+            We Have Customers Ready To Close. Are You The Right Contractor?
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
             Request a contractor review. If there is a fit, we&apos;ll discuss the structure privately.
           </p>
           <a href="#partner-application" className={`${buttonStyles.primary} mt-9 px-9 py-4 text-[1.03rem]`}>
-            Request Contractor Review
+            Claim Your Spot
             <ArrowRight className="h-5 w-5" />
           </a>
         </div>
