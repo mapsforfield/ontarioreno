@@ -79,13 +79,41 @@ import OshawaBasementRenovationCost from './pages/OshawaBasementRenovationCost';
 import OshawaLegalBasement from './pages/OshawaLegalBasement';
 import OshawaBasementPermit from './pages/OshawaBasementPermit';
 import ContractorPartners from './pages/ContractorPartners';
+import { PortalAuthProvider } from './portal/auth';
+import { PortalGuard } from './portal/components/PortalGuard';
+import { PortalDataProvider } from './portal/data/store';
+import PortalLayout from './portal/components/PortalLayout';
+import PortalAdmin from './portal/pages/PortalAdmin';
+import PortalCommissions from './portal/pages/PortalCommissions';
+import PortalContractors from './portal/pages/PortalContractors';
+import PortalDashboard from './portal/pages/PortalDashboard';
+import PortalDeals from './portal/pages/PortalDeals';
+import PortalLeaderboard from './portal/pages/PortalLeaderboard';
+import PortalLogin from './portal/pages/PortalLogin';
 
 export default function App() {
   return (
-    <Router>
-      <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Layout />}>
+    <PortalDataProvider>
+      <PortalAuthProvider>
+        <Router>
+          <ScrollToTop />
+          <Routes>
+          <Route path="/portal/login" element={<PortalLogin />} />
+          <Route element={<PortalGuard />}>
+            <Route path="/portal" element={<PortalLayout />}>
+              <Route index element={<PortalDashboard />} />
+              <Route path="dashboard" element={<PortalDashboard />} />
+              <Route path="contractors" element={<PortalContractors />} />
+              <Route path="deals" element={<PortalDeals />} />
+              <Route path="leaderboard" element={<PortalLeaderboard />} />
+              <Route path="commissions" element={<PortalCommissions />} />
+              <Route element={<PortalGuard adminOnly />}>
+                <Route path="admin" element={<PortalAdmin />} />
+              </Route>
+            </Route>
+          </Route>
+
+          <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="basements" element={<Basements />} />
           <Route path="legal-suites" element={<LegalSuites />} />
@@ -205,8 +233,10 @@ export default function App() {
           <Route path="contractor-partners" element={<ContractorPartners />} />
           <Route path="hamilton-basement-grant" element={<HamiltonBasementGrantAd />}
           />
-        </Route>
-      </Routes>
-    </Router>
+          </Route>
+          </Routes>
+        </Router>
+      </PortalAuthProvider>
+    </PortalDataProvider>
   );
 }

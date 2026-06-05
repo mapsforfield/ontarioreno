@@ -1,0 +1,920 @@
+import {
+  Building2,
+  Pencil,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  Star,
+  WalletCards,
+  X,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { usePortalAuth } from '../auth';
+import {
+  formatCurrency,
+  formatDealStatus,
+  formatFinancingStatus,
+} from '../data/selectors';
+import {
+  isContractorStatus,
+  isFinancingStatus,
+  usePortalData,
+} from '../data/store';
+import { Contractor } from '../data/types';
+import { Deal, ProposalTemplateType } from '../data/types';
+
+type ContractorFormState = {
+  averageProjectSize: string;
+  companyName: string;
+  contactName: string;
+  contractorStatus: Contractor['contractorStatus'];
+  email: string;
+  financingStatus: Contractor['financingStatus'];
+  notes: string;
+  phone: string;
+  priorityScore: string;
+  projectTypes: string;
+  serviceAreas: string;
+  website: string;
+};
+
+type ProposalFormState = {
+  contractorId: string;
+  dealId: string;
+  safeNotes: string;
+  templateType: ProposalTemplateType;
+};
+
+const proposalTemplates: Array<{
+  label: string;
+  value: ProposalTemplateType;
+}> = [
+  { label: 'New Job Opportunity', value: 'new_job_opportunity' },
+  { label: 'Financing Required Opportunity', value: 'financing_required' },
+  { label: 'Cash Job Opportunity', value: 'cash_job' },
+  { label: 'Contractor Follow-Up', value: 'contractor_follow_up' },
+];
+
+const emptyContractorForm: ContractorFormState = {
+  averageProjectSize: '0',
+  companyName: '',
+  contactName: '',
+  contractorStatus: 'active',
+  email: '',
+  financingStatus: 'pending_financing',
+  notes: '',
+  phone: '',
+  priorityScore: '50',
+  projectTypes: '',
+  serviceAreas: '',
+  website: '',
+};
+
+function contractorToForm(contractor: Contractor): ContractorFormState {
+  return {
+    averageProjectSize: String(contractor.averageProjectSize),
+    companyName: contractor.companyName,
+    contactName: contractor.contactName,
+    contractorStatus: contractor.contractorStatus,
+    email: contractor.email,
+    financingStatus: contractor.financingStatus,
+    notes: contractor.notes,
+    phone: contractor.phone,
+    priorityScore: String(contractor.priorityScore),
+    projectTypes: contractor.projectTypes.join(', '),
+    serviceAreas: contractor.serviceAreas.join(', '),
+    website: contractor.website,
+  };
+}
+
+function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
+  return {
+    averageProjectSize: Number(form.averageProjectSize) || 0,
+    companyName: form.companyName.trim(),
+    contactName: form.contactName.trim(),
+    contractorStatus: form.contractorStatus,
+    email: form.email.trim(),
+    financingStatus: form.financingStatus,
+    notes: form.notes.trim(),
+    phone: form.phone.trim(),
+    priorityScore: Math.min(Math.max(Number(form.priorityScore) || 0, 0), 100),
+    projectTypes: form.projectTypes
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    serviceAreas: form.serviceAreas
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    website: form.website.trim(),
+  };
+}
+
+function formatContractorStatus(status: Contractor['contractorStatus']) {
+  if (status === 'active') return 'Active';
+  if (status === 'pending') return 'Pending';
+
+  return 'Inactive';
+}
+
+function getTelHref(phone: string) {
+  const safePhone = phone.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+  const hasDigits = /\d/.test(safePhone);
+
+  return hasDigits ? `tel:${safePhone}` : null;
+}
+
+function getValueRange(value: number) {
+  const lower = Math.max(Math.floor((value - 10000) / 10000) * 10000, 0);
+  const upper = Math.ceil((value + 10000) / 10000) * 10000;
+  const formatRangeValue = (rangeValue: number) =>
+    `$${Math.round(rangeValue / 1000)}k`;
+
+  return `${formatRangeValue(lower)}-${formatRangeValue(upper)}`;
+}
+
+function getTemplateIntro(templateType: ProposalTemplateType, deal: Deal) {
+  if (templateType === 'financing_required') {
+    return `This opportunity appears to require financing support, so it should only be reviewed if your team can support a clean, financeable estimate for a ${deal.projectType}.`;
+  }
+
+  if (templateType === 'cash_job') {
+    return `This opportunity is currently positioned as cash-ready or non-financing, and may be a fit if your team has capacity for a ${deal.projectType}.`;
+  }
+
+  if (templateType === 'contractor_follow_up') {
+    return `We are following up on a renovation opportunity that may still be a fit for your team.`;
+  }
+
+  return `We have a potential renovation opportunity that may be a fit for this project category.`;
+}
+
+function buildProposal(
+  contractor: Contractor,
+  deal: Deal,
+  templateType: ProposalTemplateType,
+  safeNotes: string
+) {
+  const subject =
+    templateType === 'contractor_follow_up'
+      ? `OntarioReno Follow-Up - ${deal.projectType} in ${deal.city}`
+      : `OntarioReno Opportunity - ${deal.projectType} in ${deal.city}`;
+  const financingRequired = deal.financingRequired ? 'Yes' : 'No';
+  const templateIntro = getTemplateIntro(templateType, deal);
+  const notes =
+    safeNotes.trim() ||
+    'No additional safe proposal notes were added yet.';
+  const fitReason =
+    contractor.financingStatus === 'financing_available'
+      ? `${contractor.companyName} is marked as able to support financeable renovation opportunities.`
+      : `${contractor.companyName} appears aligned with this project type and service area.`;
+
+  const body = `Hi ${contractor.contactName},
+
+${templateIntro}
+
+Project overview:
+- Area: ${deal.city}
+- Project type: ${deal.projectType}
+- Estimated project range: ${getValueRange(deal.estimatedJobValue)}
+- Financing required: ${financingRequired}
+- Current CRM status: ${formatDealStatus(deal.status)}
+
+Contractor fit reason:
+${fitReason}
+
+General notes:
+${notes}
+
+At this stage, homeowner contact details are not being shared until the opportunity is accepted and assigned.
+
+Please let us know if you would like to review this opportunity further.
+
+OntarioReno Broker Portal`;
+
+  return { body, subject };
+}
+
+export default function PortalContractors() {
+  const { currentUser, isAdmin } = usePortalAuth();
+  const {
+    addDealActivity,
+    addContractor,
+    addProposalHistory,
+    contractors,
+    getVisibleDealsForUser,
+    updateContractor,
+  } = usePortalData();
+  const [selectedContractorId, setSelectedContractorId] = useState<string | null>(
+    null
+  );
+  const [isAddingContractor, setIsAddingContractor] = useState(false);
+  const [isEditingContractor, setIsEditingContractor] = useState(false);
+  const selectedContractor = contractors.find(
+    (contractor) => contractor.id === selectedContractorId
+  );
+  const [form, setForm] = useState<ContractorFormState>(emptyContractorForm);
+  const [proposalForm, setProposalForm] = useState<ProposalFormState | null>(
+    null
+  );
+
+  const isDetailsOpen = Boolean(selectedContractor || isAddingContractor);
+  const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
+  const proposalContractor = proposalForm
+    ? contractors.find((contractor) => contractor.id === proposalForm.contractorId)
+    : undefined;
+  const proposalDeal = proposalForm
+    ? visibleDeals.find((deal) => deal.id === proposalForm.dealId)
+    : undefined;
+  const generatedProposal =
+    proposalContractor && proposalDeal
+      ? buildProposal(
+          proposalContractor,
+          proposalDeal,
+          proposalForm?.templateType ?? 'new_job_opportunity',
+          proposalForm?.safeNotes ?? ''
+        )
+      : null;
+  const panelTitle = isAddingContractor
+    ? 'Add Contractor'
+    : selectedContractor?.companyName ?? 'Contractor Details';
+  const isContractorFormVisible =
+    isAdmin && (isAddingContractor || isEditingContractor);
+
+  const sortedContractors = useMemo(
+    () => {
+      const visibleContractors = isAdmin
+        ? contractors
+        : contractors.filter(
+            (contractor) => contractor.contractorStatus === 'active'
+          );
+
+      return [...visibleContractors].sort(
+        (first, second) => second.priorityScore - first.priorityScore
+      );
+    },
+    [contractors, isAdmin]
+  );
+
+  const openDetails = (contractor: Contractor) => {
+    setIsAddingContractor(false);
+    setIsEditingContractor(false);
+    setSelectedContractorId(contractor.id);
+    setForm(contractorToForm(contractor));
+  };
+
+  const openEditContractor = (contractor: Contractor) => {
+    setIsAddingContractor(false);
+    setIsEditingContractor(true);
+    setSelectedContractorId(contractor.id);
+    setForm(contractorToForm(contractor));
+  };
+
+  const openAddContractor = () => {
+    setSelectedContractorId(null);
+    setIsAddingContractor(true);
+    setIsEditingContractor(true);
+    setForm(emptyContractorForm);
+  };
+
+  const closeDetails = () => {
+    setSelectedContractorId(null);
+    setIsAddingContractor(false);
+    setIsEditingContractor(false);
+  };
+
+  const openProposalPanel = (contractor: Contractor) => {
+    setProposalForm({
+      contractorId: contractor.id,
+      dealId: visibleDeals[0]?.id ?? '',
+      safeNotes: '',
+      templateType: 'new_job_opportunity',
+    });
+  };
+
+  const closeProposalPanel = () => {
+    setProposalForm(null);
+  };
+
+  const saveContractor = () => {
+    const contractor = formToContractor(form);
+    if (!isAdmin || !contractor.companyName) return;
+
+    if (isAddingContractor) {
+      addContractor(contractor);
+    } else if (selectedContractor) {
+      updateContractor(selectedContractor.id, contractor);
+    }
+
+    closeDetails();
+  };
+
+  const updateForm = (
+    field: keyof ContractorFormState,
+    value: string
+  ) => {
+    if (field === 'financingStatus' && !isFinancingStatus(value)) return;
+    if (field === 'contractorStatus' && !isContractorStatus(value)) return;
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateProposalForm = <Field extends keyof ProposalFormState>(
+    field: Field,
+    value: ProposalFormState[Field]
+  ) => {
+    setProposalForm((current) =>
+      current ? { ...current, [field]: value } : current
+    );
+  };
+
+  const copyProposal = async () => {
+    if (!generatedProposal) return;
+
+    await navigator.clipboard.writeText(
+      `Subject: ${generatedProposal.subject}\n\n${generatedProposal.body}`
+    );
+  };
+
+  const markProposalSent = () => {
+    if (!proposalForm || !proposalContractor || !proposalDeal || !generatedProposal || !currentUser) {
+      return;
+    }
+
+    addProposalHistory({
+      contractorId: proposalContractor.id,
+      dealId: proposalDeal.id,
+      proposalBody: generatedProposal.body,
+      proposalSubject: generatedProposal.subject,
+      sentByUserId: currentUser.id,
+      templateType: proposalForm.templateType,
+    });
+    addDealActivity(
+      proposalDeal.id,
+      `Proposal sent to ${proposalContractor.companyName}`
+    );
+    closeProposalPanel();
+  };
+
+  return (
+    <div className="space-y-5">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
+            Contractor network
+          </p>
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
+            Approved contractor placeholders
+          </h1>
+        </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={openAddContractor}
+            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
+          >
+            <Plus className="h-4 w-4" />
+            Add Contractor
+          </button>
+        )}
+      </header>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sortedContractors.map((contractor) => {
+          const telHref = getTelHref(contractor.phone);
+
+          return (
+            <article
+              key={contractor.id}
+              className="flex flex-col rounded-[0.5rem] border border-white bg-white p-5 shadow-sm"
+            >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[0.5rem] bg-[#071525] text-white">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <span
+                className={
+                  contractor.contractorStatus === 'active'
+                    ? 'rounded-full bg-[#edf7ef] px-3 py-1 text-xs font-bold text-[#287247]'
+                    : contractor.contractorStatus === 'pending'
+                      ? 'rounded-full bg-[#fff6df] px-3 py-1 text-xs font-bold text-[#8a6418]'
+                      : 'rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500'
+                }
+              >
+                {contractor.contractorStatus === 'active'
+                  ? 'Approved'
+                  : contractor.contractorStatus === 'pending'
+                    ? 'Pending'
+                  : 'Inactive'}
+              </span>
+            </div>
+            <h2 className="mt-5 text-xl font-black tracking-[-0.01em]">
+              {contractor.companyName}
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Contact: {contractor.contactName}
+            </p>
+            <div className="mt-5">
+              <span
+                className={
+                  contractor.financingStatus === 'financing_available'
+                    ? 'inline-flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-[#b8dfc1] bg-[#eaf8ee] px-3 py-2.5 text-sm font-black text-[#21683d] sm:w-auto'
+                    : 'inline-flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-[#d8d4c7] bg-[#f7f4eb] px-3 py-2.5 text-sm font-black text-[#63573c] sm:w-auto'
+                }
+              >
+                <WalletCards className="h-4 w-4" />
+                {formatFinancingStatus(contractor.financingStatus)}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">
+                <Star className="h-3.5 w-3.5 text-[#d9a72f]" />
+                {contractor.projectTypes[0] ?? 'Project'}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">
+                <MapPin className="h-3.5 w-3.5 text-[#32639b]" />
+                {contractor.serviceAreas[0] ?? 'Ontario'}
+              </span>
+            </div>
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-[#1B3C6C]"
+                style={{ width: `${Math.min(contractor.priorityScore, 100)}%` }}
+              />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-200 pt-4">
+              {telHref ? (
+                <a
+                  href={telHref}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C]"
+                  title={`Call ${contractor.contactName}`}
+                >
+                  <Phone className="h-4 w-4" />
+                  Call
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-400"
+                  title="No phone number available"
+                >
+                  <Phone className="h-4 w-4" />
+                  Call
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => openProposalPanel(contractor)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C]"
+              >
+                <Mail className="h-4 w-4" />
+                Send Proposal
+              </button>
+              <button
+                type="button"
+                onClick={() => openDetails(contractor)}
+                className={
+                  isAdmin
+                    ? 'inline-flex min-h-11 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]'
+                    : 'col-span-2 inline-flex min-h-11 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]'
+                }
+              >
+                View Details
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => openEditContractor(contractor)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </button>
+              )}
+            </div>
+            </article>
+          );
+        })}
+      </section>
+
+      {isDetailsOpen && (
+        <div className="fixed inset-0 z-[90] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+                  Contractor details
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+                  {panelTitle}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeDetails}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close contractor details"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {isContractorFormVisible ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Company Name
+                    <input
+                      value={form.companyName}
+                      onChange={(event) =>
+                        updateForm('companyName', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Contact Name
+                    <input
+                      value={form.contactName}
+                      onChange={(event) =>
+                        updateForm('contactName', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Phone
+                    <input
+                      value={form.phone}
+                      onChange={(event) =>
+                        updateForm('phone', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Email
+                    <input
+                      value={form.email}
+                      onChange={(event) =>
+                        updateForm('email', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Website
+                    <input
+                      value={form.website}
+                      onChange={(event) =>
+                        updateForm('website', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Financing Status
+                    <select
+                      value={form.financingStatus}
+                      onChange={(event) =>
+                        updateForm('financingStatus', event.target.value)
+                      }
+                    >
+                      <option value="financing_available">
+                        Financing Available
+                      </option>
+                      <option value="cash_only">Cash Only</option>
+                      <option value="pending_financing">
+                        Pending Financing
+                      </option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Contractor Status
+                    <select
+                      value={form.contractorStatus}
+                      onChange={(event) =>
+                        updateForm('contractorStatus', event.target.value)
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Service Areas
+                    <input
+                      value={form.serviceAreas}
+                      onChange={(event) =>
+                        updateForm('serviceAreas', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Project Types
+                    <input
+                      value={form.projectTypes}
+                      onChange={(event) =>
+                        updateForm('projectTypes', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Average Project Size
+                    <input
+                      type="number"
+                      value={form.averageProjectSize}
+                      onChange={(event) =>
+                        updateForm('averageProjectSize', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Priority Score
+                    <input
+                      max={100}
+                      min={0}
+                      type="number"
+                      value={form.priorityScore}
+                      onChange={(event) =>
+                        updateForm('priorityScore', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Internal Notes
+                    <textarea
+                      rows={4}
+                      value={form.notes}
+                      onChange={(event) =>
+                        updateForm('notes', event.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+              ) : (
+                selectedContractor && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {[
+                      ['Company Name', selectedContractor.companyName],
+                      ['Contact Name', selectedContractor.contactName],
+                      ['Phone', selectedContractor.phone || 'Not listed'],
+                      ['Email', selectedContractor.email],
+                      ['Website', selectedContractor.website || 'Not listed'],
+                      [
+                        'Financing Status',
+                        formatFinancingStatus(
+                          selectedContractor.financingStatus
+                        ),
+                      ],
+                      [
+                        'Contractor Status',
+                        formatContractorStatus(
+                          selectedContractor.contractorStatus
+                        ),
+                      ],
+                      [
+                        'Service Areas',
+                        selectedContractor.serviceAreas.join(', '),
+                      ],
+                      [
+                        'Project Types',
+                        selectedContractor.projectTypes.join(', '),
+                      ],
+                      [
+                        'Average Project Size',
+                        formatCurrency(selectedContractor.averageProjectSize),
+                      ],
+                      [
+                        'Priority Score',
+                        String(selectedContractor.priorityScore),
+                      ],
+                      ['Internal Notes', selectedContractor.notes],
+                    ].map(([label, value]) => {
+                      const telHref =
+                        label === 'Phone'
+                          ? getTelHref(selectedContractor.phone)
+                          : null;
+
+                      return (
+                      <div
+                        key={label}
+                        className="rounded-[0.5rem] border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                          {label}
+                        </p>
+                        <p className="mt-2 text-sm font-bold text-slate-900">
+                          {value}
+                        </p>
+                        {label === 'Phone' &&
+                          (telHref ? (
+                            <a
+                              href={telHref}
+                              className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                              title={`Call ${selectedContractor.contactName}`}
+                            >
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-400"
+                              title="No phone number available"
+                            >
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </button>
+                          ))}
+                      </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </div>
+
+            {isAdmin && (
+              <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+                {!isContractorFormVisible && selectedContractor ? (
+                  <button
+                    type="button"
+                    onClick={() => openEditContractor(selectedContractor)}
+                    className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit Contractor
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={closeDetails}
+                      className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveContractor}
+                      className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+                    >
+                      Save Contractor
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {proposalForm && proposalContractor && (
+        <div className="fixed inset-0 z-[95] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+                  Send Proposal
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+                  {proposalContractor.companyName}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Privacy-safe contractor opportunity summary
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeProposalPanel}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close proposal panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Select Deal
+                  <select
+                    value={proposalForm.dealId}
+                    onChange={(event) =>
+                      updateProposalForm('dealId', event.target.value)
+                    }
+                  >
+                    {visibleDeals.length === 0 && (
+                      <option value="">No visible deals</option>
+                    )}
+                    {visibleDeals.map((deal) => (
+                      <option key={deal.id} value={deal.id}>
+                        {deal.city} - {deal.projectType} -{' '}
+                        {formatDealStatus(deal.status)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Proposal Template
+                  <select
+                    value={proposalForm.templateType}
+                    onChange={(event) =>
+                      updateProposalForm(
+                        'templateType',
+                        event.target.value as ProposalTemplateType
+                      )
+                    }
+                  >
+                    {proposalTemplates.map((template) => (
+                      <option key={template.value} value={template.value}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Selected contractor
+                </p>
+                <p className="mt-2 text-sm font-black text-slate-950">
+                  {proposalContractor.companyName} /{' '}
+                  {proposalContractor.contactName}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {proposalContractor.email || 'No contractor email on file'}
+                </p>
+              </div>
+
+              <label className="mt-4 grid gap-1.5 text-sm font-bold text-slate-700">
+                Safe Proposal Notes
+                <textarea
+                  rows={4}
+                  value={proposalForm.safeNotes}
+                  onChange={(event) =>
+                    updateProposalForm('safeNotes', event.target.value)
+                  }
+                  placeholder="Homeowner is looking for a clean, financeable estimate for a legal basement apartment."
+                />
+              </label>
+
+              <section className="mt-5 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+                <div className="border-b border-slate-200 pb-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Proposal Preview
+                  </p>
+                  <h3 className="mt-2 text-lg font-black text-slate-950">
+                    {generatedProposal?.subject ?? 'Select a deal to preview'}
+                  </h3>
+                </div>
+                <pre className="mt-4 max-h-[22rem] overflow-y-auto whitespace-pre-wrap rounded-[0.5rem] bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-700">
+                  {generatedProposal?.body ??
+                    'Choose a visible deal to generate a privacy-safe proposal.'}
+                </pre>
+              </section>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={copyProposal}
+                disabled={!generatedProposal}
+                className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Copy Proposal
+              </button>
+              <a
+                href={
+                  generatedProposal && proposalContractor.email
+                    ? `mailto:${encodeURIComponent(
+                        proposalContractor.email
+                      )}?subject=${encodeURIComponent(
+                        generatedProposal.subject
+                      )}&body=${encodeURIComponent(generatedProposal.body)}`
+                    : undefined
+                }
+                aria-disabled={!generatedProposal || !proposalContractor.email}
+                className={
+                  generatedProposal && proposalContractor.email
+                    ? 'rounded-[0.5rem] border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-50'
+                    : 'pointer-events-none rounded-[0.5rem] border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-400'
+                }
+              >
+                Open Email Client
+              </a>
+              <button
+                type="button"
+                onClick={markProposalSent}
+                disabled={!generatedProposal}
+                className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Mark as Sent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
