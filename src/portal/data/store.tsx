@@ -19,6 +19,8 @@ import {
   DealActivity,
   DealStatus,
   FinancingStatus,
+  Activity,
+  Appointment,
   ProposalHistory,
   User,
 } from './types';
@@ -39,6 +41,8 @@ type DealDraft = Pick<
 >;
 
 type PortalDataState = {
+  activities: Activity[];
+  appointments: Appointment[];
   users: User[];
   contractors: Contractor[];
   deals: Deal[];
@@ -47,18 +51,43 @@ type PortalDataState = {
 };
 
 type PortalDataContextValue = PortalDataState & {
-  addUser: (user: Omit<User, 'id' | 'role'>) => void;
-  updateUser: (userId: string, updates: Partial<Omit<User, 'id' | 'role'>>) => void;
-  toggleUserActive: (userId: string) => void;
-  addContractor: (contractor: ContractorDraft) => void;
-  updateContractor: (contractorId: string, updates: Partial<Contractor>) => void;
+  addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => void;
+  updateUser: (
+    userId: string,
+    updates: Partial<Omit<User, 'id' | 'role'>>,
+    actor?: User
+  ) => void;
+  toggleUserActive: (userId: string, actor?: User) => void;
+  authenticateUser: (email: string, password: string) => User | null;
+  changeUserPassword: (
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    actor?: User
+  ) => { ok: boolean; message?: string };
+  resetUserPassword: (
+    userId: string,
+    temporaryPassword: string,
+    actor?: User
+  ) => { ok: boolean; message?: string };
+  addContractor: (contractor: ContractorDraft, actor?: User) => void;
+  updateContractor: (
+    contractorId: string,
+    updates: Partial<Contractor>,
+    actor?: User
+  ) => void;
   toggleContractorStatus: (contractorId: string) => void;
-  addDeal: (deal: DealDraft, repId: string) => void;
-  updateDeal: (dealId: string, updates: Partial<Deal>) => void;
-  assignContractorToDeal: (dealId: string, contractorId: string | null) => void;
-  addDealActivity: (dealId: string, note: string) => void;
+  addDeal: (deal: DealDraft, repId: string, actor?: User) => void;
+  updateDeal: (dealId: string, updates: Partial<Deal>, actor?: User) => void;
+  assignContractorToDeal: (
+    dealId: string,
+    contractorId: string | null,
+    actor?: User
+  ) => void;
+  addDealActivity: (dealId: string, note: string, actor?: User) => void;
   addProposalHistory: (
-    proposal: Omit<ProposalHistory, 'id' | 'sentAt'>
+    proposal: Omit<ProposalHistory, 'id' | 'sentAt'>,
+    actor?: User
   ) => void;
   updateCommission: (
     commissionId: string,
@@ -70,8 +99,21 @@ type PortalDataContextValue = PortalDataState & {
         | 'payoutStatus'
         | 'repPaidCommission'
       >
-    >
+    >,
+    actor?: User
   ) => void;
+  addAppointment: (
+    appointment: Omit<Appointment, 'createdAt' | 'id' | 'updatedAt'>,
+    actor?: User
+  ) => void;
+  updateAppointment: (
+    appointmentId: string,
+    updates: Partial<Appointment>,
+    actor?: User
+  ) => void;
+  getActivitiesForUser: (user: User) => Activity[];
+  getAppointmentsForDeal: (dealId: string) => Appointment[];
+  getVisibleAppointmentsForUser: (user: User) => Appointment[];
   getDealsForRep: (repId: string) => Deal[];
   getVisibleDealsForUser: (user: User) => Deal[];
   calculateRepPendingCommission: (repId: string) => number;
@@ -100,6 +142,8 @@ const openDealStatuses: DealStatus[] = [
 const projectedCommissionStatuses: DealStatus[] = [...openDealStatuses, 'won'];
 
 const defaultState: PortalDataState = {
+  activities: [],
+  appointments: [],
   commissions: initialCommissions,
   contractors: initialContractors,
   deals: initialDeals,
@@ -110,6 +154,14 @@ const defaultState: PortalDataState = {
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
   undefined
 );
+
+const demoDealIds = new Set(['deal-001', 'deal-002', 'deal-003', 'deal-004']);
+const demoCommissionIds = new Set([
+  'commission-001',
+  'commission-002',
+  'commission-003',
+  'commission-004',
+]);
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -141,6 +193,150 @@ function normalizeDeal(deal: Deal): Deal {
   };
 }
 
+// INTERNAL PROTOTYPE WARNING:
+// These local password hashes and temporary passwords exist only for the
+// localStorage prototype. Replace this entire auth mechanism before production.
+const prototypePasswordHashes: Record<string, string> = {
+  oliver: 'local-prototype:b250YXJpb3Jlbm86b2xpdmVyMTIz',
+  sabah: 'local-prototype:b250YXJpb3Jlbm86YWRtaW4xMjM=',
+  xavier: 'local-prototype:b250YXJpb3Jlbm86eGF2aWVyMTIz',
+};
+
+const prototypeLoginEmails: Record<string, string> = {
+  oliver: 'david.galaxykitchenrenovation@gmail.com',
+  sabah: 'sabahohs@gmail.com',
+  xavier: 'kb.live13@gmail.com',
+};
+
+function createPrototypePasswordHash(password: string) {
+  return `local-prototype:${window.btoa(`ontarioreno:${password}`)}`;
+}
+
+function normalizeUser(user: User): User {
+  let normalizedUser = user;
+
+  if (normalizedUser.active === undefined) {
+    normalizedUser = {
+      ...normalizedUser,
+      active: true,
+    };
+  }
+
+  if (user.id === 'sabah') {
+    normalizedUser = {
+      ...normalizedUser,
+      email: 'sabahohs@gmail.com',
+    };
+  }
+
+  if (normalizedUser.id === 'oliver' && !normalizedUser.avatarUrl) {
+    normalizedUser = {
+      ...normalizedUser,
+      avatarUrl: '/images/oliverpp.png',
+    };
+  }
+
+  if (normalizedUser.id === 'oliver') {
+    normalizedUser = {
+      ...normalizedUser,
+      email: 'David.galaxykitchenrenovation@gmail.com',
+    };
+  }
+
+  if (normalizedUser.id === 'xavier' && !normalizedUser.avatarUrl) {
+    normalizedUser = {
+      ...normalizedUser,
+      avatarUrl: '/images/kevenpp.png',
+    };
+  }
+
+  if (normalizedUser.id === 'xavier') {
+    normalizedUser = {
+      ...normalizedUser,
+      email: 'kb.live13@gmail.com',
+    };
+  }
+
+  if (!normalizedUser.passwordHash && prototypePasswordHashes[normalizedUser.id]) {
+    normalizedUser = {
+      ...normalizedUser,
+      passwordHash: prototypePasswordHashes[normalizedUser.id],
+    };
+  }
+
+  return normalizedUser;
+}
+
+function getUserLoginEmail(user: User) {
+  return (prototypeLoginEmails[user.id] ?? user.email).trim().toLowerCase();
+}
+
+function getUserPasswordHash(user: User) {
+  return user.passwordHash ?? prototypePasswordHashes[user.id];
+}
+
+function normalizeUsers(users: User[]): User[] {
+  const usersById = new Map(
+    users.map((user) => {
+      const normalizedUser = normalizeUser(user);
+      return [normalizedUser.id, normalizedUser] as const;
+    })
+  );
+
+  initialUsers.map(normalizeUser).forEach((user) => {
+    if (!usersById.has(user.id)) {
+      usersById.set(user.id, user);
+    }
+  });
+
+  return Array.from(usersById.values());
+}
+
+function migrateDeals(deals: Deal[]) {
+  const importedDealIds = new Set(initialDeals.map((deal) => deal.id));
+  const currentDeals = deals.map(normalizeDeal);
+  const hasOliverImport = currentDeals.some((deal) =>
+    importedDealIds.has(deal.id)
+  );
+
+  return [
+    ...currentDeals.filter((deal) => !demoDealIds.has(deal.id)),
+    ...(hasOliverImport ? [] : initialDeals),
+  ];
+}
+
+function migrateCommissions(commissions: Commission[]) {
+  const importedCommissionIds = new Set(
+    initialCommissions.map((commission) => commission.id)
+  );
+  const hasOliverImport = commissions.some((commission) =>
+    importedCommissionIds.has(commission.id)
+  );
+
+  return [
+    ...commissions.filter(
+      (commission) => !demoCommissionIds.has(commission.id)
+    ),
+    ...(hasOliverImport ? [] : initialCommissions),
+  ];
+}
+
+function removeDemoDealActivities(activities: Activity[]) {
+  return activities.filter(
+    (activity) => !activity.dealId || !demoDealIds.has(activity.dealId)
+  );
+}
+
+function removeDemoDealAppointments(appointments: Appointment[]) {
+  return appointments.filter(
+    (appointment) => !demoDealIds.has(appointment.dealId)
+  );
+}
+
+function removeDemoDealProposals(proposals: ProposalHistory[]) {
+  return proposals.filter((proposal) => !demoDealIds.has(proposal.dealId));
+}
+
 function loadStoredState(): PortalDataState {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (!stored) return defaultState;
@@ -149,15 +345,55 @@ function loadStoredState(): PortalDataState {
     const parsed = JSON.parse(stored) as Partial<PortalDataState>;
 
     return {
-      commissions: parsed.commissions ?? defaultState.commissions,
+      activities: removeDemoDealActivities(
+        parsed.activities ?? defaultState.activities
+      ),
+      appointments: removeDemoDealAppointments(
+        parsed.appointments ?? defaultState.appointments
+      ),
+      commissions: migrateCommissions(
+        parsed.commissions ?? defaultState.commissions
+      ),
       contractors: parsed.contractors ?? defaultState.contractors,
-      deals: (parsed.deals ?? defaultState.deals).map(normalizeDeal),
-      proposals: parsed.proposals ?? defaultState.proposals,
-      users: parsed.users ?? defaultState.users,
+      deals: migrateDeals(parsed.deals ?? defaultState.deals),
+      proposals: removeDemoDealProposals(
+        parsed.proposals ?? defaultState.proposals
+      ),
+      users: normalizeUsers(parsed.users ?? defaultState.users),
     };
   } catch {
     return defaultState;
   }
+}
+
+type ActivityDraft = Omit<
+  Activity,
+  'actorName' | 'actorRole' | 'actorUserId' | 'createdAt' | 'id'
+>;
+
+function createActivity(actor: User | undefined, draft: ActivityDraft): Activity {
+  return {
+    ...draft,
+    actorName: actor?.name ?? 'System',
+    actorRole: actor?.role ?? 'admin',
+    actorUserId: actor?.id ?? 'system',
+    createdAt: new Date().toISOString(),
+    id: createId('activity'),
+  };
+}
+
+function prependActivity(
+  activities: Activity[],
+  actor: User | undefined,
+  draft: ActivityDraft
+) {
+  return [createActivity(actor, draft), ...activities].slice(0, 250);
+}
+
+function getDealLabel(deal: Deal | undefined) {
+  if (!deal) return 'Deal';
+
+  return `${deal.homeownerName} - ${deal.projectType}`;
 }
 
 function createCommissionForDeal(deal: Deal): Commission {
@@ -222,6 +458,29 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
     const getVisibleDealsForUser = (user: User) =>
       user.role === 'admin' ? state.deals : getDealsForRep(user.id);
+
+    const getAppointmentsForDeal = (dealId: string) =>
+      state.appointments.filter((appointment) => appointment.dealId === dealId);
+
+    const getVisibleAppointmentsForUser = (user: User) =>
+      user.role === 'admin'
+        ? state.appointments
+        : state.appointments.filter(
+            (appointment) => appointment.assignedRepId === user.id
+          );
+
+    const getActivitiesForUser = (user: User) => {
+      if (user.role === 'admin') return state.activities;
+
+      const visibleDealIds = new Set(
+        getDealsForRep(user.id).map((deal) => deal.id)
+      );
+
+      return state.activities.filter(
+        (activity) =>
+          activity.dealId ? visibleDealIds.has(activity.dealId) : false
+      );
+    };
 
     const calculatePipelineValue = (repId: string) =>
       getDealsForRep(repId)
@@ -380,58 +639,243 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
     return {
       ...state,
-      addUser: (user) => {
-        setState((current) => ({
-          ...current,
-          users: [
-            ...current.users,
-            {
-              ...user,
-              id: createId('user'),
-              role: 'rep',
-            },
-          ],
-        }));
+      addUser: (user, actor) => {
+        setState((current) => {
+          const newUser: User = {
+            ...user,
+            id: createId('user'),
+            passwordHash:
+              user.passwordHash ?? createPrototypePasswordHash('temporary123'),
+            role: 'rep',
+          };
+
+          return {
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Rep added: ${newUser.name}`,
+              actionType: 'rep_added',
+              entityId: newUser.id,
+              entityLabel: newUser.name,
+              entityType: 'rep',
+            }),
+            users: [...current.users, newUser],
+          };
+        });
       },
-      updateUser: (userId, updates) => {
+      updateUser: (userId, updates, actor) => {
+        setState((current) => {
+          const existingUser = current.users.find((user) => user.id === userId);
+          const updatedUser = existingUser
+            ? { ...existingUser, ...updates, id: existingUser.id, role: existingUser.role }
+            : undefined;
+
+          return {
+            ...current,
+            activities:
+              existingUser && updatedUser
+                ? prependActivity(current.activities, actor, {
+                    actionLabel: `Rep edited: ${updatedUser.name}`,
+                    actionType: 'rep_edited',
+                    entityId: updatedUser.id,
+                    entityLabel: updatedUser.name,
+                    entityType: 'rep',
+                    metadata: {
+                      active: updatedUser.active,
+                    },
+                  })
+                : current.activities,
+            users: current.users.map((user) =>
+              user.id === userId
+                ? { ...user, ...updates, id: user.id, role: user.role }
+                : user
+            ),
+          };
+        });
+      },
+      toggleUserActive: (userId, actor) => {
+        setState((current) => {
+          const existingUser = current.users.find((user) => user.id === userId);
+          const nextActive = !existingUser?.active;
+
+          return {
+            ...current,
+            activities: existingUser
+              ? prependActivity(current.activities, actor, {
+                  actionLabel: `${existingUser.name} ${
+                    nextActive ? 'activated' : 'deactivated'
+                  }`,
+                  actionType: 'rep_status_changed',
+                  entityId: existingUser.id,
+                  entityLabel: existingUser.name,
+                  entityType: 'rep',
+                  metadata: { active: nextActive },
+                })
+              : current.activities,
+            users: current.users.map((user) =>
+              user.id === userId ? { ...user, active: !user.active } : user
+            ),
+          };
+        });
+      },
+      authenticateUser: (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const passwordHash = createPrototypePasswordHash(password);
+
+        return (
+          state.users
+            .map(normalizeUser)
+            .find(
+              (user) =>
+                user.active &&
+                getUserLoginEmail(user) === normalizedEmail &&
+                getUserPasswordHash(user) === passwordHash
+            ) ?? null
+        );
+      },
+      changeUserPassword: (userId, currentPassword, newPassword, actor) => {
+        const user = state.users
+          .map(normalizeUser)
+          .find((candidate) => candidate.id === userId);
+        if (!user) return { ok: false, message: 'User not found.' };
+        if (newPassword.length < 8) {
+          return {
+            ok: false,
+            message: 'New password must be at least 8 characters.',
+          };
+        }
+        if (
+          getUserPasswordHash(user) !== createPrototypePasswordHash(currentPassword)
+        ) {
+          return { ok: false, message: 'Current password is incorrect.' };
+        }
+
         setState((current) => ({
           ...current,
-          users: current.users.map((user) =>
-            user.id === userId
-              ? { ...user, ...updates, id: user.id, role: user.role }
-              : user
+          activities: prependActivity(current.activities, actor, {
+            actionLabel: `Password changed for ${user.name}`,
+            actionType: 'user_password_changed',
+            entityId: user.id,
+            entityLabel: user.name,
+            entityType: 'rep',
+          }),
+          users: current.users.map((candidate) =>
+            candidate.id === userId
+              ? {
+                  ...candidate,
+                  passwordHash: createPrototypePasswordHash(newPassword),
+                }
+              : candidate
           ),
         }));
+
+        return { ok: true };
       },
-      toggleUserActive: (userId) => {
+      resetUserPassword: (userId, temporaryPassword, actor) => {
+        const user = state.users.find((candidate) => candidate.id === userId);
+        if (!user) return { ok: false, message: 'User not found.' };
+        if (temporaryPassword.length < 8) {
+          return {
+            ok: false,
+            message: 'Temporary password must be at least 8 characters.',
+          };
+        }
+
         setState((current) => ({
           ...current,
-          users: current.users.map((user) =>
-            user.id === userId ? { ...user, active: !user.active } : user
+          activities: prependActivity(current.activities, actor, {
+            actionLabel: `Password reset for ${user.name}`,
+            actionType: 'user_password_reset',
+            entityId: user.id,
+            entityLabel: user.name,
+            entityType: 'rep',
+          }),
+          users: current.users.map((candidate) =>
+            candidate.id === userId
+              ? {
+                  ...candidate,
+                  passwordHash: createPrototypePasswordHash(temporaryPassword),
+                }
+              : candidate
           ),
         }));
+
+        return { ok: true };
       },
-      addContractor: (contractor: ContractorDraft) => {
-        setState((current) => ({
-          ...current,
-          contractors: [
-            ...current.contractors,
-            { ...contractor, id: createId('contractor') },
-          ],
-        }));
+      addContractor: (contractor: ContractorDraft, actor) => {
+        setState((current) => {
+          const newContractor: Contractor = {
+            ...contractor,
+            id: createId('contractor'),
+          };
+
+          return {
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Contractor added: ${newContractor.companyName}`,
+              actionType: 'contractor_added',
+              contractorId: newContractor.id,
+              entityId: newContractor.id,
+              entityLabel: newContractor.companyName,
+              entityType: 'contractor',
+            }),
+            contractors: [...current.contractors, newContractor],
+          };
+        });
       },
       updateContractor: (
         contractorId: string,
-        updates: Partial<Contractor>
+        updates: Partial<Contractor>,
+        actor?: User
       ) => {
-        setState((current) => ({
-          ...current,
-          contractors: current.contractors.map((contractor) =>
-            contractor.id === contractorId
-              ? { ...contractor, ...updates, id: contractor.id }
-              : contractor
-          ),
-        }));
+        setState((current) => {
+          const existingContractor = current.contractors.find(
+            (contractor) => contractor.id === contractorId
+          );
+          const updatedContractor = existingContractor
+            ? { ...existingContractor, ...updates, id: existingContractor.id }
+            : undefined;
+
+          return {
+            ...current,
+            activities:
+              existingContractor && updatedContractor
+                ? prependActivity(
+                    current.activities,
+                    actor,
+                    existingContractor.financingStatus !==
+                      updatedContractor.financingStatus
+                      ? {
+                          actionLabel: `Contractor financing status changed: ${updatedContractor.companyName}`,
+                          actionType: 'contractor_financing_changed',
+                          contractorId: updatedContractor.id,
+                          entityId: updatedContractor.id,
+                          entityLabel: updatedContractor.companyName,
+                          entityType: 'contractor',
+                          metadata: {
+                            from: existingContractor.financingStatus,
+                            to: updatedContractor.financingStatus,
+                          },
+                        }
+                      : {
+                          actionLabel: `Contractor edited: ${updatedContractor.companyName}`,
+                          actionType: 'contractor_edited',
+                          contractorId: updatedContractor.id,
+                          entityId: updatedContractor.id,
+                          entityLabel: updatedContractor.companyName,
+                          entityType: 'contractor',
+                          metadata: {
+                            status: updatedContractor.contractorStatus,
+                          },
+                        }
+                  )
+                : current.activities,
+            contractors: current.contractors.map((contractor) =>
+              contractor.id === contractorId
+                ? { ...contractor, ...updates, id: contractor.id }
+                : contractor
+            ),
+          };
+        });
       },
       toggleContractorStatus: (contractorId: string) => {
         setState((current) => ({
@@ -449,7 +893,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           ),
         }));
       },
-      addDeal: (dealDraft: DealDraft, repId: string) => {
+      addDeal: (dealDraft: DealDraft, repId: string, actor) => {
         setState((current) => {
           const now = new Date().toISOString();
           const deal: Deal = {
@@ -464,10 +908,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
 
           return {
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Deal created: ${getDealLabel(deal)}`,
+              actionType: 'deal_created',
+              dealId: deal.id,
+              entityId: deal.id,
+              entityLabel: getDealLabel(deal),
+              entityType: 'deal',
+            }),
             commissions: [
               ...current.commissions,
               createCommissionForDeal(deal),
             ],
+            appointments: current.appointments,
             contractors: current.contractors,
             deals: [...current.deals, deal],
             proposals: current.proposals,
@@ -475,16 +928,84 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         });
       },
-      updateDeal: (dealId: string, updates: Partial<Deal>) => {
+      updateDeal: (dealId: string, updates: Partial<Deal>, actor) => {
         setState((current) => {
+          const previousDeal = current.deals.find((deal) => deal.id === dealId);
           const deals = current.deals.map((deal) =>
             deal.id === dealId
               ? { ...deal, ...updates, id: deal.id, updatedAt: new Date().toISOString() }
               : deal
           );
+          const nextDeal = deals.find((deal) => deal.id === dealId);
+          let activities = current.activities;
+
+          if (previousDeal && nextDeal) {
+            if (updates.status && previousDeal.status !== nextDeal.status) {
+              activities = prependActivity(activities, actor, {
+                actionLabel: `Status changed to ${nextDeal.status
+                  .split('_')
+                  .join(' ')}`,
+                actionType: 'deal_status_changed',
+                dealId: nextDeal.id,
+                entityId: nextDeal.id,
+                entityLabel: getDealLabel(nextDeal),
+                entityType: 'deal',
+                metadata: {
+                  from: previousDeal.status,
+                  to: nextDeal.status,
+                },
+              });
+            }
+
+            if (
+              updates.nextFollowUpDate !== undefined &&
+              previousDeal.nextFollowUpDate !== nextDeal.nextFollowUpDate
+            ) {
+              activities = prependActivity(activities, actor, {
+                actionLabel: `Follow-up date updated for ${getDealLabel(nextDeal)}`,
+                actionType: 'deal_follow_up_changed',
+                dealId: nextDeal.id,
+                entityId: nextDeal.id,
+                entityLabel: getDealLabel(nextDeal),
+                entityType: 'appointment',
+                metadata: {
+                  nextFollowUpDate: nextDeal.nextFollowUpDate || null,
+                },
+              });
+            }
+
+            if (
+              updates.financingRequired !== undefined &&
+              previousDeal.financingRequired !== nextDeal.financingRequired
+            ) {
+              activities = prependActivity(activities, actor, {
+                actionLabel: `Financing requirement changed for ${getDealLabel(
+                  nextDeal
+                )}`,
+                actionType: 'deal_financing_changed',
+                dealId: nextDeal.id,
+                entityId: nextDeal.id,
+                entityLabel: getDealLabel(nextDeal),
+                entityType: 'deal',
+                metadata: {
+                  financingRequired: nextDeal.financingRequired,
+                },
+              });
+            }
+
+            activities = prependActivity(activities, actor, {
+              actionLabel: `Deal edited: ${getDealLabel(nextDeal)}`,
+              actionType: 'deal_edited',
+              dealId: nextDeal.id,
+              entityId: nextDeal.id,
+              entityLabel: getDealLabel(nextDeal),
+              entityType: 'deal',
+            });
+          }
 
           return {
             ...current,
+            activities,
             commissions: current.commissions.map((commission) => {
               const deal = deals.find((candidate) => candidate.id === commission.dealId);
               return deal ? normalizeCommissionWithDeal(commission, deal) : commission;
@@ -495,29 +1016,66 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
       assignContractorToDeal: (
         dealId: string,
-        contractorId: string | null
+        contractorId: string | null,
+        actor?: User
       ) => {
-        setState((current) => ({
-          ...current,
-          deals: current.deals.map((deal) =>
-            deal.id === dealId
-              ? {
-                  ...deal,
-                  assignedContractorId: contractorId,
-                  updatedAt: new Date().toISOString(),
-                }
-              : deal
-          ),
-        }));
+        setState((current) => {
+          const deal = current.deals.find((candidate) => candidate.id === dealId);
+          const contractor = current.contractors.find(
+            (candidate) => candidate.id === contractorId
+          );
+
+          return {
+            ...current,
+            activities: deal
+              ? prependActivity(current.activities, actor, {
+                  actionLabel: contractor
+                    ? `Contractor assigned: ${contractor.companyName}`
+                    : 'Contractor assignment cleared',
+                  actionType: 'deal_contractor_assigned',
+                  contractorId: contractor?.id,
+                  dealId: deal.id,
+                  entityId: deal.id,
+                  entityLabel: getDealLabel(deal),
+                  entityType: 'deal',
+                  metadata: {
+                    contractorName: contractor?.companyName ?? 'Unassigned',
+                  },
+                })
+              : current.activities,
+            deals: current.deals.map((candidateDeal) =>
+              candidateDeal.id === dealId
+                ? {
+                    ...candidateDeal,
+                    assignedContractorId: contractorId,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : candidateDeal
+            ),
+          };
+        });
       },
-      addDealActivity: (dealId: string, note: string) => {
+      addDealActivity: (dealId: string, note: string, actor) => {
         const trimmedNote = note.trim();
         if (!trimmedNote) return;
 
-        setState((current) => ({
-          ...current,
-          deals: current.deals.map((deal) => {
-            if (deal.id !== dealId) return deal;
+        setState((current) => {
+          const targetDeal = current.deals.find((deal) => deal.id === dealId);
+
+          return {
+            ...current,
+            activities: targetDeal
+              ? prependActivity(current.activities, actor, {
+                  actionLabel: `Activity note added: ${trimmedNote}`,
+                  actionType: 'deal_activity_note_added',
+                  dealId: targetDeal.id,
+                  entityId: targetDeal.id,
+                  entityLabel: getDealLabel(targetDeal),
+                  entityType: 'deal',
+                })
+              : current.activities,
+            deals: current.deals.map((deal) => {
+              if (deal.id !== dealId) return deal;
 
             const activity: DealActivity = {
               createdAt: new Date().toISOString(),
@@ -530,26 +1088,74 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               activity: [activity, ...(deal.activity ?? [])],
               updatedAt: new Date().toISOString(),
             };
-          }),
-        }));
+            }),
+          };
+        });
       },
-      addProposalHistory: (proposal) => {
-        setState((current) => ({
-          ...current,
-          proposals: [
-            {
-              ...proposal,
-              id: createId('proposal'),
-              sentAt: new Date().toISOString(),
-            },
-            ...current.proposals,
-          ],
-        }));
+      addProposalHistory: (proposal, actor) => {
+        setState((current) => {
+          const contractor = current.contractors.find(
+            (candidate) => candidate.id === proposal.contractorId
+          );
+          const deal = current.deals.find(
+            (candidate) => candidate.id === proposal.dealId
+          );
+          const proposalHistory = {
+            ...proposal,
+            id: createId('proposal'),
+            sentAt: new Date().toISOString(),
+          };
+
+          return {
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Proposal sent to ${
+                contractor?.companyName ?? 'contractor'
+              }`,
+              actionType: 'proposal_sent',
+              contractorId: contractor?.id,
+              dealId: deal?.id,
+              entityId: proposalHistory.id,
+              entityLabel: proposal.proposalSubject,
+              entityType: 'proposal',
+              metadata: {
+                contractorName: contractor?.companyName ?? null,
+              },
+            }),
+            proposals: [proposalHistory, ...current.proposals],
+          };
+        });
       },
-      updateCommission: (commissionId, updates) => {
-        setState((current) => ({
-          ...current,
-          commissions: current.commissions.map((commission) => {
+      updateCommission: (commissionId, updates, actor) => {
+        setState((current) => {
+          const existingCommission = current.commissions.find(
+            (commission) => commission.id === commissionId
+          );
+          const relatedDeal = current.deals.find(
+            (deal) => deal.id === existingCommission?.dealId
+          );
+
+          return {
+            ...current,
+            activities:
+              existingCommission && relatedDeal
+                ? prependActivity(current.activities, actor, {
+                    actionLabel: `Commission payout updated for ${getDealLabel(
+                      relatedDeal
+                    )}`,
+                    actionType: 'commission_updated',
+                    dealId: relatedDeal.id,
+                    entityId: existingCommission.id,
+                    entityLabel: getDealLabel(relatedDeal),
+                    entityType: 'commission',
+                    metadata: {
+                      payoutStatus:
+                        updates.payoutStatus ??
+                        existingCommission.payoutStatus,
+                    },
+                  })
+                : current.activities,
+            commissions: current.commissions.map((commission) => {
             if (commission.id !== commissionId) return commission;
 
             const deal = current.deals.find(
@@ -592,7 +1198,121 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               repPaidCommission,
             };
           }),
-        }));
+          };
+        });
+      },
+      addAppointment: (appointmentDraft, actor) => {
+        setState((current) => {
+          const now = new Date().toISOString();
+          const appointment: Appointment = {
+            ...appointmentDraft,
+            createdAt: now,
+            id: createId('appointment'),
+            updatedAt: now,
+          };
+          const deal = current.deals.find(
+            (candidate) => candidate.id === appointment.dealId
+          );
+
+          return {
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Appointment created for ${getDealLabel(deal)}`,
+              actionType: 'appointment_created',
+              dealId: appointment.dealId,
+              entityId: appointment.id,
+              entityLabel: getDealLabel(deal),
+              entityType: 'appointment',
+              metadata: {
+                appointmentDate: appointment.appointmentDate,
+                appointmentTime: appointment.appointmentTime,
+                status: appointment.status,
+              },
+            }),
+            appointments: [appointment, ...current.appointments],
+          };
+        });
+      },
+      updateAppointment: (appointmentId, updates, actor) => {
+        setState((current) => {
+          const previousAppointment = current.appointments.find(
+            (appointment) => appointment.id === appointmentId
+          );
+          const nextAppointment = previousAppointment
+            ? {
+                ...previousAppointment,
+                ...updates,
+                id: previousAppointment.id,
+                updatedAt: new Date().toISOString(),
+              }
+            : undefined;
+          const deal = current.deals.find(
+            (candidate) => candidate.id === nextAppointment?.dealId
+          );
+          let actionType = 'appointment_edited';
+          let actionLabel = `Appointment edited for ${getDealLabel(deal)}`;
+
+          if (
+            previousAppointment &&
+            nextAppointment &&
+            (previousAppointment.appointmentDate !==
+              nextAppointment.appointmentDate ||
+              previousAppointment.appointmentTime !==
+                nextAppointment.appointmentTime)
+          ) {
+            actionType = 'appointment_rescheduled';
+            actionLabel = `Appointment rescheduled for ${getDealLabel(deal)}`;
+          }
+
+          if (
+            previousAppointment &&
+            nextAppointment &&
+            previousAppointment.status !== nextAppointment.status
+          ) {
+            if (nextAppointment.status === 'completed') {
+              actionType = 'appointment_completed';
+              actionLabel = `Appointment marked completed for ${getDealLabel(
+                deal
+              )}`;
+            } else if (nextAppointment.status === 'cancelled') {
+              actionType = 'appointment_cancelled';
+              actionLabel = `Appointment cancelled for ${getDealLabel(deal)}`;
+            } else if (nextAppointment.status === 'no_show') {
+              actionType = 'appointment_no_show';
+              actionLabel = `Appointment marked no-show for ${getDealLabel(
+                deal
+              )}`;
+            } else if (nextAppointment.status === 'rescheduled') {
+              actionType = 'appointment_rescheduled';
+              actionLabel = `Appointment rescheduled for ${getDealLabel(deal)}`;
+            }
+          }
+
+          return {
+            ...current,
+            activities:
+              previousAppointment && nextAppointment
+                ? prependActivity(current.activities, actor, {
+                    actionLabel,
+                    actionType,
+                    dealId: nextAppointment.dealId,
+                    entityId: nextAppointment.id,
+                    entityLabel: getDealLabel(deal),
+                    entityType: 'appointment',
+                    metadata: {
+                      appointmentDate: nextAppointment.appointmentDate,
+                      appointmentTime: nextAppointment.appointmentTime,
+                      status: nextAppointment.status,
+                    },
+                  })
+                : current.activities,
+            appointments: current.appointments.map((appointment) =>
+              appointment.id === appointmentId && nextAppointment
+                ? nextAppointment
+                : appointment
+            ),
+          };
+        });
       },
       calculateAdminPaidRepCommission,
       calculateAdminPendingNetCommission,
@@ -607,6 +1327,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       calculateRepProjectedCommission,
       calculateVisibleBrokerScore,
       calculateVisiblePendingCommission,
+      getActivitiesForUser,
+      getAppointmentsForDeal,
+      getVisibleAppointmentsForUser,
       getDealsForRep,
       getVisibleDealsForUser,
     };

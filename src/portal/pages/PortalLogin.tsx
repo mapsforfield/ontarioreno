@@ -1,5 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { LockKeyhole, ShieldCheck } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 import { usePortalAuth } from '../auth';
 
 type LoginLocationState = {
@@ -9,9 +10,12 @@ type LoginLocationState = {
 };
 
 export default function PortalLogin() {
-  const { currentUser, login, users } = usePortalAuth();
+  const { currentUser, login } = usePortalAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const state = location.state as LoginLocationState | null;
   const redirectTo = state?.from?.pathname ?? '/portal/dashboard';
 
@@ -19,10 +23,16 @@ export default function PortalLogin() {
     return <Navigate to="/portal/dashboard" replace />;
   }
 
-  const handleLogin = (userId: string) => {
-    if (login(userId)) {
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+
+    if (login(email, password)) {
       navigate(redirectTo, { replace: true });
+      return;
     }
+
+    setError('Invalid email or password, or this user is inactive.');
   };
 
   return (
@@ -53,10 +63,10 @@ export default function PortalLogin() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#32639b]">
-                  Mock authentication
+                  Private authentication
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
-                  Choose your portal user
+                  Sign in to the portal
                 </h2>
               </div>
               <div className="flex h-11 w-11 items-center justify-center rounded-[0.5rem] bg-[#e8f1fb] text-[#1B3C6C]">
@@ -64,31 +74,39 @@ export default function PortalLogin() {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3">
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => handleLogin(user.id)}
-                  className="group flex items-center justify-between rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-4 py-4 text-left shadow-sm transition hover:border-[#9fbad8] hover:bg-white"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#071525] text-sm font-black text-white">
-                      {user.avatarInitial}
-                    </span>
-                    <span>
-                      <span className="block text-base font-black">
-                        {user.name}
-                      </span>
-                      <span className="mt-0.5 block text-sm font-semibold text-slate-500">
-                        {user.role === 'admin' ? 'Admin access' : 'Rep access'}
-                      </span>
-                    </span>
-                  </span>
-                  <ArrowRight className="h-4.5 w-4.5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[#1B3C6C]" />
-                </button>
-              ))}
-            </div>
+            <form onSubmit={handleLogin} className="mt-5 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              {error && (
+                <p className="rounded-[0.5rem] border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+                  {error}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
+              >
+                Sign In
+              </button>
+            </form>
           </section>
         </div>
       </div>

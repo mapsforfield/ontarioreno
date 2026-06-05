@@ -46,6 +46,13 @@ type ProposalFormState = {
   templateType: ProposalTemplateType;
 };
 
+type ContractorQuickFilter =
+  | 'active_only'
+  | 'all'
+  | 'cash_only'
+  | 'financing_available'
+  | 'pending_financing';
+
 const proposalTemplates: Array<{
   label: string;
   value: ProposalTemplateType;
@@ -199,7 +206,6 @@ OntarioReno Broker Portal`;
 export default function PortalContractors() {
   const { currentUser, isAdmin } = usePortalAuth();
   const {
-    addDealActivity,
     addContractor,
     addProposalHistory,
     contractors,
@@ -218,6 +224,10 @@ export default function PortalContractors() {
   const [proposalForm, setProposalForm] = useState<ProposalFormState | null>(
     null
   );
+  const [contractorFilter, setContractorFilter] =
+    useState<ContractorQuickFilter>('all');
+  const [projectTypeFilter, setProjectTypeFilter] = useState('');
+  const [serviceAreaFilter, setServiceAreaFilter] = useState('');
 
   const isDetailsOpen = Boolean(selectedContractor || isAddingContractor);
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
@@ -250,11 +260,45 @@ export default function PortalContractors() {
             (contractor) => contractor.contractorStatus === 'active'
           );
 
-      return [...visibleContractors].sort(
+      return visibleContractors
+        .filter((contractor) => {
+          if (contractorFilter === 'active_only') {
+            return contractor.contractorStatus === 'active';
+          }
+
+          if (
+            ['cash_only', 'financing_available', 'pending_financing'].includes(
+              contractorFilter
+            )
+          ) {
+            return contractor.financingStatus === contractorFilter;
+          }
+
+          return true;
+        })
+        .filter((contractor) =>
+          projectTypeFilter.trim()
+            ? contractor.projectTypes.some((projectType) =>
+                projectType
+                  .toLowerCase()
+                  .includes(projectTypeFilter.trim().toLowerCase())
+              )
+            : true
+        )
+        .filter((contractor) =>
+          serviceAreaFilter.trim()
+            ? contractor.serviceAreas.some((serviceArea) =>
+                serviceArea
+                  .toLowerCase()
+                  .includes(serviceAreaFilter.trim().toLowerCase())
+              )
+            : true
+        )
+        .sort(
         (first, second) => second.priorityScore - first.priorityScore
       );
     },
-    [contractors, isAdmin]
+    [contractorFilter, contractors, isAdmin, projectTypeFilter, serviceAreaFilter]
   );
 
   const openDetails = (contractor: Contractor) => {
@@ -302,9 +346,13 @@ export default function PortalContractors() {
     if (!isAdmin || !contractor.companyName) return;
 
     if (isAddingContractor) {
-      addContractor(contractor);
+      addContractor(contractor, currentUser ?? undefined);
     } else if (selectedContractor) {
-      updateContractor(selectedContractor.id, contractor);
+      updateContractor(
+        selectedContractor.id,
+        contractor,
+        currentUser ?? undefined
+      );
     }
 
     closeDetails();
@@ -348,11 +396,7 @@ export default function PortalContractors() {
       proposalSubject: generatedProposal.subject,
       sentByUserId: currentUser.id,
       templateType: proposalForm.templateType,
-    });
-    addDealActivity(
-      proposalDeal.id,
-      `Proposal sent to ${proposalContractor.companyName}`
-    );
+    }, currentUser);
     closeProposalPanel();
   };
 
@@ -378,6 +422,49 @@ export default function PortalContractors() {
           </button>
         )}
       </header>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {[
+            ['All', 'all'],
+            ['Financing Available', 'financing_available'],
+            ['Cash Only', 'cash_only'],
+            ['Pending Financing', 'pending_financing'],
+            ['Active Only', 'active_only'],
+          ].map(([label, value]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setContractorFilter(value as ContractorQuickFilter)}
+              className={
+                contractorFilter === value
+                  ? 'rounded-full bg-[#1B3C6C] px-3 py-2 text-xs font-black text-white'
+                  : 'rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]'
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Project Type
+            <input
+              value={projectTypeFilter}
+              onChange={(event) => setProjectTypeFilter(event.target.value)}
+              placeholder="Basements, kitchens, legal suites"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Service Area
+            <input
+              value={serviceAreaFilter}
+              onChange={(event) => setServiceAreaFilter(event.target.value)}
+              placeholder="Toronto, Hamilton, GTA"
+            />
+          </label>
+        </div>
+      </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sortedContractors.map((contractor) => {

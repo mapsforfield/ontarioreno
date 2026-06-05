@@ -6,6 +6,8 @@ export type User = {
   role: PortalRole;
   email: string;
   avatarInitial: string;
+  avatarUrl?: string;
+  passwordHash?: string;
   active: boolean;
 };
 
@@ -45,6 +47,57 @@ export type DealActivity = {
   id: string;
   createdAt: string;
   note: string;
+};
+
+export type ActivityEntityType =
+  | 'deal'
+  | 'contractor'
+  | 'commission'
+  | 'rep'
+  | 'proposal'
+  | 'appointment';
+
+export type AppointmentType =
+  | 'home_visit'
+  | 'phone_consultation'
+  | 'video_consultation';
+
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'completed'
+  | 'rescheduled'
+  | 'cancelled'
+  | 'no_show';
+
+export type Appointment = {
+  id: string;
+  dealId: string;
+  assignedRepId: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType: AppointmentType;
+  status: AppointmentStatus;
+  location: string;
+  notes: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Activity = {
+  id: string;
+  actorUserId: string;
+  actorName: string;
+  actorRole: PortalRole;
+  actionType: string;
+  actionLabel: string;
+  entityType: ActivityEntityType;
+  entityId: string;
+  entityLabel: string;
+  dealId?: string;
+  contractorId?: string;
+  createdAt: string;
+  metadata?: Record<string, string | number | boolean | null>;
 };
 
 export type Deal = {

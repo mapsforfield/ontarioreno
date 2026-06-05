@@ -8,9 +8,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
-import { User } from '../data/types';
+import { ActivityEntityType, User } from '../data/types';
 
 type RepFormState = {
   active: boolean;
@@ -53,6 +54,22 @@ const sections = [
   },
 ];
 
+const activityFilters: Array<{ label: string; value: 'all' | ActivityEntityType }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Deals', value: 'deal' },
+  { label: 'Proposals', value: 'proposal' },
+  { label: 'Contractors', value: 'contractor' },
+  { label: 'Reps', value: 'rep' },
+  { label: 'Commissions', value: 'commission' },
+];
+
+function formatActivityTime(value: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
 function userToForm(user: User): RepFormState {
   return {
     active: user.active,
@@ -63,22 +80,34 @@ function userToForm(user: User): RepFormState {
 }
 
 export default function PortalAdmin() {
+  const { currentUser } = usePortalAuth();
   const {
     addUser,
+    activities,
     calculateBrokerScore,
     calculateOpenDealsForUser,
     calculatePipelineValue,
     calculateRepPendingCommission,
+    resetUserPassword,
     toggleUserActive,
     updateUser,
     users,
   } = usePortalData();
   const [isRepManagementOpen, setIsRepManagementOpen] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<
+    'all' | ActivityEntityType
+  >('all');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isRepPanelOpen, setIsRepPanelOpen] = useState(false);
+  const [passwordResetNotice, setPasswordResetNotice] = useState('');
   const [repForm, setRepForm] = useState<RepFormState>(emptyRepForm);
   const reps = users.filter((user) => user.role === 'rep');
   const editingUser = reps.find((rep) => rep.id === editingUserId);
+  const filteredActivities = activities
+    .filter((activity) =>
+      activityFilter === 'all' ? true : activity.entityType === activityFilter
+    )
+    .slice(0, 20);
 
   const openAddRep = () => {
     setEditingUserId(null);
@@ -109,14 +138,14 @@ export default function PortalAdmin() {
         avatarInitial,
         email,
         name,
-      });
+      }, currentUser ?? undefined);
     } else {
       addUser({
         active: repForm.active,
         avatarInitial,
         email,
         name,
-      });
+      }, currentUser ?? undefined);
     }
 
     closeRepPanel();
@@ -128,6 +157,21 @@ export default function PortalAdmin() {
     value: RepFormState[Field]
   ) => {
     setRepForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const resetRepPassword = (rep: User) => {
+    const temporaryPassword = 'temporary123';
+    const result = resetUserPassword(
+      rep.id,
+      temporaryPassword,
+      currentUser ?? undefined
+    );
+
+    setPasswordResetNotice(
+      result.ok
+        ? `${rep.name}'s temporary password is now ${temporaryPassword}.`
+        : result.message ?? 'Password reset failed.'
+    );
   };
 
   return (
@@ -184,6 +228,74 @@ export default function PortalAdmin() {
         })}
       </section>
 
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+              Activity Feed
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+              Recent portal activity
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {activityFilters.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setActivityFilter(filter.value)}
+                className={
+                  activityFilter === filter.value
+                    ? 'rounded-full bg-[#1B3C6C] px-3 py-2 text-xs font-black text-white'
+                    : 'rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]'
+                }
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {filteredActivities.length > 0 ? (
+            filteredActivities.map((activity) => (
+              <article
+                key={activity.id}
+                className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">
+                      {activity.actionLabel}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {activity.actorName} / {activity.actorRole}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">
+                      Related: {activity.entityLabel}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <span className="rounded-full bg-[#e8f1fb] px-3 py-1 text-xs font-black capitalize text-[#1B3C6C]">
+                      {activity.entityType}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                      {formatActivityTime(activity.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+              <p className="text-sm font-semibold text-slate-500">
+                No activity has been logged yet.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
       {isRepManagementOpen && (
         <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -206,6 +318,11 @@ export default function PortalAdmin() {
           </div>
 
           <div className="mt-4 grid gap-3">
+            {passwordResetNotice && (
+              <p className="rounded-[0.5rem] border border-[#c9d9eb] bg-[#e8f1fb] px-3 py-2 text-sm font-bold text-[#1B3C6C]">
+                {passwordResetNotice}
+              </p>
+            )}
             {reps.map((rep) => (
               <article
                 key={rep.id}
@@ -213,8 +330,18 @@ export default function PortalAdmin() {
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#071525] text-sm font-black text-white">
-                      {rep.avatarInitial}
+                    <div className="flex h-11 w-11 overflow-hidden rounded-full bg-[#071525] text-sm font-black text-white">
+                      {rep.avatarUrl ? (
+                        <img
+                          src={rep.avatarUrl}
+                          alt={rep.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center">
+                          {rep.avatarInitial}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <h3 className="text-lg font-black text-slate-950">
@@ -244,6 +371,13 @@ export default function PortalAdmin() {
                       className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
                     >
                       Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resetRepPassword(rep)}
+                      className="rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                    >
+                      Reset Password
                     </button>
                   </div>
                 </div>
@@ -360,7 +494,7 @@ export default function PortalAdmin() {
                 <button
                   type="button"
                   onClick={() => {
-                    toggleUserActive(editingUser.id);
+                    toggleUserActive(editingUser.id, currentUser ?? undefined);
                     closeRepPanel();
                   }}
                   className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"

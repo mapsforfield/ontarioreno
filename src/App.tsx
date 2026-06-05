@@ -84,12 +84,15 @@ import { PortalGuard } from './portal/components/PortalGuard';
 import { PortalDataProvider } from './portal/data/store';
 import PortalLayout from './portal/components/PortalLayout';
 import PortalAdmin from './portal/pages/PortalAdmin';
+import PortalAppointments from './portal/pages/PortalAppointments';
 import PortalCommissions from './portal/pages/PortalCommissions';
 import PortalContractors from './portal/pages/PortalContractors';
 import PortalDashboard from './portal/pages/PortalDashboard';
 import PortalDeals from './portal/pages/PortalDeals';
+import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalLeaderboard from './portal/pages/PortalLeaderboard';
 import PortalLogin from './portal/pages/PortalLogin';
+import PortalPerformance from './portal/pages/PortalPerformance';
 
 export default function App() {
   return (
@@ -105,6 +108,9 @@ export default function App() {
               <Route path="dashboard" element={<PortalDashboard />} />
               <Route path="contractors" element={<PortalContractors />} />
               <Route path="deals" element={<PortalDeals />} />
+              <Route path="appointments" element={<PortalAppointments />} />
+              <Route path="financing" element={<PortalFinancing />} />
+              <Route path="performance" element={<PortalPerformance />} />
               <Route path="leaderboard" element={<PortalLeaderboard />} />
               <Route path="commissions" element={<PortalCommissions />} />
               <Route element={<PortalGuard adminOnly />}>

@@ -1,12 +1,20 @@
-import { CircleDollarSign, Plus, Search, X } from 'lucide-react';
+import { CircleDollarSign, Mail, Plus, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { usePortalAuth } from '../auth';
+import { getRecommendedContractors } from '../data/recommendations';
 import {
   formatCurrency,
   formatDealStatus,
 } from '../data/selectors';
 import { usePortalData } from '../data/store';
-import { Deal, DealStatus } from '../data/types';
+import {
+  Appointment,
+  AppointmentStatus,
+  AppointmentType,
+  Contractor,
+  Deal,
+  DealStatus,
+} from '../data/types';
 
 const columns: Array<{ label: string; status: DealStatus }> = [
   { label: 'New Lead', status: 'new_lead' },
@@ -31,6 +39,16 @@ type DealFormState = {
   status: DealStatus;
 };
 
+type AppointmentFormState = {
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType: AppointmentType;
+  assignedRepId: string;
+  location: string;
+  notes: string;
+  status: AppointmentStatus;
+};
+
 const emptyDealForm: DealFormState = {
   city: '',
   email: '',
@@ -42,6 +60,16 @@ const emptyDealForm: DealFormState = {
   phone: '',
   projectType: '',
   status: 'new_lead',
+};
+
+const emptyAppointmentForm: AppointmentFormState = {
+  appointmentDate: '',
+  appointmentTime: '',
+  appointmentType: 'home_visit',
+  assignedRepId: '',
+  location: '',
+  notes: '',
+  status: 'scheduled',
 };
 
 function dealToForm(deal: Deal): DealFormState {
@@ -59,17 +87,65 @@ function dealToForm(deal: Deal): DealFormState {
   };
 }
 
+function formatTimelineTime(value: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function appointmentToForm(appointment: Appointment): AppointmentFormState {
+  return {
+    appointmentDate: appointment.appointmentDate,
+    appointmentTime: appointment.appointmentTime,
+    appointmentType: appointment.appointmentType,
+    assignedRepId: appointment.assignedRepId,
+    location: appointment.location,
+    notes: appointment.notes,
+    status: appointment.status,
+  };
+}
+
+function formatAppointmentType(type: AppointmentType) {
+  if (type === 'home_visit') return 'Home Visit';
+  if (type === 'phone_consultation') return 'Phone Consultation';
+
+  return 'Video Consultation';
+}
+
+function formatAppointmentStatus(status: AppointmentStatus) {
+  if (status === 'no_show') return 'No Show';
+
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getValueRange(value: number) {
+  const lower = Math.max(Math.floor((value - 10000) / 10000) * 10000, 0);
+  const upper = Math.ceil((value + 10000) / 10000) * 10000;
+  const formatRangeValue = (rangeValue: number) =>
+    `$${Math.round(rangeValue / 1000)}k`;
+
+  return `${formatRangeValue(lower)}-${formatRangeValue(upper)}`;
+}
+
 export default function PortalDeals() {
   const { currentUser, isAdmin } = usePortalAuth();
   const {
     addDealActivity,
     addDeal,
+    addAppointment,
+    addProposalHistory,
     assignContractorToDeal,
     contractors,
+    getActivitiesForUser,
+    getAppointmentsForDeal,
     getVisibleDealsForUser,
     updateDeal,
+    updateAppointment,
+    users,
   } = usePortalData();
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
+  const visibleActivities = currentUser ? getActivitiesForUser(currentUser) : [];
   const selectableContractors = isAdmin
     ? contractors
     : contractors.filter(
@@ -79,14 +155,66 @@ export default function PortalDeals() {
   const [isAddingDeal, setIsAddingDeal] = useState(false);
   const [form, setForm] = useState<DealFormState>(emptyDealForm);
   const [activityNote, setActivityNote] = useState('');
+  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+  const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
+    useState<string | null>(null);
+  const [appointmentForm, setAppointmentForm] =
+    useState<AppointmentFormState>(emptyAppointmentForm);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
+  const selectedDealAppointments = selectedDeal
+    ? getAppointmentsForDeal(selectedDeal.id)
+    : [];
+  const selectedAppointment = selectedDealAppointments[0];
+  const recommendedContractors = selectedDeal
+    ? getRecommendedContractors(selectedDeal, selectableContractors)
+    : [];
+  const viewingRecommendedContractor = contractors.find(
+    (contractor) => contractor.id === viewingRecommendedContractorId
+  );
+  const reps = users.filter((user) => user.role === 'rep' && user.active);
   const isPanelOpen = Boolean(selectedDeal || isAddingDeal);
+  const selectedDealTimeline = selectedDeal
+    ? [
+        ...visibleActivities
+          .filter((activity) => activity.dealId === selectedDeal.id)
+          .map((activity) => ({
+            actor: `${activity.actorName} / ${activity.actorRole}`,
+            createdAt: activity.createdAt,
+            id: activity.id,
+            label: activity.actionLabel,
+            type: activity.entityType,
+          })),
+        ...(selectedDeal.activity ?? [])
+          .filter(
+            (dealActivity) =>
+              !visibleActivities.some(
+                (activity) =>
+                  activity.dealId === selectedDeal.id &&
+                  activity.actionLabel.includes(dealActivity.note)
+              )
+          )
+          .map((dealActivity) => ({
+            actor: 'Legacy note',
+            createdAt: dealActivity.createdAt,
+            id: dealActivity.id,
+            label: dealActivity.note,
+            type: 'deal',
+          })),
+      ].sort(
+        (first, second) =>
+          new Date(second.createdAt).getTime() -
+          new Date(first.createdAt).getTime()
+      )
+    : [];
 
   const openAddDeal = () => {
     setSelectedDealId(null);
     setIsAddingDeal(true);
     setForm(emptyDealForm);
     setActivityNote('');
+    setIsEditingAppointment(false);
+    setViewingRecommendedContractorId(null);
+    setAppointmentForm(emptyAppointmentForm);
   };
 
   const openDeal = (deal: Deal) => {
@@ -94,11 +222,24 @@ export default function PortalDeals() {
     setSelectedDealId(deal.id);
     setForm(dealToForm(deal));
     setActivityNote('');
+    const appointment = getAppointmentsForDeal(deal.id)[0];
+    setAppointmentForm(
+      appointment
+        ? appointmentToForm(appointment)
+        : {
+            ...emptyAppointmentForm,
+            assignedRepId: deal.assignedRepId,
+          }
+    );
+    setIsEditingAppointment(false);
+    setViewingRecommendedContractorId(null);
   };
 
   const closePanel = () => {
     setSelectedDealId(null);
     setIsAddingDeal(false);
+    setIsEditingAppointment(false);
+    setViewingRecommendedContractorId(null);
   };
 
   const saveDeal = () => {
@@ -118,12 +259,12 @@ export default function PortalDeals() {
 
     if (isAddingDeal) {
       if (currentUser.role !== 'rep') return;
-      addDeal(dealPayload, currentUser.id);
+      addDeal(dealPayload, currentUser.id, currentUser);
     } else if (selectedDeal) {
       updateDeal(selectedDeal.id, {
         ...dealPayload,
         status: form.status,
-      });
+      }, currentUser);
     }
 
     closePanel();
@@ -139,8 +280,111 @@ export default function PortalDeals() {
   const saveActivityNote = () => {
     if (!selectedDeal || !activityNote.trim()) return;
 
-    addDealActivity(selectedDeal.id, activityNote);
+    addDealActivity(selectedDeal.id, activityNote, currentUser ?? undefined);
     setActivityNote('');
+  };
+
+  const openAppointmentForm = () => {
+    if (!selectedDeal) return;
+
+    setAppointmentForm(
+      selectedAppointment
+        ? appointmentToForm(selectedAppointment)
+        : {
+            ...emptyAppointmentForm,
+            assignedRepId: selectedDeal.assignedRepId,
+          }
+    );
+    setIsEditingAppointment(true);
+  };
+
+  const updateAppointmentForm = <Field extends keyof AppointmentFormState>(
+    field: Field,
+    value: AppointmentFormState[Field]
+  ) => {
+    setAppointmentForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const saveAppointment = () => {
+    if (!currentUser || !selectedDeal || !appointmentForm.appointmentDate) {
+      return;
+    }
+
+    const payload = {
+      assignedRepId: appointmentForm.assignedRepId || selectedDeal.assignedRepId,
+      appointmentDate: appointmentForm.appointmentDate,
+      appointmentTime: appointmentForm.appointmentTime,
+      appointmentType: appointmentForm.appointmentType,
+      createdByUserId: selectedAppointment?.createdByUserId ?? currentUser.id,
+      dealId: selectedDeal.id,
+      location: appointmentForm.location.trim(),
+      notes: appointmentForm.notes.trim(),
+      status: appointmentForm.status,
+    };
+
+    if (selectedAppointment) {
+      updateAppointment(selectedAppointment.id, payload, currentUser);
+    } else {
+      addAppointment(payload, currentUser);
+    }
+
+    setIsEditingAppointment(false);
+  };
+
+  const assignRecommendedContractor = (contractorId: string) => {
+    if (!selectedDeal) return;
+
+    assignContractorToDeal(
+      selectedDeal.id,
+      contractorId,
+      currentUser ?? undefined
+    );
+    const contractor = contractors.find((candidate) => candidate.id === contractorId);
+    if (contractor) {
+      addDealActivity(
+        selectedDeal.id,
+        `Contractor assigned from recommendation: ${contractor.companyName}`,
+        currentUser ?? undefined
+      );
+    }
+  };
+
+  const sendRecommendedProposal = (contractor: Contractor) => {
+    if (!currentUser || !selectedDeal) return;
+
+    const subject = `OntarioReno Opportunity - ${selectedDeal.projectType} in ${selectedDeal.city}`;
+    const body = `Hi ${contractor.contactName},
+
+We have a potential renovation opportunity that may be a fit for ${contractor.companyName}.
+
+Project overview:
+- Area: ${selectedDeal.city}
+- Project type: ${selectedDeal.projectType}
+- Estimated project range: ${getValueRange(selectedDeal.estimatedJobValue)}
+- Financing required: ${selectedDeal.financingRequired ? 'Yes' : 'No'}
+
+At this stage, homeowner contact details are not being shared until the opportunity is accepted and assigned.
+
+OntarioReno Broker Portal`;
+
+    addProposalHistory(
+      {
+        contractorId: contractor.id,
+        dealId: selectedDeal.id,
+        proposalBody: body,
+        proposalSubject: subject,
+        sentByUserId: currentUser.id,
+        templateType: selectedDeal.financingRequired
+          ? 'financing_required'
+          : 'cash_job',
+      },
+      currentUser
+    );
+    addDealActivity(
+      selectedDeal.id,
+      `Proposal sent from recommendation to ${contractor.companyName}`,
+      currentUser
+    );
   };
 
   return (
@@ -173,8 +417,8 @@ export default function PortalDeals() {
         </div>
       </section>
 
-      <section className="overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]">
-        <div className="grid gap-4 md:grid-flow-col md:auto-cols-[minmax(260px,300px)] md:grid-cols-none">
+      <section className="w-full overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]">
+        <div className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
           {columns.map((column) => {
             const columnDeals = visibleDeals.filter(
               (deal) => deal.status === column.status
@@ -186,7 +430,7 @@ export default function PortalDeals() {
                 className="min-h-[16rem] rounded-[0.5rem] border border-white bg-white p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                  <h2 className="text-sm font-black uppercase leading-snug tracking-[0.12em] text-slate-700">
+                  <h2 className="whitespace-nowrap text-sm font-black uppercase leading-snug tracking-[0.12em] text-slate-700">
                     {column.label}
                   </h2>
                   <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500">
@@ -366,7 +610,8 @@ export default function PortalDeals() {
                       onChange={(event) =>
                         assignContractorToDeal(
                           selectedDeal.id,
-                          event.target.value || null
+                          event.target.value || null,
+                          currentUser ?? undefined
                         )
                       }
                     >
@@ -418,6 +663,357 @@ export default function PortalDeals() {
 
               {!isAddingDeal && selectedDeal && (
                 <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                      Recommended Contractors
+                    </p>
+                    <h3 className="mt-1 text-lg font-black text-slate-950">
+                      Rule-based contractor fits
+                    </h3>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {recommendedContractors.length > 0 ? (
+                      recommendedContractors.map((recommendation) => (
+                        <article
+                          key={recommendation.contractor.id}
+                          className="rounded-[0.5rem] border border-slate-200 bg-white p-3"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="text-base font-black text-slate-950">
+                                  {recommendation.contractor.companyName}
+                                </h4>
+                                <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-[0.65rem] font-black text-[#1B3C6C]">
+                                  {recommendation.label}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                {recommendation.contractor.contactName} / Score{' '}
+                                {recommendation.contractor.priorityScore}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setViewingRecommendedContractorId(
+                                    recommendation.contractor.id
+                                  )
+                                }
+                                className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  sendRecommendedProposal(
+                                    recommendation.contractor
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                              >
+                                <Mail className="h-3.5 w-3.5" />
+                                Send Proposal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  assignRecommendedContractor(
+                                    recommendation.contractor.id
+                                  )
+                                }
+                                className="rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#153158]"
+                              >
+                                Assign Contractor
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {recommendation.reasons.map((reason) => (
+                              <span
+                                key={reason}
+                                className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-bold text-slate-600"
+                              >
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500">
+                        No active contractor recommendations are available for
+                        this deal yet.
+                      </p>
+                    )}
+                  </div>
+                  {viewingRecommendedContractor && (
+                    <div className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-lg font-black text-slate-950">
+                            {viewingRecommendedContractor.companyName}
+                          </h4>
+                          <p className="mt-1 text-sm font-semibold text-slate-500">
+                            {viewingRecommendedContractor.contactName} /{' '}
+                            {viewingRecommendedContractor.email || 'No email'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewingRecommendedContractorId(null)}
+                          className="text-sm font-bold text-slate-500 transition hover:text-[#1B3C6C]"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            Service Areas
+                          </p>
+                          <p className="mt-1 text-sm font-bold">
+                            {viewingRecommendedContractor.serviceAreas.join(
+                              ', '
+                            ) || 'Ontario'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            Project Types
+                          </p>
+                          <p className="mt-1 text-sm font-bold">
+                            {viewingRecommendedContractor.projectTypes.join(
+                              ', '
+                            ) || 'Renovation'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            Financing
+                          </p>
+                          <p className="mt-1 text-sm font-bold">
+                            {viewingRecommendedContractor.financingStatus}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            Notes
+                          </p>
+                          <p className="mt-1 text-sm font-bold">
+                            {viewingRecommendedContractor.notes || 'No notes'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {!isAddingDeal && selectedDeal && (
+                <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                        Appointment
+                      </p>
+                      <h3 className="mt-1 text-lg font-black text-slate-950">
+                        Consultation booking
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openAppointmentForm}
+                      className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                    >
+                      {selectedAppointment
+                        ? 'Edit Appointment'
+                        : 'Add Appointment'}
+                    </button>
+                  </div>
+
+                  {isEditingAppointment ? (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Assigned Rep
+                        <select
+                          value={appointmentForm.assignedRepId}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'assignedRepId',
+                              event.target.value
+                            )
+                          }
+                        >
+                          {reps.map((rep) => (
+                            <option key={rep.id} value={rep.id}>
+                              {rep.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Appointment Type
+                        <select
+                          value={appointmentForm.appointmentType}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'appointmentType',
+                              event.target.value as AppointmentType
+                            )
+                          }
+                        >
+                          <option value="home_visit">Home Visit</option>
+                          <option value="phone_consultation">
+                            Phone Consultation
+                          </option>
+                          <option value="video_consultation">
+                            Video Consultation
+                          </option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Date
+                        <input
+                          type="date"
+                          value={appointmentForm.appointmentDate}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'appointmentDate',
+                              event.target.value
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Time
+                        <input
+                          type="time"
+                          value={appointmentForm.appointmentTime}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'appointmentTime',
+                              event.target.value
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Status
+                        <select
+                          value={appointmentForm.status}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'status',
+                              event.target.value as AppointmentStatus
+                            )
+                          }
+                        >
+                          <option value="scheduled">Scheduled</option>
+                          <option value="completed">Completed</option>
+                          <option value="rescheduled">Rescheduled</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="no_show">No Show</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Location
+                        <input
+                          value={appointmentForm.location}
+                          onChange={(event) =>
+                            updateAppointmentForm('location', event.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                        Appointment Notes
+                        <textarea
+                          rows={3}
+                          value={appointmentForm.notes}
+                          onChange={(event) =>
+                            updateAppointmentForm('notes', event.target.value)
+                          }
+                        />
+                      </label>
+                      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingAppointment(false)}
+                          className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Cancel Appointment Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAppointment}
+                          className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+                        >
+                          Save Appointment
+                        </button>
+                      </div>
+                    </div>
+                  ) : selectedAppointment ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {[
+                        [
+                          'Assigned Rep',
+                          users.find(
+                            (user) =>
+                              user.id === selectedAppointment.assignedRepId
+                          )?.name ?? selectedAppointment.assignedRepId,
+                        ],
+                        [
+                          'Type',
+                          formatAppointmentType(
+                            selectedAppointment.appointmentType
+                          ),
+                        ],
+                        [
+                          'Date',
+                          selectedAppointment.appointmentDate || 'Not set',
+                        ],
+                        [
+                          'Time',
+                          selectedAppointment.appointmentTime || 'Not set',
+                        ],
+                        [
+                          'Status',
+                          formatAppointmentStatus(selectedAppointment.status),
+                        ],
+                        [
+                          'Location',
+                          selectedAppointment.location || 'Not set',
+                        ],
+                        [
+                          'Notes',
+                          selectedAppointment.notes || 'No notes yet',
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-[0.5rem] border border-slate-200 bg-white p-3"
+                        >
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            {label}
+                          </p>
+                          <p className="mt-2 text-sm font-bold text-slate-900">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500">
+                      No appointment has been booked for this deal yet.
+                    </p>
+                  )}
+                </section>
+              )}
+
+              {!isAddingDeal && selectedDeal && (
+                <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -444,18 +1040,30 @@ export default function PortalDeals() {
                     </div>
                   </div>
                   <div className="mt-4 space-y-3">
-                    {(selectedDeal.activity ?? []).length > 0 ? (
-                      selectedDeal.activity.map((activity) => (
+                    {selectedDealTimeline.length > 0 ? (
+                      selectedDealTimeline.map((activity) => (
                         <article
                           key={activity.id}
                           className="rounded-[0.5rem] border border-slate-200 bg-white p-3"
                         >
-                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                            {new Date(activity.createdAt).toLocaleString()}
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-slate-800">
-                            {activity.note}
-                          </p>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="text-sm font-black text-slate-900">
+                                {activity.label}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                {activity.actor}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 sm:justify-end">
+                              <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-[0.65rem] font-black capitalize text-[#1B3C6C]">
+                                {activity.type}
+                              </span>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-bold text-slate-500">
+                                {formatTimelineTime(activity.createdAt)}
+                              </span>
+                            </div>
+                          </div>
                         </article>
                       ))
                     ) : (

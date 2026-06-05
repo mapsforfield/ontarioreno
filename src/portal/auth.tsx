@@ -12,7 +12,7 @@ import { User } from './data/types';
 type PortalAuthContextValue = {
   currentUser: User | null;
   users: User[];
-  login: (userId: string) => boolean;
+  login: (email: string, password: string) => boolean;
   logout: () => void;
   isAdmin: boolean;
 };
@@ -24,7 +24,7 @@ const PortalAuthContext = createContext<PortalAuthContextValue | undefined>(
 );
 
 export function PortalAuthProvider({ children }: { children: ReactNode }) {
-  const { users: storedUsers } = usePortalData();
+  const { authenticateUser, users: storedUsers } = usePortalData();
   const activeUsers = useMemo(
     () => storedUsers.filter((user) => user.active),
     [storedUsers]
@@ -48,8 +48,8 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     () => ({
       currentUser,
       users: activeUsers,
-      login: (userId: string) => {
-        const user = activeUsers.find((candidate) => candidate.id === userId);
+      login: (email, password) => {
+        const user = authenticateUser(email, password);
         if (!user) return false;
 
         setCurrentUserId(user.id);
@@ -58,7 +58,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
       logout: () => setCurrentUserId(null),
       isAdmin: currentUser?.role === 'admin',
     }),
-    [activeUsers, currentUser]
+    [activeUsers, authenticateUser, currentUser]
   );
 
   return (

@@ -202,7 +202,7 @@ export default function PortalCommissions() {
                             updateCommission(commission.id, {
                               repPaidCommission:
                                 Number(event.target.value) || 0,
-                            })
+                            }, currentUser)
                           }
                           className="w-28"
                         />
@@ -214,7 +214,7 @@ export default function PortalCommissions() {
                             updateCommission(commission.id, {
                               payoutStatus: event.target
                                 .value as CommissionPayoutStatus,
-                            })
+                            }, currentUser)
                           }
                         >
                           <option value="pending">Pending</option>
@@ -232,7 +232,7 @@ export default function PortalCommissions() {
                             updateCommission(commission.id, {
                               adminTotalCommissionRate:
                                 (Number(event.target.value) || 0) / 100,
-                            })
+                            }, currentUser)
                           }
                           className="w-24"
                         />
@@ -246,7 +246,7 @@ export default function PortalCommissions() {
                             updateCommission(commission.id, {
                               adminTotalEstimatedCommission:
                                 Number(event.target.value) || 0,
-                            })
+                            }, currentUser)
                           }
                           className="w-32"
                         />

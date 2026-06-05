@@ -2,20 +2,28 @@ import {
   BarChart3,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
+  CreditCard,
   Gauge,
   HandCoins,
+  LineChart,
   LogOut,
   ShieldCheck,
   Trophy,
 } from 'lucide-react';
+import { ChangeEvent, FormEvent, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
+import { usePortalData } from '../data/store';
 
 const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
   { label: 'Contractors', href: '/portal/contractors', icon: Building2 },
   { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness },
+  { label: 'Appointments', href: '/portal/appointments', icon: CalendarDays },
+  { label: 'Financing', href: '/portal/financing', icon: CreditCard },
+  { label: 'Performance', href: '/portal/performance', icon: LineChart },
   { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy },
   { label: 'Commissions', href: '/portal/commissions', icon: HandCoins },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
@@ -23,14 +31,25 @@ const navItems = [
 
 export default function PortalLayout() {
   const { currentUser, isAdmin, logout } = usePortalAuth();
+  const { changeUserPassword, updateUser } = usePortalData();
+  const [isPasswordPanelOpen, setIsPasswordPanelOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    confirmPassword: '',
+    currentPassword: '',
+    newPassword: '',
+  });
+  const [passwordMessage, setPasswordMessage] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
   const wideWorkspaceRoutes = [
     '/portal/admin',
+    '/portal/appointments',
     '/portal/commissions',
     '/portal/contractors',
     '/portal/deals',
+    '/portal/financing',
+    '/portal/performance',
   ];
   const isWideWorkspace = wideWorkspaceRoutes.some((route) =>
     location.pathname.startsWith(route)
@@ -41,15 +60,90 @@ export default function PortalLayout() {
     navigate('/portal/login', { replace: true });
   };
 
+  const closePasswordPanel = () => {
+    setIsPasswordPanelOpen(false);
+    setPasswordForm({
+      confirmPassword: '',
+      currentPassword: '',
+      newPassword: '',
+    });
+    setPasswordMessage('');
+  };
+
+  const handlePasswordChange = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!currentUser) return;
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage('New password and confirmation must match.');
+      return;
+    }
+
+    const result = changeUserPassword(
+      currentUser.id,
+      passwordForm.currentPassword,
+      passwordForm.newPassword,
+      currentUser
+    );
+    if (!result.ok) {
+      setPasswordMessage(result.message ?? 'Password could not be changed.');
+      return;
+    }
+
+    setPasswordMessage('Password updated successfully.');
+    setPasswordForm({
+      confirmPassword: '',
+      currentPassword: '',
+      newPassword: '',
+    });
+  };
+
+  const handleProfileImageUpload = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        updateUser(currentUser.id, { avatarUrl: reader.result }, currentUser);
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const profileAvatar = currentUser?.avatarUrl ? (
+    <img
+      src={currentUser.avatarUrl}
+      alt={currentUser.name}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    currentUser?.avatarInitial
+  );
+
   return (
     <div className="min-h-screen bg-[#eef3f8] text-slate-950">
       <div className="fixed inset-x-0 top-0 z-40 border-b border-white/65 bg-white/88 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-[#b9cbe0] bg-[#f8fbff] px-3 py-1 text-xs font-semibold text-[#1B3C6C]">
+            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[#b9cbe0] bg-[#f8fbff] py-1 pl-1 pr-3 text-xs font-semibold text-[#1B3C6C]">
+              <span className="flex h-7 w-7 overflow-hidden rounded-full bg-[#f4c35a] text-[#071525]">
+                <span className="flex h-full w-full items-center justify-center text-xs font-black">
+                  {profileAvatar}
+                </span>
+              </span>
               {currentUser?.name}
-            </span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfileImageUpload}
+                className="hidden"
+              />
+            </label>
             <button
               type="button"
               onClick={handleLogout}
@@ -100,8 +194,10 @@ export default function PortalLayout() {
 
           <div className="mt-auto rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4c35a] text-sm font-black text-[#071525]">
-                {currentUser?.avatarInitial}
+              <div className="flex h-10 w-10 overflow-hidden rounded-full bg-[#f4c35a] text-sm font-black text-[#071525]">
+                <div className="flex h-full w-full items-center justify-center">
+                  {profileAvatar}
+                </div>
               </div>
               <div>
                 <p className="text-sm font-bold">{currentUser?.name}</p>
@@ -118,15 +214,36 @@ export default function PortalLayout() {
               <LogOut className="h-4 w-4" />
               Sign out
             </button>
+            <label className="mt-2 flex w-full cursor-pointer items-center justify-center rounded-[0.5rem] border border-white/12 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/14">
+              Upload profile image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfileImageUpload}
+                className="hidden"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsPasswordPanelOpen(true)}
+              className="mt-2 flex w-full items-center justify-center rounded-[0.5rem] border border-white/12 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/14"
+            >
+              Change password
+            </button>
           </div>
         </div>
       </aside>
 
-      <main className="min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-8 lg:pb-10 lg:pt-8">
+      <main
+        className={cn(
+          'min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
+          isWideWorkspace ? 'lg:px-6 xl:px-8 2xl:px-10' : 'lg:px-8'
+        )}
+      >
         <div
           className={cn(
             'mx-auto w-full',
-            isWideWorkspace ? 'max-w-[100rem]' : 'max-w-6xl'
+            isWideWorkspace ? 'max-w-none' : 'max-w-6xl'
           )}
         >
           <div className="mb-6 hidden items-center justify-between lg:flex">
@@ -175,6 +292,100 @@ export default function PortalLayout() {
           ))}
         </div>
       </nav>
+
+      {isPasswordPanelOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+                  Profile Security
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+                  Change password
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closePasswordPanel}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close password panel"
+              >
+                X
+              </button>
+            </div>
+            <form onSubmit={handlePasswordChange} className="grid gap-4 p-5">
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                Current Password
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      currentPassword: event.target.value,
+                    }))
+                  }
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                New Password
+                <input
+                  type="password"
+                  minLength={8}
+                  value={passwordForm.newPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      newPassword: event.target.value,
+                    }))
+                  }
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                Confirm New Password
+                <input
+                  type="password"
+                  minLength={8}
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      confirmPassword: event.target.value,
+                    }))
+                  }
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              {passwordMessage && (
+                <p className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                  {passwordMessage}
+                </p>
+              )}
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closePasswordPanel}
+                  className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+                >
+                  Save Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
