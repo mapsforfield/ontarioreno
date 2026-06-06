@@ -1,8 +1,9 @@
-import { Appointment, Contractor, Deal, User } from './types';
+import { Appointment, Contractor, ContractorDispatch, Deal, User } from './types';
 
 export type ConsultationEmailType =
   | 'booking_confirmation'
   | 'cancellation_notice'
+  | 'contractor_dispatch'
   | 'rep_assignment'
   | 'reschedule_notice';
 
@@ -30,6 +31,7 @@ type ConsultationEmailInput = {
 const templateLabels: Record<ConsultationEmailType, string> = {
   booking_confirmation: 'Booking Confirmation',
   cancellation_notice: 'Cancellation Notice',
+  contractor_dispatch: 'Contractor Dispatch',
   rep_assignment: 'Rep Assignment Notice',
   reschedule_notice: 'Reschedule Notice',
 };
@@ -184,6 +186,65 @@ export function generateConsultationEmailPreview(
 ) {
   if (type === 'rep_assignment') return buildRepAssignmentEmail(input);
 
-  return buildCustomerEmail(type, input);
+  return buildCustomerEmail(
+    type as Exclude<ConsultationEmailType, 'rep_assignment' | 'contractor_dispatch'>,
+    input
+  );
+}
+
+export type ContractorDispatchEmailInput = {
+  appointment: Appointment;
+  contractor: Contractor;
+  deal?: Deal;
+  dispatch: ContractorDispatch;
+  estimatedProjectRange?: string;
+  safeSummary?: string;
+};
+
+export function generateContractorDispatchEmail(
+  input: ContractorDispatchEmailInput
+): ConsultationEmailPreview {
+  const { appointment, contractor, deal, dispatch, estimatedProjectRange, safeSummary } = input;
+  const contactName = contractor.contactName || contractor.companyName;
+  const city = appointment.city || deal?.city || 'General Ontario area';
+  const projectType = appointment.projectType || deal?.projectType || 'Renovation project';
+  const financingRequired = dispatch.financingRequired ?? deal?.financingRequired ?? false;
+
+  const body = [
+    `Hi ${contactName},`,
+    '',
+    'OntarioReno has a renovation opportunity that may be a fit for your team.',
+    '',
+    'Opportunity overview:',
+    `- Area: ${city}`,
+    `- Project type: ${projectType}`,
+    `- Estimated project range: ${estimatedProjectRange || 'To be confirmed'}`,
+    `- Financing required: ${financingRequired ? 'Yes' : 'No'}`,
+    '',
+    'Safe summary:',
+    safeSummary || dispatch.safeSummary || 'Summary to be provided.',
+    '',
+    'Homeowner contact details and exact address are not shared until the opportunity is accepted and assigned.',
+    '',
+    'Please let us know if you are interested in reviewing this opportunity further.',
+    '',
+    'OntarioReno Broker Portal',
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
+
+  return {
+    body,
+    metadata: {
+      contractorName: contractor.companyName,
+      isCustomerFacing: false,
+      logoUrl: '',
+      recipientEmail: contractor.email,
+      recipientLabel: contactName,
+      templateLabel: templateLabels.contractor_dispatch,
+    },
+    subject: `Renovation Opportunity – ${projectType} in ${city}`,
+    type: 'contractor_dispatch',
+  };
 }
 

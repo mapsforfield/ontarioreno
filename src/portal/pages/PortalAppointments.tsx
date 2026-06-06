@@ -17,6 +17,7 @@ import {
   ConsultationEmailType,
   generateConsultationEmailPreview,
 } from '../data/consultationEmails';
+import { sendEmail } from '../lib/sendEmail';
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
@@ -473,6 +474,7 @@ export default function PortalAppointments() {
   );
   const [connectionMessage, setConnectionMessage] = useState('');
   const [emailActionMessage, setEmailActionMessage] = useState('');
+  const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
@@ -1155,6 +1157,42 @@ export default function PortalAppointments() {
       'email_client_opened',
       `${currentUser.name} opened email client for ${preview.metadata.templateLabel}`
     );
+  };
+
+  const handleSendEmail = async (preview: ConsultationEmailPreview) => {
+    if (!selectedAppointment || sendingEmailType) return;
+
+    setSendingEmailType(preview.type);
+    setEmailActionMessage('');
+
+    const result = await sendEmail(preview);
+
+    setSendingEmailType(null);
+
+    if (result.ok) {
+      setEmailActionMessage(`${preview.metadata.templateLabel} sent to ${preview.metadata.recipientEmail}.`);
+      logActivity(
+        {
+          actionLabel: `Email sent: ${preview.metadata.templateLabel} to ${preview.metadata.recipientLabel}`,
+          actionType: 'email_sent',
+          contractorId: selectedAppointment.contractorId || undefined,
+          dealId: selectedAppointment.dealId || undefined,
+          entityId: selectedAppointment.id,
+          entityLabel:
+            selectedAppointment.customerName ||
+            selectedAppointment.title ||
+            preview.metadata.templateLabel,
+          entityType: 'appointment',
+          metadata: {
+            recipient: preview.metadata.recipientEmail || null,
+            templateType: preview.type,
+          },
+        },
+        currentUser
+      );
+    } else if ('error' in result) {
+      setEmailActionMessage(`Failed to send ${preview.metadata.templateLabel}: ${result.error}`);
+    }
   };
 
   const openDispatchPanel = () => {
@@ -2491,7 +2529,7 @@ export default function PortalAppointments() {
                       </h3>
                     </div>
                     <p className="max-w-sm text-sm font-semibold text-slate-500">
-                      Previews only. Nothing is sent from the portal yet.
+                      Review each template before sending. Emails are sent from info@ontarioreno.ca.
                     </p>
                   </div>
                   {emailActionMessage && (
@@ -2592,6 +2630,18 @@ export default function PortalAppointments() {
                             className="rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Open Email Client
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSendEmail(preview)}
+                            disabled={
+                              !preview.metadata.recipientEmail ||
+                              sendingEmailType !== null
+                            }
+                            className="flex items-center gap-2 rounded-[0.5rem] bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            {sendingEmailType === preview.type ? 'Sending…' : 'Send Now'}
                           </button>
                         </div>
                       </article>
