@@ -1,21 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
-import { prisma } from './_lib/prisma.js';
+import { prisma } from '../lib/prisma.js';
 
 /**
  * Customer-facing endpoint for reschedule and cancellation requests.
  *
  * This function is called directly by the public-facing ConsultationReschedule
- * and ConsultationCancel pages — no portal auth required.
+ * and ConsultationCancel pages â€” no portal auth required.
  *
  * On a reschedule request it:
- *   1. Updates the appointment in the Neon database (status → "rescheduled",
+ *   1. Updates the appointment in the Neon database (status â†’ "rescheduled",
  *      new date/time stored in appointmentDate/appointmentTime).
  *   2. Sends a notification email to the business inbox AND to the assigned
  *      rep (if their email is on file).
  *
  * On a cancel request it:
- *   1. Updates the appointment in the Neon database (status → "cancelled").
+ *   1. Updates the appointment in the Neon database (status â†’ "cancelled").
  *   2. Sends notification emails as above.
  *
  * Security: RESEND_API_KEY lives only in Vercel env vars, never in frontend
@@ -120,7 +120,7 @@ function buildRescheduleNotification(
   repName: string | null,
 ): { subject: string; text: string } {
   const ref = p.appointmentId.replace(/-/g, '').slice(-8).toUpperCase();
-  const subject = `Reschedule Request — ${customerName} — Consultation #${ref}`;
+  const subject = `Reschedule Request â€” ${customerName} â€” Consultation #${ref}`;
   const lines = [
     `A customer has submitted a reschedule request for their consultation.`,
     ``,
@@ -144,7 +144,7 @@ function buildCancelNotification(
   repName: string | null,
 ): { subject: string; text: string } {
   const ref = p.appointmentId.replace(/-/g, '').slice(-8).toUpperCase();
-  const subject = `Cancellation Request — ${customerName} — Consultation #${ref}`;
+  const subject = `Cancellation Request â€” ${customerName} â€” Consultation #${ref}`;
   const lines = [
     `A customer has requested to cancel their consultation.`,
     ``,
@@ -184,7 +184,7 @@ export default async function handler(
 
   const { payload } = result;
 
-  // ── 1. Look up the appointment from the database ─────────────────────────────
+  // â”€â”€ 1. Look up the appointment from the database â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const appointment = await prisma.appointment.findUnique({
     where: { id: payload.appointmentId },
     include: {
@@ -192,13 +192,13 @@ export default async function handler(
     },
   }).catch(() => null);
 
-  // Appointment not found is non-fatal — we still update if possible and always
+  // Appointment not found is non-fatal â€” we still update if possible and always
   // notify.  Unknown IDs (e.g. old Google Calendar imports) fall back gracefully.
   const customerName = appointment?.customerName ?? 'Customer';
   const repName = appointment?.assignedRep?.name ?? null;
   const repEmail = appointment?.assignedRep?.email ?? null;
 
-  // ── 2. Update the appointment status in the database ─────────────────────────
+  // â”€â”€ 2. Update the appointment status in the database â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (appointment) {
     const dbUpdate: Record<string, unknown> = {};
 
@@ -214,12 +214,12 @@ export default async function handler(
       where: { id: payload.appointmentId },
       data: dbUpdate,
     }).catch((err: unknown) => {
-      // Non-fatal — log and continue so the notification email still sends.
+      // Non-fatal â€” log and continue so the notification email still sends.
       console.error('Failed to update appointment in DB:', err);
     });
   }
 
-  // ── 3. Build notification email ───────────────────────────────────────────────
+  // â”€â”€ 3. Build notification email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { subject, text } =
     payload.type === 'reschedule'
       ? buildRescheduleNotification(payload, customerName, repName)
@@ -231,7 +231,7 @@ export default async function handler(
     toAddresses.push(repEmail);
   }
 
-  // ── 4. Send notification email(s) ────────────────────────────────────────────
+  // â”€â”€ 4. Send notification email(s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
