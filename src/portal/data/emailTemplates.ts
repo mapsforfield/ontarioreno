@@ -204,11 +204,19 @@ function noteBlock(
 
 /**
  * Dark-blue contractor header block.
- * If the contractor has a logoUrl, the logo is shown centred at ≤72 px tall.
- * Otherwise the company name appears as reversed-out text.
+ * If the contractor has a publicly hosted logoUrl (http/https), the logo is
+ * shown centred at ≤72 px tall. Base64 data URLs are intentionally excluded
+ * because email clients (Gmail, Outlook, Apple Mail) block data: src values
+ * for security — the broken-image icon would appear instead of the logo.
+ * When no valid hosted URL exists, the company name appears as reversed-out text.
  */
 function contractorHeader(contractor: Contractor | undefined, contractorName: string): string {
-  const logoUrl = contractor?.logoUrl?.trim();
+  const rawLogoUrl = contractor?.logoUrl?.trim();
+  // Only use the logo if it's a hosted URL — data: URLs don't render in email.
+  const logoUrl =
+    rawLogoUrl && (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://'))
+      ? rawLogoUrl
+      : undefined;
   const brand = logoUrl
     ? `<img src="${e(logoUrl)}" alt="${e(contractorName)}" height="72"
         style="display:block;margin:0 auto 12px auto;max-width:200px;max-height:72px;object-fit:contain;" />`
