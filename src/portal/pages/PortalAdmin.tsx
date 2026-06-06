@@ -159,9 +159,9 @@ export default function PortalAdmin() {
     setRepForm((current) => ({ ...current, [field]: value }));
   };
 
-  const resetRepPassword = (rep: User) => {
+  const resetRepPassword = async (rep: User) => {
     const temporaryPassword = generateTemporaryPassword();
-    const result = resetUserPassword(
+    const result = await resetUserPassword(
       rep.id,
       temporaryPassword,
       currentUser ?? undefined

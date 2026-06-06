@@ -23,11 +23,12 @@ export default function PortalLogin() {
     return <Navigate to="/portal/dashboard" replace />;
   }
 
-  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
 
-    if (login(email, password)) {
+    const ok = await login(email, password);
+    if (ok) {
       navigate(redirectTo, { replace: true });
       return;
     }

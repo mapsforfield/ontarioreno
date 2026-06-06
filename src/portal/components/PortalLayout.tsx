@@ -97,7 +97,7 @@ export default function PortalLayout() {
     setPasswordMessage('');
   };
 
-  const handlePasswordChange = (event: FormEvent<HTMLFormElement>) => {
+  const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!currentUser) return;
 
@@ -106,7 +106,7 @@ export default function PortalLayout() {
       return;
     }
 
-    const result = changeUserPassword(
+    const result = await changeUserPassword(
       currentUser.id,
       passwordForm.currentPassword,
       passwordForm.newPassword,
