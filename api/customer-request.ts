@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
-import { prisma } from './lib/prisma.js';
+import { prisma } from './_lib/prisma.js';
 
 /**
  * Customer-facing endpoint for reschedule and cancellation requests.

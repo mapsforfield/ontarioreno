@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { prisma } from '../lib/prisma.js';
+import { prisma } from '../_lib/prisma.js';
 import {
   signToken,
   setAuthCookie,
   clearAuthCookie,
   getCurrentUser,
-} from '../lib/auth.js';
+} from '../_lib/auth.js';
 
 /**
  * Single handler for all auth routes:
