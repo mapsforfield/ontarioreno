@@ -93,6 +93,8 @@ import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalLeaderboard from './portal/pages/PortalLeaderboard';
 import PortalLogin from './portal/pages/PortalLogin';
 import PortalPerformance from './portal/pages/PortalPerformance';
+import ConsultationReschedule from './portal/pages/ConsultationReschedule';
+import ConsultationCancel from './portal/pages/ConsultationCancel';
 
 export default function App() {
   return (
@@ -101,6 +103,16 @@ export default function App() {
         <Router>
           <ScrollToTop />
           <Routes>
+          {/* Public customer-facing consultation pages — no auth required */}
+          <Route
+            path="/portal/consultation/:id/reschedule"
+            element={<ConsultationReschedule />}
+          />
+          <Route
+            path="/portal/consultation/:id/cancel"
+            element={<ConsultationCancel />}
+          />
+
           <Route path="/portal/login" element={<PortalLogin />} />
           <Route element={<PortalGuard />}>
             <Route path="/portal" element={<PortalLayout />}>
