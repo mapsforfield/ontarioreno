@@ -760,7 +760,10 @@ export default function PortalContractors() {
                       {/* Controls */}
                       <div className="flex min-w-0 flex-1 flex-col gap-2">
                         <p className="text-xs font-normal leading-5 text-slate-500">
-                          Used in branded emails sent to customers. PNG, JPG, or SVG — displayed at up to 72 px tall in emails.
+                          Displayed on the contractor card in this portal. PNG, JPG, or SVG.
+                        </p>
+                        <p className="text-xs font-normal leading-5 text-amber-700">
+                          <strong>For emails:</strong> email clients block uploaded images. Paste a public <span className="font-mono">https://</span> URL below so the logo appears in customer emails.
                         </p>
 
                         <div className="flex flex-wrap gap-2">
@@ -793,17 +796,15 @@ export default function PortalContractors() {
                           )}
                         </div>
 
-                        {/* URL fallback — hidden when a file has been uploaded */}
-                        {!form.logoUrl.startsWith('data:') && (
-                          <input
-                            value={form.logoUrl}
-                            onChange={(event) =>
-                              updateForm('logoUrl', event.target.value)
-                            }
-                            placeholder="Or paste an image URL"
-                            className="text-sm font-normal"
-                          />
-                        )}
+                        {/* Hosted URL field — always visible so admins can set a public URL for emails */}
+                        <input
+                          value={form.logoUrl.startsWith('data:') ? '' : form.logoUrl}
+                          onChange={(event) =>
+                            updateForm('logoUrl', event.target.value)
+                          }
+                          placeholder="Paste public https:// URL for email logo"
+                          className="text-sm font-normal"
+                        />
 
                         {/* Size warning */}
                         {logoUploadWarning && (
