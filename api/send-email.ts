@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
 
 // Body shape posted by the React frontend. The frontend pre-renders the email
@@ -14,10 +14,10 @@ type SendEmailBody = {
 };
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
-/** Plain-text body limit — should stay small. */
+/** Plain-text body limit â€” should stay small. */
 const MAX_TEXT_LENGTH = 20_000;
 /**
- * HTML body limit — intentionally higher because our templates include
+ * HTML body limit â€” intentionally higher because our templates include
  * substantial inline CSS required for email client compatibility.
  * 200 KB covers even the largest template with a long safe summary.
  */
