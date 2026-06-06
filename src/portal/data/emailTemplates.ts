@@ -313,7 +313,8 @@ function emailFooter(): string {
 
 /**
  * Outer email shell: doctype, <head> with media queries, full-width
- * background table, and the 600 px centred card.
+ * background table, and the 620 px centred card.
+ * Media queries make two-column rows collapse to single-column on mobile.
  */
 function shell(inner: string): string {
   return `<!DOCTYPE html>
@@ -334,6 +335,8 @@ function shell(inner: string): string {
   <style type="text/css">
     @media only screen and (max-width: 620px) {
       .email-container { width: 100% !important; border-radius: 0 !important; }
+      .col-left  { display: block !important; width: 100% !important; padding: 28px 20px 20px !important; }
+      .col-right { display: block !important; width: 100% !important; padding: 20px !important; border-top: 1px solid #e2e8f0 !important; border-left: none !important; }
       .body-cell { padding: 24px 16px !important; }
     }
   </style>
@@ -342,7 +345,7 @@ function shell(inner: string): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="min-height:100%;background-color:#f0f4f8;">
 <tbody><tr>
   <td align="center" style="padding:32px 12px 48px 12px;">
-    <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+    <!--[if mso]><table role="presentation" width="620" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
     <table
       class="email-container"
       role="presentation"
@@ -350,7 +353,7 @@ function shell(inner: string): string {
       cellspacing="0"
       border="0"
       bgcolor="#ffffff"
-      style="max-width:600px;width:100%;border-radius:14px;overflow:hidden;background-color:#ffffff;box-shadow:0 4px 32px rgba(15,23,42,0.10);"
+      style="max-width:620px;width:100%;border-radius:14px;overflow:hidden;background-color:#ffffff;box-shadow:0 4px 32px rgba(15,23,42,0.10);"
     >
       <tbody>
         ${inner}
@@ -375,16 +378,12 @@ export type CustomerEmailInput = {
 };
 
 /**
- * Builds the HTML body for all three customer-facing email types:
- * booking confirmation, reschedule notice, and cancellation notice.
+ * Two-column customer email layout (Setmore-style):
+ *  LEFT  (58%): status heading, greeting, appointment detail rows, customer notes
+ *  RIGHT (42%): contractor logo, contact links, action buttons
  *
- * The template renders:
- *  1. Contractor-branded dark-blue header (logo or company name)
- *  2. Status badge pill
- *  3. Body: greeting, intro paragraph, appointment details card
- *  4. Optional: customer notes, action buttons (reschedule / cancel)
- *  5. Contractor contact strip
- *  6. OntarioReno footer
+ * On mobile (≤620 px) the columns stack via the .col-left / .col-right
+ * media-query rules in the shell <style> block.
  */
 export function buildCustomerHtml(input: CustomerEmailInput): string {
   const { type, appointment, contractor, rep, contractorName } = input;
@@ -399,47 +398,105 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
     video_consultation: 'Video Consultation',
   };
   const apptTypeLabel = apptTypeLabels[appointment.appointmentType] ?? 'Consultation';
-  const dateTime = `${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`;
 
-  const detailRows = [
-    detailRow('Date &amp; Time', e(dateTime), cfg.accent),
-    detailRow('Consultation Type', e(apptTypeLabel), cfg.accent),
-    detailRow('Project Type', e(appointment.projectType || 'Renovation Consultation'), cfg.accent),
-    rep?.name ? detailRow('Sales Representative', e(rep.name), cfg.accent) : '',
-    detailRow('Contractor', e(contractorName), cfg.accent),
-    detailRow('Reference', e(refId(appointment.id)), cfg.accent, true),
-  ].filter(Boolean);
+  // ── Left column: text detail rows ────────────────────────────────────────
+  function textRow(label: string, value: string): string {
+    return `<tr>
+  <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+    <span style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:3px;">${label}</span>
+    <span style="font-size:14px;font-weight:700;color:#0f172a;">${value}</span>
+  </td>
+</tr>`;
+  }
+
+  const detailTableRows = [
+    textRow('Date &amp; Time', e(`${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`)),
+    textRow('Service', e(apptTypeLabel)),
+    textRow('Project', e(appointment.projectType || 'Renovation Consultation')),
+    rep?.name ? textRow('Provider', e(rep.name)) : '',
+    textRow('Contractor', e(contractorName)),
+    textRow('Booking ID', e(refId(appointment.id))),
+  ].filter(Boolean).join('\n');
 
   const customerNotes = appointment.customerNotes?.trim();
-  const notesHtml = customerNotes
-    ? noteBlock('Your Notes', customerNotes, '#f8fafc', '#cbd5e1', '#64748b', '#475569')
-    : '';
-
-  const actionsHtml = cfg.showActions
-    ? `<div style="margin-top:28px;">
-        ${ctaButton('Reschedule Consultation', rescheduleUrl, '#1B3C6C', '#ffffff')}
-        ${ctaButton('Cancel Consultation', cancelUrl, '#f1f5f9', '#475569')}
+  const notesSection = customerNotes
+    ? `<div style="margin-top:16px;padding:12px 14px;background-color:#f8fafc;border-left:3px solid #cbd5e1;border-radius:0 6px 6px 0;">
+        <p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;font-family:sans-serif;">Your Notes</p>
+        <p style="margin:0;font-size:13px;color:#475569;line-height:1.6;font-family:sans-serif;">${e(customerNotes)}</p>
        </div>`
     : '';
 
-  const bodyRow = `<tr>
-  <td class="body-cell" style="padding:28px 28px 36px 28px;background-color:#ffffff;">
-    <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:800;color:#0f172a;letter-spacing:-0.02em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">${e(cfg.label)}</h1>
-    <p style="margin:0 0 24px 0;font-size:15px;color:#475569;line-height:1.65;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-      Hi ${e(appointment.customerName || 'there')},<br /><br />${e(cfg.intro)}
-    </p>
-    ${detailCard(detailRows)}
-    ${notesHtml}
-    ${actionsHtml}
-  </td>
+  const leftCol = `<td class="col-left" width="58%" valign="top"
+  style="padding:32px 28px 32px 32px;background-color:#ffffff;vertical-align:top;">
+  <h2 style="margin:0 0 4px;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">${e(cfg.label)}</h2>
+  <p style="margin:0 0 20px;font-size:14px;color:#64748b;font-family:sans-serif;">Hi ${e(appointment.customerName || 'there')},</p>
+  <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;font-family:sans-serif;">${e(cfg.intro)}</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tbody>${detailTableRows}</tbody>
+  </table>
+  ${notesSection}
+  <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;font-family:sans-serif;">Thanks,<br /><strong style="color:#64748b;">${e(contractorName)}</strong></p>
+</td>`;
+
+  // ── Right column: logo + contact + buttons ────────────────────────────────
+  const rawLogoUrl = contractor?.logoUrl?.trim();
+  const hostedLogoUrl =
+    rawLogoUrl &&
+    (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://'))
+      ? rawLogoUrl
+      : undefined;
+
+  const logoBlock = hostedLogoUrl
+    ? `<div style="text-align:center;margin-bottom:16px;">
+        <img src="${e(hostedLogoUrl)}" alt="${e(contractorName)}" height="80"
+          style="display:inline-block;max-width:160px;max-height:80px;object-fit:contain;border:0;" />
+       </div>`
+    : `<div style="text-align:center;margin-bottom:14px;">
+        <div style="display:inline-block;background:#1B3C6C;border-radius:10px;padding:8px 18px;">
+          <span style="font-size:15px;font-weight:800;color:#ffffff;font-family:sans-serif;">${e(contractorName)}</span>
+        </div>
+       </div>`;
+
+  const phone = contractor?.publicPhone?.trim() || contractor?.phone || '';
+  const email = contractor?.publicEmail?.trim() || contractor?.email || '';
+  const website = contractor?.publicWebsite?.trim() || contractor?.website || '';
+  const websiteDisplay = website.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const websiteHref = website && !website.startsWith('http') ? `https://${website}` : website;
+
+  const contactLinks = [
+    phone ? `<p style="margin:0 0 6px;font-size:13px;font-family:sans-serif;"><a href="tel:${e(phone)}" style="color:#1B3C6C;text-decoration:none;font-weight:600;">${e(phone)}</a></p>` : '',
+    email ? `<p style="margin:0 0 6px;font-size:13px;font-family:sans-serif;"><a href="mailto:${e(email)}" style="color:#1B3C6C;text-decoration:none;font-weight:600;">Email</a></p>` : '',
+    website ? `<p style="margin:0 0 6px;font-size:13px;font-family:sans-serif;"><a href="${e(websiteHref)}" target="_blank" style="color:#1B3C6C;text-decoration:none;font-weight:600;">${e(websiteDisplay)}</a></p>` : '',
+  ].filter(Boolean).join('');
+
+  const actionButtons = cfg.showActions
+    ? `<div style="margin-top:20px;">
+        <a href="${e(rescheduleUrl)}" target="_blank"
+          style="display:block;margin-bottom:8px;padding:11px 16px;background-color:#1B3C6C;color:#ffffff;font-size:13px;font-weight:700;text-align:center;text-decoration:none;border-radius:8px;font-family:sans-serif;">Reschedule</a>
+        <a href="${e(cancelUrl)}" target="_blank"
+          style="display:block;padding:11px 16px;background-color:#f1f5f9;color:#475569;font-size:13px;font-weight:700;text-align:center;text-decoration:none;border-radius:8px;font-family:sans-serif;">Cancel Appointment</a>
+       </div>`
+    : '';
+
+  const rightCol = `<td class="col-right" width="42%" valign="top" bgcolor="#f8fafc"
+  style="padding:32px 24px;background-color:#f8fafc;vertical-align:top;border-left:1px solid #e2e8f0;">
+  ${logoBlock}
+  <p style="margin:0 0 4px;text-align:center;font-size:14px;font-weight:800;color:#0f172a;font-family:sans-serif;">${e(contractorName)}</p>
+  <div style="margin-top:12px;text-align:left;">${contactLinks}</div>
+  ${actionButtons}
+</td>`;
+
+  const twoColRow = `<tr>
+  <!--[if mso]><td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><![endif]-->
+  ${leftCol}
+  ${rightCol}
+  <!--[if mso]></tr></table></td><![endif]-->
 </tr>`;
 
   return shell(`
-<tr><td>${contractorHeader(contractor, contractorName)}</td></tr>
-<tr><td>${statusBadge(cfg)}</td></tr>
-${bodyRow}
-<tr><td>${contactStrip(contractor)}</td></tr>
-<tr><td>${emailFooter()}</td></tr>
+<tr><td colspan="2">${contractorHeader(contractor, contractorName)}</td></tr>
+${twoColRow}
+<tr><td colspan="2">${emailFooter()}</td></tr>
 `);
 }
 
