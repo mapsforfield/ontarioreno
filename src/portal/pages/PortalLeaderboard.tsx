@@ -4,9 +4,10 @@ import { usePortalData } from '../data/store';
 
 export default function PortalLeaderboard() {
   const {
-    calculateBrokerScore,
+    calculateClosedVolume,
     calculatePipelineValue,
     calculateRepPendingCommission,
+    calculateWonDeals,
     getDealsForRep,
     users,
   } = usePortalData();
@@ -26,15 +27,21 @@ export default function PortalLeaderboard() {
       return {
         id: rep.id,
         name: rep.name,
-        brokerScore: calculateBrokerScore(rep.id),
+        closedVolume: calculateClosedVolume(rep.id),
         openDeals,
-        pipelineValue: formatCurrency(calculatePipelineValue(rep.id)),
-        pendingCommission: formatCurrency(
-          calculateRepPendingCommission(rep.id)
-        ),
+        pipelineValue: calculatePipelineValue(rep.id),
+        pendingCommission: calculateRepPendingCommission(rep.id),
+        wonDeals: calculateWonDeals(rep.id),
       };
     })
-    .sort((first, second) => second.brokerScore - first.brokerScore);
+    .sort(
+      (first, second) =>
+        second.wonDeals - first.wonDeals ||
+        second.closedVolume - first.closedVolume ||
+        second.pendingCommission - first.pendingCommission ||
+        second.pipelineValue - first.pipelineValue
+    );
+  const topWonDeals = Math.max(...reps.map((rep) => rep.wonDeals), 1);
 
   return (
     <div className="space-y-5">
@@ -69,17 +76,17 @@ export default function PortalLeaderboard() {
                 <div className="sm:text-right">
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a6418]">
                     <Trophy className="h-3.5 w-3.5" />
-                    Broker Score {rep.brokerScore}
+                    Won Deals {rep.wonDeals}
                   </div>
                 </div>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                    Broker Score
+                    Won Deals
                   </p>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {rep.brokerScore}
+                    {rep.wonDeals}
                   </p>
                 </div>
                 <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
@@ -101,7 +108,7 @@ export default function PortalLeaderboard() {
                     </p>
                   </div>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {rep.pipelineValue}
+                    {formatCurrency(rep.pipelineValue)}
                   </p>
                 </div>
                 <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
@@ -112,14 +119,16 @@ export default function PortalLeaderboard() {
                     </p>
                   </div>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {rep.pendingCommission}
+                    {formatCurrency(rep.pendingCommission)}
                   </p>
                 </div>
               </div>
               <div className="mt-5 h-2 rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-[#1B3C6C]"
-                  style={{ width: `${rep.brokerScore}%` }}
+                  style={{
+                    width: `${Math.max((rep.wonDeals / topWonDeals) * 100, 4)}%`,
+                  }}
                 />
               </div>
             </article>
@@ -131,7 +140,7 @@ export default function PortalLeaderboard() {
         <div className="flex items-center gap-3">
           <TrendingUp className="h-5 w-5" />
           <p className="text-sm font-bold">
-            Commission-weighted scoring can be connected in a later phase.
+            Ranked by won deals, then closed volume, pending commission, and pipeline value.
           </p>
         </div>
       </section>

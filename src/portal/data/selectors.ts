@@ -70,16 +70,14 @@ export function calculatePipelineValue(repId: string): number {
     .reduce((total, deal) => total + deal.estimatedJobValue, 0);
 }
 
-export function calculateBrokerScore(repId: string): number {
-  const repDeals = getDealsForRep(repId);
-  const openDeals = repDeals.filter((deal) => openDealStatuses.includes(deal.status));
-  const wonDeals = repDeals.filter((deal) => deal.status === 'won');
-  const pipelineScore = Math.min(calculatePipelineValue(repId) / 2500, 48);
-  const activityScore = Math.min(openDeals.length * 12, 24);
-  const winScore = Math.min(wonDeals.length * 10, 20);
-  const followUpScore = repDeals.some((deal) => deal.nextFollowUpDate) ? 8 : 0;
+export function calculateWonDeals(repId: string): number {
+  return getDealsForRep(repId).filter((deal) => deal.status === 'won').length;
+}
 
-  return Math.round(pipelineScore + activityScore + winScore + followUpScore);
+export function calculateClosedVolume(repId: string): number {
+  return getDealsForRep(repId)
+    .filter((deal) => deal.status === 'won')
+    .reduce((total, deal) => total + deal.estimatedJobValue, 0);
 }
 
 export function calculateOpenDealsForUser(user: User): number {
@@ -96,18 +94,13 @@ export function calculateVisiblePendingCommission(user: User): number {
   return calculateRepPendingCommission(user.id);
 }
 
-export function calculateVisibleBrokerScore(user: User): number {
+export function calculateVisibleWonDeals(user: User): number {
   if (user.role === 'rep') {
-    return calculateBrokerScore(user.id);
+    return calculateWonDeals(user.id);
   }
 
-  const reps = getReps();
-  if (reps.length === 0) return 0;
-
-  return Math.round(
-    reps.reduce((total, rep) => total + calculateBrokerScore(rep.id), 0) /
-      reps.length
-  );
+  return getVisibleDealsForUser(user).filter((deal) => deal.status === 'won')
+    .length;
 }
 
 export function formatCurrency(value: number): string {

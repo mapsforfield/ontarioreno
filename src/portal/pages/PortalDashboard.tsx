@@ -2,21 +2,34 @@ import {
   BadgeDollarSign,
   Building2,
   CalendarDays,
-  Gauge,
   HandCoins,
+  Trophy,
   TrendingUp,
 } from 'lucide-react';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
+import { ConsultationStage } from '../data/types';
+
+function formatConsultationStage(stage: ConsultationStage) {
+  return stage
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getDaysSince(value: string) {
+  if (!value) return 0;
+  return Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
+}
 
 export default function PortalDashboard() {
   const { currentUser } = usePortalAuth();
   const {
     calculateOpenDealsForUser,
     calculatePipelineValueForUser,
-    calculateVisibleBrokerScore,
     calculateVisiblePendingCommission,
+    calculateVisibleWonDeals,
     contractors,
     deals,
     getVisibleAppointmentsForUser,
@@ -31,7 +44,7 @@ export default function PortalDashboard() {
     ? calculateVisiblePendingCommission(currentUser)
     : 0;
   const pipelineValue = currentUser ? calculatePipelineValueForUser(currentUser) : 0;
-  const brokerScore = currentUser ? calculateVisibleBrokerScore(currentUser) : 0;
+  const wonDeals = currentUser ? calculateVisibleWonDeals(currentUser) : 0;
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
   const financingRequiredDeals = visibleDeals.filter(
     (deal) => deal.financingRequired
@@ -47,11 +60,28 @@ export default function PortalDashboard() {
   const todayAppointments = visibleAppointments.filter(
     (appointment) => appointment.appointmentDate === today
   );
+  const needsAttentionAppointments = visibleAppointments.filter(
+    (appointment) =>
+      (appointment.status === 'completed' && !appointment.outcomeSubmitted) ||
+      (appointment.nextStep === 'follow_up_required' &&
+        appointment.followUpDate &&
+        appointment.followUpDate <= today) ||
+      (['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
+        appointment.nextStep === 'no_action') ||
+      (appointment.appointmentDate < today && appointment.status !== 'completed') ||
+      appointment.consultationStage === 'follow_up_required' ||
+      (appointment.consultationStage === 'estimate_requested' &&
+        getDaysSince(appointment.updatedAt) > 3) ||
+      (appointment.consultationStage === 'contractor_review' &&
+        getDaysSince(appointment.updatedAt) > 3) ||
+      !appointment.assignedRepId ||
+      !appointment.contractorId
+  );
   const upcomingAppointments = visibleAppointments
     .filter(
       (appointment) =>
         appointment.appointmentDate >= today &&
-        ['rescheduled', 'scheduled'].includes(appointment.status)
+        ['confirmed', 'rescheduled', 'scheduled'].includes(appointment.status)
     )
     .sort((first, second) =>
       `${first.appointmentDate}T${first.appointmentTime}`.localeCompare(
@@ -61,10 +91,10 @@ export default function PortalDashboard() {
     .slice(0, 4);
   const getDealLabel = (dealId: string) => {
     const deal = deals.find((candidate) => candidate.id === dealId);
-    return deal ? `${deal.homeownerName} / ${deal.projectType}` : 'Deal';
+    return deal ? `${deal.homeownerName} / ${deal.projectType}` : 'Consultation';
   };
   const getRepName = (repId: string) =>
-    users.find((user) => user.id === repId)?.name ?? repId;
+    repId ? users.find((user) => user.id === repId)?.name ?? repId : 'Unassigned Rep';
 
   const summaryCards = [
     {
@@ -95,10 +125,10 @@ export default function PortalDashboard() {
       icon: TrendingUp,
     },
     {
-      label: 'Broker Score',
-      value: String(brokerScore),
-      detail: currentUser?.role === 'admin' ? 'Team average' : 'Your score',
-      icon: Gauge,
+      label: 'Won Deals',
+      value: String(wonDeals),
+      detail: currentUser?.role === 'admin' ? 'Team closed wins' : 'Your closed wins',
+      icon: Trophy,
     },
   ];
 
@@ -181,7 +211,7 @@ export default function PortalDashboard() {
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
-              Appointments
+              Consultations
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
               Consultation schedule
@@ -195,7 +225,7 @@ export default function PortalDashboard() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
             <div className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                Today's Appointments
+                Today's Consultations
               </p>
               <p className="mt-2 text-3xl font-black">
                 {todayAppointments.length}
@@ -203,10 +233,18 @@ export default function PortalDashboard() {
             </div>
             <div className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                Upcoming Appointments
+                Upcoming Consultations
               </p>
               <p className="mt-2 text-3xl font-black">
                 {upcomingAppointments.length}
+              </p>
+            </div>
+            <div className="col-span-2 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-4 lg:col-span-1">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-800">
+                Needs Attention
+              </p>
+              <p className="mt-2 text-3xl font-black">
+                {needsAttentionAppointments.length}
               </p>
             </div>
           </div>
@@ -220,11 +258,16 @@ export default function PortalDashboard() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-black text-slate-950">
-                        {getDealLabel(appointment.dealId)}
+                        {appointment.customerName ||
+                          appointment.title ||
+                          getDealLabel(appointment.dealId)}
                       </p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">
                         {appointment.appointmentDate} /{' '}
                         {appointment.appointmentTime || 'Time not set'}
+                      </p>
+                      <p className="mt-1 text-xs font-black uppercase text-[#32639b]">
+                        {formatConsultationStage(appointment.consultationStage)}
                       </p>
                     </div>
                     <span className="w-fit rounded-full bg-[#e8f1fb] px-3 py-1 text-xs font-black text-[#1B3C6C]">
@@ -237,7 +280,7 @@ export default function PortalDashboard() {
               ))
             ) : (
               <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
-                No upcoming appointments yet.
+                No upcoming consultations yet.
               </p>
             )}
           </div>

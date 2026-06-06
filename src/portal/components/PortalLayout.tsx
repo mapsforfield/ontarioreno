@@ -8,8 +8,10 @@ import {
   HandCoins,
   LineChart,
   LogOut,
+  MoreHorizontal,
   ShieldCheck,
   Trophy,
+  X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -21,7 +23,12 @@ const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
   { label: 'Contractors', href: '/portal/contractors', icon: Building2 },
   { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness },
-  { label: 'Appointments', href: '/portal/appointments', icon: CalendarDays },
+  {
+    label: 'Consultations',
+    mobileLabel: 'Consults',
+    href: '/portal/appointments',
+    icon: CalendarDays,
+  },
   { label: 'Financing', href: '/portal/financing', icon: CreditCard },
   { label: 'Performance', href: '/portal/performance', icon: LineChart },
   { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy },
@@ -33,6 +40,7 @@ export default function PortalLayout() {
   const { currentUser, isAdmin, logout } = usePortalAuth();
   const { changeUserPassword, updateUser } = usePortalData();
   const [isPasswordPanelOpen, setIsPasswordPanelOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     confirmPassword: '',
     currentPassword: '',
@@ -42,6 +50,21 @@ export default function PortalLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const mobilePrimaryHrefs = [
+    '/portal/dashboard',
+    '/portal/deals',
+    '/portal/appointments',
+    '/portal/contractors',
+  ];
+  const mobilePrimaryItems = mobilePrimaryHrefs
+    .map((href) => visibleNavItems.find((item) => item.href === href))
+    .filter((item): item is (typeof visibleNavItems)[number] => Boolean(item));
+  const mobileMoreItems = visibleNavItems.filter(
+    (item) => !mobilePrimaryHrefs.includes(item.href)
+  );
+  const isMoreRouteActive = mobileMoreItems.some((item) =>
+    location.pathname.startsWith(item.href)
+  );
   const wideWorkspaceRoutes = [
     '/portal/admin',
     '/portal/appointments',
@@ -236,7 +259,7 @@ export default function PortalLayout() {
 
       <main
         className={cn(
-          'min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
+          'min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
           isWideWorkspace ? 'lg:px-6 xl:px-8 2xl:px-10' : 'lg:px-8'
         )}
       >
@@ -267,19 +290,15 @@ export default function PortalLayout() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.45rem)] pt-2 shadow-[0_-12px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
-        <div
-          className="mx-auto grid max-w-lg gap-1"
-          style={{
-            gridTemplateColumns: `repeat(${visibleNavItems.length}, minmax(0, 1fr))`,
-          }}
-        >
-          {visibleNavItems.map((item) => (
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+          {mobilePrimaryItems.map((item) => (
             <NavLink
               key={item.href}
               to={item.href}
+              onClick={() => setIsMoreMenuOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-14 flex-col items-center justify-center gap-1 rounded-[0.5rem] px-1 text-[0.66rem] font-bold transition',
+                  'flex min-h-14 flex-col items-center justify-center gap-1 rounded-[0.5rem] px-0.5 text-[0.63rem] font-bold leading-none transition sm:text-[0.68rem]',
                   isActive
                     ? 'bg-[#e8f1fb] text-[#1B3C6C]'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-[#1B3C6C]'
@@ -287,11 +306,82 @@ export default function PortalLayout() {
               }
             >
               <item.icon className="h-4.5 w-4.5" />
-              <span>{item.label}</span>
+              <span>{item.mobileLabel ?? item.label}</span>
             </NavLink>
           ))}
+          <button
+            type="button"
+            onClick={() => setIsMoreMenuOpen((current) => !current)}
+            className={cn(
+              'flex min-h-14 flex-col items-center justify-center gap-1 rounded-[0.5rem] px-0.5 text-[0.63rem] font-bold leading-none transition sm:text-[0.68rem]',
+              isMoreRouteActive || isMoreMenuOpen
+                ? 'bg-[#e8f1fb] text-[#1B3C6C]'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-[#1B3C6C]'
+            )}
+            aria-expanded={isMoreMenuOpen}
+            aria-controls="portal-mobile-more-menu"
+          >
+            <MoreHorizontal className="h-4.5 w-4.5" />
+            <span>More</span>
+          </button>
         </div>
       </nav>
+
+      {isMoreMenuOpen && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-30 h-full w-full bg-slate-950/30 backdrop-blur-[2px] lg:hidden"
+            onClick={() => setIsMoreMenuOpen(false)}
+            aria-label="Close more navigation"
+          />
+          <div
+            id="portal-mobile-more-menu"
+            className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5.35rem)] z-50 mx-auto max-w-lg overflow-hidden rounded-[0.5rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.24)] lg:hidden"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#32639b]">
+                  More
+                </p>
+                <p className="text-sm font-black text-slate-950">
+                  Portal sections
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMoreMenuOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close more menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-1 p-2">
+              {mobileMoreItems.map((item) => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => setIsMoreMenuOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-[0.5rem] px-3.5 py-3 text-sm font-bold transition',
+                      isActive
+                        ? 'bg-[#e8f1fb] text-[#1B3C6C]'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-[#1B3C6C]'
+                    )
+                  }
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[0.5rem] bg-slate-100 text-[#1B3C6C]">
+                    <item.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {isPasswordPanelOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">

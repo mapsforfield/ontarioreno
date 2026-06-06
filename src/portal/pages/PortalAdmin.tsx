@@ -84,10 +84,10 @@ export default function PortalAdmin() {
   const {
     addUser,
     activities,
-    calculateBrokerScore,
     calculateOpenDealsForUser,
     calculatePipelineValue,
     calculateRepPendingCommission,
+    calculateWonDeals,
     resetUserPassword,
     toggleUserActive,
     updateUser,
@@ -409,10 +409,10 @@ export default function PortalAdmin() {
                   </div>
                   <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                      Broker Score
+                      Won Deals
                     </p>
                     <p className="mt-2 text-2xl font-black">
-                      {calculateBrokerScore(rep.id)}
+                      {calculateWonDeals(rep.id)}
                     </p>
                   </div>
                 </div>

@@ -25,6 +25,12 @@ export type Contractor = {
   phone: string;
   email: string;
   website: string;
+  logoUrl?: string;
+  publicCompanyName?: string;
+  publicPhone?: string;
+  publicEmail?: string;
+  publicWebsite?: string;
+  emailFooterText?: string;
   financingStatus: FinancingStatus;
   contractorStatus: ContractorStatus;
   serviceAreas: string[];
@@ -64,21 +70,78 @@ export type AppointmentType =
 
 export type AppointmentStatus =
   | 'scheduled'
+  | 'confirmed'
   | 'completed'
   | 'rescheduled'
   | 'cancelled'
   | 'no_show';
 
+export type AppointmentSource = 'manual' | 'google_calendar';
+
+export type ConsultationStage =
+  | 'lead_qualified'
+  | 'consultation_scheduled'
+  | 'consultation_completed'
+  | 'estimate_requested'
+  | 'contractor_review'
+  | 'proposal_sent'
+  | 'contractor_accepted'
+  | 'won'
+  | 'lost'
+  | 'follow_up_required';
+
+export type ConsultationInterestLevel =
+  | 'hot'
+  | 'warm'
+  | 'cold'
+  | 'not_interested';
+
+export type ConsultationNextStep =
+  | 'estimate_required'
+  | 'contractor_review'
+  | 'follow_up_required'
+  | 'won'
+  | 'lost'
+  | 'no_action';
+
 export type Appointment = {
   id: string;
   dealId: string;
+  customerName: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  projectType: string;
   assignedRepId: string;
+  contractorId: string | null;
   appointmentDate: string;
   appointmentTime: string;
+  durationMinutes: number;
   appointmentType: AppointmentType;
   status: AppointmentStatus;
+  consultationStage: ConsultationStage;
   location: string;
   notes: string;
+  customerNotes: string;
+  internalNotes: string;
+  source: AppointmentSource;
+  title?: string;
+  outcomeSubmitted: boolean;
+  outcomeSubmittedAt?: string;
+  outcomeSubmittedByUserId?: string;
+  estimatedProjectValue: number;
+  financingNeeded: boolean | null;
+  homeownerInterestLevel: ConsultationInterestLevel | null;
+  nextStep: ConsultationNextStep;
+  recommendedContractorId: string | null;
+  closeProbability: number;
+  outcomeNotes: string;
+  objections: string;
+  followUpDate: string;
+  externalCalendarId?: string;
+  externalEventId?: string;
+  syncedAt?: string;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -149,4 +212,29 @@ export type ProposalHistory = {
   proposalBody: string;
   sentAt: string;
   sentByUserId: string;
+};
+
+export type ContractorDispatchStatus =
+  | 'draft'
+  | 'sent'
+  | 'viewed'
+  | 'interested'
+  | 'accepted'
+  | 'declined'
+  | 'expired';
+
+export type ContractorDispatch = {
+  id: string;
+  consultationId?: string;
+  dealId: string;
+  contractorId: string;
+  sentByUserId: string;
+  sentAt: string;
+  status: ContractorDispatchStatus;
+  contractorResponseNote: string;
+  safeSummary: string;
+  estimatedProjectRange: string;
+  financingRequired: boolean;
+  createdAt: string;
+  updatedAt: string;
 };

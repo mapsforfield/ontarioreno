@@ -1,5 +1,4 @@
 import {
-  BadgeDollarSign,
   CalendarCheck,
   HandCoins,
   Send,
@@ -77,7 +76,6 @@ function metricCard(
 
 function buildRepPerformance({
   appointments,
-  brokerScore,
   commissions,
   deals,
   proposals,
@@ -85,7 +83,6 @@ function buildRepPerformance({
   rep,
 }: {
   appointments: Appointment[];
-  brokerScore: number;
   commissions: Commission[];
   deals: Deal[];
   proposals: ProposalHistory[];
@@ -118,6 +115,10 @@ function buildRepPerformance({
   const wonDeals = repDeals.filter((deal) => deal.status === 'won');
   const lostDeals = repDeals.filter((deal) => deal.status === 'lost');
   const closedDeals = wonDeals.length + lostDeals.length;
+  const closedVolume = wonDeals.reduce(
+    (total, deal) => total + deal.estimatedJobValue,
+    0
+  );
   const pendingCommission = repCommissions.reduce((total, commission) => {
     const deal = deals.find((candidate) => candidate.id === commission.dealId);
     const estimated = deal
@@ -130,13 +131,24 @@ function buildRepPerformance({
         : 0)
     );
   }, 0);
+  const completedConsultations = repAppointments.filter(
+    (appointment) => appointment.status === 'completed'
+  );
+  const outcomesSubmitted = repAppointments.filter(
+    (appointment) => appointment.outcomeSubmitted
+  );
+  const outcomePipelineValue = repAppointments.reduce(
+    (total, appointment) => total + (appointment.estimatedProjectValue || 0),
+    0
+  );
 
   return {
     appointmentsAssigned: repAppointments.length,
-    appointmentsCompleted: repAppointments.filter(
-      (appointment) => appointment.status === 'completed'
+    appointmentsCompleted: completedConsultations.length,
+    contractorReviewConsultations: repAppointments.filter(
+      (appointment) => appointment.consultationStage === 'contractor_review'
     ).length,
-    brokerScore,
+    closedVolume,
     lostDeals: lostDeals.length,
     noShows: repAppointments.filter(
       (appointment) => appointment.status === 'no_show'
@@ -153,6 +165,23 @@ function buildRepPerformance({
     ),
     proposalsSent: repProposals.length,
     rep,
+    followUpRequiredConsultations: repAppointments.filter(
+      (appointment) =>
+        appointment.consultationStage === 'follow_up_required' ||
+        appointment.nextStep === 'follow_up_required'
+    ).length,
+    hotLeads: repAppointments.filter(
+      (appointment) => appointment.homeownerInterestLevel === 'hot'
+    ).length,
+    outcomeCompletionRate:
+      completedConsultations.length > 0
+        ? Math.round((outcomesSubmitted.length / completedConsultations.length) * 100)
+        : 0,
+    outcomePipelineValue,
+    outcomesSubmitted: outcomesSubmitted.length,
+    warmLeads: repAppointments.filter(
+      (appointment) => appointment.homeownerInterestLevel === 'warm'
+    ).length,
     winRate: closedDeals > 0 ? Math.round((wonDeals.length / closedDeals) * 100) : 0,
     wonDeals: wonDeals.length,
   };
@@ -162,7 +191,6 @@ export default function PortalPerformance() {
   const { currentUser, isAdmin } = usePortalAuth();
   const {
     appointments,
-    calculateBrokerScore,
     commissions,
     deals,
     proposals,
@@ -179,7 +207,6 @@ export default function PortalPerformance() {
     .map((rep) =>
       buildRepPerformance({
         appointments,
-        brokerScore: calculateBrokerScore(rep.id),
         commissions,
         deals,
         proposals,
@@ -187,7 +214,13 @@ export default function PortalPerformance() {
         rep,
       })
     )
-    .sort((first, second) => second.brokerScore - first.brokerScore);
+    .sort(
+      (first, second) =>
+        second.wonDeals - first.wonDeals ||
+        second.closedVolume - first.closedVolume ||
+        second.pendingCommission - first.pendingCommission ||
+        second.pipelineValue - first.pipelineValue
+    );
   const primary = repPerformance[0];
 
   return (
@@ -224,17 +257,23 @@ export default function PortalPerformance() {
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {metricCard('My Open Deals', String(primary.openDeals), 'Pipeline Health', Target)}
             {metricCard('My Pipeline Value', formatCurrency(primary.pipelineValue), 'Pipeline Health', TrendingUp)}
-            {metricCard('My Appointments', String(primary.appointmentsAssigned), 'Consultation Activity', CalendarCheck)}
+            {metricCard('My Consultations', String(primary.appointmentsAssigned), 'Consultation Activity', CalendarCheck)}
             {metricCard('My Proposals Sent', String(primary.proposalsSent), 'Proposal Activity', Send)}
-            {metricCard('My Broker Score', String(primary.brokerScore), 'Performance Snapshot', BadgeDollarSign)}
+            {metricCard('My Won Deals', String(primary.wonDeals), 'Performance Snapshot', Target)}
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
             <article className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
               <h2 className="text-xl font-black tracking-[-0.01em]">Consultation Activity</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {metricCard('My Completed Appointments', String(primary.appointmentsCompleted), 'Completed consultations', CalendarCheck)}
+                {metricCard('My Completed Consultations', String(primary.appointmentsCompleted), 'Completed consultations', CalendarCheck)}
+                {metricCard('Outcomes Submitted', String(primary.outcomesSubmitted), `${primary.outcomeCompletionRate}% completion`, CalendarCheck)}
                 {metricCard('No-Shows', String(primary.noShows), 'Follow-through watch', CalendarCheck)}
+                {metricCard('Needs Follow-Up', String(primary.followUpRequiredConsultations), 'Lifecycle stage', CalendarCheck)}
+                {metricCard('Contractor Review', String(primary.contractorReviewConsultations), 'Lifecycle stage', CalendarCheck)}
+                {metricCard('Hot Leads', String(primary.hotLeads), 'Outcome reports', CalendarCheck)}
+                {metricCard('Warm Leads', String(primary.warmLeads), 'Outcome reports', CalendarCheck)}
+                {metricCard('Outcome Pipeline', formatCurrency(primary.outcomePipelineValue), 'Estimated from reports', CalendarCheck)}
               </div>
             </article>
             <article className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
@@ -273,7 +312,7 @@ export default function PortalPerformance() {
                     </p>
                   </div>
                   <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a6418]">
-                    Score {rep.brokerScore}
+                    Won Deals {rep.wonDeals}
                   </span>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
@@ -290,8 +329,8 @@ export default function PortalPerformance() {
                     <p className="mt-1 text-xl font-black">{rep.appointmentsCompleted}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Win Rate</p>
-                    <p className="mt-1 text-xl font-black">{rep.winRate}%</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Closed Volume</p>
+                    <p className="mt-1 text-xl font-black">{formatCurrency(rep.closedVolume)}</p>
                   </div>
                 </div>
               </article>
@@ -313,11 +352,11 @@ export default function PortalPerformance() {
                   <tr>
                     <th className="px-4 py-3">Rep</th>
                     <th className="px-4 py-3">Pipeline Value</th>
-                    <th className="px-4 py-3">Appointments Completed</th>
+                    <th className="px-4 py-3">Consultations Completed</th>
                     <th className="px-4 py-3">Proposals Sent</th>
                     <th className="px-4 py-3">Won Deals</th>
                     <th className="px-4 py-3">Pending Commission</th>
-                    <th className="px-4 py-3">Broker Score</th>
+                    <th className="px-4 py-3">Closed Volume</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -329,7 +368,7 @@ export default function PortalPerformance() {
                       <td className="px-4 py-4 font-semibold">{rep.proposalsSent}</td>
                       <td className="px-4 py-4 font-semibold">{rep.wonDeals}</td>
                       <td className="px-4 py-4 font-bold">{formatCurrency(rep.pendingCommission)}</td>
-                      <td className="px-4 py-4 font-black">{rep.brokerScore}</td>
+                      <td className="px-4 py-4 font-black">{formatCurrency(rep.closedVolume)}</td>
                     </tr>
                   ))}
                 </tbody>

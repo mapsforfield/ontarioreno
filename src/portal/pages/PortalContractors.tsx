@@ -6,6 +6,7 @@ import {
   Phone,
   Plus,
   Star,
+  Trash2,
   WalletCards,
   X,
 } from 'lucide-react';
@@ -30,11 +31,17 @@ type ContractorFormState = {
   contactName: string;
   contractorStatus: Contractor['contractorStatus'];
   email: string;
+  emailFooterText: string;
   financingStatus: Contractor['financingStatus'];
+  logoUrl: string;
   notes: string;
   phone: string;
   priorityScore: string;
   projectTypes: string;
+  publicCompanyName: string;
+  publicEmail: string;
+  publicPhone: string;
+  publicWebsite: string;
   serviceAreas: string;
   website: string;
 };
@@ -69,11 +76,17 @@ const emptyContractorForm: ContractorFormState = {
   contactName: '',
   contractorStatus: 'active',
   email: '',
+  emailFooterText: '',
   financingStatus: 'pending_financing',
+  logoUrl: '',
   notes: '',
   phone: '',
   priorityScore: '50',
   projectTypes: '',
+  publicCompanyName: '',
+  publicEmail: '',
+  publicPhone: '',
+  publicWebsite: '',
   serviceAreas: '',
   website: '',
 };
@@ -85,11 +98,17 @@ function contractorToForm(contractor: Contractor): ContractorFormState {
     contactName: contractor.contactName,
     contractorStatus: contractor.contractorStatus,
     email: contractor.email,
+    emailFooterText: contractor.emailFooterText ?? '',
     financingStatus: contractor.financingStatus,
+    logoUrl: contractor.logoUrl ?? '',
     notes: contractor.notes,
     phone: contractor.phone,
     priorityScore: String(contractor.priorityScore),
     projectTypes: contractor.projectTypes.join(', '),
+    publicCompanyName: contractor.publicCompanyName ?? '',
+    publicEmail: contractor.publicEmail ?? '',
+    publicPhone: contractor.publicPhone ?? '',
+    publicWebsite: contractor.publicWebsite ?? '',
     serviceAreas: contractor.serviceAreas.join(', '),
     website: contractor.website,
   };
@@ -102,7 +121,9 @@ function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
     contactName: form.contactName.trim(),
     contractorStatus: form.contractorStatus,
     email: form.email.trim(),
+    emailFooterText: form.emailFooterText.trim(),
     financingStatus: form.financingStatus,
+    logoUrl: form.logoUrl.trim(),
     notes: form.notes.trim(),
     phone: form.phone.trim(),
     priorityScore: Math.min(Math.max(Number(form.priorityScore) || 0, 0), 100),
@@ -110,6 +131,10 @@ function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean),
+    publicCompanyName: form.publicCompanyName.trim(),
+    publicEmail: form.publicEmail.trim(),
+    publicPhone: form.publicPhone.trim(),
+    publicWebsite: form.publicWebsite.trim(),
     serviceAreas: form.serviceAreas
       .split(',')
       .map((item) => item.trim())
@@ -209,6 +234,7 @@ export default function PortalContractors() {
     addContractor,
     addProposalHistory,
     contractors,
+    deleteContractor,
     getVisibleDealsForUser,
     updateContractor,
   } = usePortalData();
@@ -224,6 +250,8 @@ export default function PortalContractors() {
   const [proposalForm, setProposalForm] = useState<ProposalFormState | null>(
     null
   );
+  const [contractorPendingDelete, setContractorPendingDelete] =
+    useState<Contractor | null>(null);
   const [contractorFilter, setContractorFilter] =
     useState<ContractorQuickFilter>('all');
   const [projectTypeFilter, setProjectTypeFilter] = useState('');
@@ -398,6 +426,17 @@ export default function PortalContractors() {
       templateType: proposalForm.templateType,
     }, currentUser);
     closeProposalPanel();
+  };
+
+  const confirmDeleteContractor = () => {
+    if (!isAdmin || !currentUser || !contractorPendingDelete) return;
+
+    deleteContractor(contractorPendingDelete.id, currentUser);
+    setContractorPendingDelete(null);
+    setProposalForm((current) =>
+      current?.contractorId === contractorPendingDelete.id ? null : current
+    );
+    closeDetails();
   };
 
   return (
@@ -656,6 +695,51 @@ export default function PortalContractors() {
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Logo URL
+                    <input
+                      value={form.logoUrl}
+                      onChange={(event) =>
+                        updateForm('logoUrl', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Public Company Name
+                    <input
+                      value={form.publicCompanyName}
+                      onChange={(event) =>
+                        updateForm('publicCompanyName', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Public Phone
+                    <input
+                      value={form.publicPhone}
+                      onChange={(event) =>
+                        updateForm('publicPhone', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Public Email
+                    <input
+                      value={form.publicEmail}
+                      onChange={(event) =>
+                        updateForm('publicEmail', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Public Website
+                    <input
+                      value={form.publicWebsite}
+                      onChange={(event) =>
+                        updateForm('publicWebsite', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     Financing Status
                     <select
                       value={form.financingStatus}
@@ -722,6 +806,16 @@ export default function PortalContractors() {
                       value={form.priorityScore}
                       onChange={(event) =>
                         updateForm('priorityScore', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Email Footer Text
+                    <textarea
+                      rows={3}
+                      value={form.emailFooterText}
+                      onChange={(event) =>
+                        updateForm('emailFooterText', event.target.value)
                       }
                     />
                   </label>
@@ -822,6 +916,16 @@ export default function PortalContractors() {
 
             {isAdmin && (
               <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+                {selectedContractor && !isAddingContractor && (
+                  <button
+                    type="button"
+                    onClick={() => setContractorPendingDelete(selectedContractor)}
+                    className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 sm:mr-auto"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Contractor
+                  </button>
+                )}
                 {!isContractorFormVisible && selectedContractor ? (
                   <button
                     type="button"
@@ -851,6 +955,46 @@ export default function PortalContractors() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {contractorPendingDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[0.5rem] bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.3)]">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">
+                  Delete contractor
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Delete this contractor? This cannot be undone in the local
+                  prototype.
+                </p>
+                <p className="mt-2 text-sm font-bold text-slate-900">
+                  {contractorPendingDelete.companyName}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setContractorPendingDelete(null)}
+                className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteContractor}
+                className="rounded-[0.5rem] bg-red-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-800"
+              >
+                Delete Contractor
+              </button>
+            </div>
           </div>
         </div>
       )}

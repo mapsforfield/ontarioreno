@@ -1,4 +1,4 @@
-import { CircleDollarSign, Mail, Plus, Search, X } from 'lucide-react';
+import { CircleDollarSign, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { getRecommendedContractors } from '../data/recommendations';
@@ -11,7 +11,10 @@ import {
   Appointment,
   AppointmentStatus,
   AppointmentType,
+  ConsultationStage,
   Contractor,
+  ContractorDispatch,
+  ContractorDispatchStatus,
   Deal,
   DealStatus,
 } from '../data/types';
@@ -44,10 +47,30 @@ type AppointmentFormState = {
   appointmentTime: string;
   appointmentType: AppointmentType;
   assignedRepId: string;
+  consultationStage: ConsultationStage;
+  contractorId: string;
+  customerNotes: string;
+  internalNotes: string;
   location: string;
   notes: string;
   status: AppointmentStatus;
 };
+
+type DispatchFormState = {
+  contractorIds: string[];
+  desiredTimeline: string;
+  estimatedProjectRange: string;
+  financingRequired: boolean;
+  safeSummary: string;
+};
+
+const dispatchStatusOptions: ContractorDispatchStatus[] = [
+  'viewed',
+  'interested',
+  'accepted',
+  'declined',
+  'expired',
+];
 
 const emptyDealForm: DealFormState = {
   city: '',
@@ -67,6 +90,10 @@ const emptyAppointmentForm: AppointmentFormState = {
   appointmentTime: '',
   appointmentType: 'home_visit',
   assignedRepId: '',
+  consultationStage: 'consultation_scheduled',
+  contractorId: '',
+  customerNotes: '',
+  internalNotes: '',
   location: '',
   notes: '',
   status: 'scheduled',
@@ -100,6 +127,10 @@ function appointmentToForm(appointment: Appointment): AppointmentFormState {
     appointmentTime: appointment.appointmentTime,
     appointmentType: appointment.appointmentType,
     assignedRepId: appointment.assignedRepId,
+    consultationStage: appointment.consultationStage ?? 'consultation_scheduled',
+    contractorId: appointment.contractorId ?? '',
+    customerNotes: appointment.customerNotes ?? '',
+    internalNotes: appointment.internalNotes ?? appointment.notes ?? '',
     location: appointment.location,
     notes: appointment.notes,
     status: appointment.status,
@@ -114,9 +145,16 @@ function formatAppointmentType(type: AppointmentType) {
 }
 
 function formatAppointmentStatus(status: AppointmentStatus) {
-  if (status === 'no_show') return 'No Show';
+  if (status === 'no_show') return 'No-show';
 
   return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatDispatchStatus(status: ContractorDispatchStatus) {
+  return status
+    .split('_')
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 function getValueRange(value: number) {
@@ -131,15 +169,20 @@ function getValueRange(value: number) {
 export default function PortalDeals() {
   const { currentUser, isAdmin } = usePortalAuth();
   const {
+    addContractorDispatch,
     addDealActivity,
     addDeal,
     addAppointment,
     addProposalHistory,
+    assignDispatchContractor,
     assignContractorToDeal,
     contractors,
+    deleteDeal,
     getActivitiesForUser,
     getAppointmentsForDeal,
+    getDispatchesForDeal,
     getVisibleDealsForUser,
+    updateContractorDispatch,
     updateDeal,
     updateAppointment,
     users,
@@ -156,8 +199,18 @@ export default function PortalDeals() {
   const [form, setForm] = useState<DealFormState>(emptyDealForm);
   const [activityNote, setActivityNote] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+  const [dealPendingDelete, setDealPendingDelete] = useState<Deal | null>(null);
   const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
     useState<string | null>(null);
+  const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
+  const [dispatchActionMessage, setDispatchActionMessage] = useState('');
+  const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
+    contractorIds: [],
+    desiredTimeline: '',
+    estimatedProjectRange: '',
+    financingRequired: false,
+    safeSummary: '',
+  });
   const [appointmentForm, setAppointmentForm] =
     useState<AppointmentFormState>(emptyAppointmentForm);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
@@ -165,9 +218,69 @@ export default function PortalDeals() {
     ? getAppointmentsForDeal(selectedDeal.id)
     : [];
   const selectedAppointment = selectedDealAppointments[0];
+  const canDeleteSelectedDeal = Boolean(
+    currentUser &&
+      selectedDeal &&
+      (currentUser.role === 'admin' ||
+        selectedDeal.assignedRepId === currentUser.id)
+  );
   const recommendedContractors = selectedDeal
     ? getRecommendedContractors(selectedDeal, selectableContractors)
     : [];
+  const selectedDealDispatches = selectedDeal
+    ? getDispatchesForDeal(selectedDeal.id)
+    : [];
+  const dispatchContractorOptions = [...selectableContractors].sort(
+    (first, second) => {
+      if (!dispatchForm.financingRequired) {
+        return second.priorityScore - first.priorityScore;
+      }
+      if (first.financingStatus === second.financingStatus) {
+        return second.priorityScore - first.priorityScore;
+      }
+      if (first.financingStatus === 'financing_available') return -1;
+      if (second.financingStatus === 'financing_available') return 1;
+      return second.priorityScore - first.priorityScore;
+    }
+  );
+  const selectedDispatchContractors = contractors.filter((contractor) =>
+    dispatchForm.contractorIds.includes(contractor.id)
+  );
+  const dispatchPreviewMessage = selectedDeal
+    ? [
+        `Hi ${
+          selectedDispatchContractors.length === 1
+            ? selectedDispatchContractors[0].contactName
+            : 'Contractor Team'
+        },`,
+        '',
+        'OntarioReno has a renovation opportunity that may be a fit for your team.',
+        '',
+        'Opportunity overview:',
+        `- Area: ${selectedDeal.city || 'General Ontario area'}`,
+        `- Project type: ${selectedDeal.projectType || 'Renovation project'}`,
+        `- Estimated project range: ${
+          dispatchForm.estimatedProjectRange || 'To be confirmed'
+        }`,
+        `- Financing required: ${
+          dispatchForm.financingRequired ? 'Yes' : 'No'
+        }`,
+        dispatchForm.desiredTimeline
+          ? `- Desired timeline: ${dispatchForm.desiredTimeline}`
+          : '',
+        '',
+        'Safe summary:',
+        dispatchForm.safeSummary || 'Summary to be provided.',
+        '',
+        'Homeowner contact details and exact address are not shared until the opportunity is accepted and assigned.',
+        '',
+        'Please let us know if you are interested in reviewing this opportunity further.',
+        '',
+        'OntarioReno Broker Portal',
+      ]
+        .filter((line) => line !== '')
+        .join('\n')
+    : '';
   const viewingRecommendedContractor = contractors.find(
     (contractor) => contractor.id === viewingRecommendedContractorId
   );
@@ -214,6 +327,7 @@ export default function PortalDeals() {
     setActivityNote('');
     setIsEditingAppointment(false);
     setViewingRecommendedContractorId(null);
+    setIsDispatchPanelOpen(false);
     setAppointmentForm(emptyAppointmentForm);
   };
 
@@ -233,6 +347,7 @@ export default function PortalDeals() {
     );
     setIsEditingAppointment(false);
     setViewingRecommendedContractorId(null);
+    setIsDispatchPanelOpen(false);
   };
 
   const closePanel = () => {
@@ -240,6 +355,7 @@ export default function PortalDeals() {
     setIsAddingDeal(false);
     setIsEditingAppointment(false);
     setViewingRecommendedContractorId(null);
+    setIsDispatchPanelOpen(false);
   };
 
   const saveDeal = () => {
@@ -293,6 +409,8 @@ export default function PortalDeals() {
         : {
             ...emptyAppointmentForm,
             assignedRepId: selectedDeal.assignedRepId,
+            consultationStage: 'consultation_scheduled',
+            contractorId: selectedDeal.assignedContractorId ?? '',
           }
     );
     setIsEditingAppointment(true);
@@ -311,14 +429,37 @@ export default function PortalDeals() {
     }
 
     const payload = {
+      address: appointmentForm.location.trim(),
       assignedRepId: appointmentForm.assignedRepId || selectedDeal.assignedRepId,
       appointmentDate: appointmentForm.appointmentDate,
       appointmentTime: appointmentForm.appointmentTime,
       appointmentType: appointmentForm.appointmentType,
+      consultationStage: appointmentForm.consultationStage,
+      contractorId:
+        appointmentForm.contractorId || selectedDeal.assignedContractorId,
+      city: selectedDeal.city,
       createdByUserId: selectedAppointment?.createdByUserId ?? currentUser.id,
+      closeProbability: selectedAppointment?.closeProbability ?? 0,
+      customerNotes: appointmentForm.customerNotes.trim(),
+      customerName: selectedDeal.homeownerName,
       dealId: selectedDeal.id,
+      durationMinutes: selectedAppointment?.durationMinutes ?? 60,
+      email: selectedDeal.email,
+      estimatedProjectValue: selectedAppointment?.estimatedProjectValue ?? 0,
+      financingNeeded: selectedAppointment?.financingNeeded ?? null,
+      followUpDate: selectedAppointment?.followUpDate ?? '',
+      homeownerInterestLevel: selectedAppointment?.homeownerInterestLevel ?? null,
+      internalNotes: appointmentForm.internalNotes.trim(),
       location: appointmentForm.location.trim(),
-      notes: appointmentForm.notes.trim(),
+      notes: appointmentForm.internalNotes.trim() || appointmentForm.notes.trim(),
+      nextStep: selectedAppointment?.nextStep ?? 'no_action',
+      objections: selectedAppointment?.objections ?? '',
+      outcomeNotes: selectedAppointment?.outcomeNotes ?? '',
+      outcomeSubmitted: selectedAppointment?.outcomeSubmitted ?? false,
+      phone: selectedDeal.phone,
+      projectType: selectedDeal.projectType,
+      recommendedContractorId:
+        selectedAppointment?.recommendedContractorId ?? null,
       status: appointmentForm.status,
     };
 
@@ -385,6 +526,133 @@ OntarioReno Broker Portal`;
       `Proposal sent from recommendation to ${contractor.companyName}`,
       currentUser
     );
+  };
+
+  const openDispatchPanel = (contractorId?: string) => {
+    if (!selectedDeal) return;
+
+    setDispatchForm({
+      contractorIds:
+        contractorId ||
+        selectedDeal.assignedContractorId ||
+        recommendedContractors[0]?.contractor.id
+          ? [
+              contractorId ||
+                selectedDeal.assignedContractorId ||
+                recommendedContractors[0]?.contractor.id,
+            ].filter(Boolean) as string[]
+          : [],
+      desiredTimeline: selectedDeal.nextFollowUpDate
+        ? `Follow up around ${selectedDeal.nextFollowUpDate}`
+        : '',
+      estimatedProjectRange: getValueRange(selectedDeal.estimatedJobValue),
+      financingRequired: selectedDeal.financingRequired,
+      safeSummary: `${selectedDeal.projectType || 'Renovation'} opportunity in ${
+        selectedDeal.city || 'Ontario'
+      }.`,
+    });
+    setDispatchActionMessage('');
+    setIsDispatchPanelOpen(true);
+  };
+
+  const toggleDispatchContractor = (contractorId: string) => {
+    setDispatchForm((current) => ({
+      ...current,
+      contractorIds: current.contractorIds.includes(contractorId)
+        ? current.contractorIds.filter((id) => id !== contractorId)
+        : [...current.contractorIds, contractorId],
+    }));
+  };
+
+  const copyDispatchMessage = async () => {
+    await navigator.clipboard.writeText(dispatchPreviewMessage);
+    setDispatchActionMessage('Dispatch message copied.');
+  };
+
+  const openDispatchEmailClient = () => {
+    if (!selectedDeal || selectedDispatchContractors.length !== 1) return;
+    const contractor = selectedDispatchContractors[0];
+    if (!contractor.email) return;
+
+    window.location.href = `mailto:${encodeURIComponent(
+      contractor.email
+    )}?subject=${encodeURIComponent(
+      `OntarioReno Opportunity - ${selectedDeal.projectType} in ${selectedDeal.city}`
+    )}&body=${encodeURIComponent(dispatchPreviewMessage)}`;
+    setDispatchActionMessage(`Email client opened for ${contractor.companyName}.`);
+  };
+
+  const markDispatchesSent = () => {
+    if (!currentUser || !selectedDeal || dispatchForm.contractorIds.length === 0) {
+      setDispatchActionMessage('Select at least one contractor first.');
+      return;
+    }
+
+    dispatchForm.contractorIds.forEach((contractorId) => {
+      addContractorDispatch(
+        {
+          consultationId: selectedAppointment?.id,
+          contractorId,
+          contractorResponseNote: '',
+          dealId: selectedDeal.id,
+          estimatedProjectRange: dispatchForm.estimatedProjectRange,
+          financingRequired: dispatchForm.financingRequired,
+          safeSummary: dispatchForm.safeSummary,
+          sentAt: new Date().toISOString(),
+          sentByUserId: currentUser.id,
+          status: 'sent',
+        },
+        currentUser
+      );
+    });
+    setDispatchActionMessage('Dispatch marked as sent.');
+    setIsDispatchPanelOpen(false);
+  };
+
+  const updateDispatchStatus = (
+    dispatch: ContractorDispatch,
+    status: ContractorDispatchStatus
+  ) => {
+    if (!currentUser) return;
+    if (
+      status === 'accepted' &&
+      window.confirm('Assign this contractor to the opportunity now?')
+    ) {
+      assignDispatchContractor(dispatch.id, currentUser);
+      return;
+    }
+
+    updateContractorDispatch(dispatch.id, { status }, currentUser);
+  };
+
+  const updateDispatchResponseNote = (dispatch: ContractorDispatch) => {
+    if (!currentUser) return;
+    const nextNote = window.prompt(
+      'Contractor response note',
+      dispatch.contractorResponseNote
+    );
+    if (nextNote === null) return;
+
+    updateContractorDispatch(
+      dispatch.id,
+      { contractorResponseNote: nextNote.trim() },
+      currentUser
+    );
+  };
+
+  const confirmDeleteDeal = () => {
+    if (!currentUser || !dealPendingDelete) return;
+    if (
+      currentUser.role !== 'admin' &&
+      dealPendingDelete.assignedRepId !== currentUser.id
+    ) {
+      setDealPendingDelete(null);
+      return;
+    }
+
+    deleteDeal(dealPendingDelete.id, currentUser);
+    setDealPendingDelete(null);
+    closePanel();
   };
 
   return (
@@ -662,6 +930,123 @@ OntarioReno Broker Portal`;
               </div>
 
               {!isAddingDeal && selectedDeal && (
+                <section className="mt-6 rounded-[0.5rem] border border-[#c9d9eb] bg-[#f6faff] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
+                        Contractor Dispatch
+                      </p>
+                      <h3 className="mt-1 text-lg font-black text-slate-950">
+                        Send this opportunity only after the summary is safe.
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openDispatchPanel()}
+                      className="inline-flex w-fit items-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+                    >
+                      <Send className="h-4 w-4" />
+                      Dispatch to Contractor
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {!isAddingDeal && selectedDeal && (
+                <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                        Contractor Dispatch History
+                      </p>
+                      <h3 className="mt-1 text-lg font-black text-slate-950">
+                        Responses and assignment
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openDispatchPanel()}
+                      className="inline-flex w-fit items-center gap-2 rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                    >
+                      <Send className="h-4 w-4" />
+                      Dispatch
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {selectedDealDispatches.length > 0 ? (
+                      selectedDealDispatches.map((dispatch) => {
+                        const contractor = contractors.find(
+                          (candidate) => candidate.id === dispatch.contractorId
+                        );
+                        const sender = users.find(
+                          (user) => user.id === dispatch.sentByUserId
+                        );
+
+                        return (
+                          <article
+                            key={dispatch.id}
+                            className="rounded-[0.5rem] border border-slate-200 bg-white p-3"
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-sm font-black text-slate-950">
+                                  {contractor?.companyName ?? 'Deleted contractor'}
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-slate-500">
+                                  Sent by {sender?.name ?? 'Unknown'} on{' '}
+                                  {new Date(dispatch.sentAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <span className="w-fit rounded-full bg-[#e8f1fb] px-3 py-1 text-xs font-black text-[#1B3C6C]">
+                                {formatDispatchStatus(dispatch.status)}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm font-semibold text-slate-600">
+                              {dispatch.contractorResponseNote ||
+                                'No contractor response note yet.'}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {dispatchStatusOptions.map((status) => (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => updateDispatchStatus(dispatch, status)}
+                                  className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                                >
+                                  Mark {formatDispatchStatus(status)}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  currentUser &&
+                                  assignDispatchContractor(dispatch.id, currentUser)
+                                }
+                                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                              >
+                                Assign Contractor
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateDispatchResponseNote(dispatch)}
+                                className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                              >
+                                Response Note
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500">
+                        No contractor dispatches yet.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {!isAddingDeal && selectedDeal && (
                 <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -716,6 +1101,18 @@ OntarioReno Broker Portal`;
                               >
                                 <Mail className="h-3.5 w-3.5" />
                                 Send Proposal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openDispatchPanel(
+                                    recommendation.contractor.id
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Dispatch
                               </button>
                               <button
                                 type="button"
@@ -817,10 +1214,10 @@ OntarioReno Broker Portal`;
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                        Appointment
+                        Consultation
                       </p>
                       <h3 className="mt-1 text-lg font-black text-slate-950">
-                        Consultation booking
+                        Linked consultation
                       </h3>
                     </div>
                     <button
@@ -829,8 +1226,8 @@ OntarioReno Broker Portal`;
                       className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
                     >
                       {selectedAppointment
-                        ? 'Edit Appointment'
-                        : 'Add Appointment'}
+                        ? 'Edit Consultation'
+                        : 'Schedule Consultation'}
                     </button>
                   </div>
 
@@ -840,6 +1237,7 @@ OntarioReno Broker Portal`;
                         Assigned Rep
                         <select
                           value={appointmentForm.assignedRepId}
+                          disabled={!isAdmin}
                           onChange={(event) =>
                             updateAppointmentForm(
                               'assignedRepId',
@@ -855,9 +1253,36 @@ OntarioReno Broker Portal`;
                         </select>
                       </label>
                       <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                        Appointment Type
+                        Assigned Contractor
+                        <select
+                          value={appointmentForm.contractorId}
+                          disabled={!isAdmin}
+                          onChange={(event) =>
+                            updateAppointmentForm(
+                              'contractorId',
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="">Unassigned Contractor</option>
+                          {contractors
+                            .filter(
+                              (contractor) =>
+                                contractor.contractorStatus === 'active' ||
+                                isAdmin
+                            )
+                            .map((contractor) => (
+                              <option key={contractor.id} value={contractor.id}>
+                                {contractor.companyName}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                        Consultation Type
                         <select
                           value={appointmentForm.appointmentType}
+                          disabled={!isAdmin}
                           onChange={(event) =>
                             updateAppointmentForm(
                               'appointmentType',
@@ -879,6 +1304,7 @@ OntarioReno Broker Portal`;
                         <input
                           type="date"
                           value={appointmentForm.appointmentDate}
+                          readOnly={!isAdmin}
                           onChange={(event) =>
                             updateAppointmentForm(
                               'appointmentDate',
@@ -892,6 +1318,7 @@ OntarioReno Broker Portal`;
                         <input
                           type="time"
                           value={appointmentForm.appointmentTime}
+                          readOnly={!isAdmin}
                           onChange={(event) =>
                             updateAppointmentForm(
                               'appointmentTime',
@@ -911,29 +1338,63 @@ OntarioReno Broker Portal`;
                             )
                           }
                         >
-                          <option value="scheduled">Scheduled</option>
-                          <option value="completed">Completed</option>
-                          <option value="rescheduled">Rescheduled</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="no_show">No Show</option>
+                          {Array.from(
+                            new Map(
+                              (isAdmin
+                                ? [
+                                    ['scheduled', 'Scheduled'],
+                                    ['confirmed', 'Confirmed'],
+                                    ['completed', 'Completed'],
+                                    ['rescheduled', 'Rescheduled'],
+                                    ['cancelled', 'Cancelled'],
+                                    ['no_show', 'No-show'],
+                                  ]
+                                : [
+                                    [
+                                      appointmentForm.status,
+                                      formatAppointmentStatus(
+                                        appointmentForm.status
+                                      ),
+                                    ],
+                                    ['completed', 'Completed'],
+                                    ['no_show', 'No-show'],
+                                  ]) as Array<[AppointmentStatus, string]>
+                            )
+                          ).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
                         </select>
                       </label>
                       <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                         Location
                         <input
                           value={appointmentForm.location}
+                          readOnly={!isAdmin}
                           onChange={(event) =>
                             updateAppointmentForm('location', event.target.value)
                           }
                         />
                       </label>
                       <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                        Appointment Notes
+                        Customer Notes
                         <textarea
                           rows={3}
-                          value={appointmentForm.notes}
+                          value={appointmentForm.customerNotes}
+                          readOnly={!isAdmin}
                           onChange={(event) =>
-                            updateAppointmentForm('notes', event.target.value)
+                            updateAppointmentForm('customerNotes', event.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">
+                        Internal Notes - Not visible to customer
+                        <textarea
+                          rows={3}
+                          value={appointmentForm.internalNotes}
+                          onChange={(event) =>
+                            updateAppointmentForm('internalNotes', event.target.value)
                           }
                         />
                       </label>
@@ -943,14 +1404,14 @@ OntarioReno Broker Portal`;
                           onClick={() => setIsEditingAppointment(false)}
                           className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                         >
-                          Cancel Appointment Edit
+                          Cancel Consultation Edit
                         </button>
                         <button
                           type="button"
                           onClick={saveAppointment}
                           className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
                         >
-                          Save Appointment
+                          Save Consultation
                         </button>
                       </div>
                     </div>
@@ -959,10 +1420,21 @@ OntarioReno Broker Portal`;
                       {[
                         [
                           'Assigned Rep',
-                          users.find(
-                            (user) =>
-                              user.id === selectedAppointment.assignedRepId
-                          )?.name ?? selectedAppointment.assignedRepId,
+                          selectedAppointment.assignedRepId
+                            ? users.find(
+                                (user) =>
+                                  user.id === selectedAppointment.assignedRepId
+                              )?.name ?? selectedAppointment.assignedRepId
+                            : 'Unassigned Rep',
+                        ],
+                        [
+                          'Assigned Contractor',
+                          selectedAppointment.contractorId
+                            ? contractors.find(
+                                (contractor) =>
+                                  contractor.id === selectedAppointment.contractorId
+                              )?.companyName ?? 'Unassigned Contractor'
+                            : 'Unassigned Contractor',
                         ],
                         [
                           'Type',
@@ -987,8 +1459,14 @@ OntarioReno Broker Portal`;
                           selectedAppointment.location || 'Not set',
                         ],
                         [
-                          'Notes',
-                          selectedAppointment.notes || 'No notes yet',
+                          'Customer Notes',
+                          selectedAppointment.customerNotes || 'No customer notes yet',
+                        ],
+                        [
+                          'Internal Notes - Not visible to customer',
+                          selectedAppointment.internalNotes ||
+                            selectedAppointment.notes ||
+                            'No internal notes yet',
                         ],
                       ].map(([label, value]) => (
                         <div
@@ -1006,7 +1484,7 @@ OntarioReno Broker Portal`;
                     </div>
                   ) : (
                     <p className="mt-4 rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500">
-                      No appointment has been booked for this deal yet.
+                      No consultation has been booked for this deal yet.
                     </p>
                   )}
                 </section>
@@ -1077,6 +1555,16 @@ OntarioReno Broker Portal`;
             </div>
 
             <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+              {canDeleteSelectedDeal && selectedDeal && (
+                <button
+                  type="button"
+                  onClick={() => setDealPendingDelete(selectedDeal)}
+                  className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 sm:mr-auto"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Deal
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closePanel}
@@ -1090,6 +1578,246 @@ OntarioReno Broker Portal`;
                 className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
               >
                 Save Deal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDispatchPanelOpen && selectedDeal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+                  Contractor Dispatch
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+                  Dispatch opportunity
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDispatchPanelOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close dispatch panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+                  Privacy Safe Summary
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  This message excludes homeowner name, phone, email, exact
+                  address, internal notes, and commission details.
+                </p>
+              </div>
+              {recommendedContractors.length > 0 && (
+                <section className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
+                    Recommended Contractors
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {recommendedContractors.map((recommendation) => (
+                      <button
+                        key={recommendation.contractor.id}
+                        type="button"
+                        onClick={() => toggleDispatchContractor(recommendation.contractor.id)}
+                        className="w-full rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3 text-left transition hover:border-[#b8c9dd]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-black text-slate-950">
+                              {recommendation.contractor.companyName}
+                            </p>
+                            <p className="mt-1 text-xs font-semibold text-slate-500">
+                              {recommendation.label} /{' '}
+                              {recommendation.reasons.join(', ')}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-black text-[#1B3C6C]">
+                            {dispatchForm.contractorIds.includes(
+                              recommendation.contractor.id
+                            )
+                              ? 'Selected'
+                              : 'Select'}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <section className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
+                  Select Contractor(s)
+                </p>
+                <div className="mt-3 grid gap-2">
+                  {dispatchContractorOptions.map((contractor) => (
+                    <label
+                      key={contractor.id}
+                      className="flex items-start gap-3 rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3 text-sm font-bold text-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={dispatchForm.contractorIds.includes(contractor.id)}
+                        onChange={() => toggleDispatchContractor(contractor.id)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block text-slate-950">
+                          {contractor.companyName}
+                        </span>
+                        <span className="mt-1 block text-xs font-semibold text-slate-500">
+                          {contractor.financingStatus === 'financing_available'
+                            ? 'Financing available'
+                            : contractor.financingStatus === 'cash_only'
+                              ? dispatchForm.financingRequired
+                                ? 'Cash only - caution for financed opportunity'
+                                : 'Cash only'
+                              : 'Pending financing'}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Estimated Project Range
+                  <input
+                    value={dispatchForm.estimatedProjectRange}
+                    onChange={(event) =>
+                      setDispatchForm((current) => ({
+                        ...current,
+                        estimatedProjectRange: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Financing Required
+                  <select
+                    value={dispatchForm.financingRequired ? 'yes' : 'no'}
+                    onChange={(event) =>
+                      setDispatchForm((current) => ({
+                        ...current,
+                        financingRequired: event.target.value === 'yes',
+                      }))
+                    }
+                  >
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Desired Timeline
+                  <input
+                    value={dispatchForm.desiredTimeline}
+                    onChange={(event) =>
+                      setDispatchForm((current) => ({
+                        ...current,
+                        desiredTimeline: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Safe Summary
+                  <textarea
+                    rows={5}
+                    value={dispatchForm.safeSummary}
+                    onChange={(event) =>
+                      setDispatchForm((current) => ({
+                        ...current,
+                        safeSummary: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </section>
+              <section className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
+                  Preview Message
+                </p>
+                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-[0.5rem] border border-slate-200 bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-700">
+                  {dispatchPreviewMessage}
+                </pre>
+                {dispatchActionMessage && (
+                  <p className="mt-3 rounded-[0.5rem] border border-[#c9d9eb] bg-[#f6faff] p-3 text-sm font-bold text-[#1B3C6C]">
+                    {dispatchActionMessage}
+                  </p>
+                )}
+              </section>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={copyDispatchMessage}
+                className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Copy Message
+              </button>
+              <button
+                type="button"
+                onClick={openDispatchEmailClient}
+                disabled={
+                  selectedDispatchContractors.length !== 1 ||
+                  !selectedDispatchContractors[0]?.email
+                }
+                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Open Email Client
+              </button>
+              <button
+                type="button"
+                onClick={markDispatchesSent}
+                className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]"
+              >
+                Mark as Sent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dealPendingDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[0.5rem] bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.3)]">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">
+                  Delete deal
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Delete this deal? This cannot be undone in the local
+                  prototype.
+                </p>
+                <p className="mt-2 text-sm font-bold text-slate-900">
+                  {dealPendingDelete.homeownerName}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDealPendingDelete(null)}
+                className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteDeal}
+                className="rounded-[0.5rem] bg-red-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-800"
+              >
+                Delete Deal
               </button>
             </div>
           </div>
