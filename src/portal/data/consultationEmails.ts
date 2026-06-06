@@ -92,7 +92,7 @@ function buildCustomerEmail(
   input: ConsultationEmailInput
 ): ConsultationEmailPreview {
   const contractorName = contractorPublicName(input.contractor);
-  const logoUrl = input.contractor?.logoUrl?.trim() || '';
+  const logoUrl = input.contractor?.logoUrl?.trim() || ''; // used in metadata and HTML template
   const subjectAction =
     type === 'booking_confirmation'
       ? 'Consultation Confirmed'
@@ -100,7 +100,8 @@ function buildCustomerEmail(
         ? 'Consultation Rescheduled'
         : 'Consultation Cancelled';
   const body = [
-    logoUrl ? `[Contractor logo: ${logoUrl}]` : '',
+    // Logo is included in the HTML template only — never in plain text,
+    // as a data URL would make the plain-text body massive.
     `Hi ${input.appointment.customerName || 'there'},`,
     '',
     customerBodyIntro(type),
