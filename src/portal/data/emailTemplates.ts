@@ -204,11 +204,16 @@ function noteBlock(
 
 /**
  * Dark-blue contractor header block.
- * If the contractor has a publicly hosted logoUrl (http/https), the logo is
- * shown centred at ≤72 px tall. Base64 data URLs are intentionally excluded
- * because email clients (Gmail, Outlook, Apple Mail) block data: src values
- * for security — the broken-image icon would appear instead of the logo.
- * When no valid hosted URL exists, the company name appears as reversed-out text.
+ *
+ * Logo display rules:
+ *  - Only publicly hosted http/https URLs are used in <img> — data: URIs are
+ *    blocked by every major email client (Gmail, Outlook, Apple Mail).
+ *  - When a valid URL is present the logo is shown inside a white rounded card
+ *    (16 px radius, generous padding) so it pops cleanly against the dark blue
+ *    regardless of whether the image has a transparent or white background.
+ *    Max rendered height is 96 px, max-width 220 px.
+ *  - When no hosted URL is available, the company name appears as a
+ *    frosted-glass pill (white/12% opacity background) in reversed-out text.
  */
 function contractorHeader(contractor: Contractor | undefined, contractorName: string): string {
   const rawLogoUrl = contractor?.logoUrl?.trim();
@@ -217,16 +222,21 @@ function contractorHeader(contractor: Contractor | undefined, contractorName: st
     rawLogoUrl && (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://'))
       ? rawLogoUrl
       : undefined;
+
   const brand = logoUrl
-    ? `<img src="${e(logoUrl)}" alt="${e(contractorName)}" height="72"
-        style="display:block;margin:0 auto 12px auto;max-width:200px;max-height:72px;object-fit:contain;" />`
-    : `<div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:10px;padding:10px 22px;margin-bottom:12px;">
+    ? `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td style="background:#ffffff;border-radius:16px;padding:16px 24px;"><![endif]-->
+       <div style="display:inline-block;background:#ffffff;border-radius:16px;padding:16px 24px;margin-bottom:16px;line-height:0;">
+         <img src="${e(logoUrl)}" alt="${e(contractorName)}" height="96"
+           style="display:block;max-width:220px;max-height:96px;width:auto;object-fit:contain;border:0;outline:none;" />
+       </div>
+       <!--[if mso]></td></tr></table><![endif]-->`
+    : `<div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:10px;padding:10px 22px;margin-bottom:16px;">
         <span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">${e(contractorName)}</span>
        </div>`;
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1B3C6C">
 <tbody><tr>
-  <td align="center" style="padding:36px 24px 24px 24px;background-color:#1B3C6C;">
+  <td align="center" style="padding:36px 24px 28px 24px;background-color:#1B3C6C;">
     ${brand}
     <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:rgba(255,255,255,0.55);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Renovation Consultation</p>
   </td>
