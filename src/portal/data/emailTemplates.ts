@@ -486,6 +486,12 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
   ${actionButtons}
 </td>`;
 
+  // Thin branded accent bar at the very top of the card
+  const accentBar = `<tr>
+  <td colspan="2" height="5" bgcolor="#1B3C6C"
+    style="height:5px;line-height:5px;font-size:0;background-color:#1B3C6C;">&nbsp;</td>
+</tr>`;
+
   const twoColRow = `<tr>
   <!--[if mso]><td><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><![endif]-->
   ${leftCol}
@@ -494,7 +500,7 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
 </tr>`;
 
   return shell(`
-<tr><td colspan="2">${contractorHeader(contractor, contractorName)}</td></tr>
+${accentBar}
 ${twoColRow}
 <tr><td colspan="2">${emailFooter()}</td></tr>
 `);
