@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { prisma } from '../lib/prisma.js';
-import { requireAdmin, requireAuth } from '../lib/auth.js';
+import { prisma } from '../_lib/prisma.js';
+import { requireAdmin, requireAuth } from '../_lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { id } = req.query as { id: string };
