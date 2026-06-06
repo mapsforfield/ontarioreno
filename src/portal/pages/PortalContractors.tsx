@@ -1,5 +1,6 @@
 import {
   Building2,
+  ImagePlus,
   Pencil,
   Mail,
   MapPin,
@@ -10,7 +11,7 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { usePortalAuth } from '../auth';
 import {
   formatCurrency,
@@ -254,6 +255,8 @@ export default function PortalContractors() {
     useState<Contractor | null>(null);
   const [contractorFilter, setContractorFilter] =
     useState<ContractorQuickFilter>('all');
+  const [logoUploadWarning, setLogoUploadWarning] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState('');
   const [serviceAreaFilter, setServiceAreaFilter] = useState('');
 
@@ -395,6 +398,41 @@ export default function PortalContractors() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  /**
+   * Reads an uploaded image as a base64 data URL and stores it in logoUrl.
+   * Warns (but does not block) if the file exceeds 300 KB, since base64
+   * images are stored in localStorage alongside all other portal data.
+   */
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploadWarning('');
+
+    if (file.size > 300_000) {
+      setLogoUploadWarning(
+        `This image is ${Math.round(file.size / 1024)} KB. Images over 300 KB may use significant localStorage space. Consider compressing it first.`
+      );
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm((current) => ({ ...current, logoUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset the input so the same file can be re-selected after a Remove
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
+  const removeLogo = () => {
+    setForm((current) => ({ ...current, logoUrl: '' }));
+    setLogoUploadWarning('');
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
   const updateProposalForm = <Field extends keyof ProposalFormState>(
     field: Field,
     value: ProposalFormState[Field]
@@ -515,8 +553,16 @@ export default function PortalContractors() {
               className="flex flex-col rounded-[0.5rem] border border-white bg-white p-5 shadow-sm"
             >
             <div className="flex items-start justify-between gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[0.5rem] bg-[#071525] text-white">
-                <Building2 className="h-5 w-5" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[0.5rem] bg-[#071525] text-white">
+                {contractor.logoUrl ? (
+                  <img
+                    src={contractor.logoUrl}
+                    alt={`${contractor.companyName} logo`}
+                    className="h-full w-full object-contain p-1"
+                  />
+                ) : (
+                  <Building2 className="h-5 w-5" />
+                )}
               </div>
               <span
                 className={
@@ -694,15 +740,80 @@ export default function PortalContractors() {
                       }
                     />
                   </label>
-                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                    Logo URL
-                    <input
-                      value={form.logoUrl}
-                      onChange={(event) =>
-                        updateForm('logoUrl', event.target.value)
-                      }
-                    />
-                  </label>
+                  {/* ── Company logo upload ── */}
+                  <div className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Company Logo
+                    <div className="flex items-start gap-4 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                      {/* Preview square */}
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.5rem] border border-slate-200 bg-white">
+                        {form.logoUrl ? (
+                          <img
+                            src={form.logoUrl}
+                            alt="Logo preview"
+                            className="h-full w-full object-contain p-1.5"
+                          />
+                        ) : (
+                          <Building2 className="h-8 w-8 text-slate-300" />
+                        )}
+                      </div>
+
+                      {/* Controls */}
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <p className="text-xs font-normal leading-5 text-slate-500">
+                          Used in branded emails sent to customers. PNG, JPG, or SVG — displayed at up to 72 px tall in emails.
+                        </p>
+
+                        <div className="flex flex-wrap gap-2">
+                          {/* Hidden file input */}
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            id="logo-upload-input"
+                            onChange={handleLogoFileChange}
+                          />
+                          <label
+                            htmlFor="logo-upload-input"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                          >
+                            <ImagePlus className="h-3.5 w-3.5" />
+                            {form.logoUrl ? 'Replace' : 'Upload Logo'}
+                          </label>
+
+                          {form.logoUrl && (
+                            <button
+                              type="button"
+                              onClick={removeLogo}
+                              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-100"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        {/* URL fallback — hidden when a file has been uploaded */}
+                        {!form.logoUrl.startsWith('data:') && (
+                          <input
+                            value={form.logoUrl}
+                            onChange={(event) =>
+                              updateForm('logoUrl', event.target.value)
+                            }
+                            placeholder="Or paste an image URL"
+                            className="text-sm font-normal"
+                          />
+                        )}
+
+                        {/* Size warning */}
+                        {logoUploadWarning && (
+                          <p className="text-xs font-semibold text-amber-700">
+                            ⚠ {logoUploadWarning}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     Public Company Name
                     <input
@@ -833,6 +944,29 @@ export default function PortalContractors() {
               ) : (
                 selectedContractor && (
                   <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Logo — shown full-width at the top when present */}
+                    {selectedContractor.logoUrl && (
+                      <div className="flex items-center gap-4 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[0.5rem] border border-slate-200 bg-white">
+                          <img
+                            src={selectedContractor.logoUrl}
+                            alt={`${selectedContractor.companyName} logo`}
+                            className="h-full w-full object-contain p-1.5"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                            Company Logo
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-slate-700">
+                            {selectedContractor.companyName}
+                          </p>
+                          <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                            Used in customer-facing emails
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {[
                       ['Company Name', selectedContractor.companyName],
                       ['Contact Name', selectedContractor.contactName],
