@@ -1,0 +1,226 @@
+// OntarioReno Portal — Prisma Schema
+// Prisma 7 — datasource URL is configured in prisma.config.ts
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  role          String   // 'admin' | 'rep'
+  email         String   @unique
+  avatarInitial String
+  avatarUrl     String?
+  passwordHash  String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignedAppointments Appointment[]        @relation("AssignedRep")
+  createdAppointments  Appointment[]        @relation("CreatedBy")
+  deals                Deal[]
+  activities           Activity[]
+  commissions          Commission[]
+  dispatches           ContractorDispatch[]
+}
+
+// ─── Contractors ─────────────────────────────────────────────────────────────
+
+model Contractor {
+  id                 String   @id @default(cuid())
+  companyName        String
+  contactName        String
+  phone              String
+  email              String
+  website            String   @default("")
+  logoUrl            String?
+  publicCompanyName  String?
+  publicPhone        String?
+  publicEmail        String?
+  publicWebsite      String?
+  emailFooterText    String?
+  financingStatus    String   @default("cash_only")
+  contractorStatus   String   @default("pending")
+  serviceAreas       String[]
+  projectTypes       String[]
+  averageProjectSize Float    @default(0)
+  notes              String   @default("")
+  priorityScore      Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  appointments Appointment[]
+  deals        Deal[]
+  dispatches   ContractorDispatch[]
+}
+
+// ─── Deals ───────────────────────────────────────────────────────────────────
+
+model Deal {
+  id                   String   @id @default(cuid())
+  homeownerName        String
+  phone                String
+  email                String
+  city                 String
+  projectType          String
+  estimatedJobValue    Float    @default(0)
+  financingRequired    Boolean  @default(false)
+  assignedRepId        String
+  assignedContractorId String?
+  status               String   @default("new_lead")
+  notes                String   @default("")
+  nextFollowUpDate     String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  assignedRep        User        @relation(fields: [assignedRepId], references: [id])
+  assignedContractor Contractor? @relation(fields: [assignedContractorId], references: [id])
+  appointments       Appointment[]
+  commissions        Commission[]
+  dispatches         ContractorDispatch[]
+  proposals          ProposalHistory[]
+  activity           DealActivity[]
+}
+
+model DealActivity {
+  id        String   @id @default(cuid())
+  dealId    String
+  note      String
+  createdAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+model Appointment {
+  id                       String   @id @default(cuid())
+  dealId                   String
+  customerName             String
+  phone                    String
+  email                    String
+  address                  String   @default("")
+  city                     String   @default("")
+  projectType              String
+  assignedRepId            String
+  contractorId             String?
+  appointmentDate          String
+  appointmentTime          String
+  durationMinutes          Int      @default(60)
+  appointmentType          String   @default("home_visit")
+  status                   String   @default("scheduled")
+  consultationStage        String   @default("consultation_scheduled")
+  location                 String   @default("")
+  notes                    String   @default("")
+  customerNotes            String   @default("")
+  internalNotes            String   @default("")
+  source                   String   @default("manual")
+  title                    String?
+  outcomeSubmitted         Boolean  @default(false)
+  outcomeSubmittedAt       String?
+  outcomeSubmittedByUserId String?
+  estimatedProjectValue    Float    @default(0)
+  financingNeeded          Boolean?
+  homeownerInterestLevel   String?
+  nextStep                 String   @default("no_action")
+  recommendedContractorId  String?
+  closeProbability         Float    @default(0)
+  outcomeNotes             String   @default("")
+  objections               String   @default("")
+  followUpDate             String   @default("")
+  externalCalendarId       String?
+  externalEventId          String?
+  syncedAt                 String?
+  createdByUserId          String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  deal        Deal        @relation(fields: [dealId], references: [id])
+  assignedRep User        @relation("AssignedRep", fields: [assignedRepId], references: [id])
+  contractor  Contractor? @relation(fields: [contractorId], references: [id])
+  createdBy   User        @relation("CreatedBy", fields: [createdByUserId], references: [id])
+}
+
+// ─── Commissions ─────────────────────────────────────────────────────────────
+
+model Commission {
+  id                            String @id @default(cuid())
+  dealId                        String @unique
+  repId                         String
+  repCommissionRate             Float
+  repEstimatedCommission        Float
+  repPaidCommission             Float  @default(0)
+  payoutStatus                  String @default("pending")
+  adminTotalCommissionRate      Float
+  adminTotalEstimatedCommission Float
+  adminNetCommission            Float
+
+  deal Deal @relation(fields: [dealId], references: [id])
+  rep  User @relation(fields: [repId], references: [id])
+}
+
+// ─── Activities ──────────────────────────────────────────────────────────────
+
+model Activity {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  actorName    String
+  actorRole    String
+  actionType   String
+  actionLabel  String
+  entityType   String
+  entityId     String
+  entityLabel  String
+  dealId       String?
+  contractorId String?
+  createdAt    DateTime @default(now())
+  metadata     Json?
+
+  actor User @relation(fields: [actorUserId], references: [id])
+}
+
+// ─── Contractor Dispatches ────────────────────────────────────────────────────
+
+model ContractorDispatch {
+  id                     String   @id @default(cuid())
+  consultationId         String?
+  dealId                 String
+  contractorId           String
+  sentByUserId           String
+  sentAt                 String
+  status                 String   @default("draft")
+  contractorResponseNote String   @default("")
+  safeSummary            String   @default("")
+  estimatedProjectRange  String   @default("")
+  financingRequired      Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  deal       Deal       @relation(fields: [dealId], references: [id])
+  contractor Contractor @relation(fields: [contractorId], references: [id])
+  sentBy     User       @relation(fields: [sentByUserId], references: [id])
+}
+
+// ─── Proposals ────────────────────────────────────────────────────────────────
+
+model ProposalHistory {
+  id              String   @id @default(cuid())
+  contractorId    String
+  dealId          String
+  templateType    String
+  proposalSubject String
+  proposalBody    String
+  sentAt          String
+  sentByUserId    String
+  createdAt       DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id])
+}
