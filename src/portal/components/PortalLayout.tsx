@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Trophy,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useState } from 'react';
@@ -40,6 +41,9 @@ export default function PortalLayout() {
   const { currentUser, isAdmin, logout } = usePortalAuth();
   const { changeUserPassword, updateUser } = usePortalData();
   const [isPasswordPanelOpen, setIsPasswordPanelOpen] = useState(false);
+  const [isPrototypeBannerDismissed, setIsPrototypeBannerDismissed] = useState(
+    () => sessionStorage.getItem('prototype-banner-dismissed') === 'true'
+  );
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     confirmPassword: '',
@@ -285,6 +289,28 @@ export default function PortalLayout() {
               </span>
             </div>
           </div>
+          {!isPrototypeBannerDismissed && (
+            <div className="mb-5 flex items-start gap-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <p className="flex-1 font-medium">
+                <span className="font-bold">Prototype mode:</span> All data is
+                stored locally in this browser only. Clearing browser data or
+                switching devices will reset the portal. Do not use for
+                production data.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.setItem('prototype-banner-dismissed', 'true');
+                  setIsPrototypeBannerDismissed(true);
+                }}
+                className="shrink-0 text-amber-600 transition hover:text-amber-900"
+                aria-label="Dismiss prototype warning"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <Outlet />
         </div>
       </main>

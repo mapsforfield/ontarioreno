@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
-import { usePortalData } from '../data/store';
+import { generateTemporaryPassword, usePortalData } from '../data/store';
 import { ActivityEntityType, User } from '../data/types';
 
 type RepFormState = {
@@ -160,7 +160,7 @@ export default function PortalAdmin() {
   };
 
   const resetRepPassword = (rep: User) => {
-    const temporaryPassword = 'temporary123';
+    const temporaryPassword = generateTemporaryPassword();
     const result = resetUserPassword(
       rep.id,
       temporaryPassword,

@@ -1,3 +1,7 @@
+// DEAD CODE — do not use. All selector and calculation functions here operate
+// on static seed arrays, not live store state. The canonical implementations
+// are in store.tsx and are accessed via usePortalData(). This file exists as a
+// historical artifact and should be deleted once confirmed unused.
 import { commissions } from './commissions';
 import { contractors } from './contractors';
 import { deals } from './deals';

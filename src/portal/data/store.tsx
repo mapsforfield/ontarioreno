@@ -174,6 +174,10 @@ type PortalDataContextValue = PortalDataState & {
   calculateVisibleWonDeals: (user: User) => number;
 };
 
+// localStorage persistence key. The "v1" suffix is a schema version. If the
+// shape of PortalDataState ever changes in a breaking way, bump to "v2" and add
+// a migration in loadStoredState() — never mutate v1 data in place, as that
+// would silently corrupt existing sessions on older clients.
 const STORAGE_KEY = 'ontarioreno.portal.data.v1';
 const openDealStatuses: DealStatus[] = [
   'new_lead',
@@ -199,6 +203,11 @@ const PortalDataContext = createContext<PortalDataContextValue | undefined>(
   undefined
 );
 
+// Legacy demo-data IDs from an earlier version of the seed. These records no
+// longer exist in the current seed files (deals.ts / commissions.ts), but the
+// migration filters still remove them on load to clean up any stale localStorage
+// sessions that were created with the old seed. IDs are generated with createId()
+// (timestamp + random), so collision with these hardcoded strings is impossible.
 const demoDealIds = new Set(['deal-001', 'deal-002', 'deal-003', 'deal-004']);
 const demoCommissionIds = new Set([
   'commission-001',
@@ -261,6 +270,14 @@ const prototypeLoginEmails: Record<string, string> = {
 
 function createPrototypePasswordHash(password: string) {
   return `local-prototype:${window.btoa(`ontarioreno:${password}`)}`;
+}
+
+export function generateTemporaryPassword(): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from(
+    { length: 12 },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join('');
 }
 
 function normalizeUser(user: User): User {
@@ -934,7 +951,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ...user,
             id: createId('user'),
             passwordHash:
-              user.passwordHash ?? createPrototypePasswordHash('temporary123'),
+              user.passwordHash ??
+              createPrototypePasswordHash(generateTemporaryPassword()),
             role: 'rep',
           };
 
