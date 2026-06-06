@@ -13,6 +13,7 @@ export async function sendEmail(preview: ConsultationEmailPreview): Promise<Send
     const response = await fetch('/api/send-email', {
       body: JSON.stringify({
         body: preview.body,
+        html: preview.html,
         // For customer-facing emails, set replyTo to the contractor's public email
         // so replies land with the contractor, not info@ontarioreno.ca.
         replyTo: preview.metadata.isCustomerFacing

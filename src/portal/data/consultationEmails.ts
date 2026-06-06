@@ -1,4 +1,9 @@
 import { Appointment, Contractor, ContractorDispatch, Deal, User } from './types';
+import {
+  buildCustomerHtml,
+  buildRepAssignmentHtml,
+  buildContractorDispatchHtml,
+} from './emailTemplates';
 
 export type ConsultationEmailType =
   | 'booking_confirmation'
@@ -9,6 +14,8 @@ export type ConsultationEmailType =
 
 export type ConsultationEmailPreview = {
   body: string;
+  /** HTML version of the email body. Sent alongside plain-text for email client rendering. */
+  html: string;
   metadata: {
     contractorName: string;
     isCustomerFacing: boolean;
@@ -113,8 +120,19 @@ function buildCustomerEmail(
     .filter((line) => line !== '')
     .join('\n');
 
+  // Only booking_confirmation, reschedule_notice, cancellation_notice are
+  // valid CustomerEmailType values — the cast is safe at this call site.
+  const html = buildCustomerHtml({
+    type: type as Exclude<ConsultationEmailType, 'rep_assignment' | 'contractor_dispatch'>,
+    appointment: input.appointment,
+    contractor: input.contractor,
+    rep: input.rep,
+    contractorName,
+  });
+
   return {
     body,
+    html,
     metadata: {
       contractorName,
       isCustomerFacing: true,
@@ -144,6 +162,14 @@ function buildRepAssignmentEmail(
       : 'No financing required'
     : 'No linked deal';
 
+  const html = buildRepAssignmentHtml({
+    appointment: input.appointment,
+    contractor: input.contractor,
+    deal: input.deal,
+    rep: input.rep,
+    contractorName,
+  });
+
   return {
     body: [
       `Hi ${input.rep?.name || 'Sales Rep'},`,
@@ -167,6 +193,7 @@ function buildRepAssignmentEmail(
       'Customer notes:',
       input.appointment.customerNotes || 'No customer-facing notes.',
     ].join('\n'),
+    html,
     metadata: {
       contractorName,
       isCustomerFacing: false,
@@ -233,8 +260,18 @@ export function generateContractorDispatchEmail(
     .filter((line) => line !== '')
     .join('\n');
 
+  const html = buildContractorDispatchHtml({
+    appointment,
+    contractor,
+    deal,
+    dispatch,
+    estimatedProjectRange,
+    safeSummary,
+  });
+
   return {
     body,
+    html,
     metadata: {
       contractorName: contractor.companyName,
       isCustomerFacing: false,

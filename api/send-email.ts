@@ -6,6 +6,8 @@ import { Resend } from 'resend';
 // posts it here. The API key never touches the browser.
 type SendEmailBody = {
   body: string;
+  /** HTML version of the email. Sent alongside the plain-text fallback. */
+  html?: string;
   replyTo?: string;
   subject: string;
   to: string;
@@ -23,7 +25,7 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     return { error: 'Invalid request body.' };
   }
 
-  const { to, subject, body, replyTo } = data as Record<string, unknown>;
+  const { to, subject, body, html, replyTo } = data as Record<string, unknown>;
 
   if (typeof to !== 'string' || !isValidEmail(to)) {
     return { error: 'Missing or invalid recipient email address.' };
@@ -37,6 +39,12 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
   if (body.length > MAX_BODY_LENGTH) {
     return { error: 'Email body exceeds maximum allowed length.' };
   }
+  if (html !== undefined && typeof html !== 'string') {
+    return { error: 'Invalid html field: must be a string.' };
+  }
+  if (html !== undefined && html.length > MAX_BODY_LENGTH) {
+    return { error: 'Email HTML exceeds maximum allowed length.' };
+  }
   if (replyTo !== undefined && (typeof replyTo !== 'string' || !isValidEmail(replyTo))) {
     return { error: 'Invalid replyTo email address.' };
   }
@@ -45,6 +53,7 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     ok: true,
     payload: {
       body: body.trim(),
+      html: typeof html === 'string' && html.trim().length > 0 ? html : undefined,
       replyTo: typeof replyTo === 'string' ? replyTo.trim() : undefined,
       subject: subject.trim(),
       to: to.trim(),
@@ -72,12 +81,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: result.error });
   }
 
-  const { to, subject, body, replyTo } = result.payload;
+  const { to, subject, body, html, replyTo } = result.payload;
 
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from: EMAIL_FROM,
+      html,
       replyTo,
       subject,
       text: body,
