@@ -14,7 +14,14 @@ type SendEmailBody = {
 };
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
-const MAX_BODY_LENGTH = 20_000;
+/** Plain-text body limit — should stay small. */
+const MAX_TEXT_LENGTH = 20_000;
+/**
+ * HTML body limit — intentionally higher because our templates include
+ * substantial inline CSS required for email client compatibility.
+ * 200 KB covers even the largest template with a long safe summary.
+ */
+const MAX_HTML_LENGTH = 200_000;
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -36,13 +43,13 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
   if (typeof body !== 'string' || body.trim().length === 0) {
     return { error: 'Missing email body.' };
   }
-  if (body.length > MAX_BODY_LENGTH) {
+  if (body.length > MAX_TEXT_LENGTH) {
     return { error: 'Email body exceeds maximum allowed length.' };
   }
   if (html !== undefined && typeof html !== 'string') {
     return { error: 'Invalid html field: must be a string.' };
   }
-  if (html !== undefined && html.length > MAX_BODY_LENGTH) {
+  if (html !== undefined && html.length > MAX_HTML_LENGTH) {
     return { error: 'Email HTML exceeds maximum allowed length.' };
   }
   if (replyTo !== undefined && (typeof replyTo !== 'string' || !isValidEmail(replyTo))) {
