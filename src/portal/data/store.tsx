@@ -6,14 +6,10 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { commissions as initialCommissions } from './commissions';
-import { contractors as initialContractors } from './contractors';
-import { deals as initialDeals } from './deals';
 import {
   fetchGoogleCalendarEvents,
   GoogleCalendarEvent,
 } from './googleCalendar';
-import { users as initialUsers } from './users';
 import {
   Commission,
   CommissionPayoutStatus,
@@ -74,6 +70,7 @@ type ContractorDispatchDraft = Omit<
 >;
 
 type PortalDataContextValue = PortalDataState & {
+  isLoading: boolean;
   addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => void;
   updateUser: (
     userId: string,
@@ -81,18 +78,19 @@ type PortalDataContextValue = PortalDataState & {
     actor?: User
   ) => void;
   toggleUserActive: (userId: string, actor?: User) => void;
+  /** @deprecated auth is now handled by /api/auth/login — always returns null */
   authenticateUser: (email: string, password: string) => User | null;
   changeUserPassword: (
     userId: string,
     currentPassword: string,
     newPassword: string,
     actor?: User
-  ) => { ok: boolean; message?: string };
+  ) => Promise<{ ok: boolean; message?: string }>;
   resetUserPassword: (
     userId: string,
     temporaryPassword: string,
     actor?: User
-  ) => { ok: boolean; message?: string };
+  ) => Promise<{ ok: boolean; message?: string }>;
   logActivity: (activity: ActivityDraft, actor?: User) => void;
   addContractor: (contractor: ContractorDraft, actor?: User) => void;
   updateContractor: (
@@ -174,11 +172,8 @@ type PortalDataContextValue = PortalDataState & {
   calculateVisibleWonDeals: (user: User) => number;
 };
 
-// localStorage persistence key. The "v1" suffix is a schema version. If the
-// shape of PortalDataState ever changes in a breaking way, bump to "v2" and add
-// a migration in loadStoredState() — never mutate v1 data in place, as that
-// would silently corrupt existing sessions on older clients.
-const STORAGE_KEY = 'ontarioreno.portal.data.v1';
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const openDealStatuses: DealStatus[] = [
   'new_lead',
   'contacted',
@@ -188,33 +183,22 @@ const openDealStatuses: DealStatus[] = [
 ];
 const projectedCommissionStatuses: DealStatus[] = [...openDealStatuses, 'won'];
 
-const defaultState: PortalDataState = {
+const emptyState: PortalDataState = {
   activities: [],
   appointments: [],
-  commissions: initialCommissions,
-  contractors: initialContractors,
-  deals: initialDeals,
+  commissions: [],
+  contractors: [],
+  deals: [],
   dispatches: [],
   proposals: [],
-  users: initialUsers,
+  users: [],
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
   undefined
 );
 
-// Legacy demo-data IDs from an earlier version of the seed. These records no
-// longer exist in the current seed files (deals.ts / commissions.ts), but the
-// migration filters still remove them on load to clean up any stale localStorage
-// sessions that were created with the old seed. IDs are generated with createId()
-// (timestamp + random), so collision with these hardcoded strings is impossible.
-const demoDealIds = new Set(['deal-001', 'deal-002', 'deal-003', 'deal-004']);
-const demoCommissionIds = new Set([
-  'commission-001',
-  'commission-002',
-  'commission-003',
-  'commission-004',
-]);
+// ─── Utility helpers ──────────────────────────────────────────────────────────
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -253,163 +237,12 @@ function formatConsultationStage(stage: ConsultationStage) {
     .join(' ');
 }
 
-// INTERNAL PROTOTYPE WARNING:
-// These local password hashes and temporary passwords exist only for the
-// localStorage prototype. Replace this entire auth mechanism before production.
-const prototypePasswordHashes: Record<string, string> = {
-  oliver: 'local-prototype:b250YXJpb3Jlbm86b2xpdmVyMTIz',
-  sabah: 'local-prototype:b250YXJpb3Jlbm86YWRtaW4xMjM=',
-  xavier: 'local-prototype:b250YXJpb3Jlbm86eGF2aWVyMTIz',
-};
-
-const prototypeLoginEmails: Record<string, string> = {
-  oliver: 'david.galaxykitchenrenovation@gmail.com',
-  sabah: 'sabahohs@gmail.com',
-  xavier: 'kb.live13@gmail.com',
-};
-
-function createPrototypePasswordHash(password: string) {
-  return `local-prototype:${window.btoa(`ontarioreno:${password}`)}`;
-}
-
 export function generateTemporaryPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   return Array.from(
     { length: 12 },
     () => chars[Math.floor(Math.random() * chars.length)]
   ).join('');
-}
-
-function normalizeUser(user: User): User {
-  let normalizedUser = user;
-
-  if (normalizedUser.active === undefined) {
-    normalizedUser = {
-      ...normalizedUser,
-      active: true,
-    };
-  }
-
-  if (user.id === 'sabah') {
-    normalizedUser = {
-      ...normalizedUser,
-      email: 'sabahohs@gmail.com',
-    };
-  }
-
-  if (normalizedUser.id === 'oliver' && !normalizedUser.avatarUrl) {
-    normalizedUser = {
-      ...normalizedUser,
-      avatarUrl: '/images/oliverpp.png',
-    };
-  }
-
-  if (normalizedUser.id === 'oliver') {
-    normalizedUser = {
-      ...normalizedUser,
-      email: 'David.galaxykitchenrenovation@gmail.com',
-    };
-  }
-
-  if (normalizedUser.id === 'xavier' && !normalizedUser.avatarUrl) {
-    normalizedUser = {
-      ...normalizedUser,
-      avatarUrl: '/images/kevenpp.png',
-    };
-  }
-
-  if (normalizedUser.id === 'xavier') {
-    normalizedUser = {
-      ...normalizedUser,
-      email: 'kb.live13@gmail.com',
-    };
-  }
-
-  if (!normalizedUser.passwordHash && prototypePasswordHashes[normalizedUser.id]) {
-    normalizedUser = {
-      ...normalizedUser,
-      passwordHash: prototypePasswordHashes[normalizedUser.id],
-    };
-  }
-
-  return normalizedUser;
-}
-
-function getUserLoginEmail(user: User) {
-  return (prototypeLoginEmails[user.id] ?? user.email).trim().toLowerCase();
-}
-
-function getUserPasswordHash(user: User) {
-  return user.passwordHash ?? prototypePasswordHashes[user.id];
-}
-
-function normalizeUsers(users: User[]): User[] {
-  const usersById = new Map(
-    users.map((user) => {
-      const normalizedUser = normalizeUser(user);
-      return [normalizedUser.id, normalizedUser] as const;
-    })
-  );
-
-  initialUsers.map(normalizeUser).forEach((user) => {
-    if (!usersById.has(user.id)) {
-      usersById.set(user.id, user);
-    }
-  });
-
-  return Array.from(usersById.values());
-}
-
-function migrateDeals(deals: Deal[]) {
-  const currentDeals = deals.map(normalizeDeal);
-  const currentNonDemoDeals = currentDeals.filter(
-    (deal) => !demoDealIds.has(deal.id)
-  );
-  const hasOliverImport = currentNonDemoDeals.some((deal) =>
-    deal.id.startsWith('oliver-sold-')
-  );
-  const hasXavierImport = currentNonDemoDeals.some((deal) =>
-    deal.id.startsWith('xavier-sold-')
-  );
-  const missingSeedDeals = initialDeals.filter(
-    (deal) =>
-      (deal.id.startsWith('oliver-sold-') && !hasOliverImport) ||
-      (deal.id.startsWith('xavier-sold-') && !hasXavierImport)
-  );
-
-  return [...currentNonDemoDeals, ...missingSeedDeals];
-}
-
-function migrateCommissions(commissions: Commission[]) {
-  const currentCommissionIds = new Set(
-    commissions.map((commission) => commission.id)
-  );
-  const missingSeedCommissions = initialCommissions.filter(
-    (commission) => !currentCommissionIds.has(commission.id)
-  );
-
-  return [
-    ...commissions.filter(
-      (commission) => !demoCommissionIds.has(commission.id)
-    ),
-    ...missingSeedCommissions,
-  ];
-}
-
-function removeDemoDealActivities(activities: Activity[]) {
-  return activities.filter(
-    (activity) => !activity.dealId || !demoDealIds.has(activity.dealId)
-  );
-}
-
-function removeDemoDealAppointments(appointments: Appointment[]) {
-  return appointments.filter(
-    (appointment) => !demoDealIds.has(appointment.dealId)
-  );
-}
-
-function removeDemoDealProposals(proposals: ProposalHistory[]) {
-  return proposals.filter((proposal) => !demoDealIds.has(proposal.dealId));
 }
 
 function normalizeAppointment(appointment: Appointment, deals: Deal[]): Appointment {
@@ -457,38 +290,6 @@ function normalizeAppointment(appointment: Appointment, deals: Deal[]): Appointm
   };
 }
 
-function loadStoredState(): PortalDataState {
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (!stored) return defaultState;
-
-  try {
-    const parsed = JSON.parse(stored) as Partial<PortalDataState>;
-    const deals = migrateDeals(parsed.deals ?? defaultState.deals);
-
-    return {
-      activities: removeDemoDealActivities(
-        parsed.activities ?? defaultState.activities
-      ),
-      appointments: removeDemoDealAppointments(
-        parsed.appointments ?? defaultState.appointments
-      ).map((appointment) => normalizeAppointment(appointment, deals)),
-      commissions: syncCommissionsWithDeals(
-        migrateCommissions(parsed.commissions ?? defaultState.commissions),
-        deals
-      ),
-      contractors: parsed.contractors ?? defaultState.contractors,
-      deals,
-      dispatches: parsed.dispatches ?? defaultState.dispatches,
-      proposals: removeDemoDealProposals(
-        parsed.proposals ?? defaultState.proposals
-      ),
-      users: normalizeUsers(parsed.users ?? defaultState.users),
-    };
-  } catch {
-    return defaultState;
-  }
-}
-
 type ActivityDraft = Omit<
   Activity,
   'actorName' | 'actorRole' | 'actorUserId' | 'createdAt' | 'id'
@@ -515,7 +316,6 @@ function prependActivity(
 
 function getDealLabel(deal: Deal | undefined) {
   if (!deal) return 'Deal';
-
   return `${deal.homeownerName} - ${deal.projectType}`;
 }
 
@@ -715,11 +515,10 @@ function syncCommissionsWithDeals(
   deals: Deal[]
 ): Commission[] {
   const dealsById = new Map(deals.map((deal) => [deal.id, deal]));
-  const syncedCommissions = commissions
-    .map((commission) => {
-      const deal = dealsById.get(commission.dealId);
-      return deal ? normalizeCommissionWithDeal(commission, deal) : commission;
-    });
+  const syncedCommissions = commissions.map((commission) => {
+    const deal = dealsById.get(commission.dealId);
+    return deal ? normalizeCommissionWithDeal(commission, deal) : commission;
+  });
   const commissionDealIds = new Set(
     syncedCommissions.map((commission) => commission.dealId)
   );
@@ -730,33 +529,64 @@ function syncCommissionsWithDeals(
   return [...syncedCommissions, ...missingWonDealCommissions];
 }
 
-export function PortalDataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PortalDataState>(loadStoredState);
+// ─── API helper ───────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    setState((current) => {
-      const syncedCommissions = syncCommissionsWithDeals(
-        current.commissions,
-        current.deals
-      );
-
-      if (
-        JSON.stringify(syncedCommissions) ===
-        JSON.stringify(current.commissions)
-      ) {
-        return current;
-      }
-
-      return {
-        ...current,
-        commissions: syncedCommissions,
-      };
+async function apiCall<T>(
+  url: string,
+  options?: RequestInit
+): Promise<T | null> {
+  try {
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
     });
-  }, []);
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
 
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
+export function PortalDataProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<PortalDataState>(emptyState);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load all portal data from the API on mount.
+  // We only run this when on a /portal route so public pages don't fire
+  // unauthenticated API calls unnecessarily.
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    if (!window.location.pathname.startsWith('/portal')) {
+      setIsLoading(false);
+      return;
+    }
+
+    Promise.all([
+      apiCall<User[]>('/api/users'),
+      apiCall<Contractor[]>('/api/contractors'),
+      apiCall<Deal[]>('/api/deals'),
+      apiCall<Appointment[]>('/api/appointments'),
+      apiCall<Commission[]>('/api/commissions'),
+      apiCall<Activity[]>('/api/activities'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities]) => {
+      const deals = (rawDeals ?? []).map(normalizeDeal);
+
+      setState({
+        users: users ?? [],
+        contractors: contractors ?? [],
+        deals,
+        appointments: (appointments ?? []).map((a) => normalizeAppointment(a, deals)),
+        commissions: syncCommissionsWithDeals(commissions ?? [], deals),
+        activities: activities ?? [],
+        dispatches: [],
+        proposals: [],
+      });
+      setIsLoading(false);
+    }).catch(() => setIsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const value = useMemo<PortalDataContextValue>(() => {
     const getDealsForRep = (repId: string) =>
@@ -945,33 +775,47 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
     return {
       ...state,
-      addUser: (user, actor) => {
-        setState((current) => {
-          const newUser: User = {
-            ...user,
-            id: createId('user'),
-            passwordHash:
-              user.passwordHash ??
-              createPrototypePasswordHash(generateTemporaryPassword()),
-            role: 'rep',
-          };
+      isLoading,
 
-          return {
+      // ── User mutations ──────────────────────────────────────────────────────
+
+      addUser: (user, actor) => {
+        const tempId = createId('user');
+        const newUser: User = {
+          ...user,
+          id: tempId,
+          role: 'rep',
+          passwordHash: undefined,
+        };
+
+        setState((current) => ({
+          ...current,
+          activities: prependActivity(current.activities, actor, {
+            actionLabel: `Rep added: ${newUser.name}`,
+            actionType: 'rep_added',
+            entityId: newUser.id,
+            entityLabel: newUser.name,
+            entityType: 'rep',
+          }),
+          users: [...current.users, newUser],
+        }));
+
+        // Server creates real ID — replace temp once saved
+        apiCall<User>('/api/users', {
+          method: 'POST',
+          body: JSON.stringify({ ...user, role: 'rep' }),
+        }).then((saved) => {
+          if (!saved) return;
+          setState((current) => ({
             ...current,
-            activities: prependActivity(current.activities, actor, {
-              actionLabel: `Rep added: ${newUser.name}`,
-              actionType: 'rep_added',
-              entityId: newUser.id,
-              entityLabel: newUser.name,
-              entityType: 'rep',
-            }),
-            users: [...current.users, newUser],
-          };
+            users: current.users.map((u) => (u.id === tempId ? saved : u)),
+          }));
         });
       },
+
       updateUser: (userId, updates, actor) => {
         setState((current) => {
-          const existingUser = current.users.find((user) => user.id === userId);
+          const existingUser = current.users.find((u) => u.id === userId);
           const updatedUser = existingUser
             ? { ...existingUser, ...updates, id: existingUser.id, role: existingUser.role }
             : undefined;
@@ -986,22 +830,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                     entityId: updatedUser.id,
                     entityLabel: updatedUser.name,
                     entityType: 'rep',
-                    metadata: {
-                      active: updatedUser.active,
-                    },
+                    metadata: { active: updatedUser.active },
                   })
                 : current.activities,
-            users: current.users.map((user) =>
-              user.id === userId
-                ? { ...user, ...updates, id: user.id, role: user.role }
-                : user
+            users: current.users.map((u) =>
+              u.id === userId
+                ? { ...u, ...updates, id: u.id, role: u.role }
+                : u
             ),
           };
         });
+
+        apiCall(`/api/users/${userId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
       },
+
       toggleUserActive: (userId, actor) => {
         setState((current) => {
-          const existingUser = current.users.find((user) => user.id === userId);
+          const existingUser = current.users.find((u) => u.id === userId);
           const nextActive = !existingUser?.active;
 
           return {
@@ -1018,131 +866,138 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   metadata: { active: nextActive },
                 })
               : current.activities,
-            users: current.users.map((user) =>
-              user.id === userId ? { ...user, active: !user.active } : user
+            users: current.users.map((u) =>
+              u.id === userId ? { ...u, active: !u.active } : u
             ),
           };
         });
-      },
-      authenticateUser: (email, password) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        const passwordHash = createPrototypePasswordHash(password);
 
-        return (
-          state.users
-            .map(normalizeUser)
-            .find(
-              (user) =>
-                user.active &&
-                getUserLoginEmail(user) === normalizedEmail &&
-                getUserPasswordHash(user) === passwordHash
-            ) ?? null
-        );
+        // Read current active state before the toggle to send correct value
+        const currentUser = state.users.find((u) => u.id === userId);
+        apiCall(`/api/users/${userId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ active: !currentUser?.active }),
+        });
       },
-      changeUserPassword: (userId, currentPassword, newPassword, actor) => {
-        const user = state.users
-          .map(normalizeUser)
-          .find((candidate) => candidate.id === userId);
-        if (!user) return { ok: false, message: 'User not found.' };
+
+      /** @deprecated — auth is handled by /api/auth/login */
+      authenticateUser: () => null,
+
+      changeUserPassword: async (userId, currentPassword, newPassword, actor) => {
         if (newPassword.length < 8) {
-          return {
-            ok: false,
-            message: 'New password must be at least 8 characters.',
-          };
+          return { ok: false, message: 'New password must be at least 8 characters.' };
         }
-        if (
-          getUserPasswordHash(user) !== createPrototypePasswordHash(currentPassword)
-        ) {
+
+        const result = await apiCall<{ ok: boolean; error?: string }>(
+          `/api/users/${userId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({ currentPassword, password: newPassword }),
+          }
+        );
+
+        if (!result) {
           return { ok: false, message: 'Current password is incorrect.' };
         }
 
-        setState((current) => ({
-          ...current,
-          activities: prependActivity(current.activities, actor, {
-            actionLabel: `Password changed for ${user.name}`,
-            actionType: 'user_password_changed',
-            entityId: user.id,
-            entityLabel: user.name,
-            entityType: 'rep',
-          }),
-          users: current.users.map((candidate) =>
-            candidate.id === userId
-              ? {
-                  ...candidate,
-                  passwordHash: createPrototypePasswordHash(newPassword),
-                }
-              : candidate
-          ),
-        }));
-
-        return { ok: true };
-      },
-      resetUserPassword: (userId, temporaryPassword, actor) => {
-        const user = state.users.find((candidate) => candidate.id === userId);
-        if (!user) return { ok: false, message: 'User not found.' };
-        if (temporaryPassword.length < 8) {
-          return {
-            ok: false,
-            message: 'Temporary password must be at least 8 characters.',
-          };
+        if (actor) {
+          const user = state.users.find((u) => u.id === userId);
+          setState((current) => ({
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Password changed for ${user?.name ?? userId}`,
+              actionType: 'user_password_changed',
+              entityId: userId,
+              entityLabel: user?.name ?? userId,
+              entityType: 'rep',
+            }),
+          }));
         }
 
+        return { ok: true };
+      },
+
+      resetUserPassword: async (userId, temporaryPassword, actor) => {
+        if (temporaryPassword.length < 8) {
+          return { ok: false, message: 'Temporary password must be at least 8 characters.' };
+        }
+
+        const result = await apiCall<{ ok: boolean }>(
+          `/api/users/${userId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({ password: temporaryPassword }),
+          }
+        );
+
+        if (!result) {
+          return { ok: false, message: 'Password reset failed.' };
+        }
+
+        const user = state.users.find((u) => u.id === userId);
         setState((current) => ({
           ...current,
           activities: prependActivity(current.activities, actor, {
-            actionLabel: `Password reset for ${user.name}`,
+            actionLabel: `Password reset for ${user?.name ?? userId}`,
             actionType: 'user_password_reset',
-            entityId: user.id,
-            entityLabel: user.name,
+            entityId: userId,
+            entityLabel: user?.name ?? userId,
             entityType: 'rep',
           }),
-          users: current.users.map((candidate) =>
-            candidate.id === userId
-              ? {
-                  ...candidate,
-                  passwordHash: createPrototypePasswordHash(temporaryPassword),
-                }
-              : candidate
-          ),
         }));
 
         return { ok: true };
       },
+
       logActivity: (activity, actor) => {
         setState((current) => ({
           ...current,
           activities: prependActivity(current.activities, actor, activity),
         }));
-      },
-      addContractor: (contractor: ContractorDraft, actor) => {
-        setState((current) => {
-          const newContractor: Contractor = {
-            ...contractor,
-            id: createId('contractor'),
-          };
 
-          return {
-            ...current,
-            activities: prependActivity(current.activities, actor, {
-              actionLabel: `Contractor added: ${newContractor.companyName}`,
-              actionType: 'contractor_added',
-              contractorId: newContractor.id,
-              entityId: newContractor.id,
-              entityLabel: newContractor.companyName,
-              entityType: 'contractor',
-            }),
-            contractors: [...current.contractors, newContractor],
-          };
+        apiCall('/api/activities', {
+          method: 'POST',
+          body: JSON.stringify(activity),
         });
       },
-      updateContractor: (
-        contractorId: string,
-        updates: Partial<Contractor>,
-        actor?: User
-      ) => {
+
+      // ── Contractor mutations ────────────────────────────────────────────────
+
+      addContractor: (contractor, actor) => {
+        const tempId = createId('contractor');
+        const newContractor: Contractor = { ...contractor, id: tempId };
+
+        setState((current) => ({
+          ...current,
+          activities: prependActivity(current.activities, actor, {
+            actionLabel: `Contractor added: ${newContractor.companyName}`,
+            actionType: 'contractor_added',
+            contractorId: newContractor.id,
+            entityId: newContractor.id,
+            entityLabel: newContractor.companyName,
+            entityType: 'contractor',
+          }),
+          contractors: [...current.contractors, newContractor],
+        }));
+
+        apiCall<Contractor>('/api/contractors', {
+          method: 'POST',
+          body: JSON.stringify(contractor),
+        }).then((saved) => {
+          if (!saved) return;
+          setState((current) => ({
+            ...current,
+            contractors: current.contractors.map((c) =>
+              c.id === tempId ? saved : c
+            ),
+          }));
+        });
+      },
+
+      updateContractor: (contractorId, updates, actor) => {
         setState((current) => {
           const existingContractor = current.contractors.find(
-            (contractor) => contractor.id === contractorId
+            (c) => c.id === contractorId
           );
           const updatedContractor = existingContractor
             ? { ...existingContractor, ...updates, id: existingContractor.id }
@@ -1182,18 +1037,24 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                         }
                   )
                 : current.activities,
-            contractors: current.contractors.map((contractor) =>
-              contractor.id === contractorId
-                ? { ...contractor, ...updates, id: contractor.id }
-                : contractor
+            contractors: current.contractors.map((c) =>
+              c.id === contractorId
+                ? { ...c, ...updates, id: c.id }
+                : c
             ),
           };
         });
+
+        apiCall(`/api/contractors/${contractorId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
       },
+
       deleteContractor: (contractorId, actor) => {
         setState((current) => {
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === contractorId
+            (c) => c.id === contractorId
           );
 
           return {
@@ -1209,7 +1070,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 })
               : current.activities,
             contractors: current.contractors.filter(
-              (candidate) => candidate.id !== contractorId
+              (c) => c.id !== contractorId
             ),
             deals: current.deals.map((deal) =>
               deal.assignedContractorId === contractorId
@@ -1225,85 +1086,100 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
+
+        apiCall(`/api/contractors/${contractorId}`, { method: 'DELETE' });
       },
-      toggleContractorStatus: (contractorId: string) => {
+
+      toggleContractorStatus: (contractorId) => {
+        const contractor = state.contractors.find((c) => c.id === contractorId);
+        const nextStatus =
+          contractor?.contractorStatus === 'active' ? 'inactive' : 'active';
+
         setState((current) => ({
           ...current,
-          contractors: current.contractors.map((contractor) =>
-            contractor.id === contractorId
-              ? {
-                  ...contractor,
-                  contractorStatus:
-                    contractor.contractorStatus === 'active'
-                      ? 'inactive'
-                      : 'active',
-                }
-              : contractor
+          contractors: current.contractors.map((c) =>
+            c.id === contractorId
+              ? { ...c, contractorStatus: nextStatus as ContractorStatus }
+              : c
           ),
         }));
-      },
-      addDeal: (dealDraft: DealDraft, repId: string, actor) => {
-        setState((current) => {
-          const now = new Date().toISOString();
-          const deal: Deal = {
-            ...dealDraft,
-            assignedContractorId: null,
-            assignedRepId: repId,
-            activity: [],
-            createdAt: now,
-            id: createId('deal'),
-            status: 'new_lead',
-            updatedAt: now,
-          };
 
-          return {
-            activities: prependActivity(current.activities, actor, {
-              actionLabel: `Deal created: ${getDealLabel(deal)}`,
-              actionType: 'deal_created',
-              dealId: deal.id,
-              entityId: deal.id,
-              entityLabel: getDealLabel(deal),
-              entityType: 'deal',
-            }),
-            commissions: [
-              ...current.commissions,
-              createCommissionForDeal(deal),
-            ],
-            appointments: current.appointments,
-            contractors: current.contractors,
-            deals: [...current.deals, deal],
-            dispatches: current.dispatches,
-            proposals: current.proposals,
-            users: current.users,
-          };
+        apiCall(`/api/contractors/${contractorId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ contractorStatus: nextStatus }),
         });
       },
-      updateDeal: (dealId: string, updates: Partial<Deal>, actor) => {
+
+      // ── Deal mutations ──────────────────────────────────────────────────────
+
+      addDeal: (dealDraft, repId, actor) => {
+        const tempId = createId('deal');
+        const now = new Date().toISOString();
+        const deal: Deal = {
+          ...dealDraft,
+          assignedContractorId: null,
+          assignedRepId: repId,
+          activity: [],
+          createdAt: now,
+          id: tempId,
+          status: 'new_lead',
+          updatedAt: now,
+        };
+
+        setState((current) => ({
+          activities: prependActivity(current.activities, actor, {
+            actionLabel: `Deal created: ${getDealLabel(deal)}`,
+            actionType: 'deal_created',
+            dealId: deal.id,
+            entityId: deal.id,
+            entityLabel: getDealLabel(deal),
+            entityType: 'deal',
+          }),
+          commissions: [...current.commissions, createCommissionForDeal(deal)],
+          appointments: current.appointments,
+          contractors: current.contractors,
+          deals: [...current.deals, deal],
+          dispatches: current.dispatches,
+          proposals: current.proposals,
+          users: current.users,
+        }));
+
+        apiCall<Deal>('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ ...dealDraft, assignedRepId: repId }),
+        }).then((saved) => {
+          if (!saved) return;
+          setState((current) => ({
+            ...current,
+            deals: current.deals.map((d) => (d.id === tempId ? normalizeDeal(saved) : d)),
+            commissions: current.commissions.map((c) =>
+              c.dealId === tempId ? { ...c, dealId: saved.id } : c
+            ),
+          }));
+        });
+      },
+
+      updateDeal: (dealId, updates, actor) => {
         setState((current) => {
-          const previousDeal = current.deals.find((deal) => deal.id === dealId);
-          const deals = current.deals.map((deal) =>
-            deal.id === dealId
-              ? { ...deal, ...updates, id: deal.id, updatedAt: new Date().toISOString() }
-              : deal
+          const previousDeal = current.deals.find((d) => d.id === dealId);
+          const deals = current.deals.map((d) =>
+            d.id === dealId
+              ? { ...d, ...updates, id: d.id, updatedAt: new Date().toISOString() }
+              : d
           );
-          const nextDeal = deals.find((deal) => deal.id === dealId);
+          const nextDeal = deals.find((d) => d.id === dealId);
           let activities = current.activities;
 
           if (previousDeal && nextDeal) {
             if (updates.status && previousDeal.status !== nextDeal.status) {
               activities = prependActivity(activities, actor, {
-                actionLabel: `Status changed to ${nextDeal.status
-                  .split('_')
-                  .join(' ')}`,
+                actionLabel: `Status changed to ${nextDeal.status.split('_').join(' ')}`,
                 actionType: 'deal_status_changed',
                 dealId: nextDeal.id,
                 entityId: nextDeal.id,
                 entityLabel: getDealLabel(nextDeal),
                 entityType: 'deal',
-                metadata: {
-                  from: previousDeal.status,
-                  to: nextDeal.status,
-                },
+                metadata: { from: previousDeal.status, to: nextDeal.status },
               });
             }
 
@@ -1318,9 +1194,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 entityId: nextDeal.id,
                 entityLabel: getDealLabel(nextDeal),
                 entityType: 'appointment',
-                metadata: {
-                  nextFollowUpDate: nextDeal.nextFollowUpDate || null,
-                },
+                metadata: { nextFollowUpDate: nextDeal.nextFollowUpDate || null },
               });
             }
 
@@ -1329,17 +1203,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               previousDeal.financingRequired !== nextDeal.financingRequired
             ) {
               activities = prependActivity(activities, actor, {
-                actionLabel: `Financing requirement changed for ${getDealLabel(
-                  nextDeal
-                )}`,
+                actionLabel: `Financing requirement changed for ${getDealLabel(nextDeal)}`,
                 actionType: 'deal_financing_changed',
                 dealId: nextDeal.id,
                 entityId: nextDeal.id,
                 entityLabel: getDealLabel(nextDeal),
                 entityType: 'deal',
-                metadata: {
-                  financingRequired: nextDeal.financingRequired,
-                },
+                metadata: { financingRequired: nextDeal.financingRequired },
               });
             }
 
@@ -1357,24 +1227,28 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ...current,
             activities,
             commissions: current.commissions.map((commission) => {
-              const deal = deals.find((candidate) => candidate.id === commission.dealId);
+              const deal = deals.find((d) => d.id === commission.dealId);
               return deal ? normalizeCommissionWithDeal(commission, deal) : commission;
             }),
             deals,
           };
         });
+
+        apiCall(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
       },
+
       deleteDeal: (dealId, actor) => {
         setState((current) => {
-          const deal = current.deals.find((candidate) => candidate.id === dealId);
+          const deal = current.deals.find((d) => d.id === dealId);
 
           return {
             ...current,
             activities: deal
               ? prependActivity(
-                  current.activities.filter(
-                    (activity) => activity.dealId !== dealId
-                  ),
+                  current.activities.filter((a) => a.dealId !== dealId),
                   actor,
                   {
                     actionLabel: `Deal deleted: ${getDealLabel(deal)}`,
@@ -1387,12 +1261,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 )
               : current.activities,
             appointments: current.appointments.filter(
-              (appointment) => appointment.dealId !== dealId
+              (a) => a.dealId !== dealId
             ),
             commissions: current.commissions.filter(
-              (commission) => commission.dealId !== dealId
+              (c) => c.dealId !== dealId
             ),
-            deals: current.deals.filter((candidate) => candidate.id !== dealId),
+            deals: current.deals.filter((d) => d.id !== dealId),
             dispatches: current.dispatches.filter(
               (dispatch) => dispatch.dealId !== dealId
             ),
@@ -1401,16 +1275,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
+
+        apiCall(`/api/deals/${dealId}`, { method: 'DELETE' });
       },
-      assignContractorToDeal: (
-        dealId: string,
-        contractorId: string | null,
-        actor?: User
-      ) => {
+
+      assignContractorToDeal: (dealId, contractorId, actor) => {
         setState((current) => {
-          const deal = current.deals.find((candidate) => candidate.id === dealId);
+          const deal = current.deals.find((d) => d.id === dealId);
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === contractorId
+            (c) => c.id === contractorId
           );
 
           return {
@@ -1431,24 +1304,30 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   },
                 })
               : current.activities,
-            deals: current.deals.map((candidateDeal) =>
-              candidateDeal.id === dealId
+            deals: current.deals.map((d) =>
+              d.id === dealId
                 ? {
-                    ...candidateDeal,
+                    ...d,
                     assignedContractorId: contractorId,
                     updatedAt: new Date().toISOString(),
                   }
-                : candidateDeal
+                : d
             ),
           };
         });
+
+        apiCall(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ assignedContractorId: contractorId }),
+        });
       },
-      addDealActivity: (dealId: string, note: string, actor) => {
+
+      addDealActivity: (dealId, note, actor) => {
         const trimmedNote = note.trim();
         if (!trimmedNote) return;
 
         setState((current) => {
-          const targetDeal = current.deals.find((deal) => deal.id === dealId);
+          const targetDeal = current.deals.find((d) => d.id === dealId);
 
           return {
             ...current,
@@ -1464,30 +1343,33 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : current.activities,
             deals: current.deals.map((deal) => {
               if (deal.id !== dealId) return deal;
-
-            const activity: DealActivity = {
-              createdAt: new Date().toISOString(),
-              id: createId('activity'),
-              note: trimmedNote,
-            };
-
-            return {
-              ...deal,
-              activity: [activity, ...(deal.activity ?? [])],
-              updatedAt: new Date().toISOString(),
-            };
+              const activity: DealActivity = {
+                createdAt: new Date().toISOString(),
+                id: createId('activity'),
+                note: trimmedNote,
+              };
+              return {
+                ...deal,
+                activity: [activity, ...(deal.activity ?? [])],
+                updatedAt: new Date().toISOString(),
+              };
             }),
           };
         });
+
+        // POST note via the deals/:id endpoint (method: POST adds a note)
+        apiCall(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ note: trimmedNote }),
+        });
       },
+
       addProposalHistory: (proposal, actor) => {
         setState((current) => {
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === proposal.contractorId
+            (c) => c.id === proposal.contractorId
           );
-          const deal = current.deals.find(
-            (candidate) => candidate.id === proposal.dealId
-          );
+          const deal = current.deals.find((d) => d.id === proposal.dealId);
           const proposalHistory = {
             ...proposal,
             id: createId('proposal'),
@@ -1497,39 +1379,33 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             activities: prependActivity(current.activities, actor, {
-              actionLabel: `Proposal sent to ${
-                contractor?.companyName ?? 'contractor'
-              }`,
+              actionLabel: `Proposal sent to ${contractor?.companyName ?? 'contractor'}`,
               actionType: 'proposal_sent',
               contractorId: contractor?.id,
               dealId: deal?.id,
               entityId: proposalHistory.id,
               entityLabel: proposal.proposalSubject,
               entityType: 'proposal',
-              metadata: {
-                contractorName: contractor?.companyName ?? null,
-              },
+              metadata: { contractorName: contractor?.companyName ?? null },
             }),
             proposals: [proposalHistory, ...current.proposals],
           };
         });
+        // proposals are currently memory-only; add API endpoint in follow-up PR
       },
+
       addContractorDispatch: (dispatch, actor) => {
         setState((current) => {
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === dispatch.contractorId
+            (c) => c.id === dispatch.contractorId
           );
-          const deal = current.deals.find(
-            (candidate) => candidate.id === dispatch.dealId
-          );
+          const deal = current.deals.find((d) => d.id === dispatch.dealId);
           const now = new Date().toISOString();
           const contractorDispatch: ContractorDispatch = {
             ...dispatch,
             id: createId('dispatch'),
             sentAt:
-              dispatch.status === 'sent' && !dispatch.sentAt
-                ? now
-                : dispatch.sentAt,
+              dispatch.status === 'sent' && !dispatch.sentAt ? now : dispatch.sentAt,
             createdAt: now,
             updatedAt: now,
           };
@@ -1539,9 +1415,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             activities: prependActivity(current.activities, actor, {
-              actionLabel: `${note}${
-                actor?.name ? ` by ${actor.name}` : ''
-              }`,
+              actionLabel: `${note}${actor?.name ? ` by ${actor.name}` : ''}`,
               actionType: 'contractor_dispatch_sent',
               contractorId: contractor?.id,
               dealId: deal?.id,
@@ -1557,19 +1431,21 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             dispatches: [contractorDispatch, ...current.dispatches],
           };
         });
+        // dispatches are currently memory-only; add API endpoint in follow-up PR
       },
+
       updateContractorDispatch: (dispatchId, updates, actor) => {
         setState((current) => {
           const existingDispatch = current.dispatches.find(
-            (dispatch) => dispatch.id === dispatchId
+            (d) => d.id === dispatchId
           );
           if (!existingDispatch) return current;
 
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === existingDispatch.contractorId
+            (c) => c.id === existingDispatch.contractorId
           );
           const deal = current.deals.find(
-            (candidate) => candidate.id === existingDispatch.dealId
+            (d) => d.id === existingDispatch.dealId
           );
           const nextDispatch: ContractorDispatch = {
             ...existingDispatch,
@@ -1585,8 +1461,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             updates.status && updates.status !== existingDispatch.status;
           const responseNoteChanged =
             updates.contractorResponseNote !== undefined &&
-            updates.contractorResponseNote !==
-              existingDispatch.contractorResponseNote;
+            updates.contractorResponseNote !== existingDispatch.contractorResponseNote;
           const contractorName = contractor?.companyName ?? 'contractor';
           const statusLabel = nextDispatch.status.replace('_', ' ');
           const note = statusChanged
@@ -1617,25 +1492,24 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               statusChanged || responseNoteChanged
                 ? addDealTimelineNote(current.deals, deal?.id, note)
                 : current.deals,
-            dispatches: current.dispatches.map((dispatch) =>
-              dispatch.id === dispatchId ? nextDispatch : dispatch
+            dispatches: current.dispatches.map((d) =>
+              d.id === dispatchId ? nextDispatch : d
             ),
           };
         });
       },
+
       assignDispatchContractor: (dispatchId, actor) => {
         setState((current) => {
           const dispatch = current.dispatches.find(
-            (candidate) => candidate.id === dispatchId
+            (d) => d.id === dispatchId
           );
           if (!dispatch) return current;
 
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === dispatch.contractorId
+            (c) => c.id === dispatch.contractorId
           );
-          const deal = current.deals.find(
-            (candidate) => candidate.id === dispatch.dealId
-          );
+          const deal = current.deals.find((d) => d.id === dispatch.dealId);
           const contractorName = contractor?.companyName ?? 'contractor';
           const note = `${contractorName} assigned as contractor`;
 
@@ -1649,9 +1523,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               entityId: dispatch.id,
               entityLabel: contractorName,
               entityType: 'proposal',
-              metadata: {
-                consultationId: dispatch.consultationId ?? null,
-              },
+              metadata: { consultationId: dispatch.consultationId ?? null },
             }),
             appointments: current.appointments.map((appointment) =>
               dispatch.consultationId &&
@@ -1669,43 +1541,43 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 : appointment
             ),
             deals: addDealTimelineNote(
-              current.deals.map((candidateDeal) =>
-                candidateDeal.id === dispatch.dealId
+              current.deals.map((d) =>
+                d.id === dispatch.dealId
                   ? {
-                      ...candidateDeal,
+                      ...d,
                       assignedContractorId: dispatch.contractorId,
                       updatedAt: new Date().toISOString(),
                     }
-                  : candidateDeal
+                  : d
               ),
               dispatch.dealId,
               note
             ),
-            dispatches: current.dispatches.map((candidate) =>
-              candidate.id === dispatchId
+            dispatches: current.dispatches.map((d) =>
+              d.id === dispatchId
                 ? {
-                    ...candidate,
-                    status:
-                      candidate.status === 'accepted'
-                        ? candidate.status
-                        : 'accepted',
+                    ...d,
+                    status: d.status === 'accepted' ? d.status : 'accepted',
                     updatedAt: new Date().toISOString(),
                   }
-                : candidate
+                : d
             ),
           };
         });
       },
+
+      // ── Commission mutations ────────────────────────────────────────────────
+
       updateCommission: (commissionId, updates, actor) => {
         setState((current) => {
           const existingCommission = current.commissions.find(
-            (commission) => commission.id === commissionId
+            (c) => c.id === commissionId
           );
           const relatedDeal = current.deals.find(
-            (deal) => deal.id === existingCommission?.dealId
+            (d) => d.id === existingCommission?.dealId
           );
           const relatedRep = current.users.find(
-            (user) => user.id === existingCommission?.repId
+            (u) => u.id === existingCommission?.repId
           );
           const repName = relatedRep?.name ?? 'rep';
           const repEstimatedCommission = relatedDeal
@@ -1719,15 +1591,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             if (updates.payoutStatus === 'paid') {
               return Math.max(requestedPaidAmount, repEstimatedCommission);
             }
+            if (updates.payoutStatus === 'pending') return 0;
 
-            if (updates.payoutStatus === 'pending') {
-              return 0;
-            }
-
-            return Math.min(
-              Math.max(requestedPaidAmount, 0),
-              repEstimatedCommission
-            );
+            return Math.min(Math.max(requestedPaidAmount, 0), repEstimatedCommission);
           })();
           const nextPayoutStatus = normalizePayoutStatus(
             nextPaidAmount,
@@ -1735,18 +1601,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           );
           const actionLabel =
             nextPayoutStatus === 'partial'
-              ? `${
-                  actor?.name ?? 'Admin'
-                } recorded partial payout of ${new Intl.NumberFormat('en-CA', {
+              ? `${actor?.name ?? 'Admin'} recorded partial payout of ${new Intl.NumberFormat('en-CA', {
                   currency: 'CAD',
                   maximumFractionDigits: 0,
                   style: 'currency',
                 }).format(nextPaidAmount)} for ${getDealLabel(relatedDeal)}`
-              : `${
-                  actor?.name ?? 'Admin'
-                } updated ${repName}'s payout for ${getDealLabel(
-                  relatedDeal
-                )} to ${
+              : `${actor?.name ?? 'Admin'} updated ${repName}'s payout for ${getDealLabel(relatedDeal)} to ${
                   nextPayoutStatus.charAt(0).toUpperCase() +
                   nextPayoutStatus.slice(1)
                 }`;
@@ -1769,67 +1629,67 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   })
                 : current.activities,
             commissions: current.commissions.map((commission) => {
-            if (commission.id !== commissionId) return commission;
+              if (commission.id !== commissionId) return commission;
 
-            const deal = current.deals.find(
-              (candidate) => candidate.id === commission.dealId
-            );
-            const repEstimatedCommission = deal
-              ? Math.round(deal.estimatedJobValue * 0.05)
-              : commission.repEstimatedCommission;
-            const adminTotalCommissionRate =
-              updates.adminTotalCommissionRate ??
-              commission.adminTotalCommissionRate;
-            const adminTotalEstimatedCommission =
-              updates.adminTotalEstimatedCommission ??
-              (deal
-                ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
-                : commission.adminTotalEstimatedCommission);
-            const requestedPaidAmount =
-              updates.repPaidCommission ?? commission.repPaidCommission;
-            const repPaidCommission =
-              updates.payoutStatus === 'paid'
-                ? Math.max(requestedPaidAmount, repEstimatedCommission)
-                : updates.payoutStatus === 'pending'
-                  ? 0
-                  : Math.min(
-                      Math.max(requestedPaidAmount, 0),
-                      repEstimatedCommission
-                    );
-            const payoutStatus = normalizePayoutStatus(
-              repPaidCommission,
-              repEstimatedCommission
-            );
+              const deal = current.deals.find(
+                (d) => d.id === commission.dealId
+              );
+              const repEst = deal
+                ? Math.round(deal.estimatedJobValue * 0.05)
+                : commission.repEstimatedCommission;
+              const adminTotalCommissionRate =
+                updates.adminTotalCommissionRate ?? commission.adminTotalCommissionRate;
+              const adminTotalEstimatedCommission =
+                updates.adminTotalEstimatedCommission ??
+                (deal
+                  ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
+                  : commission.adminTotalEstimatedCommission);
+              const requestedPaid =
+                updates.repPaidCommission ?? commission.repPaidCommission;
+              const repPaidCommission =
+                updates.payoutStatus === 'paid'
+                  ? Math.max(requestedPaid, repEst)
+                  : updates.payoutStatus === 'pending'
+                    ? 0
+                    : Math.min(Math.max(requestedPaid, 0), repEst);
+              const payoutStatus = normalizePayoutStatus(repPaidCommission, repEst);
 
-            return {
-              ...commission,
-              adminNetCommission:
-                adminTotalEstimatedCommission - repEstimatedCommission,
-              adminTotalCommissionRate,
-              adminTotalEstimatedCommission,
-              payoutStatus,
-              repEstimatedCommission,
-              repPaidCommission,
-            };
-          }),
+              return {
+                ...commission,
+                adminNetCommission: adminTotalEstimatedCommission - repEst,
+                adminTotalCommissionRate,
+                adminTotalEstimatedCommission,
+                payoutStatus,
+                repEstimatedCommission: repEst,
+                repPaidCommission,
+              };
+            }),
           };
         });
+
+        apiCall(`/api/commissions/${commissionId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
       },
+
+      // ── Appointment mutations ───────────────────────────────────────────────
+
       addAppointment: (appointmentDraft, actor) => {
+        const tempId = createId('appointment');
+        const now = new Date().toISOString();
+        const appointment: Appointment = {
+          ...appointmentDraft,
+          createdAt: now,
+          id: tempId,
+          source: 'manual',
+          updatedAt: now,
+        };
+
         setState((current) => {
-          const now = new Date().toISOString();
-          const appointment: Appointment = {
-            ...appointmentDraft,
-            createdAt: now,
-            id: createId('appointment'),
-            source: 'manual',
-            updatedAt: now,
-          };
-          const deal = current.deals.find(
-            (candidate) => candidate.id === appointment.dealId
-          );
+          const deal = current.deals.find((d) => d.id === appointment.dealId);
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === appointment.contractorId
+            (c) => c.id === appointment.contractorId
           );
           const entityLabel =
             appointment.customerName || appointment.title || getDealLabel(deal);
@@ -1854,11 +1714,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             appointments: [appointment, ...current.appointments],
           };
         });
+
+        apiCall<Appointment>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify(appointmentDraft),
+        }).then((saved) => {
+          if (!saved) return;
+          setState((current) => ({
+            ...current,
+            appointments: current.appointments.map((a) =>
+              a.id === tempId ? normalizeAppointment(saved, current.deals) : a
+            ),
+          }));
+        });
       },
+
       updateAppointment: (appointmentId, updates, actor) => {
         setState((current) => {
           const previousAppointment = current.appointments.find(
-            (appointment) => appointment.id === appointmentId
+            (a) => a.id === appointmentId
           );
           const nextAppointment = previousAppointment
             ? {
@@ -1869,13 +1743,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               }
             : undefined;
           const deal = current.deals.find(
-            (candidate) => candidate.id === nextAppointment?.dealId
+            (d) => d.id === nextAppointment?.dealId
           );
           const contractor = current.contractors.find(
-            (candidate) => candidate.id === nextAppointment?.contractorId
+            (c) => c.id === nextAppointment?.contractorId
           );
           const rep = current.users.find(
-            (candidate) => candidate.id === nextAppointment?.assignedRepId
+            (u) => u.id === nextAppointment?.assignedRepId
           );
           const entityLabel =
             nextAppointment?.customerName ||
@@ -1894,10 +1768,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           if (
             previousAppointment &&
             nextAppointment &&
-            (previousAppointment.appointmentDate !==
-              nextAppointment.appointmentDate ||
-              previousAppointment.appointmentTime !==
-                nextAppointment.appointmentTime)
+            (previousAppointment.appointmentDate !== nextAppointment.appointmentDate ||
+              previousAppointment.appointmentTime !== nextAppointment.appointmentTime)
           ) {
             actionType = 'consultation_rescheduled';
             actionLabel = `Consultation rescheduled for ${entityLabel}`;
@@ -1957,8 +1829,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           if (
             previousAppointment &&
             nextAppointment &&
-            previousAppointment.consultationStage !==
-              nextAppointment.consultationStage
+            previousAppointment.consultationStage !== nextAppointment.consultationStage
           ) {
             actionType = 'consultation_stage_changed';
             actionLabel = `Consultation stage changed to ${formatConsultationStage(
@@ -2020,26 +1891,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           if (
             previousAppointment &&
             nextAppointment &&
-            (previousAppointment.outcomeSubmitted !==
-              nextAppointment.outcomeSubmitted ||
-              previousAppointment.estimatedProjectValue !==
-                nextAppointment.estimatedProjectValue ||
-              previousAppointment.financingNeeded !==
-                nextAppointment.financingNeeded ||
-              previousAppointment.homeownerInterestLevel !==
-                nextAppointment.homeownerInterestLevel ||
+            (previousAppointment.outcomeSubmitted !== nextAppointment.outcomeSubmitted ||
+              previousAppointment.estimatedProjectValue !== nextAppointment.estimatedProjectValue ||
+              previousAppointment.financingNeeded !== nextAppointment.financingNeeded ||
+              previousAppointment.homeownerInterestLevel !== nextAppointment.homeownerInterestLevel ||
               previousAppointment.nextStep !== nextAppointment.nextStep ||
-              previousAppointment.recommendedContractorId !==
-                nextAppointment.recommendedContractorId ||
-              previousAppointment.closeProbability !==
-                nextAppointment.closeProbability ||
+              previousAppointment.recommendedContractorId !== nextAppointment.recommendedContractorId ||
+              previousAppointment.closeProbability !== nextAppointment.closeProbability ||
               previousAppointment.outcomeNotes !== nextAppointment.outcomeNotes ||
               previousAppointment.objections !== nextAppointment.objections ||
               previousAppointment.followUpDate !== nextAppointment.followUpDate)
           ) {
             const isFirstSubmission =
-              !previousAppointment.outcomeSubmitted &&
-              nextAppointment.outcomeSubmitted;
+              !previousAppointment.outcomeSubmitted && nextAppointment.outcomeSubmitted;
             actionType = isFirstSubmission
               ? 'consultation_outcome_submitted'
               : 'consultation_outcome_edited';
@@ -2094,10 +1958,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                     },
                   })
                 : current.activities,
-            appointments: current.appointments.map((appointment) =>
-              appointment.id === appointmentId && nextAppointment
-                ? nextAppointment
-                : appointment
+            appointments: current.appointments.map((a) =>
+              a.id === appointmentId && nextAppointment ? nextAppointment : a
             ),
             deals: current.deals.map((candidate) => {
               if (!nextAppointment || candidate.id !== nextAppointment.dealId) {
@@ -2109,26 +1971,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   ? {
                       createdAt: new Date().toISOString(),
                       id: createId('deal-activity'),
-                      note: `Consultation moved to Proposal Sent by ${
-                        actor?.name ?? 'System'
-                      }`,
+                      note: `Consultation moved to Proposal Sent by ${actor?.name ?? 'System'}`,
                     }
-                  : shouldAddOutcomeDealActivity &&
-                      candidate.id === nextAppointment.dealId
+                  : shouldAddOutcomeDealActivity && candidate.id === nextAppointment.dealId
                     ? {
                         createdAt: new Date().toISOString(),
                         id: createId('deal-activity'),
-                        note: `Outcome report applied by ${
-                          actor?.name ?? 'System'
-                        }`,
+                        note: `Outcome report applied by ${actor?.name ?? 'System'}`,
                       }
-                  : null;
+                    : null;
 
               return {
                 ...candidate,
-                ...(linkedDealStatusUpdate
-                  ? { status: linkedDealStatusUpdate }
-                  : {}),
+                ...(linkedDealStatusUpdate ? { status: linkedDealStatusUpdate } : {}),
                 ...(linkedDealEstimatedValue !== null
                   ? { estimatedJobValue: linkedDealEstimatedValue }
                   : {}),
@@ -2157,14 +2012,20 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             }),
           };
         });
+
+        apiCall(`/api/appointments/${appointmentId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
       },
+
       deleteAppointment: (appointmentId, actor) => {
         setState((current) => {
           const appointment = current.appointments.find(
-            (candidate) => candidate.id === appointmentId
+            (a) => a.id === appointmentId
           );
           const deal = current.deals.find(
-            (candidate) => candidate.id === appointment?.dealId
+            (d) => d.id === appointment?.dealId
           );
 
           return {
@@ -2186,15 +2047,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 })
               : current.activities,
             appointments: current.appointments.filter(
-              (candidate) => candidate.id !== appointmentId
+              (a) => a.id !== appointmentId
             ),
           };
         });
+
+        apiCall(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
       },
+
       createDealFromAppointment: (appointmentId, actor) => {
         setState((current) => {
           const appointment = current.appointments.find(
-            (candidate) => candidate.id === appointmentId
+            (a) => a.id === appointmentId
           );
           if (!appointment || appointment.dealId) return current;
 
@@ -2209,9 +2073,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             email: appointment.email,
             estimatedJobValue: appointment.estimatedProjectValue || 0,
             financingRequired: appointment.financingNeeded ?? false,
-            homeownerName: appointment.customerName || appointment.title || 'Consultation lead',
+            homeownerName:
+              appointment.customerName || appointment.title || 'Consultation lead',
             id: createId('deal'),
-            nextFollowUpDate: appointment.followUpDate || appointment.appointmentDate,
+            nextFollowUpDate:
+              appointment.followUpDate || appointment.appointmentDate,
             notes: appointment.internalNotes || appointment.notes,
             phone: appointment.phone,
             projectType: appointment.projectType || 'Consultation',
@@ -2240,16 +2106,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 entityType: 'appointment',
               }
             ),
-            appointments: current.appointments.map((candidate) =>
-              candidate.id === appointmentId
-                ? { ...candidate, dealId: deal.id, updatedAt: now }
-                : candidate
+            appointments: current.appointments.map((a) =>
+              a.id === appointmentId
+                ? { ...a, dealId: deal.id, updatedAt: now }
+                : a
             ),
-            commissions: [...current.commissions, createCommissionForDeal(deal)],
+            commissions: [
+              ...current.commissions,
+              createCommissionForDeal(deal),
+            ],
             deals: [...current.deals, deal],
           };
         });
+
+        // TODO: persist createDealFromAppointment via API in follow-up PR
       },
+
       importGoogleCalendarEvents: async (actor, providedEvents) => {
         const events = providedEvents ?? (await fetchGoogleCalendarEvents());
         let result = { imported: 0, updated: 0, unlinked: 0 };
@@ -2267,23 +2139,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               current.deals
             );
             const existingIndex = appointments.findIndex(
-              (candidate) =>
-                candidate.externalEventId === appointment.externalEventId
+              (a) => a.externalEventId === appointment.externalEventId
             );
             const deal = current.deals.find(
-              (candidate) => candidate.id === appointment.dealId
+              (d) => d.id === appointment.dealId
             );
             const entityLabel = appointment.dealId
               ? getDealLabel(deal)
               : event.title;
 
             if (existingIndex >= 0) {
-              const previousAppointment = appointments[existingIndex];
+              const prev = appointments[existingIndex];
               appointments[existingIndex] = {
-                ...previousAppointment,
+                ...prev,
                 ...appointment,
-                createdAt: previousAppointment.createdAt,
-                id: previousAppointment.id,
+                createdAt: prev.createdAt,
+                id: prev.id,
                 syncedAt: now,
                 updatedAt: now,
               };
@@ -2292,7 +2163,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 actionLabel: `Google Calendar appointment updated: ${entityLabel}`,
                 actionType: 'google_calendar_appointment_updated',
                 dealId: appointment.dealId || undefined,
-                entityId: previousAppointment.id,
+                entityId: prev.id,
                 entityLabel,
                 entityType: 'appointment',
                 metadata: {
@@ -2301,7 +2172,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 },
               });
 
-              if (previousAppointment.dealId !== appointment.dealId) {
+              if (prev.dealId !== appointment.dealId) {
                 activities = prependActivity(activities, actor, {
                   actionLabel: appointment.dealId
                     ? `Appointment linked to deal: ${entityLabel}`
@@ -2310,7 +2181,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                     ? 'appointment_linked_to_deal'
                     : 'appointment_unlinked_from_deal',
                   dealId: appointment.dealId || undefined,
-                  entityId: previousAppointment.id,
+                  entityId: prev.id,
                   entityLabel,
                   entityType: 'appointment',
                 });
@@ -2349,15 +2220,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             }
           });
 
-          return {
-            ...current,
-            activities,
-            appointments,
-          };
+          return { ...current, activities, appointments };
         });
 
         return result;
       },
+
+      // ── Selectors / calculators (pure, no API) ──────────────────────────────
       calculateAdminPaidRepCommission,
       calculateAdminPendingNetCommission,
       calculateAdminPendingRepCommission,
@@ -2381,7 +2250,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       getDealsForRep,
       getVisibleDealsForUser,
     };
-  }, [state]);
+  }, [state, isLoading]);
 
   return (
     <PortalDataContext.Provider value={value}>
