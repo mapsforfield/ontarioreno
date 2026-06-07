@@ -135,6 +135,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── Transfer appointment to another rep ──
+    if (data._action === 'transfer_appointment') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      if (!data.toRepId) return res.status(400).json({ error: 'Missing toRepId.' });
+
+      const appt = await prisma.appointment.findUnique({ where: { id: data.id } });
+      if (!appt) return res.status(404).json({ error: 'Appointment not found.' });
+
+      // Only the currently assigned rep or an admin can transfer
+      if (user.role !== 'admin' && appt.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'You can only transfer your own consultations.' });
+      }
+
+      // Verify target rep exists
+      const toRep = await prisma.user.findUnique({ where: { id: data.toRepId } });
+      if (!toRep) return res.status(404).json({ error: 'Target rep not found.' });
+
+      const updated = await prisma.appointment.update({
+        where: { id: data.id },
+        data: { assignedRepId: data.toRepId },
+      });
+      return res.status(200).json(updated);
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         dealId: data.dealId || null,

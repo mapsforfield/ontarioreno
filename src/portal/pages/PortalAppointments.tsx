@@ -459,6 +459,7 @@ export default function PortalAppointments() {
     contractors,
     deals,
     deleteAppointment,
+    transferAppointment,
     getDispatchesForConsultation,
     getVisibleAppointmentsForUser,
     logActivity,
@@ -478,6 +479,9 @@ export default function PortalAppointments() {
   const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
+  const [showTransferUI, setShowTransferUI] = useState(false);
+  const [transferToRepId, setTransferToRepId] = useState('');
+  const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
   const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
@@ -887,6 +891,8 @@ export default function PortalAppointments() {
     setIsCreating(false);
     setSelectedAppointmentId(null);
     setForm(emptyForm);
+    setShowTransferUI(false);
+    setTransferToRepId('');
   };
 
   const saveAppointment = () => {
@@ -992,6 +998,18 @@ export default function PortalAppointments() {
       )
     ) {
       deleteAppointment(selectedAppointment.id, currentUser);
+      closePanel();
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!selectedAppointment || !transferToRepId || transferring) return;
+    setTransferring(true);
+    const ok = await transferAppointment(selectedAppointment.id, transferToRepId);
+    setTransferring(false);
+    if (ok) {
+      setShowTransferUI(false);
+      setTransferToRepId('');
       closePanel();
     }
   };
@@ -3470,6 +3488,47 @@ export default function PortalAppointments() {
                 >
                   Delete
                 </button>
+              )}
+              {!isCreating && selectedAppointment && (isAdmin || selectedAppointment.assignedRepId === currentUser.id) && (
+                showTransferUI ? (
+                  <div className="flex items-center gap-2 sm:mr-auto">
+                    <select
+                      value={transferToRepId}
+                      onChange={(e) => setTransferToRepId(e.target.value)}
+                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-[#1B3C6C] focus:outline-none"
+                    >
+                      <option value="">Select rep…</option>
+                      {users
+                        .filter((u) => u.id !== selectedAppointment.assignedRepId)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleTransfer}
+                      disabled={!transferToRepId || transferring}
+                      className="rounded-[0.5rem] bg-amber-500 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {transferring ? 'Transferring…' : 'Confirm'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowTransferUI(false); setTransferToRepId(''); }}
+                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowTransferUI(true)}
+                    className="rounded-[0.5rem] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 sm:mr-auto"
+                  >
+                    Transfer
+                  </button>
+                )
               )}
               <button type="button" onClick={closePanel} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
                 Cancel
