@@ -232,7 +232,7 @@ export default function PortalLayout() {
 
   return (
     <div className="min-h-screen bg-[#eef3f8] text-slate-950">
-      <div className="fixed inset-x-0 top-0 z-40 border-b border-white/65 bg-white/88 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
+      <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} className="fixed inset-x-0 top-0 z-40 border-b border-white/65 bg-white/88 px-4 pb-3 pt-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
@@ -374,8 +374,9 @@ export default function PortalLayout() {
       </aside>
 
       <main
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
         className={cn(
-          'min-h-screen px-4 pb-24 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
+          'min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
           isWideWorkspace ? 'lg:px-6 xl:px-8 2xl:px-10' : 'lg:px-8'
         )}
       >
