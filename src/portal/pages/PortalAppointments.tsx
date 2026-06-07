@@ -479,6 +479,8 @@ export default function PortalAppointments() {
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
+  const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
+  const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
     contractorIds: [],
     desiredTimeline: '',
@@ -566,6 +568,25 @@ export default function PortalAppointments() {
       !appointment.assignedRepId ||
       !appointment.contractorId
   );
+  // Combined list for the desktop "Upcoming & Dispatch Gaps" section
+  const needsAttentionIds = new Set(needsAttentionAppointments.map((a) => a.id));
+  const upcomingCombined = (() => {
+    const seen = new Set<string>();
+    const combined: typeof needsAttentionAppointments = [];
+    for (const apt of upcomingAgendaAppointments.slice(0, 12)) {
+      seen.add(apt.id);
+      combined.push(apt);
+    }
+    for (const apt of needsAttentionAppointments.slice(0, 8)) {
+      if (!seen.has(apt.id)) combined.push(apt);
+    }
+    return combined.sort((a, b) => {
+      const d = a.appointmentDate.localeCompare(b.appointmentDate);
+      if (d !== 0) return d;
+      return (a.appointmentTime || '').localeCompare(b.appointmentTime || '');
+    });
+  })();
+
   const monthLabel = new Intl.DateTimeFormat('en-CA', {
     month: 'long',
     year: 'numeric',
@@ -2119,41 +2140,216 @@ export default function PortalAppointments() {
         </div>
       </section>
 
-      <section className="hidden lg:grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
-          <div className="border-b border-slate-200 pb-4">
+      {/* Desktop: Upcoming & Dispatch Gaps — collapsed list */}
+      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
+        <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
               Upcoming Consultations
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
-              Next consultations
+              Upcoming &amp; Dispatch Gaps
             </h2>
           </div>
-          <div className="mt-4">
-            {renderGroupedAgenda(
-              upcomingAgendaAppointments.slice(0, 12),
-              'No upcoming consultations scheduled.'
-            )}
+          <div className="flex shrink-0 flex-wrap items-center gap-3 pb-0.5">
+            <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Good
+            </span>
+            <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
+              <span className="h-2 w-2 rounded-full bg-amber-400" /> Missing contractor
+            </span>
+            <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
+              <span className="h-2 w-2 rounded-full bg-red-500" /> Needs attention
+            </span>
           </div>
-        </article>
-
-        <article className="rounded-[0.5rem] border border-amber-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="border-b border-amber-100 pb-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-              Needs Attention
+        </div>
+        <div className="mt-2">
+          {upcomingCombined.length === 0 ? (
+            <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+              No upcoming consultations or dispatch gaps.
             </p>
-            <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
-              Dispatch gaps
-            </h2>
-          </div>
-          <div className="mt-4">
-            {renderGroupedAgenda(
-              needsAttentionAppointments.slice(0, 8),
-              'No consultations need attention right now.',
-              { attention: true }
-            )}
-          </div>
-        </article>
+          ) : (
+            <div>
+              {groupByRep(upcomingCombined).map((group) => {
+                const isGroupCollapsed = collapsedRepGroups.has(group.id);
+                const groupHasAttention = group.appointments.some((a) => needsAttentionIds.has(a.id));
+                return (
+                  <div key={group.id} className="border-b border-slate-100 last:border-b-0">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollapsedRepGroups((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(group.id)) next.delete(group.id);
+                            else next.add(group.id);
+                            return next;
+                          })
+                        }
+                        className="flex w-full items-center gap-2 px-2 py-2.5 text-left transition hover:bg-slate-50"
+                      >
+                        <ChevronRight
+                          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 ${isGroupCollapsed ? '' : 'rotate-90'}`}
+                        />
+                        <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                          {group.name}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.62rem] font-black text-slate-500">
+                          {group.appointments.length}
+                        </span>
+                        {groupHasAttention && (
+                          <span className="ml-1 h-2 w-2 rounded-full bg-red-500" />
+                        )}
+                      </button>
+                    )}
+                    {!isGroupCollapsed && (
+                      <div className={isAdmin ? 'ml-5' : ''}>
+                        {group.appointments.map((apt) => {
+                          const isRowExpanded = expandedUpcomingRows.has(apt.id);
+                          const isAttention = needsAttentionIds.has(apt.id);
+                          const isMissingContractor = !apt.contractorId;
+                          const dotColor = isAttention
+                            ? 'bg-red-500'
+                            : isMissingContractor
+                              ? 'bg-amber-400'
+                              : 'bg-emerald-500';
+                          const sc = getStatusClasses(apt.status);
+                          const canUseRepActions =
+                            currentUser.role === 'admin' || apt.assignedRepId === currentUser.id;
+                          const attentionReasons = getAttentionReasons(apt);
+                          return (
+                            <div key={apt.id} className="border-b border-slate-100 last:border-b-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedUpcomingRows((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(apt.id)) next.delete(apt.id);
+                                    else next.add(apt.id);
+                                    return next;
+                                  })
+                                }
+                                className="flex w-full items-center gap-3 px-2 py-2.5 text-left transition hover:bg-slate-50/80"
+                              >
+                                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotColor}`} />
+                                <span className="w-[8rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
+                                  {apt.appointmentDate}
+                                  {apt.appointmentTime ? ` · ${apt.appointmentTime}` : ''}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
+                                  {apt.customerName || apt.title || 'Consultation'}
+                                </span>
+                                {isAdmin && (
+                                  <span className="shrink-0 text-xs font-semibold text-slate-400">
+                                    {getRepName(apt.assignedRepId)}
+                                  </span>
+                                )}
+                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.62rem] font-black ${sc.badge}`}>
+                                  {formatAppointmentStatus(apt.status)}
+                                </span>
+                                {isAttention && (
+                                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[0.62rem] font-black text-red-700">
+                                    Attention
+                                  </span>
+                                )}
+                                <ChevronRight
+                                  className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 ${isRowExpanded ? 'rotate-90' : ''}`}
+                                />
+                              </button>
+                              {isRowExpanded && (
+                                <div className="px-2 pb-3 pt-1">
+                                  {attentionReasons.length > 0 && (
+                                    <div className="mb-2.5 flex flex-wrap gap-1.5">
+                                      {attentionReasons.map((r) => (
+                                        <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">
+                                          {r}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="mb-3 grid gap-3 lg:grid-cols-2">
+                                    <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
+                                      <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+                                        Internal — Not visible to customer
+                                      </p>
+                                      <p className="mt-1.5 text-sm font-semibold text-slate-700">
+                                        {getPreview(apt.internalNotes || apt.notes || '', 'No internal prep notes yet.')}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3">
+                                      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                                        Customer Notes
+                                      </p>
+                                      <p className="mt-1.5 text-sm font-semibold text-slate-700">
+                                        {getPreview(apt.customerNotes || '', 'No customer-facing notes.')}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openAppointment(apt)}
+                                      className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                                    >
+                                      Open Details
+                                    </button>
+                                    {isAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={() => markConsultationStatus(apt, 'confirmed')}
+                                        className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-100"
+                                      >
+                                        Mark Confirmed
+                                      </button>
+                                    )}
+                                    {canUseRepActions && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => markConsultationStatus(apt, 'completed')}
+                                          className="rounded-[0.5rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
+                                        >
+                                          Mark Completed
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => markConsultationStatus(apt, 'no_show')}
+                                          className="rounded-[0.5rem] border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-800 transition hover:bg-orange-100"
+                                        >
+                                          Mark No-show
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateInternalNotesFromAgenda(apt)}
+                                          className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100"
+                                        >
+                                          Update Notes
+                                        </button>
+                                      </>
+                                    )}
+                                    {isAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openReschedule(apt)}
+                                        className="rounded-[0.5rem] border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                                      >
+                                        Reschedule
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
