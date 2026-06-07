@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { usePortalAuth } from '../auth';
 import {
+  Client,
   Commission,
   CommissionPayoutStatus,
   ContractorStatus,
@@ -54,6 +55,7 @@ type AppointmentDraft = Omit<
 type PortalDataState = {
   activities: Activity[];
   appointments: Appointment[];
+  clients: Client[];
   users: User[];
   contractors: Contractor[];
   dispatches: ContractorDispatch[];
@@ -134,6 +136,10 @@ type PortalDataContextValue = PortalDataState & {
     >,
     actor?: User
   ) => void;
+  addClient: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'source' | 'createdByUserId'>) => Promise<Client | null>;
+  updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
+  deleteClient: (clientId: string) => Promise<void>;
+  getAppointmentsForClient: (clientId: string) => Appointment[];
   addAppointment: (appointment: AppointmentDraft, actor?: User) => void;
   updateAppointment: (
     appointmentId: string,
@@ -180,6 +186,7 @@ const projectedCommissionStatuses: DealStatus[] = [...openDealStatuses, 'won'];
 const emptyState: PortalDataState = {
   activities: [],
   appointments: [],
+  clients: [],
   commissions: [],
   contractors: [],
   deals: [],
@@ -491,7 +498,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Appointment[]>('/api/appointments'),
       apiCall<Commission[]>('/api/commissions'),
       apiCall<Activity[]>('/api/auth/activities'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities]) => {
+      apiCall<Client[]>('/api/appointments?_resource=clients'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -508,6 +516,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         activities: activities ?? [],
         dispatches,
         proposals,
+        clients: clients ?? [],
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1077,6 +1086,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }),
           commissions: [...current.commissions, createCommissionForDeal(deal)],
           appointments: current.appointments,
+          clients: current.clients,
           contractors: current.contractors,
           deals: [...current.deals, deal],
           dispatches: current.dispatches,
@@ -1691,6 +1701,47 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
+      },
+
+      // ── Client mutations ────────────────────────────────────────────────────
+
+      getAppointmentsForClient: (clientId) =>
+        state.appointments.filter((a) => a.clientId === clientId),
+
+      addClient: async (draft) => {
+        const client = await apiCall<Client>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'create_client', ...draft }),
+        });
+        if (client) {
+          setState((current) => ({ ...current, clients: [client, ...current.clients] }));
+        }
+        return client;
+      },
+
+      updateClient: async (clientId, updates) => {
+        const client = await apiCall<Client>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'update_client', id: clientId, ...updates }),
+        });
+        if (client) {
+          setState((current) => ({
+            ...current,
+            clients: current.clients.map((c) => (c.id === clientId ? client : c)),
+          }));
+        }
+        return client;
+      },
+
+      deleteClient: async (clientId) => {
+        await apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_client', id: clientId }),
+        });
+        setState((current) => ({
+          ...current,
+          clients: current.clients.filter((c) => c.id !== clientId),
+        }));
       },
 
       // ── Appointment mutations ───────────────────────────────────────────────
