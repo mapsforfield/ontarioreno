@@ -140,6 +140,7 @@ export default function PortalLayout() {
     '/portal/deals',
     '/portal/financing',
     '/portal/performance',
+    '/portal/sales-tracker',
   ];
   const isWideWorkspace = wideWorkspaceRoutes.some((route) =>
     location.pathname.startsWith(route)
