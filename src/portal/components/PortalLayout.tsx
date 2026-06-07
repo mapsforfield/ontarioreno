@@ -66,13 +66,25 @@ export default function PortalLayout() {
   }, []);
   const handleTogglePush = async () => {
     if (!currentUser) return;
+    if (pushState === 'unsupported') {
+      alert('To enable push notifications on iPhone, open this page in Safari, tap Share → Add to Home Screen, then open the app from your Home Screen icon.');
+      return;
+    }
     if (pushState === 'granted') {
       await unregisterPushNotifications(currentUser.id);
       setPushState('default');
     } else {
       setPushState('registering');
       const ok = await registerPushNotifications(currentUser.id);
-      setPushState(ok ? 'granted' : Notification.permission === 'denied' ? 'denied' : 'default');
+      if (ok) {
+        setPushState('granted');
+      } else {
+        const perm = 'Notification' in window ? Notification.permission : 'denied';
+        setPushState(perm === 'denied' ? 'denied' : 'default');
+        if (perm === 'denied') {
+          alert('Notifications are blocked. Go to your iPhone Settings → Safari → Notifications to allow them for this site.');
+        }
+      }
     }
   };
 
@@ -231,7 +243,7 @@ export default function PortalLayout() {
               <button
                 type="button"
                 onClick={handleTogglePush}
-                disabled={pushState === 'registering' || pushState === 'denied'}
+                disabled={pushState === 'registering' || pushState === 'denied' || pushState === 'unsupported'}
                 title={
                   pushState === 'granted'
                     ? 'Notifications on — tap to disable'
