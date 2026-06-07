@@ -443,7 +443,7 @@ function syncCommissionsWithDeals(
     syncedCommissions.map((commission) => commission.dealId)
   );
   const missingWonDealCommissions = deals
-    .filter((deal) => deal.status === 'won' && !commissionDealIds.has(deal.id))
+    .filter((deal) => deal.status === 'won' && !deal.isHistorical && !commissionDealIds.has(deal.id))
     .map(createMissingCommissionForDeal);
 
   return [...syncedCommissions, ...missingWonDealCommissions];
@@ -604,6 +604,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return (
             commission.repId === repId &&
             deal?.status === 'won' &&
+            !deal.isHistorical &&
             commission.payoutStatus !== 'paid'
           );
         })
@@ -627,6 +628,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
           return (
             commission.repId === repId &&
+            !deal?.isHistorical &&
             Boolean(deal && projectedCommissionStatuses.includes(deal.status))
           );
         })
@@ -647,7 +649,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             (candidate) => candidate.id === commission.dealId
           );
 
-          return deal?.status === 'won' && commission.payoutStatus !== 'paid';
+          return deal?.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid';
         })
         .reduce(
           (total, commission) =>
@@ -667,7 +669,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             (candidate) => candidate.id === commission.dealId
           );
 
-          return deal?.status === 'won' && commission.payoutStatus !== 'paid';
+          return deal?.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid';
         })
         .reduce((total, commission) => total + commission.adminNetCommission, 0);
 
@@ -679,7 +681,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           );
 
           return Boolean(
-            deal && projectedCommissionStatuses.includes(deal.status)
+            deal && !deal.isHistorical && projectedCommissionStatuses.includes(deal.status)
           );
         })
         .reduce(
