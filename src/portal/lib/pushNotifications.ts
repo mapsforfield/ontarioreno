@@ -29,6 +29,7 @@ export async function registerPushNotifications(userId: string): Promise<boolean
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return false;
@@ -63,8 +64,8 @@ export async function registerPushNotifications(userId: string): Promise<boolean
 
     return response.ok;
   } catch (error) {
-    console.error('[Push] Registration failed:', error);
-    return false;
+    // Surface the real error so we can diagnose
+    throw error;
   }
 }
 
