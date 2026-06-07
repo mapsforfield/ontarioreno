@@ -193,6 +193,8 @@ export type Deal = {
   status: DealStatus;
   notes: string;
   nextFollowUpDate: string;
+  /** Deals imported from before the portal existed. Excluded from leaderboard rankings. */
+  isHistorical?: boolean;
   activity: DealActivity[];
   createdAt: string;
   updatedAt: string;

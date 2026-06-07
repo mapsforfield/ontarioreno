@@ -80,6 +80,9 @@ model Deal {
   status               String   @default("new_lead")
   notes                String   @default("")
   nextFollowUpDate     String   @default("")
+  /// True for deals imported from before the portal existed.
+  /// Historical deals are excluded from the leaderboard so they don't skew rep rankings.
+  isHistorical         Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

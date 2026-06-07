@@ -166,6 +166,8 @@ type PortalDataContextValue = PortalDataState & {
   calculateAdminPaidRepCommission: () => number;
   calculateWonDeals: (repId: string) => number;
   calculateClosedVolume: (repId: string) => number;
+  calculateHistoricalSalesTotal: (repId: string) => number;
+  calculateHistoricalSalesCount: (repId: string) => number;
   calculatePipelineValue: (repId: string) => number;
   calculatePipelineValueForUser: (user: User) => number;
   calculateOpenDealsForUser: (user: User) => number;
@@ -576,12 +578,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
     const calculatePipelineValue = (repId: string) =>
       getDealsForRep(repId)
-        .filter((deal) => openDealStatuses.includes(deal.status))
+        .filter((deal) => openDealStatuses.includes(deal.status) && !deal.isHistorical)
         .reduce((total, deal) => total + deal.estimatedJobValue, 0);
 
     const calculatePipelineValueForUser = (user: User) =>
       getVisibleDealsForUser(user)
-        .filter((deal) => openDealStatuses.includes(deal.status))
+        .filter((deal) => openDealStatuses.includes(deal.status) && !deal.isHistorical)
         .reduce((total, deal) => total + deal.estimatedJobValue, 0);
 
     const calculateRepPendingCommission = (repId: string) =>
@@ -684,13 +686,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         0
       );
 
+    // Historical deals are excluded from all leaderboard metrics
     const calculateWonDeals = (repId: string) =>
-      getDealsForRep(repId).filter((deal) => deal.status === 'won').length;
+      getDealsForRep(repId).filter((deal) => deal.status === 'won' && !deal.isHistorical).length;
 
     const calculateClosedVolume = (repId: string) =>
       getDealsForRep(repId)
-        .filter((deal) => deal.status === 'won')
+        .filter((deal) => deal.status === 'won' && !deal.isHistorical)
         .reduce((total, deal) => total + deal.estimatedJobValue, 0);
+
+    // Total value of historical (pre-portal) won deals for a rep's personal reference
+    const calculateHistoricalSalesTotal = (repId: string) =>
+      getDealsForRep(repId)
+        .filter((deal) => deal.isHistorical && deal.status === 'won')
+        .reduce((total, deal) => total + deal.estimatedJobValue, 0);
+
+    const calculateHistoricalSalesCount = (repId: string) =>
+      getDealsForRep(repId).filter((deal) => deal.isHistorical && deal.status === 'won').length;
 
     const calculateOpenDealsForUser = (user: User) =>
       getVisibleDealsForUser(user).filter((deal) =>
@@ -2293,6 +2305,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       calculateAdminPendingRepCommission,
       calculateAdminProjectedCommission,
       calculateClosedVolume,
+      calculateHistoricalSalesTotal,
+      calculateHistoricalSalesCount,
       calculateOpenDealsForUser,
       calculatePipelineValue,
       calculatePipelineValueForUser,
