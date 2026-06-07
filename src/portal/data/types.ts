@@ -106,7 +106,7 @@ export type ConsultationNextStep =
 
 export type Appointment = {
   id: string;
-  dealId: string;
+  dealId: string | null;
   customerName: string;
   phone: string;
   email: string;

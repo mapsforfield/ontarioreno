@@ -98,8 +98,8 @@ import ConsultationCancel from './portal/pages/ConsultationCancel';
 
 export default function App() {
   return (
-    <PortalDataProvider>
-      <PortalAuthProvider>
+    <PortalAuthProvider>
+      <PortalDataProvider>
         <Router>
           <ScrollToTop />
           <Routes>
@@ -254,7 +254,7 @@ export default function App() {
           </Route>
           </Routes>
         </Router>
-      </PortalAuthProvider>
-    </PortalDataProvider>
+      </PortalDataProvider>
+    </PortalAuthProvider>
   );
 }

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma.js';
-import { requireAdmin, requireAuth, getCurrentUser } from '../../lib/auth.js';
+import { requireAdmin, requireAuth } from '../../lib/auth.js';
 
 const SELECT = {
   id: true, name: true, email: true, role: true,
@@ -9,52 +9,8 @@ const SELECT = {
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // id is undefined for /api/users, ['abc'] for /api/users/abc
-  const segments = req.query['id'] as string[] | undefined;
-  const id = segments?.[0];
+  const id = req.query['id'] as string;
 
-  // ── /api/users (list + create) ────────────────────────────────────────────────
-  if (!id) {
-    if (req.method === 'GET') {
-      const user = await getCurrentUser(req);
-      if (!user) return res.status(401).json({ error: 'Unauthorized.' });
-      const users = await prisma.user.findMany({
-        orderBy: { name: 'asc' },
-        select: { ...SELECT, createdAt: true, updatedAt: true },
-      });
-      return res.status(200).json(users);
-    }
-
-    if (req.method === 'POST') {
-      const admin = await requireAdmin(req, res);
-      if (!admin) return;
-      const { name, email, password, role, avatarInitial, avatarUrl } = req.body as {
-        name: string; email: string; password: string;
-        role: string; avatarInitial: string; avatarUrl?: string;
-      };
-      if (!name || !email || !password) {
-        return res.status(400).json({ error: 'Name, email, and password are required.' });
-      }
-      const passwordHash = await bcrypt.hash(password, 10);
-      const user = await prisma.user.create({
-        data: {
-          name,
-          email: email.toLowerCase().trim(),
-          passwordHash,
-          role: role ?? 'rep',
-          avatarInitial: avatarInitial ?? name[0].toUpperCase(),
-          avatarUrl: avatarUrl ?? null,
-          active: true,
-        },
-        select: { ...SELECT, createdAt: true, updatedAt: true },
-      });
-      return res.status(201).json(user);
-    }
-
-    return res.status(405).json({ error: 'Method not allowed.' });
-  }
-
-  // ── /api/users/:id (get + update + delete) ────────────────────────────────────
   if (req.method === 'GET') {
     const user = await requireAuth(req, res);
     if (!user) return;
@@ -94,7 +50,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' });
         const existing = await prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
         if (!existing) return res.status(404).json({ error: 'User not found.' });
-        const match = await bcrypt.compare(currentPassword as string, existing.passwordHash);
+        const match = existing.passwordHash
+          ? await bcrypt.compare(currentPassword as string, existing.passwordHash)
+          : false;
         if (!match) return res.status(400).json({ error: 'Current password is incorrect.' });
       }
       data.passwordHash = await bcrypt.hash(password as string, 10);
@@ -104,6 +62,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const updated = await prisma.user.update({ where: { id }, data, select: SELECT });
     return res.status(200).json(updated);
+  }
+
+  // Push subscription management — no new API file needed (_action discriminator)
+  if (req.method === 'POST') {
+    const authUser = await requireAuth(req, res);
+    if (!authUser) return;
+    if (authUser.id !== id && authUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+
+    const { _action, endpoint, p256dh, auth } = req.body ?? {};
+
+    if (_action === 'push_subscribe') {
+      if (!endpoint || !p256dh || !auth) {
+        return res.status(400).json({ error: 'Missing subscription fields.' });
+      }
+      await prisma.pushSubscription.upsert({
+        where: { endpoint },
+        update: { userId: id, p256dh, auth },
+        create: { userId: id, endpoint, p256dh, auth },
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (_action === 'push_unsubscribe') {
+      await prisma.pushSubscription.deleteMany({ where: { userId: id } }).catch(() => {});
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'Unknown action.' });
   }
 
   if (req.method === 'DELETE') {

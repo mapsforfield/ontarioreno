@@ -1160,7 +1160,7 @@ export default function PortalContractors() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3">
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Select Deal
                   <select

@@ -50,12 +50,19 @@ export default function PortalLeaderboard() {
           Leaderboard
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
-          Rep performance placeholders
+          Rep Performance Rankings
         </h1>
       </header>
 
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
         <div className="space-y-3">
+          {reps.length === 0 && (
+            <div className="flex flex-col items-center rounded-[0.5rem] border border-dashed border-slate-200 bg-slate-50 py-12 text-center">
+              <Trophy className="h-10 w-10 text-slate-200" />
+              <p className="mt-3 text-sm font-bold text-slate-500">No reps yet</p>
+              <p className="mt-1 text-xs text-slate-400">Add reps from the Admin panel to see their rankings here.</p>
+            </div>
+          )}
           {reps.map((rep, index) => (
             <article
               key={rep.id}
@@ -123,13 +130,19 @@ export default function PortalLeaderboard() {
                   </p>
                 </div>
               </div>
-              <div className="mt-5 h-2 rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-[#1B3C6C]"
-                  style={{
-                    width: `${Math.max((rep.wonDeals / topWonDeals) * 100, 4)}%`,
-                  }}
-                />
+              <div className="mt-5">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-400">Won deals vs. top performer</p>
+                  <p className="text-xs font-bold text-slate-500">
+                    {rep.wonDeals === 0 ? '—' : `${Math.round((rep.wonDeals / topWonDeals) * 100)}%`}
+                  </p>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-[#1B3C6C] transition-all duration-500"
+                    style={{ width: `${Math.max((rep.wonDeals / topWonDeals) * 100, 4)}%` }}
+                  />
+                </div>
               </div>
             </article>
           ))}

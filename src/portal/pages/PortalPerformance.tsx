@@ -252,6 +252,14 @@ export default function PortalPerformance() {
         </div>
       </header>
 
+      {!isAdmin && !primary && (
+        <div className="flex flex-col items-center rounded-[0.5rem] border border-dashed border-slate-200 bg-white py-14 text-center">
+          <Target className="h-10 w-10 text-slate-200" />
+          <p className="mt-3 text-sm font-bold text-slate-500">No performance data yet</p>
+          <p className="mt-1 text-xs text-slate-400">Your stats will appear here once you have deals and consultations.</p>
+        </div>
+      )}
+
       {!isAdmin && primary && (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -294,7 +302,15 @@ export default function PortalPerformance() {
         </>
       )}
 
-      {isAdmin && (
+      {isAdmin && repPerformance.length === 0 && (
+        <div className="flex flex-col items-center rounded-[0.5rem] border border-dashed border-slate-200 bg-white py-14 text-center">
+          <Target className="h-10 w-10 text-slate-200" />
+          <p className="mt-3 text-sm font-bold text-slate-500">No reps to show</p>
+          <p className="mt-1 text-xs text-slate-400">Add reps from the Admin panel to track their performance here.</p>
+        </div>
+      )}
+
+      {isAdmin && repPerformance.length > 0 && (
         <>
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {repPerformance.map((rep) => (

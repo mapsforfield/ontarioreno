@@ -13,6 +13,7 @@ type PortalAuthContextValue = {
   users: User[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  updateCurrentUser: (updates: Partial<User>) => void;
   isAdmin: boolean;
   isAuthLoading: boolean;
 };
@@ -55,6 +56,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
       currentUser,
       users,
       isAuthLoading,
+      updateCurrentUser: (updates) => setCurrentUser((u) => u ? { ...u, ...updates } : u),
       login: async (email, password) => {
         const res = await fetch('/api/auth/login', {
           method: 'POST',

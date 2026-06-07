@@ -6,7 +6,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
@@ -16,6 +16,7 @@ import { ActivityEntityType, User } from '../data/types';
 type RepFormState = {
   active: boolean;
   avatarInitial: string;
+  avatarUrl: string;
   email: string;
   name: string;
 };
@@ -23,9 +24,32 @@ type RepFormState = {
 const emptyRepForm: RepFormState = {
   active: true,
   avatarInitial: '',
+  avatarUrl: '',
   email: '',
   name: '',
 };
+
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 200;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 const sections = [
   {
@@ -74,6 +98,7 @@ function userToForm(user: User): RepFormState {
   return {
     active: user.active,
     avatarInitial: user.avatarInitial,
+    avatarUrl: user.avatarUrl ?? '',
     email: user.email,
     name: user.name,
   };
@@ -93,7 +118,7 @@ export default function PortalAdmin() {
     updateUser,
     users,
   } = usePortalData();
-  const [isRepManagementOpen, setIsRepManagementOpen] = useState(false);
+  const repManagementRef = useRef<HTMLElement>(null);
   const [activityFilter, setActivityFilter] = useState<
     'all' | ActivityEntityType
   >('all');
@@ -126,7 +151,7 @@ export default function PortalAdmin() {
     setIsRepPanelOpen(false);
   };
 
-  const saveRep = () => {
+  const saveRep = async () => {
     const name = repForm.name.trim();
     const email = repForm.email.trim();
     const avatarInitial = repForm.avatarInitial.trim().slice(0, 2).toUpperCase();
@@ -136,20 +161,32 @@ export default function PortalAdmin() {
       updateUser(editingUser.id, {
         active: repForm.active,
         avatarInitial,
+        avatarUrl: repForm.avatarUrl || undefined,
         email,
         name,
       }, currentUser ?? undefined);
+      closeRepPanel();
     } else {
-      addUser({
+      closeRepPanel();
+      const result = await addUser({
         active: repForm.active,
         avatarInitial,
+        avatarUrl: repForm.avatarUrl || undefined,
         email,
         name,
       }, currentUser ?? undefined);
+      if (result && 'tempPassword' in result) {
+        setPasswordResetNotice(
+          `${name} was added. Their temporary password is: ${result.tempPassword} — share this with them directly.`
+        );
+      } else if (result && 'error' in result) {
+        setPasswordResetNotice(`Could not add rep: ${result.error}`);
+      } else {
+        setPasswordResetNotice('Failed to create rep. Please try again.');
+      }
     }
 
-    closeRepPanel();
-    setIsRepManagementOpen(true);
+    repManagementRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const updateRepForm = <Field extends keyof RepFormState>(
@@ -219,7 +256,7 @@ export default function PortalAdmin() {
             <button
               key={section.title}
               type="button"
-              onClick={() => setIsRepManagementOpen(true)}
+              onClick={() => repManagementRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               className="rounded-[0.5rem] border border-white bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#b8c9dd] hover:shadow-md"
             >
               {cardContent}
@@ -296,8 +333,7 @@ export default function PortalAdmin() {
         </div>
       </section>
 
-      {isRepManagementOpen && (
-        <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+      <section ref={repManagementRef} className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -420,7 +456,6 @@ export default function PortalAdmin() {
             ))}
           </div>
         </section>
-      )}
 
       {isRepPanelOpen && (
         <div className="fixed inset-0 z-[95] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
@@ -486,6 +521,42 @@ export default function PortalAdmin() {
                     <option value="inactive">Inactive</option>
                   </select>
                 </label>
+                <div className="grid gap-1.5">
+                  <span className="text-sm font-bold text-slate-700">Profile Photo</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1B3C6C] text-lg font-bold text-white">
+                      {repForm.avatarUrl ? (
+                        <img src={repForm.avatarUrl} alt="preview" className="h-full w-full object-cover" />
+                      ) : (
+                        repForm.avatarInitial || '?'
+                      )}
+                    </div>
+                    <label className="cursor-pointer rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]">
+                      {repForm.avatarUrl ? 'Change photo' : 'Upload photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          e.target.value = '';
+                          const dataUrl = await compressImage(file);
+                          updateRepForm('avatarUrl', dataUrl);
+                        }}
+                      />
+                    </label>
+                    {repForm.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => updateRepForm('avatarUrl', '')}
+                        className="text-sm text-slate-400 hover:text-slate-600"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -1,5 +1,7 @@
-import { CircleDollarSign, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarDays, ChevronRight, CircleDollarSign, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
+import { Fragment, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { getRecommendedContractors } from '../data/recommendations';
 import {
@@ -194,6 +196,10 @@ export default function PortalDeals() {
     : contractors.filter(
         (contractor) => contractor.contractorStatus === 'active'
       );
+  const [mobileStageFilter, setMobileStageFilter] = useState<DealStatus | null>(null);
+  const columnsToRender = mobileStageFilter
+    ? columns.filter((col) => col.status === mobileStageFilter)
+    : columns;
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [isAddingDeal, setIsAddingDeal] = useState(false);
   const [form, setForm] = useState<DealFormState>(emptyDealForm);
@@ -374,7 +380,6 @@ export default function PortalDeals() {
     };
 
     if (isAddingDeal) {
-      if (currentUser.role !== 'rep') return;
       addDeal(dealPayload, currentUser.id, currentUser);
     } else if (selectedDeal) {
       updateDeal(selectedDeal.id, {
@@ -685,9 +690,103 @@ OntarioReno Broker Portal`;
         </div>
       </section>
 
+      {/* ── Mobile pipeline strip ──────────────────────────────── */}
+      <section className="lg:hidden">
+        <div className="-mx-4 overflow-x-auto overscroll-x-contain px-4">
+          <div className="flex w-max items-center gap-1 py-1">
+            {/* All pill */}
+            <button
+              type="button"
+              onClick={() => setMobileStageFilter(null)}
+              className={cn(
+                'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[0.68rem] font-bold transition',
+                mobileStageFilter === null
+                  ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+              )}
+            >
+              All
+              <span
+                className={cn(
+                  'flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[0.58rem] font-black',
+                  mobileStageFilter === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                )}
+              >
+                {visibleDeals.length}
+              </span>
+            </button>
+
+            {columns.map((col, colIndex) => {
+              const stageCount = visibleDeals.filter((d) => d.status === col.status).length;
+              const isActive = mobileStageFilter === col.status;
+              const isWon = col.status === 'won';
+              const isLost = col.status === 'lost';
+              const shortLabel = col.label.replace('Appointment ', '');
+
+              return (
+                <Fragment key={col.status}>
+                  {/* Vertical separator before Lost — it's an off-ramp, not a funnel step */}
+                  {isLost ? (
+                    <span className="mx-1 h-5 w-px shrink-0 bg-slate-300" />
+                  ) : colIndex > 0 ? (
+                    <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setMobileStageFilter(isActive ? null : col.status)}
+                    className={cn(
+                      'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[0.68rem] font-bold transition',
+                      isActive
+                        ? isWon
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : isLost
+                          ? 'border-slate-600 bg-slate-600 text-white'
+                          : 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
+                        : isWon
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : isLost
+                        ? 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    )}
+                  >
+                    {shortLabel}
+                    <span
+                      className={cn(
+                        'flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[0.58rem] font-black',
+                        isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                      )}
+                    >
+                      {stageCount}
+                    </span>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Stage summary when a filter is active */}
+        {mobileStageFilter && (() => {
+          const stageDeals = visibleDeals.filter((d) => d.status === mobileStageFilter);
+          const stageValue = stageDeals.reduce((sum, d) => sum + d.estimatedJobValue, 0);
+          const stageLabel = columns.find((c) => c.status === mobileStageFilter)?.label ?? '';
+          return (
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2">
+              <span className="text-xs font-black text-slate-900">{stageLabel}</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-xs font-bold text-slate-600">
+                {stageDeals.length} deal{stageDeals.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="text-xs font-bold text-[#1B3C6C]">{formatCurrency(stageValue)}</span>
+            </div>
+          );
+        })()}
+      </section>
+
       <section className="w-full overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]">
         <div className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
-          {columns.map((column) => {
+          {columnsToRender.map((column) => {
             const columnDeals = visibleDeals.filter(
               (deal) => deal.status === column.status
             );
@@ -739,11 +838,32 @@ OntarioReno Broker Portal`;
                     })}
                   </div>
                 ) : (
-                  <div className="mt-6 flex min-h-36 flex-col items-center justify-center rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 text-center">
-                    <CircleDollarSign className="h-7 w-7 text-slate-300" />
-                    <p className="mt-3 text-sm font-semibold text-slate-500">
-                      No deals yet
-                    </p>
+                  <div className="mt-6 flex min-h-36 flex-col items-center justify-center rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
+                    {column.status === 'new_lead' ? (
+                      <>
+                        <CalendarDays className="h-7 w-7 text-slate-300" />
+                        <p className="mt-3 text-sm font-semibold text-slate-500">
+                          No deals yet
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Deals are created from consultations.
+                        </p>
+                        <Link
+                          to="/portal/appointments"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#1B3C6C] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#153158]"
+                        >
+                          <CalendarDays className="h-3 w-3" />
+                          Schedule Consultation
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <CircleDollarSign className="h-7 w-7 text-slate-300" />
+                        <p className="mt-3 text-sm font-semibold text-slate-500">
+                          No deals yet
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </article>

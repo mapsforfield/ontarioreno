@@ -9,13 +9,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const deals = await prisma.deal.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { activity: { orderBy: { createdAt: 'desc' } } },
+      include: {
+        activity: { orderBy: { createdAt: 'desc' } },
+        proposals: { orderBy: { sentAt: 'desc' } },
+        dispatches: { orderBy: { createdAt: 'desc' } },
+      },
     });
     return res.status(200).json(deals);
   }
 
   if (req.method === 'POST') {
     const data = req.body;
+    const jobValue = data.estimatedJobValue ?? 0;
+    const repEst = Math.round(jobValue * 0.05);
+    const adminTotalEst = Math.round(jobValue * 0.1);
+
     const deal = await prisma.deal.create({
       data: {
         homeownerName: data.homeownerName,
@@ -23,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email: data.email ?? '',
         city: data.city ?? '',
         projectType: data.projectType,
-        estimatedJobValue: data.estimatedJobValue ?? 0,
+        estimatedJobValue: jobValue,
         financingRequired: data.financingRequired ?? false,
         assignedRepId: data.assignedRepId ?? user.id,
         assignedContractorId: data.assignedContractorId ?? null,
@@ -31,9 +39,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         notes: data.notes ?? '',
         nextFollowUpDate: data.nextFollowUpDate ?? '',
       },
-      include: { activity: true },
+      include: { activity: true, proposals: true, dispatches: true },
     });
-    return res.status(201).json(deal);
+
+    // Create the commission record atomically with the deal
+    const commission = await prisma.commission.upsert({
+      where: { dealId: deal.id },
+      update: {},
+      create: {
+        dealId: deal.id,
+        repId: deal.assignedRepId,
+        repCommissionRate: 0.05,
+        repEstimatedCommission: repEst,
+        repPaidCommission: 0,
+        payoutStatus: 'pending',
+        adminTotalCommissionRate: 0.1,
+        adminTotalEstimatedCommission: adminTotalEst,
+        adminNetCommission: adminTotalEst - repEst,
+      },
+    });
+
+    // Return commission id so the client can reconcile the temp commission id
+    return res.status(201).json({ ...deal, _commissionId: commission.id });
   }
 
   return res.status(405).json({ error: 'Method not allowed.' });
