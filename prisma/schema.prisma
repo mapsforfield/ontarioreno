@@ -32,6 +32,7 @@ model User {
   dispatches           ContractorDispatch[]
   pushSubscriptions    PushSubscription[]
   clients              Client[]
+  trackerRows          SaleTracker[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -234,6 +235,32 @@ model ContractorDispatch {
   deal       Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contractor Contractor @relation(fields: [contractorId], references: [id])
   sentBy     User       @relation(fields: [sentByUserId], references: [id])
+}
+
+// ─── Sales Tracker ───────────────────────────────────────────────────────────
+// Per-rep personal deal tracker (replaces the Google Sheets each rep maintained).
+// Rows can be standalone or optionally linked to a Deal in the pipeline.
+
+model SaleTracker {
+  id              String   @id @default(cuid())
+  repId           String
+  dealId          String?
+  clientName      String
+  projectTotal    Float    @default(0)
+  paymentType     String   @default("")   // Finance / Cash / Finance and Cash / etc.
+  city            String   @default("")
+  startDate       String   @default("")   // free text: "Finished", "April", "TBD", etc.
+  signingStatus   String   @default("")   // free-text notes on contract signing
+  approvalStatus  String   @default("")   // "Approved 60,000", "N/A", "Pre-Approved"
+  fundedStatus    String   @default("")   // "YES", "PARTIALLY", "NO"
+  amountLeftToPay Float?
+  notes           String   @default("")   // extra notes (extras, hold reason, etc.)
+  onHold          Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rep  User  @relation(fields: [repId], references: [id])
 }
 
 // ─── Push Subscriptions ──────────────────────────────────────────────────────

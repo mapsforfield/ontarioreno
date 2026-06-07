@@ -23,6 +23,7 @@ import {
   Appointment,
   ConsultationStage,
   ProposalHistory,
+  SaleTrackerRow,
   User,
 } from './types';
 
@@ -62,6 +63,7 @@ type PortalDataState = {
   deals: Deal[];
   commissions: Commission[];
   proposals: ProposalHistory[];
+  trackerRows: SaleTrackerRow[];
 };
 
 type ContractorDispatchDraft = Omit<
@@ -140,6 +142,9 @@ type PortalDataContextValue = PortalDataState & {
   updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
   deleteClient: (clientId: string) => Promise<void>;
   getAppointmentsForClient: (clientId: string) => Appointment[];
+  addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
+  updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
+  deleteTrackerRow: (id: string) => Promise<void>;
   addAppointment: (appointment: AppointmentDraft, actor?: User) => void;
   updateAppointment: (
     appointmentId: string,
@@ -195,6 +200,7 @@ const emptyState: PortalDataState = {
   deals: [],
   dispatches: [],
   proposals: [],
+  trackerRows: [],
   users: [],
 };
 
@@ -502,7 +508,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Commission[]>('/api/commissions'),
       apiCall<Activity[]>('/api/auth/activities'),
       apiCall<Client[]>('/api/appointments?_resource=clients'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients]) => {
+      apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -520,6 +527,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         dispatches,
         proposals,
         clients: clients ?? [],
+        trackerRows: trackerRows ?? [],
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1104,6 +1112,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           deals: [...current.deals, deal],
           dispatches: current.dispatches,
           proposals: current.proposals,
+          trackerRows: current.trackerRows,
           users: current.users,
         }));
 
@@ -1754,6 +1763,42 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           clients: current.clients.filter((c) => c.id !== clientId),
+        }));
+      },
+
+      // ── Sales Tracker mutations ─────────────────────────────────────────────
+
+      addTrackerRow: async (repId, draft = {}) => {
+        const row = await apiCall<SaleTrackerRow>('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'create_tracker_row', repId, ...draft }),
+        });
+        if (row) setState((current) => ({ ...current, trackerRows: [...current.trackerRows, row] }));
+        return row;
+      },
+
+      updateTrackerRow: async (id, updates) => {
+        const row = await apiCall<SaleTrackerRow>('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'update_tracker_row', id, ...updates }),
+        });
+        if (row) {
+          setState((current) => ({
+            ...current,
+            trackerRows: current.trackerRows.map((r) => (r.id === id ? row : r)),
+          }));
+        }
+        return row;
+      },
+
+      deleteTrackerRow: async (id) => {
+        await apiCall('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_tracker_row', id }),
+        });
+        setState((current) => ({
+          ...current,
+          trackerRows: current.trackerRows.filter((r) => r.id !== id),
         }));
       },
 
