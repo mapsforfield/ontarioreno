@@ -147,6 +147,7 @@ type PortalDataContextValue = PortalDataState & {
     actor?: User
   ) => void;
   deleteAppointment: (appointmentId: string, actor?: User) => void;
+  transferAppointment: (appointmentId: string, toRepId: string) => Promise<boolean>;
   createDealFromAppointment: (appointmentId: string, actor?: User) => void;
   getActivitiesForUser: (user: User) => Activity[];
   getAppointmentsForDeal: (dealId: string) => Appointment[];
@@ -2148,6 +2149,21 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         });
 
         apiCall(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+      },
+
+      transferAppointment: async (appointmentId, toRepId) => {
+        const updated = await apiCall<Appointment>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'transfer_appointment', id: appointmentId, toRepId }),
+        });
+        if (!updated) return false;
+        setState((current) => ({
+          ...current,
+          appointments: current.appointments.map((a) =>
+            a.id === appointmentId ? { ...a, assignedRepId: toRepId } : a
+          ),
+        }));
+        return true;
       },
 
       createDealFromAppointment: (appointmentId, actor) => {
