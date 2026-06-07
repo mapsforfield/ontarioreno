@@ -916,7 +916,7 @@ OntarioReno Broker Portal`;
       {isPanelOpen && (
         <div className="fixed inset-0 z-[90] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
           <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
                   Deal details
@@ -1748,7 +1748,7 @@ OntarioReno Broker Portal`;
       {isDispatchPanelOpen && selectedDeal && (
         <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
           <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
                   Contractor Dispatch
