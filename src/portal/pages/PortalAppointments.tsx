@@ -111,6 +111,7 @@ const stageOptions: Array<{ label: string; value: ConsultationStage }> = [
 
 const repStageOptions = stageOptions.filter((option) =>
   [
+    'consultation_scheduled',
     'consultation_completed',
     'estimate_requested',
     'contractor_review',
