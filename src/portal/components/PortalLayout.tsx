@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Trophy,
+  UserRound,
   X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
@@ -37,6 +38,7 @@ const navItems = [
     href: '/portal/appointments',
     icon: CalendarDays,
   },
+  { label: 'Clients', href: '/portal/clients', icon: UserRound },
   { label: 'Financing', href: '/portal/financing', icon: CreditCard },
   { label: 'Performance', href: '/portal/performance', icon: LineChart },
   { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy },

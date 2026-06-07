@@ -139,9 +139,25 @@ export type Appointment = {
   outcomeNotes: string;
   objections: string;
   followUpDate: string;
+  clientId?: string | null;
   externalCalendarId?: string;
   externalEventId?: string;
   syncedAt?: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Client = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  projectTypes: string[];
+  internalNotes: string;
+  source: string;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

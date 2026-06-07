@@ -75,6 +75,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   if (req.method === 'GET') {
+    // ── Client list ──
+    if (req.query['_resource'] === 'clients') {
+      const clients = await prisma.client.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      return res.status(200).json(clients);
+    }
+
     const appointments = await prisma.appointment.findMany({
       orderBy: { appointmentDate: 'desc' },
     });
@@ -83,6 +91,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const data = req.body;
+
+    // ── Client CRUD actions ──
+    if (data._action === 'create_client') {
+      const client = await prisma.client.create({
+        data: {
+          name: data.name,
+          phone: data.phone ?? '',
+          email: data.email ?? '',
+          address: data.address ?? '',
+          city: data.city ?? '',
+          projectTypes: data.projectTypes ?? [],
+          internalNotes: data.internalNotes ?? '',
+          source: 'manual',
+          createdByUserId: user.id,
+        },
+      });
+      return res.status(201).json(client);
+    }
+
+    if (data._action === 'update_client') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const client = await prisma.client.update({
+        where: { id: data.id },
+        data: {
+          name: data.name,
+          phone: data.phone ?? '',
+          email: data.email ?? '',
+          address: data.address ?? '',
+          city: data.city ?? '',
+          projectTypes: data.projectTypes ?? [],
+          internalNotes: data.internalNotes ?? '',
+        },
+      });
+      return res.status(200).json(client);
+    }
+
+    if (data._action === 'delete_client') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      // Admin only
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
+      await prisma.client.delete({ where: { id: data.id } });
+      return res.status(200).json({ ok: true });
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         dealId: data.dealId || null,
@@ -119,6 +171,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         createdByUserId: user.id,
       },
     });
+    // ── Auto-upsert client profile ──
+    // Match by email if provided, otherwise create a new profile.
+    // Link the appointment back to the client.
+    try {
+      let client = appointment.email
+        ? await prisma.client.findFirst({ where: { email: appointment.email } })
+        : null;
+
+      if (client) {
+        // Update existing client with any new info
+        client = await prisma.client.update({
+          where: { id: client.id },
+          data: {
+            name: appointment.customerName || client.name,
+            phone: appointment.phone || client.phone,
+            address: appointment.address || client.address,
+            city: appointment.city || client.city,
+            projectTypes: appointment.projectType
+              ? Array.from(new Set([...client.projectTypes, appointment.projectType]))
+              : client.projectTypes,
+          },
+        });
+      } else {
+        client = await prisma.client.create({
+          data: {
+            name: appointment.customerName,
+            phone: appointment.phone ?? '',
+            email: appointment.email ?? '',
+            address: appointment.address ?? '',
+            city: appointment.city ?? '',
+            projectTypes: appointment.projectType ? [appointment.projectType] : [],
+            internalNotes: '',
+            source: 'appointment',
+            createdByUserId: user.id,
+          },
+        });
+      }
+
+      // Link appointment → client
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { clientId: client.id },
+      });
+    } catch {
+      // Client auto-linking is non-critical
+    }
+
     // Best-effort push to assigned rep
     try {
       const subs = await prisma.pushSubscription.findMany({
