@@ -1,8 +1,11 @@
 import {
   BarChart3,
+  Bell,
+  BellOff,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
+  Camera,
   CreditCard,
   Gauge,
   HandCoins,
@@ -11,10 +14,14 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Trophy,
-  TriangleAlert,
   X,
 } from 'lucide-react';
-import { ChangeEvent, FormEvent, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import {
+  getPushPermissionState,
+  registerPushNotifications,
+  unregisterPushNotifications,
+} from '../lib/pushNotifications';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
@@ -38,19 +45,46 @@ const navItems = [
 ];
 
 export default function PortalLayout() {
-  const { currentUser, isAdmin, logout } = usePortalAuth();
-  const { changeUserPassword, updateUser } = usePortalData();
+  const { currentUser, isAdmin, logout, updateCurrentUser } = usePortalAuth();
+  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser } = usePortalData();
+
+  // Needs-attention count for badge on Consultations nav item
+  const today = new Date().toISOString().slice(0, 10);
+  const visibleAppointments = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
+  const needsAttentionCount = visibleAppointments.filter(
+    (a) =>
+      (a.status === 'completed' && !a.outcomeSubmitted) ||
+      (a.nextStep === 'follow_up_required' && a.followUpDate && a.followUpDate <= today) ||
+      (['hot', 'warm'].includes(a.homeownerInterestLevel ?? '') && a.nextStep === 'no_action') ||
+      (a.appointmentDate < today && a.status !== 'completed') ||
+      a.consultationStage === 'follow_up_required'
+  ).length;
+  // Push notifications
+  const [pushState, setPushState] = useState<'unsupported' | 'default' | 'granted' | 'denied' | 'registering'>('default');
+  useEffect(() => {
+    setPushState(getPushPermissionState());
+  }, []);
+  const handleTogglePush = async () => {
+    if (!currentUser) return;
+    if (pushState === 'granted') {
+      await unregisterPushNotifications(currentUser.id);
+      setPushState('default');
+    } else {
+      setPushState('registering');
+      const ok = await registerPushNotifications(currentUser.id);
+      setPushState(ok ? 'granted' : Notification.permission === 'denied' ? 'denied' : 'default');
+    }
+  };
+
   const [isPasswordPanelOpen, setIsPasswordPanelOpen] = useState(false);
-  const [isPrototypeBannerDismissed, setIsPrototypeBannerDismissed] = useState(
-    () => sessionStorage.getItem('prototype-banner-dismissed') === 'true'
-  );
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const[isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     confirmPassword: '',
     currentPassword: '',
     newPassword: '',
   });
   const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const location = useLocation();
   const navigate = useNavigate();
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
@@ -95,6 +129,7 @@ export default function PortalLayout() {
       newPassword: '',
     });
     setPasswordMessage('');
+    setPasswordStatus('idle');
   };
 
   const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
@@ -102,6 +137,7 @@ export default function PortalLayout() {
     if (!currentUser) return;
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordStatus('error');
       setPasswordMessage('New password and confirmation must match.');
       return;
     }
@@ -113,10 +149,12 @@ export default function PortalLayout() {
       currentUser
     );
     if (!result.ok) {
+      setPasswordStatus('error');
       setPasswordMessage(result.message ?? 'Password could not be changed.');
       return;
     }
 
+    setPasswordStatus('success');
     setPasswordMessage('Password updated successfully.');
     setPasswordForm({
       confirmPassword: '',
@@ -130,15 +168,31 @@ export default function PortalLayout() {
   ) => {
     const file = event.target.files?.[0];
     if (!file || !currentUser) return;
+    event.target.value = '';
 
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateUser(currentUser.id, { avatarUrl: reader.result }, currentUser);
-      }
+      const img = new Image();
+      img.onload = () => {
+        // Resize to max 200×200, keeping aspect ratio
+        const MAX = 200;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        // Update store + auth context so sidebar updates immediately
+        updateUser(currentUser.id, { avatarUrl: dataUrl }, currentUser);
+        updateCurrentUser({ avatarUrl: dataUrl });
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
-    event.target.value = '';
   };
 
   const profileAvatar = currentUser?.avatarUrl ? (
@@ -157,13 +211,15 @@ export default function PortalLayout() {
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[#b9cbe0] bg-[#f8fbff] py-1 pl-1 pr-3 text-xs font-semibold text-[#1B3C6C]">
-              <span className="flex h-7 w-7 overflow-hidden rounded-full bg-[#f4c35a] text-[#071525]">
-                <span className="flex h-full w-full items-center justify-center text-xs font-black">
+            <label className="relative flex h-10 w-10 cursor-pointer shrink-0 overflow-visible rounded-full">
+              <span className="flex h-10 w-10 overflow-hidden rounded-full bg-[#f4c35a] text-[#071525]">
+                <span className="flex h-full w-full items-center justify-center text-sm font-black">
                   {profileAvatar}
                 </span>
               </span>
-              {currentUser?.name}
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1B3C6C] ring-1 ring-white">
+                <Camera className="h-2.5 w-2.5 text-white" />
+              </span>
               <input
                 type="file"
                 accept="image/*"
@@ -171,6 +227,36 @@ export default function PortalLayout() {
                 className="hidden"
               />
             </label>
+            {(
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                disabled={pushState === 'registering' || pushState === 'denied'}
+                title={
+                  pushState === 'granted'
+                    ? 'Notifications on — tap to disable'
+                    : pushState === 'denied'
+                    ? 'Notifications blocked in browser settings'
+                    : pushState === 'unsupported'
+                    ? 'Add to Home Screen to enable push notifications'
+                    : 'Enable push notifications'
+                }
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition',
+                  pushState === 'granted'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : pushState === 'denied' || pushState === 'unsupported'
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                    : 'border-slate-200 bg-white text-slate-600 hover:text-[#1B3C6C]'
+                )}
+              >
+                {pushState === 'granted' ? (
+                  <Bell className="h-4 w-4" />
+                ) : (
+                  <BellOff className="h-4 w-4" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleLogout}
@@ -233,15 +319,8 @@ export default function PortalLayout() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-white/12 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/14"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-            <label className="mt-2 flex w-full cursor-pointer items-center justify-center rounded-[0.5rem] border border-white/12 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/14">
+            <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-[0.5rem] border border-white/12 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/14">
+              <Camera className="h-4 w-4" />
               Upload profile image
               <input
                 type="file"
@@ -257,13 +336,21 @@ export default function PortalLayout() {
             >
               Change password
             </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-red-400/30 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
           </div>
         </div>
       </aside>
 
       <main
         className={cn(
-          'min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
+          'min-h-screen px-4 pb-24 pt-20 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
           isWideWorkspace ? 'lg:px-6 xl:px-8 2xl:px-10' : 'lg:px-8'
         )}
       >
@@ -289,52 +376,40 @@ export default function PortalLayout() {
               </span>
             </div>
           </div>
-          {!isPrototypeBannerDismissed && (
-            <div className="mb-5 flex items-start gap-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-              <p className="flex-1 font-medium">
-                <span className="font-bold">Prototype mode:</span> All data is
-                stored locally in this browser only. Clearing browser data or
-                switching devices will reset the portal. Do not use for
-                production data.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  sessionStorage.setItem('prototype-banner-dismissed', 'true');
-                  setIsPrototypeBannerDismissed(true);
-                }}
-                className="shrink-0 text-amber-600 transition hover:text-amber-900"
-                aria-label="Dismiss prototype warning"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
           <Outlet />
         </div>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.45rem)] pt-2 shadow-[0_-12px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
-          {mobilePrimaryItems.map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-14 flex-col items-center justify-center gap-1 rounded-[0.5rem] px-0.5 text-[0.63rem] font-bold leading-none transition sm:text-[0.68rem]',
-                  isActive
-                    ? 'bg-[#e8f1fb] text-[#1B3C6C]'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-[#1B3C6C]'
-                )
-              }
-            >
-              <item.icon className="h-4.5 w-4.5" />
-              <span>{item.mobileLabel ?? item.label}</span>
-            </NavLink>
-          ))}
+          {mobilePrimaryItems.map((item) => {
+            const showBadge = item.href === '/portal/appointments' && needsAttentionCount > 0;
+            return (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                onClick={() => setIsMoreMenuOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-[0.5rem] px-0.5 text-[0.63rem] font-bold leading-none transition sm:text-[0.68rem]',
+                    isActive
+                      ? 'bg-[#e8f1fb] text-[#1B3C6C]'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-[#1B3C6C]'
+                  )
+                }
+              >
+                <span className="relative">
+                  <item.icon className="h-4.5 w-4.5" />
+                  {showBadge && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[0.5rem] font-black text-white ring-1 ring-white">
+                      {needsAttentionCount > 9 ? '9+' : needsAttentionCount}
+                    </span>
+                  )}
+                </span>
+                <span>{item.mobileLabel ?? item.label}</span>
+              </NavLink>
+            );
+          })}
           <button
             type="button"
             onClick={() => setIsMoreMenuOpen((current) => !current)}
@@ -391,7 +466,7 @@ export default function PortalLayout() {
                   onClick={() => setIsMoreMenuOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 rounded-[0.5rem] px-3.5 py-3 text-sm font-bold transition',
+                      'flex items-center gap-3 rounded-[0.5rem] px-3.5 py-3.5 text-sm font-bold transition',
                       isActive
                         ? 'bg-[#e8f1fb] text-[#1B3C6C]'
                         : 'text-slate-600 hover:bg-slate-50 hover:text-[#1B3C6C]'
@@ -427,7 +502,7 @@ export default function PortalLayout() {
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
                 aria-label="Close password panel"
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handlePasswordChange} className="grid gap-4 p-5">
@@ -479,7 +554,11 @@ export default function PortalLayout() {
                 />
               </label>
               {passwordMessage && (
-                <p className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                <p className={`rounded-[0.5rem] border px-3 py-2 text-sm font-bold ${
+                  passwordStatus === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-red-200 bg-red-50 text-red-700'
+                }`}>
                   {passwordMessage}
                 </p>
               )}
