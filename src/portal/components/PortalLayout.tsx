@@ -82,17 +82,22 @@ export default function PortalLayout() {
       return;
     }
     setPushState('registering');
-    const ok = await registerPushNotifications(currentUser.id);
-    if (ok) {
-      setPushState('granted');
-    } else {
-      const perm = Notification.permission;
-      setPushState(perm === 'denied' ? 'denied' : 'default');
-      if (perm === 'denied') {
-        alert('Notifications are blocked. Go to iPhone Settings → [your app] → Notifications and enable them.');
+    try {
+      const ok = await registerPushNotifications(currentUser.id);
+      if (ok) {
+        setPushState('granted');
       } else {
-        alert(`Could not enable notifications. Permission state: "${perm}". Try closing and reopening the app from your Home Screen.`);
+        const perm = Notification.permission;
+        setPushState(perm === 'denied' ? 'denied' : 'default');
+        if (perm === 'denied') {
+          alert('Notifications are blocked. Go to iPhone Settings → Notifications → find OntarioReno and enable.');
+        } else {
+          alert(`Push registration returned false. Permission: "${perm}". VAPID key present: ${!!import.meta.env.VITE_VAPID_PUBLIC_KEY}`);
+        }
       }
+    } catch (err) {
+      setPushState('default');
+      alert(`Push error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
