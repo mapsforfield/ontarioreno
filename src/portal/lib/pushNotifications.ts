@@ -21,11 +21,10 @@ export function getPushPermissionState(): NotificationPermission | 'unsupported'
 export async function registerPushNotifications(userId: string): Promise<boolean> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
 
-  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-  if (!vapidPublicKey) {
-    console.warn('[Push] VITE_VAPID_PUBLIC_KEY is not set — push notifications disabled.');
-    return false;
-  }
+  // Public key is safe to hardcode — VAPID public keys are designed to be public
+  const vapidPublicKey =
+    (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) ||
+    'BBwj7vwD5fm8niCQPvimtb4mPCLl9BAivVy0psG-DVjtAnreKcVGNL6X_a5Wjj7r5TIRNxm4cWokutIh8lblLrs';
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
