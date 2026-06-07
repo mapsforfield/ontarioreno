@@ -867,12 +867,13 @@ export default function PortalAppointments() {
   };
 
   const openCreatePanel = () => {
-    if (!isAdmin) return;
     setIsCreating(true);
     setSelectedAppointmentId(null);
     setForm({
       ...emptyForm,
       appointmentDate: toDateKey(cursorDate),
+      // Pre-assign to the current rep so they don't need to pick themselves
+      assignedRepId: isAdmin ? '' : currentUser.id,
     });
   };
 
@@ -927,14 +928,15 @@ export default function PortalAppointments() {
       return;
     }
 
-    if (!isAdmin || !form.customerName.trim() || !form.appointmentDate) return;
+    if (!form.customerName.trim() || !form.appointmentDate) return;
 
     const payload = {
       address: form.address.trim(),
       appointmentDate: form.appointmentDate,
       appointmentTime: form.appointmentTime,
       appointmentType: form.appointmentType,
-      assignedRepId: form.assignedRepId,
+      // Non-admins are always assigned to themselves
+      assignedRepId: isAdmin ? form.assignedRepId : currentUser.id,
       contractorId: form.contractorId || null,
       city: form.city.trim(),
       consultationStage: form.consultationStage,
@@ -1608,16 +1610,14 @@ export default function PortalAppointments() {
           </h1>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={openCreatePanel}
-              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
-            >
-              <Plus className="h-4 w-4" />
-              + Schedule Consultation
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openCreatePanel}
+            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
+          >
+            <Plus className="h-4 w-4" />
+            + Schedule Consultation
+          </button>
         </div>
       </header>
 
@@ -1741,16 +1741,14 @@ export default function PortalAppointments() {
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-10">
                   <CalendarDays className="h-9 w-9 text-slate-200" />
                   <p className="mt-3 text-sm font-bold text-slate-400">No consultations today</p>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={openCreatePanel}
-                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#1B3C6C] px-4 py-2 text-xs font-black text-white shadow-sm"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Schedule Consultation
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={openCreatePanel}
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#1B3C6C] px-4 py-2 text-xs font-black text-white shadow-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Schedule Consultation
+                  </button>
                 </div>
               )}
             </>
@@ -3083,28 +3081,28 @@ export default function PortalAppointments() {
                   <input
                     value={form.customerName}
                     onChange={(event) => updateForm('customerName', event.target.value)}
-                    readOnly={!isAdmin}
+                    readOnly={!isAdmin && !isCreating}
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Phone
-                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} readOnly={!isAdmin} />
+                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Email
-                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} readOnly={!isAdmin} />
+                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   City
-                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin} />
+                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address
-                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} readOnly={!isAdmin} />
+                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Project Type
-                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} readOnly={!isAdmin} />
+                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Assigned Sales Rep
@@ -3130,19 +3128,19 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Date
-                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} readOnly={!isAdmin} />
+                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Time
-                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} readOnly={!isAdmin} />
+                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Duration
-                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} readOnly={!isAdmin} />
+                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} readOnly={!isAdmin && !isCreating} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Type
-                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)} disabled={!isAdmin}>
+                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)} disabled={!isAdmin && !isCreating}>
                     {typeOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -3153,7 +3151,7 @@ export default function PortalAppointments() {
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Status
                   <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
-                    {(isAdmin
+                    {(isAdmin || isCreating
                       ? statusOptions
                       : statusOptions.filter((option) =>
                           ['completed', 'no_show', form.status].includes(option.value)
@@ -3218,7 +3216,7 @@ export default function PortalAppointments() {
                     rows={3}
                     value={form.customerNotes}
                     onChange={(event) => updateForm('customerNotes', event.target.value)}
-                    readOnly={!isAdmin}
+                    readOnly={!isAdmin && !isCreating}
                   />
                 </label>
                 <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">
