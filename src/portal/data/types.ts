@@ -200,6 +200,28 @@ export type Deal = {
   updatedAt: string;
 };
 
+export type SaleTrackerFundedStatus = 'YES' | 'PARTIALLY' | 'NO' | '';
+
+export type SaleTrackerRow = {
+  id: string;
+  repId: string;
+  dealId?: string | null;
+  clientName: string;
+  projectTotal: number;
+  paymentType: string;
+  city: string;
+  startDate: string;
+  signingStatus: string;
+  approvalStatus: string;
+  fundedStatus: SaleTrackerFundedStatus;
+  amountLeftToPay: number | null;
+  notes: string;
+  onHold: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CommissionPayoutStatus = 'pending' | 'partial' | 'paid';
 
 export type Commission = {
