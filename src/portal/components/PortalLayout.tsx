@@ -66,24 +66,32 @@ export default function PortalLayout() {
   }, []);
   const handleTogglePush = async () => {
     if (!currentUser) return;
-    if (pushState === 'unsupported') {
-      alert('To enable push notifications on iPhone, open this page in Safari, tap Share → Add to Home Screen, then open the app from your Home Screen icon.');
-      return;
-    }
     if (pushState === 'granted') {
       await unregisterPushNotifications(currentUser.id);
       setPushState('default');
+      return;
+    }
+    // Check support before attempting
+    const hasNotification = 'Notification' in window;
+    const hasPushManager = 'PushManager' in window;
+    const hasServiceWorker = 'serviceWorker' in navigator;
+    if (!hasNotification || !hasPushManager || !hasServiceWorker) {
+      alert(
+        `Push not available in this browser context.\n\nSupport: Notification=${hasNotification}, PushManager=${hasPushManager}, ServiceWorker=${hasServiceWorker}\n\nMake sure you opened this from your Home Screen icon (not Safari).`
+      );
+      return;
+    }
+    setPushState('registering');
+    const ok = await registerPushNotifications(currentUser.id);
+    if (ok) {
+      setPushState('granted');
     } else {
-      setPushState('registering');
-      const ok = await registerPushNotifications(currentUser.id);
-      if (ok) {
-        setPushState('granted');
+      const perm = Notification.permission;
+      setPushState(perm === 'denied' ? 'denied' : 'default');
+      if (perm === 'denied') {
+        alert('Notifications are blocked. Go to iPhone Settings → [your app] → Notifications and enable them.');
       } else {
-        const perm = 'Notification' in window ? Notification.permission : 'denied';
-        setPushState(perm === 'denied' ? 'denied' : 'default');
-        if (perm === 'denied') {
-          alert('Notifications are blocked. Go to your iPhone Settings → Safari → Notifications to allow them for this site.');
-        }
+        alert(`Could not enable notifications. Permission state: "${perm}". Try closing and reopening the app from your Home Screen.`);
       }
     }
   };
@@ -243,7 +251,7 @@ export default function PortalLayout() {
               <button
                 type="button"
                 onClick={handleTogglePush}
-                disabled={pushState === 'registering' || pushState === 'denied' || pushState === 'unsupported'}
+                disabled={pushState === 'registering'}
                 title={
                   pushState === 'granted'
                     ? 'Notifications on — tap to disable'
