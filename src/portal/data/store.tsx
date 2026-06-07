@@ -4,12 +4,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import {
-  fetchGoogleCalendarEvents,
-  GoogleCalendarEvent,
-} from './googleCalendar';
+import { usePortalAuth } from '../auth';
 import {
   Commission,
   CommissionPayoutStatus,
@@ -71,7 +69,7 @@ type ContractorDispatchDraft = Omit<
 
 type PortalDataContextValue = PortalDataState & {
   isLoading: boolean;
-  addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => void;
+  addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => Promise<{ tempPassword: string } | { error: string } | null>;
   updateUser: (
     userId: string,
     updates: Partial<Omit<User, 'id' | 'role'>>,
@@ -144,10 +142,6 @@ type PortalDataContextValue = PortalDataState & {
   ) => void;
   deleteAppointment: (appointmentId: string, actor?: User) => void;
   createDealFromAppointment: (appointmentId: string, actor?: User) => void;
-  importGoogleCalendarEvents: (
-    actor?: User,
-    events?: GoogleCalendarEvent[]
-  ) => Promise<{ imported: number; updated: number; unlinked: number }>;
   getActivitiesForUser: (user: User) => Activity[];
   getAppointmentsForDeal: (dealId: string) => Appointment[];
   getDispatchesForConsultation: (consultationId: string) => ContractorDispatch[];
@@ -246,10 +240,13 @@ export function generateTemporaryPassword(): string {
 }
 
 function normalizeAppointment(appointment: Appointment, deals: Deal[]): Appointment {
-  const deal = deals.find((candidate) => candidate.id === appointment.dealId);
+  // Normalize empty-string dealId (from Google Calendar import) to null
+  const dealId = appointment.dealId || null;
+  const deal = deals.find((candidate) => candidate.id === dealId);
 
   return {
     ...appointment,
+    dealId,
     address: appointment.address ?? appointment.location ?? '',
     city: appointment.city ?? deal?.city ?? '',
     contractorId:
@@ -345,99 +342,6 @@ function addDealTimelineNote(
 
 function normalizeSearchValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function findRepForGoogleEvent(
-  event: GoogleCalendarEvent,
-  users: User[]
-) {
-  const eventText = normalizeSearchValue(
-    `${event.teamMemberName ?? ''} ${event.title} ${event.description}`
-  );
-
-  return users.find(
-    (user) =>
-      user.role === 'rep' &&
-      user.active &&
-      eventText.includes(normalizeSearchValue(user.name))
-  );
-}
-
-function findDealForGoogleEvent(event: GoogleCalendarEvent, deals: Deal[]) {
-  const eventText = normalizeSearchValue(
-    `${event.title} ${event.description}`
-  );
-
-  const nameMatch = deals.find((deal) =>
-    eventText.includes(normalizeSearchValue(deal.homeownerName))
-  );
-  if (nameMatch) return nameMatch;
-
-  return deals.find((deal) => {
-    const projectType = normalizeSearchValue(deal.projectType);
-    return projectType && eventText.includes(projectType);
-  });
-}
-
-function googleEventToAppointment(
-  event: GoogleCalendarEvent,
-  actor: User | undefined,
-  users: User[],
-  deals: Deal[]
-): Appointment {
-  const [appointmentDate, appointmentTime = ''] =
-    event.startDateTime.split('T');
-  const matchedDeal = findDealForGoogleEvent(event, deals);
-  const matchedRep = findRepForGoogleEvent(event, users);
-  const fallbackRep = users.find((user) => user.role === 'rep' && user.active);
-  const assignedRepId =
-    matchedRep?.id ??
-    (actor?.role === 'rep' ? actor.id : undefined) ??
-    matchedDeal?.assignedRepId ??
-    fallbackRep?.id ??
-    actor?.id ??
-    'unassigned';
-
-  return {
-    appointmentDate,
-    appointmentTime: appointmentTime.slice(0, 5),
-    appointmentType: 'home_visit',
-    address: event.location,
-    assignedRepId,
-    consultationStage: 'consultation_scheduled',
-    contractorId: matchedDeal?.assignedContractorId ?? null,
-    closeProbability: 0,
-    city: matchedDeal?.city ?? '',
-    createdAt: new Date().toISOString(),
-    createdByUserId: actor?.id ?? 'system',
-    customerNotes: '',
-    customerName: matchedDeal?.homeownerName ?? event.title,
-    dealId: matchedDeal?.id ?? '',
-    durationMinutes: 60,
-    email: '',
-    externalCalendarId: event.externalCalendarId,
-    externalEventId: event.externalEventId,
-    estimatedProjectValue: 0,
-    financingNeeded: null,
-    followUpDate: '',
-    homeownerInterestLevel: null,
-    id: `google-${event.externalEventId}`,
-    internalNotes: `${event.title}\n\n${event.description}`,
-    location: event.location,
-    notes: `${event.title}\n\n${event.description}`,
-    nextStep: 'no_action',
-    objections: '',
-    outcomeNotes: '',
-    outcomeSubmitted: false,
-    phone: '',
-    projectType: matchedDeal?.projectType ?? 'Consultation',
-    recommendedContractorId: null,
-    source: 'google_calendar',
-    status: 'scheduled',
-    syncedAt: new Date().toISOString(),
-    title: event.title,
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 function createCommissionForDeal(deal: Deal): Commission {
@@ -541,9 +445,13 @@ async function apiCall<T>(
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[store] apiCall ${url} → ${res.status}`, await res.text().catch(() => ''));
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (err) {
+    console.error(`[store] apiCall ${url} threw`, err);
     return null;
   }
 }
@@ -551,8 +459,10 @@ async function apiCall<T>(
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
+  const { currentUser, isAuthLoading } = usePortalAuth();
   const [state, setState] = useState<PortalDataState>(emptyState);
   const [isLoading, setIsLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   // Load all portal data from the API on mount.
   // We only run this when on a /portal route so public pages don't fire
@@ -563,15 +473,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Wait until auth check resolves and a user is confirmed before fetching.
+    // This prevents a race where GET /api/users fires before the JWT cookie
+    // is verified, causing a 401 and leaving the store empty.
+    if (isAuthLoading) return;
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     Promise.all([
       apiCall<User[]>('/api/users'),
       apiCall<Contractor[]>('/api/contractors'),
       apiCall<Deal[]>('/api/deals'),
       apiCall<Appointment[]>('/api/appointments'),
       apiCall<Commission[]>('/api/commissions'),
-      apiCall<Activity[]>('/api/activities'),
+      apiCall<Activity[]>('/api/auth/activities'),
     ]).then(([users, contractors, rawDeals, appointments, commissions, activities]) => {
-      const deals = (rawDeals ?? []).map(normalizeDeal);
+      // Deals API now embeds proposals and dispatches — extract them
+      type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
+      const rawDealList = (rawDeals ?? []) as RawDeal[];
+      const deals = rawDealList.map(normalizeDeal);
+      const proposals = rawDealList.flatMap((d) => d.proposals ?? []);
+      const dispatches = rawDealList.flatMap((d) => d.dispatches ?? []);
 
       setState({
         users: users ?? [],
@@ -580,13 +506,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         appointments: (appointments ?? []).map((a) => normalizeAppointment(a, deals)),
         commissions: syncCommissionsWithDeals(commissions ?? [], deals),
         activities: activities ?? [],
-        dispatches: [],
-        proposals: [],
+        dispatches,
+        proposals,
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthLoading, currentUser?.id]);
 
   const value = useMemo<PortalDataContextValue>(() => {
     const getDealsForRep = (repId: string) =>
@@ -779,8 +705,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       // ── User mutations ──────────────────────────────────────────────────────
 
-      addUser: (user, actor) => {
+      addUser: async (user, actor) => {
         const tempId = createId('user');
+        const tempPassword = generateTemporaryPassword();
         const newUser: User = {
           ...user,
           id: tempId,
@@ -801,16 +728,29 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         }));
 
         // Server creates real ID — replace temp once saved
-        apiCall<User>('/api/users', {
+        // POST to /api/users base path has a Vercel routing bug with [[...id]].ts
+        // User creation is handled by /api/auth/add-rep instead.
+        const res = await fetch('/api/auth/add-rep', {
           method: 'POST',
-          body: JSON.stringify({ ...user, role: 'rep' }),
-        }).then((saved) => {
-          if (!saved) return;
-          setState((current) => ({
-            ...current,
-            users: current.users.map((u) => (u.id === tempId ? saved : u)),
-          }));
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...user, role: 'rep', password: tempPassword }),
         });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { error?: string };
+          return { error: body.error ?? 'Failed to create rep.' };
+        }
+
+        const saved = await res.json() as User;
+        if (!saved) return null;
+
+        setState((current) => ({
+          ...current,
+          users: current.users.map((u) => (u.id === tempId ? saved : u)),
+        }));
+
+        return { tempPassword };
       },
 
       updateUser: (userId, updates, actor) => {
@@ -955,7 +895,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           activities: prependActivity(current.activities, actor, activity),
         }));
 
-        apiCall('/api/activities', {
+        apiCall('/api/auth/activities', {
           method: 'POST',
           body: JSON.stringify(activity),
         });
@@ -1144,7 +1084,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           users: current.users,
         }));
 
-        apiCall<Deal>('/api/deals', {
+        apiCall<Deal & { _commissionId?: string }>('/api/deals', {
           method: 'POST',
           body: JSON.stringify({ ...dealDraft, assignedRepId: repId }),
         }).then((saved) => {
@@ -1152,9 +1092,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           setState((current) => ({
             ...current,
             deals: current.deals.map((d) => (d.id === tempId ? normalizeDeal(saved) : d)),
-            commissions: current.commissions.map((c) =>
-              c.dealId === tempId ? { ...c, dealId: saved.id } : c
-            ),
+            commissions: current.commissions.map((c) => {
+              if (c.dealId !== tempId) return c;
+              return {
+                ...c,
+                dealId: saved.id,
+                // Reconcile temp commission id with the real DB-assigned id
+                ...(saved._commissionId ? { id: saved._commissionId } : {}),
+              };
+            }),
           }));
         });
       },
@@ -1365,16 +1311,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       addProposalHistory: (proposal, actor) => {
+        // Declare outside setState so it's accessible in the .then() callback
+        const proposalHistory: ProposalHistory = {
+          ...proposal,
+          id: createId('proposal'),
+          sentAt: new Date().toISOString(),
+        };
+
         setState((current) => {
           const contractor = current.contractors.find(
             (c) => c.id === proposal.contractorId
           );
           const deal = current.deals.find((d) => d.id === proposal.dealId);
-          const proposalHistory = {
-            ...proposal,
-            id: createId('proposal'),
-            sentAt: new Date().toISOString(),
-          };
 
           return {
             ...current,
@@ -1391,24 +1339,47 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             proposals: [proposalHistory, ...current.proposals],
           };
         });
-        // proposals are currently memory-only; add API endpoint in follow-up PR
+
+        // Persist proposal to DB
+        apiCall<ProposalHistory>(`/api/deals/${proposal.dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            _action: 'add_proposal',
+            contractorId: proposal.contractorId,
+            templateType: proposal.templateType,
+            proposalSubject: proposal.proposalSubject,
+            proposalBody: proposal.proposalBody,
+            sentAt: new Date().toISOString(),
+            sentByUserId: proposal.sentByUserId,
+          }),
+        }).then((saved) => {
+          if (!saved) return;
+          // Replace temp id with DB-assigned id
+          setState((current) => ({
+            ...current,
+            proposals: current.proposals.map((p) =>
+              p.id === proposalHistory.id ? { ...p, id: saved.id } : p
+            ),
+          }));
+        });
       },
 
       addContractorDispatch: (dispatch, actor) => {
+        const now = new Date().toISOString();
+        const tempId = createId('dispatch');
+        const contractorDispatch: ContractorDispatch = {
+          ...dispatch,
+          id: tempId,
+          sentAt: dispatch.status === 'sent' && !dispatch.sentAt ? now : dispatch.sentAt,
+          createdAt: now,
+          updatedAt: now,
+        };
+
         setState((current) => {
           const contractor = current.contractors.find(
             (c) => c.id === dispatch.contractorId
           );
           const deal = current.deals.find((d) => d.id === dispatch.dealId);
-          const now = new Date().toISOString();
-          const contractorDispatch: ContractorDispatch = {
-            ...dispatch,
-            id: createId('dispatch'),
-            sentAt:
-              dispatch.status === 'sent' && !dispatch.sentAt ? now : dispatch.sentAt,
-            createdAt: now,
-            updatedAt: now,
-          };
           const contractorName = contractor?.companyName ?? 'contractor';
           const note = `Opportunity dispatched to ${contractorName}`;
 
@@ -1431,15 +1402,44 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             dispatches: [contractorDispatch, ...current.dispatches],
           };
         });
-        // dispatches are currently memory-only; add API endpoint in follow-up PR
+
+        // Persist dispatch to DB
+        apiCall<ContractorDispatch>(`/api/deals/${dispatch.dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            _action: 'add_dispatch',
+            consultationId: dispatch.consultationId ?? null,
+            contractorId: dispatch.contractorId,
+            sentByUserId: dispatch.sentByUserId,
+            sentAt: contractorDispatch.sentAt,
+            status: dispatch.status ?? 'draft',
+            contractorResponseNote: dispatch.contractorResponseNote ?? '',
+            safeSummary: dispatch.safeSummary ?? '',
+            estimatedProjectRange: dispatch.estimatedProjectRange ?? '',
+            financingRequired: dispatch.financingRequired ?? false,
+          }),
+        }).then((saved) => {
+          if (!saved) return;
+          // Replace temp id with DB-assigned id
+          setState((current) => ({
+            ...current,
+            dispatches: current.dispatches.map((d) =>
+              d.id === tempId ? { ...d, id: saved.id } : d
+            ),
+          }));
+        });
       },
 
       updateContractorDispatch: (dispatchId, updates, actor) => {
+        let capturedDealId: string | null = null;
+
         setState((current) => {
           const existingDispatch = current.dispatches.find(
             (d) => d.id === dispatchId
           );
           if (!existingDispatch) return current;
+
+          capturedDealId = existingDispatch.dealId;
 
           const contractor = current.contractors.find(
             (c) => c.id === existingDispatch.contractorId
@@ -1497,14 +1497,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
+
+        // Persist dispatch updates to DB
+        if (capturedDealId) {
+          apiCall(`/api/deals/${capturedDealId}`, {
+            method: 'POST',
+            body: JSON.stringify({ _action: 'update_dispatch', dispatchId, ...updates }),
+          });
+        }
       },
 
       assignDispatchContractor: (dispatchId, actor) => {
+        let capturedDealId: string | null = null;
+
         setState((current) => {
           const dispatch = current.dispatches.find(
             (d) => d.id === dispatchId
           );
           if (!dispatch) return current;
+
+          capturedDealId = dispatch.dealId;
 
           const contractor = current.contractors.find(
             (c) => c.id === dispatch.contractorId
@@ -1564,6 +1576,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
+
+        // Persist: mark dispatch accepted, update deal + appointment in DB
+        if (capturedDealId) {
+          apiCall(`/api/deals/${capturedDealId}`, {
+            method: 'POST',
+            body: JSON.stringify({ _action: 'assign_dispatch', dispatchId }),
+          });
+        }
       },
 
       // ── Commission mutations ────────────────────────────────────────────────
@@ -1730,6 +1750,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       updateAppointment: (appointmentId, updates, actor) => {
+        // Capture linked deal updates so we can persist them after setState
+        let capturedLinkedDealId: string | null = null;
+        let capturedLinkedDealUpdates: Record<string, unknown> = {};
+
         setState((current) => {
           const previousAppointment = current.appointments.find(
             (a) => a.id === appointmentId
@@ -1935,6 +1959,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             }
           }
 
+          // Capture any linked deal mutations for persistence outside setState
+          if (nextAppointment?.dealId) {
+            capturedLinkedDealId = nextAppointment.dealId;
+            capturedLinkedDealUpdates = {
+              ...(linkedDealStatusUpdate ? { status: linkedDealStatusUpdate } : {}),
+              ...(linkedDealEstimatedValue !== null ? { estimatedJobValue: linkedDealEstimatedValue } : {}),
+              ...(linkedDealFinancingRequired !== null ? { financingRequired: linkedDealFinancingRequired } : {}),
+              ...(linkedDealFollowUpDate !== null ? { nextFollowUpDate: linkedDealFollowUpDate } : {}),
+              ...(linkedDealContractorId !== undefined ? { assignedContractorId: linkedDealContractorId } : {}),
+            };
+          }
+
           return {
             ...current,
             activities:
@@ -2017,6 +2053,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
+
+        // If the outcome submission changed linked deal fields, persist those too
+        if (capturedLinkedDealId && Object.keys(capturedLinkedDealUpdates).length > 0) {
+          apiCall(`/api/deals/${capturedLinkedDealId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(capturedLinkedDealUpdates),
+          });
+        }
       },
 
       deleteAppointment: (appointmentId, actor) => {
@@ -2056,6 +2100,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       createDealFromAppointment: (appointmentId, actor) => {
+        // Capture deal data outside setState so we can persist it after
+        let capturedDeal: Deal | null = null;
+
         setState((current) => {
           const appointment = current.appointments.find(
             (a) => a.id === appointmentId
@@ -2084,6 +2131,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             status: 'appointment_booked',
             updatedAt: now,
           };
+
+          capturedDeal = deal;
 
           return {
             ...current,
@@ -2119,111 +2168,56 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         });
 
-        // TODO: persist createDealFromAppointment via API in follow-up PR
-      },
+        // Persist: create the deal in the DB, then link the appointment to it
+        if (!capturedDeal) return;
+        const tempDeal = capturedDeal as Deal;
+        const tempId = tempDeal.id;
 
-      importGoogleCalendarEvents: async (actor, providedEvents) => {
-        const events = providedEvents ?? (await fetchGoogleCalendarEvents());
-        let result = { imported: 0, updated: 0, unlinked: 0 };
+        apiCall<Deal & { _commissionId?: string }>('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({
+            homeownerName: tempDeal.homeownerName,
+            phone: tempDeal.phone,
+            email: tempDeal.email,
+            city: tempDeal.city,
+            projectType: tempDeal.projectType,
+            estimatedJobValue: tempDeal.estimatedJobValue,
+            financingRequired: tempDeal.financingRequired,
+            assignedRepId: tempDeal.assignedRepId,
+            assignedContractorId: tempDeal.assignedContractorId ?? null,
+            status: tempDeal.status,
+            notes: tempDeal.notes,
+            nextFollowUpDate: tempDeal.nextFollowUpDate,
+          }),
+        }).then((saved) => {
+          if (!saved) return;
+          const realDealId = saved.id;
 
-        setState((current) => {
-          const now = new Date().toISOString();
-          let activities = current.activities;
-          const appointments = [...current.appointments];
-
-          events.forEach((event) => {
-            const appointment = googleEventToAppointment(
-              event,
-              actor,
-              current.users,
-              current.deals
-            );
-            const existingIndex = appointments.findIndex(
-              (a) => a.externalEventId === appointment.externalEventId
-            );
-            const deal = current.deals.find(
-              (d) => d.id === appointment.dealId
-            );
-            const entityLabel = appointment.dealId
-              ? getDealLabel(deal)
-              : event.title;
-
-            if (existingIndex >= 0) {
-              const prev = appointments[existingIndex];
-              appointments[existingIndex] = {
-                ...prev,
-                ...appointment,
-                createdAt: prev.createdAt,
-                id: prev.id,
-                syncedAt: now,
-                updatedAt: now,
+          // Replace temp IDs with the real DB-assigned IDs
+          setState((current) => ({
+            ...current,
+            deals: current.deals.map((d) =>
+              d.id === tempId ? normalizeDeal(saved) : d
+            ),
+            commissions: current.commissions.map((c) => {
+              if (c.dealId !== tempId) return c;
+              return {
+                ...c,
+                dealId: realDealId,
+                ...(saved._commissionId ? { id: saved._commissionId } : {}),
               };
-              result = { ...result, updated: result.updated + 1 };
-              activities = prependActivity(activities, actor, {
-                actionLabel: `Google Calendar appointment updated: ${entityLabel}`,
-                actionType: 'google_calendar_appointment_updated',
-                dealId: appointment.dealId || undefined,
-                entityId: prev.id,
-                entityLabel,
-                entityType: 'appointment',
-                metadata: {
-                  externalEventId: event.externalEventId,
-                  source: 'google_calendar',
-                },
-              });
+            }),
+            appointments: current.appointments.map((a) =>
+              a.id === appointmentId ? { ...a, dealId: realDealId } : a
+            ),
+          }));
 
-              if (prev.dealId !== appointment.dealId) {
-                activities = prependActivity(activities, actor, {
-                  actionLabel: appointment.dealId
-                    ? `Appointment linked to deal: ${entityLabel}`
-                    : `Appointment unlinked from deal: ${event.title}`,
-                  actionType: appointment.dealId
-                    ? 'appointment_linked_to_deal'
-                    : 'appointment_unlinked_from_deal',
-                  dealId: appointment.dealId || undefined,
-                  entityId: prev.id,
-                  entityLabel,
-                  entityType: 'appointment',
-                });
-              }
-            } else {
-              appointments.unshift(appointment);
-              result = {
-                ...result,
-                imported: result.imported + 1,
-                unlinked: result.unlinked + (appointment.dealId ? 0 : 1),
-              };
-              activities = prependActivity(activities, actor, {
-                actionLabel: `Google Calendar appointment imported: ${entityLabel}`,
-                actionType: 'google_calendar_appointment_imported',
-                dealId: appointment.dealId || undefined,
-                entityId: appointment.id,
-                entityLabel,
-                entityType: 'appointment',
-                metadata: {
-                  externalEventId: event.externalEventId,
-                  source: 'google_calendar',
-                },
-              });
-              activities = prependActivity(activities, actor, {
-                actionLabel: appointment.dealId
-                  ? `Appointment linked to deal: ${entityLabel}`
-                  : `Appointment imported as unlinked: ${event.title}`,
-                actionType: appointment.dealId
-                  ? 'appointment_linked_to_deal'
-                  : 'appointment_unlinked_from_deal',
-                dealId: appointment.dealId || undefined,
-                entityId: appointment.id,
-                entityLabel,
-                entityType: 'appointment',
-              });
-            }
+          // Persist the appointment → deal link in the DB
+          apiCall(`/api/appointments/${appointmentId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ dealId: realDealId }),
           });
-
-          return { ...current, activities, appointments };
         });
-
-        return result;
       },
 
       // ── Selectors / calculators (pure, no API) ──────────────────────────────

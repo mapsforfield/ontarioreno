@@ -40,7 +40,7 @@ export default function ConsultationCancel() {
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/customer-request', {
+      const res = await fetch('/api/auth/customer-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

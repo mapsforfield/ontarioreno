@@ -3,7 +3,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  CloudDownload,
   MapPin,
   Plus,
   Send,
@@ -18,11 +17,6 @@ import {
   generateConsultationEmailPreview,
 } from '../data/consultationEmails';
 import { sendEmail } from '../lib/sendEmail';
-import {
-  connectGoogleCalendar,
-  disconnectGoogleCalendar,
-  getGoogleCalendarConnection,
-} from '../data/googleCalendar';
 import { getRecommendedContractors } from '../data/recommendations';
 import { formatCurrency, formatDealStatus } from '../data/selectors';
 import { usePortalData } from '../data/store';
@@ -305,6 +299,19 @@ function sourceLabel(source: Appointment['source']) {
   return source === 'google_calendar' ? 'Google Calendar' : 'Manual';
 }
 
+function getMobileDotColor(status: AppointmentStatus): string {
+  if (status === 'completed') return 'bg-emerald-500';
+  if (status === 'confirmed') return 'bg-sky-500';
+  if (status === 'rescheduled') return 'bg-amber-500';
+  if (status === 'no_show') return 'bg-orange-500';
+  if (status === 'cancelled') return 'bg-slate-400';
+  return 'bg-[#1B3C6C]';
+}
+
+function getStatusLabel(status: AppointmentStatus): string {
+  return status.replace(/_/g, ' ');
+}
+
 function getStatusClasses(status: AppointmentStatus) {
   if (status === 'completed') {
     return {
@@ -454,7 +461,6 @@ export default function PortalAppointments() {
     deleteAppointment,
     getDispatchesForConsultation,
     getVisibleAppointmentsForUser,
-    importGoogleCalendarEvents,
     logActivity,
     updateContractorDispatch,
     updateAppointment,
@@ -468,15 +474,11 @@ export default function PortalAppointments() {
     useState<ConsultationFilter>('all');
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<AppointmentFormState>(emptyForm);
-  const [isSyncPanelOpen, setIsSyncPanelOpen] = useState(false);
-  const [calendarConnection, setCalendarConnection] = useState(() =>
-    getGoogleCalendarConnection()
-  );
-  const [connectionMessage, setConnectionMessage] = useState('');
   const [emailActionMessage, setEmailActionMessage] = useState('');
   const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
+  const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
     contractorIds: [],
     desiredTimeline: '',
@@ -484,9 +486,6 @@ export default function PortalAppointments() {
     financingRequired: false,
     safeSummary: '',
   });
-  const [importMessage, setImportMessage] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
   const monthDays = useMemo(() => {
     const firstOfMonth = new Date(
       cursorDate.getFullYear(),
@@ -1321,49 +1320,6 @@ export default function PortalAppointments() {
     });
   };
 
-  const handleConnectGoogleCalendar = async () => {
-    setIsConnecting(true);
-    setConnectionMessage('');
-    setImportMessage('');
-    try {
-      const connection = await connectGoogleCalendar();
-      setCalendarConnection(connection);
-      setConnectionMessage('Google Calendar connected for this local prototype.');
-    } catch (error) {
-      setConnectionMessage(
-        error instanceof Error ? error.message : 'Google Calendar connection failed.'
-      );
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const handleDisconnectGoogleCalendar = () => {
-    disconnectGoogleCalendar();
-    setCalendarConnection(null);
-    setConnectionMessage('Google Calendar disconnected locally.');
-    setImportMessage('');
-  };
-
-  const importUpcomingGoogleEvents = async () => {
-    setIsImporting(true);
-    setImportMessage('');
-    try {
-      const result = await importGoogleCalendarEvents(currentUser);
-      setImportMessage(
-        `Google Calendar import complete: ${result.imported} imported, ${result.updated} updated, ${result.unlinked} unlinked.`
-      );
-    } catch (error) {
-      setImportMessage(
-        error instanceof Error
-          ? error.message
-          : 'Could not import Google Calendar events.'
-      );
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   const metrics = [
     { detail: 'Scheduled for today', label: "Today's Consultations", value: todayAppointments.length },
     { detail: 'Scheduled, confirmed, or rescheduled', label: 'Upcoming Consultations', value: upcomingAppointments.length },
@@ -1438,7 +1394,8 @@ export default function PortalAppointments() {
           </div>
         </div>
 
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        {/* Notes — desktop only */}
+        <div className="mt-3 hidden lg:grid gap-3 lg:grid-cols-2">
           <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
               Internal - Not visible to customer
@@ -1468,58 +1425,61 @@ export default function PortalAppointments() {
           >
             Open Details
           </button>
-          {isAdmin && (
-            <>
+          {/* Extra action buttons — desktop only */}
+          <div className="hidden lg:contents">
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openAppointment(appointment)}
+                  className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Edit Consultation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => markConsultationStatus(appointment, 'confirmed')}
+                  className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 transition hover:bg-sky-100"
+                >
+                  Mark Confirmed
+                </button>
+              </>
+            )}
+            {canUseRepActions && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => markConsultationStatus(appointment, 'completed')}
+                  className="rounded-[0.5rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+                >
+                  Mark Completed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => markConsultationStatus(appointment, 'no_show')}
+                  className="rounded-[0.5rem] border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800 transition hover:bg-orange-100"
+                >
+                  Mark No-show
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateInternalNotesFromAgenda(appointment)}
+                  className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
+                >
+                  Update Internal Notes
+                </button>
+              </>
+            )}
+            {isAdmin && (
               <button
                 type="button"
-                onClick={() => openAppointment(appointment)}
-                className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => openReschedule(appointment)}
+                className="rounded-[0.5rem] border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
               >
-                Edit Consultation
+                Reschedule
               </button>
-              <button
-                type="button"
-                onClick={() => markConsultationStatus(appointment, 'confirmed')}
-                className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 transition hover:bg-sky-100"
-              >
-                Mark Confirmed
-              </button>
-            </>
-          )}
-          {canUseRepActions && (
-            <>
-              <button
-                type="button"
-                onClick={() => markConsultationStatus(appointment, 'completed')}
-                className="rounded-[0.5rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
-              >
-                Mark Completed
-              </button>
-              <button
-                type="button"
-                onClick={() => markConsultationStatus(appointment, 'no_show')}
-                className="rounded-[0.5rem] border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800 transition hover:bg-orange-100"
-              >
-                Mark No-show
-              </button>
-              <button
-                type="button"
-                onClick={() => updateInternalNotesFromAgenda(appointment)}
-                className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
-              >
-                Update Internal Notes
-              </button>
-            </>
-          )}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => openReschedule(appointment)}
-              className="rounded-[0.5rem] border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-            >
-              Reschedule
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </article>
     );
@@ -1637,20 +1597,10 @@ export default function PortalAppointments() {
               + Schedule Consultation
             </button>
           )}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsSyncPanelOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              <CloudDownload className="h-4 w-4" />
-              External Calendar Sync
-            </button>
-          )}
         </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
@@ -1667,7 +1617,456 @@ export default function PortalAppointments() {
         ))}
       </section>
 
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+      {/* ── Mobile section tab bar ─────────────────────────────── */}
+      <div className="lg:hidden">
+        <nav className="sticky top-20 z-20 -mx-4 border-b border-slate-100 bg-white/96 px-4 backdrop-blur-sm">
+          <div className="flex overflow-x-auto [scrollbar-width:none]">
+            {(
+              [
+                { key: 'today' as const, label: 'Today', count: todayAppointments.length },
+                { key: 'upcoming' as const, label: 'Upcoming', count: upcomingAppointments.length },
+                { key: 'attention' as const, label: 'Attention', count: needsAttentionAppointments.length, warn: needsAttentionAppointments.length > 0 },
+                { key: 'calendar' as const, label: 'Calendar', count: 0 },
+                { key: 'all' as const, label: 'All', count: visibleAppointments.length },
+              ]
+            ).map((tab) => {
+              const isActive = mobileConsultTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setMobileConsultTab(tab.key)}
+                  className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-xs font-black transition ${
+                    isActive
+                      ? 'border-[#1B3C6C] text-[#1B3C6C]'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span
+                      className={`flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[0.58rem] font-black ${
+                        tab.warn
+                          ? isActive
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-amber-100 text-amber-700'
+                          : isActive
+                          ? 'bg-[#1B3C6C] text-white'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {tab.count > 99 ? '99+' : tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Mobile tab content */}
+        <div className="mt-4 space-y-3">
+          {/* Today */}
+          {mobileConsultTab === 'today' && (
+            <>
+              {todayAppointments.length > 0 ? (
+                todayAppointments.map((apt) => {
+                  const sc = getStatusClasses(apt.status);
+                  const ob = getOutcomeBadge(apt);
+                  return (
+                    <button
+                      key={apt.id}
+                      type="button"
+                      onClick={() => openAppointment(apt)}
+                      className={`w-full rounded-xl border px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99] ${sc.card}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                              {apt.customerName || apt.title || 'Consultation'}
+                            </p>
+                            <p className="mt-px shrink-0 text-xs font-bold tabular-nums leading-tight text-slate-500">
+                              {apt.appointmentTime || 'TBD'}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                            {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
+                              {formatAppointmentStatus(apt.status)}
+                            </span>
+                            <span className="text-[0.68rem] font-semibold text-[#32639b]">
+                              {formatConsultationStage(apt.consultationStage)}
+                            </span>
+                            {ob && (
+                              <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black ${ob.className}`}>
+                                {ob.label}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-[0.68rem] text-slate-400">
+                            {getRepName(apt.assignedRepId)}
+                            {apt.contractorId ? ` · ${getContractorName(apt.contractorId)}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-10">
+                  <CalendarDays className="h-9 w-9 text-slate-200" />
+                  <p className="mt-3 text-sm font-bold text-slate-400">No consultations today</p>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={openCreatePanel}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#1B3C6C] px-4 py-2 text-xs font-black text-white shadow-sm"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Schedule Consultation
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Upcoming */}
+          {mobileConsultTab === 'upcoming' && (
+            <>
+              {upcomingAgendaAppointments.length > 0 ? (
+                (() => {
+                  const groups = upcomingAgendaAppointments.reduce<Record<string, typeof upcomingAgendaAppointments>>((acc, apt) => {
+                    (acc[apt.appointmentDate] ??= []).push(apt);
+                    return acc;
+                  }, {});
+                  return Object.entries(groups).map(([date, apts]) => (
+                    <div key={date}>
+                      <p className="mb-2 text-[0.7rem] font-black uppercase tracking-[0.14em] text-slate-500">
+                        {new Intl.DateTimeFormat('en-CA', { weekday: 'long', month: 'short', day: 'numeric' }).format(new Date(`${date}T00:00:00`))}
+                      </p>
+                      <div className="space-y-2">
+                        {apts.map((apt) => {
+                          const sc = getStatusClasses(apt.status);
+                          return (
+                            <button
+                              key={apt.id}
+                              type="button"
+                              onClick={() => openAppointment(apt)}
+                              className={`w-full rounded-xl border px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99] ${sc.card}`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                      {apt.customerName || apt.title || 'Consultation'}
+                                    </p>
+                                    <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
+                                      {apt.appointmentTime || 'TBD'}
+                                    </p>
+                                  </div>
+                                  <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                                    {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
+                                      {formatAppointmentStatus(apt.status)}
+                                    </span>
+                                    <span className="text-[0.68rem] font-semibold text-[#32639b]">
+                                      {formatConsultationStage(apt.consultationStage)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()
+              ) : (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-10">
+                  <CalendarDays className="h-9 w-9 text-slate-200" />
+                  <p className="mt-3 text-sm font-bold text-slate-400">No upcoming consultations</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Attention */}
+          {mobileConsultTab === 'attention' && (
+            <>
+              {needsAttentionAppointments.length > 0 ? (
+                needsAttentionAppointments.map((apt) => {
+                  const sc = getStatusClasses(apt.status);
+                  const reasons = getAttentionReasons(apt);
+                  const ob = getOutcomeBadge(apt);
+                  return (
+                    <button
+                      key={apt.id}
+                      type="button"
+                      onClick={() => openAppointment(apt)}
+                      className="w-full rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                              {apt.customerName || apt.title || 'Consultation'}
+                            </p>
+                            <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
+                              {apt.appointmentDate}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                            {getAppointmentProjectType(apt) || 'Project TBD'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {ob && (
+                              <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black ${ob.className}`}>
+                                {ob.label}
+                              </span>
+                            )}
+                            {reasons.map((r) => (
+                              <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 py-10">
+                  <CalendarDays className="h-9 w-9 text-emerald-200" />
+                  <p className="mt-3 text-sm font-bold text-emerald-600">All clear — nothing needs attention</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Calendar — reuse mobile mini calendar */}
+          {mobileConsultTab === 'calendar' && (
+            <div>
+              {/* Month navigation */}
+              <div className="mb-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setCursorDate((d) => { const n = new Date(d); n.setMonth(d.getMonth() - 1); return n; })}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="text-center">
+                  <p className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-[#32639b]">Consultations</p>
+                  <p className="text-base font-black tracking-tight text-slate-900">{monthLabel}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCursorDate(new Date())}
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-[0.68rem] font-black text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCursorDate((d) => { const n = new Date(d); n.setMonth(d.getMonth() + 1); return n; })}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+                    aria-label="Next month"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {/* Day-of-week headers */}
+              <div className="mb-1 grid grid-cols-7">
+                {['S','M','T','W','T','F','S'].map((l, i) => (
+                  <div key={i} className="text-center text-[0.6rem] font-black uppercase tracking-wider text-slate-400">{l}</div>
+                ))}
+              </div>
+              {/* Day grid */}
+              <div className="grid grid-cols-7">
+                {monthDays.map((date) => {
+                  const dateKey = toDateKey(date);
+                  const isThisMonth = date.getMonth() === cursorDate.getMonth();
+                  const isToday = dateKey === today;
+                  const isSelected = dateKey === toDateKey(cursorDate);
+                  const dayApts = filteredAppointments.filter((a) => a.appointmentDate === dateKey);
+                  return (
+                    <button
+                      key={dateKey}
+                      type="button"
+                      onClick={() => setCursorDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()))}
+                      className="flex flex-col items-center py-1 transition"
+                    >
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition ${
+                        isSelected ? 'bg-[#1B3C6C] text-white shadow-sm'
+                        : isToday ? 'border-2 border-[#1B3C6C] font-black text-[#1B3C6C]'
+                        : isThisMonth ? 'text-slate-800 hover:bg-slate-100'
+                        : 'text-slate-300'
+                      }`}>
+                        {date.getDate()}
+                      </span>
+                      <div className="mt-0.5 flex h-2 items-center justify-center gap-px">
+                        {dayApts.slice(0, 3).map((apt, idx) => (
+                          <span key={idx} className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status)}`} />
+                        ))}
+                        {dayApts.length > 3 && <span className="h-1 w-1 rounded-full bg-slate-300" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Selected day */}
+              <div className="mt-5 border-t border-slate-100 pt-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-black tracking-tight text-slate-900">
+                    {new Intl.DateTimeFormat('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }).format(cursorDate)}
+                  </p>
+                  {currentDayAppointments.length > 0 && (
+                    <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">
+                      {currentDayAppointments.length}
+                    </span>
+                  )}
+                </div>
+                {currentDayAppointments.length > 0 ? (
+                  <div className="space-y-2">
+                    {currentDayAppointments.map((apt) => {
+                      const sc = getStatusClasses(apt.status);
+                      return (
+                        <button
+                          key={apt.id}
+                          type="button"
+                          onClick={() => openAppointment(apt)}
+                          className={`w-full rounded-xl border px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99] ${sc.card}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                  {apt.customerName || apt.title || 'Consultation'}
+                                </p>
+                                <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
+                                  {apt.appointmentTime || 'TBD'}
+                                </p>
+                              </div>
+                              <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                                {getAppointmentProjectType(apt) || 'Project type TBD'}
+                              </p>
+                              <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
+                                  {getStatusLabel(apt.status)}
+                                </span>
+                                <span className="text-[0.68rem] font-semibold text-slate-400">{getRepName(apt.assignedRepId)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-8">
+                    <CalendarDays className="h-9 w-9 text-slate-200" />
+                    <p className="mt-2.5 text-sm font-bold text-slate-400">No consultations</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {toDateKey(cursorDate) === today ? 'Nothing scheduled for today.' : 'Nothing scheduled for this day.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* All */}
+          {mobileConsultTab === 'all' && (
+            <>
+              {/* Inline filter chips */}
+              <div className="flex flex-wrap gap-2 pb-1">
+                {consultationFilters.map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setConsultationFilter(filter.value)}
+                    className={
+                      consultationFilter === filter.value
+                        ? 'rounded-full bg-[#1B3C6C] px-3 py-1.5 text-xs font-black text-white'
+                        : 'rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600'
+                    }
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              {filteredAppointments.length > 0 ? (
+                filteredAppointments.slice(0, 30).map((apt) => {
+                  const sc = getStatusClasses(apt.status);
+                  const ob = getOutcomeBadge(apt);
+                  return (
+                    <button
+                      key={apt.id}
+                      type="button"
+                      onClick={() => openAppointment(apt)}
+                      className={`w-full rounded-xl border px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99] ${sc.card}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                              {apt.customerName || apt.title || 'Consultation'}
+                            </p>
+                            <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
+                              {apt.appointmentDate}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                            {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
+                              {formatAppointmentStatus(apt.status)}
+                            </span>
+                            <span className="text-[0.68rem] font-semibold text-[#32639b]">
+                              {formatConsultationStage(apt.consultationStage)}
+                            </span>
+                            {ob && (
+                              <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black ${ob.className}`}>
+                                {ob.label}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-10">
+                  <CalendarDays className="h-9 w-9 text-slate-200" />
+                  <p className="mt-3 text-sm font-bold text-slate-400">No consultations match this filter</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {/* ── End mobile section nav ──────────────────────────────── */}
+
+      {/* Desktop: Consultation Filters */}
+      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block lg:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -1696,7 +2095,8 @@ export default function PortalAppointments() {
         </div>
       </section>
 
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+      {/* Desktop: Today's Agenda */}
+      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block lg:p-5">
         <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -1719,7 +2119,7 @@ export default function PortalAppointments() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <section className="hidden lg:grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <article className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
           <div className="border-b border-slate-200 pb-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -1756,7 +2156,7 @@ export default function PortalAppointments() {
         </article>
       </section>
 
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -1770,17 +2170,17 @@ export default function PortalAppointments() {
                   : formatAppointmentDate(toDateKey(cursorDate))}
             </h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             {(['month', 'week', 'day'] as CalendarView[]).map((view) => (
               <button
                 key={view}
                 type="button"
                 onClick={() => setCalendarView(view)}
-                className={
+                className={`${view !== 'day' ? 'hidden sm:inline-flex' : ''} ${
                   calendarView === view
                     ? 'rounded-full bg-[#1B3C6C] px-4 py-2 text-sm font-black capitalize text-white'
                     : 'rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black capitalize text-slate-600 transition hover:text-[#1B3C6C]'
-                }
+                }`}
               >
                 {view === 'day' ? 'Day/list' : view}
               </button>
@@ -1812,17 +2212,21 @@ export default function PortalAppointments() {
         </div>
 
         {calendarView === 'month' && (
-          <div className="mt-4 grid min-w-[52rem] grid-cols-7 gap-2 overflow-x-auto">
-            {monthDays.map((date) => renderDayColumn(date, true))}
+          <div className="mt-4 hidden overflow-x-auto sm:block">
+            <div className="grid min-w-[44rem] grid-cols-7 gap-1.5 md:min-w-[52rem] md:gap-2">
+              {monthDays.map((date) => renderDayColumn(date, true))}
+            </div>
           </div>
         )}
         {calendarView === 'week' && (
-          <div className="mt-4 grid min-w-[58rem] grid-cols-7 gap-3 overflow-x-auto">
-            {weekDays.map((date) => renderDayColumn(date))}
+          <div className="mt-4 hidden overflow-x-auto sm:block">
+            <div className="grid min-w-[44rem] grid-cols-7 gap-2 md:min-w-[58rem] md:gap-3">
+              {weekDays.map((date) => renderDayColumn(date))}
+            </div>
           </div>
         )}
         {calendarView === 'day' && (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 hidden space-y-3 sm:block">
             {currentDayAppointments.length > 0 ? (
               currentDayAppointments.map((appointment) => (
                 <AppointmentPill
@@ -1848,9 +2252,213 @@ export default function PortalAppointments() {
             )}
           </div>
         )}
+
+        {/* ── Mobile compact calendar — now rendered in the Calendar tab above ── */}
+        <div className="hidden">
+          {/* Month navigation */}
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() =>
+                setCursorDate((d) => {
+                  const n = new Date(d);
+                  n.setMonth(d.getMonth() - 1);
+                  return n;
+                })
+              }
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50 active:bg-slate-100"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-center">
+              <p className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-[#32639b]">
+                Consultations
+              </p>
+              <p className="text-base font-black tracking-tight text-slate-900">
+                {monthLabel}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCursorDate(new Date())}
+                className="rounded-full border border-slate-200 px-3 py-1.5 text-[0.68rem] font-black text-slate-600 transition hover:bg-slate-50 active:bg-slate-100"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setCursorDate((d) => {
+                    const n = new Date(d);
+                    n.setMonth(d.getMonth() + 1);
+                    return n;
+                  })
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50 active:bg-slate-100"
+                aria-label="Next month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Day-of-week headers */}
+          <div className="mb-1 grid grid-cols-7">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, i) => (
+              <div
+                key={i}
+                className="text-center text-[0.6rem] font-black uppercase tracking-wider text-slate-400"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div className="grid grid-cols-7">
+            {monthDays.map((date) => {
+              const dateKey = toDateKey(date);
+              const isThisMonth = date.getMonth() === cursorDate.getMonth();
+              const isToday = dateKey === today;
+              const isSelected = dateKey === toDateKey(cursorDate);
+              const dayApts = filteredAppointments.filter(
+                (a) => a.appointmentDate === dateKey
+              );
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() =>
+                    setCursorDate(
+                      new Date(
+                        date.getFullYear(),
+                        date.getMonth(),
+                        date.getDate()
+                      )
+                    )
+                  }
+                  className="flex flex-col items-center py-1 transition"
+                >
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition ${
+                      isSelected
+                        ? 'bg-[#1B3C6C] text-white shadow-sm'
+                        : isToday
+                          ? 'border-2 border-[#1B3C6C] text-[#1B3C6C] font-black'
+                          : isThisMonth
+                            ? 'text-slate-800 hover:bg-slate-100'
+                            : 'text-slate-300'
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+                  {/* Status dots */}
+                  <div className="mt-0.5 flex h-2 items-center justify-center gap-px">
+                    {dayApts.slice(0, 3).map((apt, idx) => (
+                      <span
+                        key={idx}
+                        className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status)}`}
+                      />
+                    ))}
+                    {dayApts.length > 3 && (
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected day appointments */}
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-black tracking-tight text-slate-900">
+                {new Intl.DateTimeFormat('en-CA', {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                }).format(cursorDate)}
+              </p>
+              {currentDayAppointments.length > 0 && (
+                <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">
+                  {currentDayAppointments.length}
+                </span>
+              )}
+            </div>
+
+            {currentDayAppointments.length > 0 ? (
+              <div className="space-y-2">
+                {currentDayAppointments.map((appointment) => {
+                  const sc = getStatusClasses(appointment.status);
+                  return (
+                    <button
+                      key={appointment.id}
+                      type="button"
+                      onClick={() => openAppointment(appointment)}
+                      className={`w-full rounded-xl border px-4 py-3.5 text-left shadow-sm transition active:scale-[0.99] ${sc.card}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-[0.88rem] font-black text-slate-900 leading-tight">
+                              {appointment.customerName ||
+                                appointment.title ||
+                                'Consultation'}
+                            </p>
+                            <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500 leading-tight mt-px">
+                              {appointment.appointmentTime || 'TBD'}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
+                            {getAppointmentProjectType(appointment) ||
+                              'Project type TBD'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}
+                            >
+                              {getStatusLabel(appointment.status)}
+                            </span>
+                            <span className="text-[0.68rem] font-semibold text-slate-400">
+                              {getRepName(appointment.assignedRepId)}
+                            </span>
+                            {appointment.contractorId && (
+                              <span className="text-[0.68rem] font-semibold text-slate-400">
+                                · {getContractorName(appointment.contractorId)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-8">
+                <CalendarDays className="h-9 w-9 text-slate-200" />
+                <p className="mt-2.5 text-sm font-bold text-slate-400">
+                  No consultations
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {toDateKey(cursorDate) === today
+                    ? 'Nothing scheduled for today.'
+                    : 'Nothing scheduled for this day.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* ── End mobile calendar ──────────────────────────────────── */}
+
       </section>
 
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
         <div className="border-b border-slate-200 pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
             Schedule
@@ -2884,81 +3492,6 @@ export default function PortalAppointments() {
         </div>
       )}
 
-      {isSyncPanelOpen && (
-        <div className="fixed inset-0 z-[95] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
-                  External Calendar Sync
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
-                  Legacy Google Calendar import
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSyncPanelOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
-                aria-label="Close calendar sync panel"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <div className="rounded-[0.5rem] border border-[#c9d9eb] bg-[#e8f1fb] p-4 text-[#17385f]">
-                <p className="text-sm font-bold">Native scheduling is now primary.</p>
-                <p className="mt-2 text-sm font-semibold leading-6">
-                  Google Calendar remains available as an optional legacy import
-                  path while OntarioReno moves toward an internal scheduling
-                  workflow.
-                </p>
-              </div>
-              <div className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Connection Status
-                </p>
-                <p className="mt-2 text-sm font-black text-slate-950">
-                  {calendarConnection ? 'Google Calendar connected' : 'Not connected'}
-                </p>
-                {calendarConnection && (
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    Calendar: {calendarConnection.calendarId} / Connected:{' '}
-                    {new Date(calendarConnection.connectedAt).toLocaleString()}
-                  </p>
-                )}
-              </div>
-              {connectionMessage && (
-                <p className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700">
-                  {connectionMessage}
-                </p>
-              )}
-              {importMessage && (
-                <p className="mt-4 rounded-[0.5rem] border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700">
-                  {importMessage}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
-              {calendarConnection && (
-                <button type="button" onClick={handleDisconnectGoogleCalendar} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 sm:mr-auto">
-                  Disconnect
-                </button>
-              )}
-              <button type="button" onClick={() => setIsSyncPanelOpen(false)} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                Close
-              </button>
-              <button type="button" onClick={handleConnectGoogleCalendar} disabled={isConnecting} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {isConnecting ? 'Connecting...' : 'Connect Google Calendar'}
-              </button>
-              <button type="button" onClick={importUpcomingGoogleEvents} disabled={isImporting || !calendarConnection} className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50">
-                <CloudDownload className="h-4 w-4" />
-                {isImporting ? 'Importing...' : 'Import Upcoming Events'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

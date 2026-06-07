@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": ".prisma-compiled",
+    "rootDir": "src/generated/prisma",
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "skipLibCheck": true,
+    "noEmit": false
+  },
+  "include": [
+    "src/generated/prisma/**/*.ts"
+  ]
+}

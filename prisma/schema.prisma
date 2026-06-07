@@ -30,6 +30,7 @@ model User {
   activities           Activity[]
   commissions          Commission[]
   dispatches           ContractorDispatch[]
+  pushSubscriptions    PushSubscription[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -103,7 +104,7 @@ model DealActivity {
 
 model Appointment {
   id                       String   @id @default(cuid())
-  dealId                   String
+  dealId                   String?
   customerName             String
   phone                    String
   email                    String
@@ -143,7 +144,7 @@ model Appointment {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  deal        Deal        @relation(fields: [dealId], references: [id])
+  deal        Deal?       @relation(fields: [dealId], references: [id], onDelete: SetNull)
   assignedRep User        @relation("AssignedRep", fields: [assignedRepId], references: [id])
   contractor  Contractor? @relation(fields: [contractorId], references: [id])
   createdBy   User        @relation("CreatedBy", fields: [createdByUserId], references: [id])
@@ -163,7 +164,7 @@ model Commission {
   adminTotalEstimatedCommission Float
   adminNetCommission            Float
 
-  deal Deal @relation(fields: [dealId], references: [id])
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   rep  User @relation(fields: [repId], references: [id])
 }
 
@@ -204,9 +205,22 @@ model ContractorDispatch {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  deal       Deal       @relation(fields: [dealId], references: [id])
+  deal       Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contractor Contractor @relation(fields: [contractorId], references: [id])
   sentBy     User       @relation(fields: [sentByUserId], references: [id])
+}
+
+// ─── Push Subscriptions ──────────────────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ─── Proposals ────────────────────────────────────────────────────────────────
@@ -222,5 +236,5 @@ model ProposalHistory {
   sentByUserId    String
   createdAt       DateTime @default(now())
 
-  deal Deal @relation(fields: [dealId], references: [id])
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }

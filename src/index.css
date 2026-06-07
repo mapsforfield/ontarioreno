@@ -21,7 +21,8 @@
   input:not([type='range']):not([type='checkbox']):not([type='radio']),
   select,
   textarea {
-    @apply rounded-[0.78rem] border border-slate-300/85 px-4 py-[0.92rem] outline-none transition duration-200 focus:border-[#2b5a96] focus:ring-4 focus:ring-blue-100/80;
+    /* 16px minimum prevents iOS Safari from auto-zooming on focus */
+    @apply rounded-[0.78rem] border border-slate-300/85 px-4 py-[0.92rem] text-base outline-none transition duration-200 focus:border-[#2b5a96] focus:ring-4 focus:ring-blue-100/80;
     background: var(--or-field-surface);
     box-shadow: var(--or-field-shadow);
   }

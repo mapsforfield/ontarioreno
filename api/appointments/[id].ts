@@ -15,8 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT' || req.method === 'PATCH') {
-    const { createdAt, updatedAt, id: _id, ...data } = req.body;
+    const { createdAt, updatedAt, id: _id, dealId: rawDealId, ...rest } = req.body;
     void createdAt; void updatedAt; void _id;
+    const data = {
+      ...rest,
+      ...(rawDealId !== undefined ? { dealId: rawDealId || null } : {}),
+    };
     const appointment = await prisma.appointment.update({
       where: { id },
       data,
