@@ -4,7 +4,15 @@ import { Resend } from 'resend';
 // Body shape posted by the React frontend. The frontend pre-renders the email
 // using consultationEmails.ts (same text the rep sees in the preview), then
 // posts it here. The API key never touches the browser.
+type EmailAttachment = {
+  /** Original filename shown to recipient (e.g. "Proposal.pdf") */
+  filename: string;
+  /** Base64-encoded file content */
+  content: string;
+};
+
 type SendEmailBody = {
+  attachments?: EmailAttachment[];
   body: string;
   /** HTML version of the email. Sent alongside the plain-text fallback. */
   html?: string;
@@ -12,6 +20,9 @@ type SendEmailBody = {
   subject: string;
   to: string;
 };
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB per file
+const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB total
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
 /** Plain-text body limit â€” should stay small. */
@@ -32,7 +43,7 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     return { error: 'Invalid request body.' };
   }
 
-  const { to, subject, body, html, replyTo } = data as Record<string, unknown>;
+  const { to, subject, body, html, replyTo, attachments } = data as Record<string, unknown>;
 
   if (typeof to !== 'string' || !isValidEmail(to)) {
     return { error: 'Missing or invalid recipient email address.' };
@@ -56,9 +67,33 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     return { error: 'Invalid replyTo email address.' };
   }
 
+  // Validate attachments
+  let validatedAttachments: EmailAttachment[] | undefined;
+  if (attachments !== undefined) {
+    if (!Array.isArray(attachments)) {
+      return { error: 'attachments must be an array.' };
+    }
+    let totalBytes = 0;
+    for (const att of attachments) {
+      if (!att || typeof att !== 'object') return { error: 'Each attachment must be an object.' };
+      const { filename, content } = att as Record<string, unknown>;
+      if (typeof filename !== 'string' || !filename.trim()) return { error: 'Each attachment must have a filename.' };
+      if (typeof content !== 'string' || !content) return { error: 'Each attachment must have base64 content.' };
+      const bytes = Math.ceil(content.length * 0.75); // approx decoded size
+      if (bytes > MAX_ATTACHMENT_BYTES) return { error: `Attachment "${filename}" exceeds the 10 MB per-file limit.` };
+      totalBytes += bytes;
+      if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) return { error: 'Total attachment size exceeds 25 MB.' };
+    }
+    validatedAttachments = (attachments as EmailAttachment[]).map((a) => ({
+      filename: a.filename.trim(),
+      content: a.content,
+    }));
+  }
+
   return {
     ok: true,
     payload: {
+      attachments: validatedAttachments,
       body: body.trim(),
       html: typeof html === 'string' && html.trim().length > 0 ? html : undefined,
       replyTo: typeof replyTo === 'string' ? replyTo.trim() : undefined,
@@ -88,11 +123,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: result.error });
   }
 
-  const { to, subject, body, html, replyTo } = result.payload;
+  const { to, subject, body, html, replyTo, attachments } = result.payload;
 
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
+      attachments: attachments?.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, 'base64'),
+      })),
       from: EMAIL_FROM,
       html,
       replyTo,

@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Clock,
   MapPin,
+  Paperclip,
   Plus,
   Send,
   UserRound,
@@ -16,7 +17,7 @@ import {
   ConsultationEmailType,
   generateConsultationEmailPreview,
 } from '../data/consultationEmails';
-import { sendEmail } from '../lib/sendEmail';
+import { sendEmail, EmailAttachment } from '../lib/sendEmail';
 import { getRecommendedContractors } from '../data/recommendations';
 import { formatCurrency, formatDealStatus } from '../data/selectors';
 import { usePortalData } from '../data/store';
@@ -477,6 +478,10 @@ export default function PortalAppointments() {
   const [form, setForm] = useState<AppointmentFormState>(emptyForm);
   const [emailActionMessage, setEmailActionMessage] = useState('');
   const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
+  // Per-template subject/body overrides — keyed by ConsultationEmailType
+  const [emailEdits, setEmailEdits] = useState<Record<string, { subject: string; body: string }>>({});
+  // Per-template file attachments — keyed by ConsultationEmailType
+  const [emailAttachments, setEmailAttachments] = useState<Record<string, File[]>>({});
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
   const [showTransferUI, setShowTransferUI] = useState(false);
@@ -893,6 +898,9 @@ export default function PortalAppointments() {
     setForm(emptyForm);
     setShowTransferUI(false);
     setTransferToRepId('');
+    setEmailEdits({});
+    setEmailAttachments({});
+    setEmailActionMessage('');
   };
 
   const saveAppointment = () => {
@@ -1199,13 +1207,42 @@ export default function PortalAppointments() {
     );
   };
 
+  // Encode a File to base64 for transmission
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleSendEmail = async (preview: ConsultationEmailPreview) => {
     if (!selectedAppointment || sendingEmailType) return;
 
     setSendingEmailType(preview.type);
     setEmailActionMessage('');
 
-    const result = await sendEmail(preview);
+    // Build options: apply any subject/body overrides and encode attachments
+    const edits = emailEdits[preview.type];
+    const files = emailAttachments[preview.type] ?? [];
+    let encodedAttachments: EmailAttachment[] | undefined;
+    if (files.length > 0) {
+      try {
+        encodedAttachments = await Promise.all(
+          files.map(async (f) => ({ filename: f.name, content: await fileToBase64(f) }))
+        );
+      } catch {
+        setSendingEmailType(null);
+        setEmailActionMessage('Failed to read attachment files. Please try again.');
+        return;
+      }
+    }
+
+    const result = await sendEmail(preview, {
+      subjectOverride: edits?.subject,
+      bodyOverride: edits?.body,
+      attachments: encodedAttachments,
+    });
 
     setSendingEmailType(null);
 
@@ -3405,21 +3442,139 @@ export default function PortalAppointments() {
                             />
                           </div>
                         )}
+                        {/* ── Editable Subject ── */}
                         <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
-                          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                            Subject
-                          </p>
-                          <p className="mt-2 text-sm font-bold text-slate-900">
-                            {preview.subject}
-                          </p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                              Subject
+                            </p>
+                            {emailEdits[preview.type]?.subject !== undefined && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEmailEdits((prev) => {
+                                    const next = { ...prev };
+                                    if (next[preview.type]) {
+                                      const { subject: _s, ...rest } = next[preview.type];
+                                      next[preview.type] = rest as typeof next[string];
+                                    }
+                                    return next;
+                                  })
+                                }
+                                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={emailEdits[preview.type]?.subject ?? preview.subject}
+                            onChange={(e) =>
+                              setEmailEdits((prev) => ({
+                                ...prev,
+                                [preview.type]: {
+                                  body: prev[preview.type]?.body ?? preview.body,
+                                  subject: e.target.value,
+                                },
+                              }))
+                            }
+                            className="mt-2 w-full rounded border border-transparent bg-transparent text-sm font-bold text-slate-900 focus:border-[#1B3C6C] focus:bg-slate-50 focus:outline-none focus:ring-0 px-1 py-0.5 -ml-1"
+                          />
                         </div>
+                        {/* ── Editable Body ── */}
                         <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
-                          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                            Body
-                          </p>
-                          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">
-                            {preview.body}
-                          </pre>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                              Body
+                            </p>
+                            {emailEdits[preview.type]?.body !== undefined && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEmailEdits((prev) => {
+                                    const next = { ...prev };
+                                    if (next[preview.type]) {
+                                      const { body: _b, ...rest } = next[preview.type];
+                                      next[preview.type] = rest as typeof next[string];
+                                    }
+                                    return next;
+                                  })
+                                }
+                                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            value={emailEdits[preview.type]?.body ?? preview.body}
+                            onChange={(e) =>
+                              setEmailEdits((prev) => ({
+                                ...prev,
+                                [preview.type]: {
+                                  subject: prev[preview.type]?.subject ?? preview.subject,
+                                  body: e.target.value,
+                                },
+                              }))
+                            }
+                            rows={8}
+                            className="mt-2 w-full resize-y rounded border border-transparent bg-transparent text-sm font-semibold leading-6 text-slate-700 focus:border-[#1B3C6C] focus:bg-slate-50 focus:outline-none focus:ring-0 px-1 py-0.5 -ml-1"
+                          />
+                        </div>
+                        {/* ── Attachments ── */}
+                        <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                              Attachments
+                            </p>
+                          </div>
+                          {(emailAttachments[preview.type] ?? []).length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {(emailAttachments[preview.type] ?? []).map((file, idx) => (
+                                <span
+                                  key={idx}
+                                  className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700"
+                                >
+                                  <Paperclip className="h-3 w-3 text-slate-400" />
+                                  {file.name}
+                                  <span className="text-slate-400">({(file.size / 1024).toFixed(0)} KB)</span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEmailAttachments((prev) => ({
+                                        ...prev,
+                                        [preview.type]: (prev[preview.type] ?? []).filter((_, i) => i !== idx),
+                                      }))
+                                    }
+                                    className="ml-0.5 text-slate-400 hover:text-red-500"
+                                    aria-label="Remove attachment"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-bold text-[#1B3C6C] hover:underline">
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"
+                              className="sr-only"
+                              onChange={(e) => {
+                                const newFiles = Array.from(e.target.files ?? []);
+                                if (newFiles.length === 0) return;
+                                setEmailAttachments((prev) => ({
+                                  ...prev,
+                                  [preview.type]: [...(prev[preview.type] ?? []), ...newFiles],
+                                }));
+                                e.target.value = '';
+                              }}
+                            />
+                            + Add file
+                          </label>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
