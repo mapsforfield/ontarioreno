@@ -2382,6 +2382,23 @@ export default function PortalAppointments() {
                                     >
                                       Open Details
                                     </button>
+                                    {!apt.dealId ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => createDealFromAppointment(apt.id, currentUser)}
+                                        className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                                      >
+                                        Create Deal
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate('/portal/deals', { state: { openDealId: apt.dealId } })}
+                                        className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                                      >
+                                        View Deal
+                                      </button>
+                                    )}
                                     {isAdmin && (
                                       <button
                                         type="button"
@@ -2810,16 +2827,36 @@ export default function PortalAppointments() {
                       </div>
                     </div>
                   </button>
-                  {deal ? (
-                    <p className="mt-2 text-xs font-semibold text-slate-500">
-                      Deal status: {formatDealStatus(deal.status)} / Value:{' '}
-                      {formatCurrency(deal.estimatedJobValue)}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs font-semibold text-slate-500">
-                      This consultation is not linked to a deal yet.
-                    </p>
-                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {deal ? (
+                      <>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Deal status: {formatDealStatus(deal.status)} / Value:{' '}
+                          {formatCurrency(deal.estimatedJobValue)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
+                          className="rounded-full border border-[#b8c9dd] bg-[#f6faff] px-3 py-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                        >
+                          View Deal
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Not linked to a deal yet.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => createDealFromAppointment(appointment.id, currentUser)}
+                          className="rounded-full border border-[#b8c9dd] bg-[#f6faff] px-3 py-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                        >
+                          Create Deal
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </article>
               );
             })
