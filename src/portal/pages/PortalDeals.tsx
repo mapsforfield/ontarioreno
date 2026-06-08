@@ -31,6 +31,7 @@ const columns: Array<{ label: string; status: DealStatus }> = [
 ];
 
 type DealFormState = {
+  address: string;
   city: string;
   email: string;
   estimatedJobValue: string;
@@ -39,6 +40,7 @@ type DealFormState = {
   nextFollowUpDate: string;
   notes: string;
   phone: string;
+  postalCode: string;
   projectType: string;
   status: DealStatus;
 };
@@ -74,6 +76,7 @@ const dispatchStatusOptions: ContractorDispatchStatus[] = [
 ];
 
 const emptyDealForm: DealFormState = {
+  address: '',
   city: '',
   email: '',
   estimatedJobValue: '0',
@@ -82,6 +85,7 @@ const emptyDealForm: DealFormState = {
   nextFollowUpDate: '',
   notes: '',
   phone: '',
+  postalCode: '',
   projectType: '',
   status: 'new_lead',
 };
@@ -102,6 +106,7 @@ const emptyAppointmentForm: AppointmentFormState = {
 
 function dealToForm(deal: Deal): DealFormState {
   return {
+    address: deal.address ?? '',
     city: deal.city,
     email: deal.email,
     estimatedJobValue: String(deal.estimatedJobValue),
@@ -110,6 +115,7 @@ function dealToForm(deal: Deal): DealFormState {
     nextFollowUpDate: deal.nextFollowUpDate,
     notes: deal.notes,
     phone: deal.phone,
+    postalCode: deal.postalCode ?? '',
     projectType: deal.projectType,
     status: deal.status,
   };
@@ -369,7 +375,7 @@ export default function PortalDeals() {
     if (!currentUser || !form.homeownerName.trim()) return;
 
     const dealPayload = {
-      address: (form as unknown as { address?: string }).address?.trim() ?? '',
+      address: form.address.trim(),
       city: form.city.trim(),
       email: form.email.trim(),
       estimatedJobValue: Number(form.estimatedJobValue) || 0,
@@ -377,7 +383,7 @@ export default function PortalDeals() {
       homeownerName: form.homeownerName.trim(),
       notes: form.notes.trim(),
       phone: form.phone.trim(),
-      postalCode: (form as unknown as { postalCode?: string }).postalCode?.trim() ?? '',
+      postalCode: form.postalCode.trim(),
       projectType: form.projectType.trim(),
       nextFollowUpDate: form.nextFollowUpDate,
     };
@@ -964,11 +970,25 @@ OntarioReno Broker Portal`;
                     onChange={(event) => updateForm('email', event.target.value)}
                   />
                 </label>
+                <label className="col-span-full grid gap-1.5 text-sm font-bold text-slate-700">
+                  Address
+                  <input
+                    value={form.address}
+                    onChange={(event) => updateForm('address', event.target.value)}
+                  />
+                </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   City
                   <input
                     value={form.city}
                     onChange={(event) => updateForm('city', event.target.value)}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Postal Code
+                  <input
+                    value={form.postalCode}
+                    onChange={(event) => updateForm('postalCode', event.target.value)}
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
