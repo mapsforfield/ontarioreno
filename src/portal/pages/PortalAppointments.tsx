@@ -50,6 +50,7 @@ type AppointmentFormState = {
   assignedRepId: string;
   contractorId: string;
   city: string;
+  postalCode: string;
   consultationStage: ConsultationStage;
   closeProbability: string;
   customerNotes: string;
@@ -184,6 +185,7 @@ const emptyForm: AppointmentFormState = {
   assignedRepId: '',
   contractorId: '',
   city: '',
+  postalCode: '',
   consultationStage: 'consultation_scheduled',
   closeProbability: '0',
   customerNotes: '',
@@ -268,6 +270,7 @@ function appointmentToForm(appointment: Appointment): AppointmentFormState {
     assignedRepId: appointment.assignedRepId,
     contractorId: appointment.contractorId ?? '',
     city: appointment.city,
+    postalCode: appointment.postalCode ?? '',
     consultationStage: appointment.consultationStage ?? 'consultation_scheduled',
     closeProbability: String(appointment.closeProbability ?? 0),
     customerNotes: appointment.customerNotes ?? '',
@@ -917,6 +920,7 @@ export default function PortalAppointments() {
           appointmentTime: form.appointmentTime,
           appointmentType: form.appointmentType,
           city: form.city.trim(),
+          postalCode: form.postalCode.trim(),
           consultationStage: form.consultationStage,
           closeProbability: Number(form.closeProbability) || 0,
           customerName: form.customerName.trim(),
@@ -968,6 +972,7 @@ export default function PortalAppointments() {
       assignedRepId: isAdmin ? form.assignedRepId : currentUser.id,
       contractorId: form.contractorId || null,
       city: form.city.trim(),
+      postalCode: form.postalCode.trim(),
       consultationStage: form.consultationStage,
       closeProbability: Number(form.closeProbability) || 0,
       createdByUserId: selectedAppointment?.createdByUserId ?? currentUser.id,
@@ -3194,6 +3199,10 @@ export default function PortalAppointments() {
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   City
                   <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Postal Code
+                  <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value)} placeholder="e.g. L6Y 4X2" />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address

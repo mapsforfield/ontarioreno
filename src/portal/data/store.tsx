@@ -265,6 +265,7 @@ function normalizeAppointment(appointment: Appointment, deals: Deal[]): Appointm
     dealId,
     address: appointment.address ?? appointment.location ?? '',
     city: appointment.city ?? deal?.city ?? '',
+    postalCode: appointment.postalCode ?? '',
     contractorId:
       appointment.contractorId ?? deal?.assignedContractorId ?? null,
     customerName:

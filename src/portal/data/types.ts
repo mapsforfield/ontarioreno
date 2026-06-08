@@ -112,6 +112,7 @@ export type Appointment = {
   email: string;
   address: string;
   city: string;
+  postalCode: string;
   projectType: string;
   assignedRepId: string;
   contractorId: string | null;

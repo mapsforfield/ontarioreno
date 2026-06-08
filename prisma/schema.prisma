@@ -136,6 +136,7 @@ model Appointment {
   email                    String
   address                  String   @default("")
   city                     String   @default("")
+  postalCode               String   @default("")
   projectType              String
   assignedRepId            String
   contractorId             String?

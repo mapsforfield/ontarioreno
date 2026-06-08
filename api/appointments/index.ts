@@ -169,6 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email: data.email ?? '',
         address: data.address ?? '',
         city: data.city ?? '',
+        postalCode: data.postalCode ?? '',
         projectType: data.projectType,
         assignedRepId: data.assignedRepId,
         contractorId: data.contractorId ?? null,
@@ -214,6 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             phone: appointment.phone || client.phone,
             address: appointment.address || client.address,
             city: appointment.city || client.city,
+            postalCode: appointment.postalCode || client.postalCode,
             projectTypes: appointment.projectType
               ? Array.from(new Set([...client.projectTypes, appointment.projectType]))
               : client.projectTypes,
@@ -227,6 +229,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             email: appointment.email ?? '',
             address: appointment.address ?? '',
             city: appointment.city ?? '',
+            postalCode: appointment.postalCode ?? '',
             projectTypes: appointment.projectType ? [appointment.projectType] : [],
             internalNotes: '',
             source: 'appointment',
