@@ -155,6 +155,7 @@ export type Client = {
   email: string;
   address: string;
   city: string;
+  postalCode: string;
   projectTypes: string[];
   internalNotes: string;
   source: string;

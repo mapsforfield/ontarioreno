@@ -114,6 +114,7 @@ model Client {
   email         String   @default("")
   address       String   @default("")
   city          String   @default("")
+  postalCode    String   @default("")
   projectTypes  String[]
   internalNotes String   @default("")
   source        String   @default("manual")

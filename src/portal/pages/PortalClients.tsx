@@ -42,6 +42,7 @@ type ClientForm = {
   email: string;
   address: string;
   city: string;
+  postalCode: string;
   projectTypes: string;
   internalNotes: string;
 };
@@ -52,6 +53,7 @@ const emptyForm: ClientForm = {
   email: '',
   address: '',
   city: '',
+  postalCode: '',
   projectTypes: '',
   internalNotes: '',
 };
@@ -63,6 +65,7 @@ function formToPayload(form: ClientForm) {
     email: form.email.trim(),
     address: form.address.trim(),
     city: form.city.trim(),
+    postalCode: form.postalCode.trim().toUpperCase(),
     projectTypes: form.projectTypes
       .split(',')
       .map((s) => s.trim())
@@ -78,6 +81,7 @@ function clientToForm(client: Client): ClientForm {
     email: client.email,
     address: client.address,
     city: client.city,
+    postalCode: client.postalCode ?? '',
     projectTypes: client.projectTypes.join(', '),
     internalNotes: client.internalNotes,
   };
@@ -345,10 +349,10 @@ export default function PortalClients() {
                         {selectedClient.email}
                       </div>
                     )}
-                    {(selectedClient.address || selectedClient.city) && (
+                    {(selectedClient.address || selectedClient.city || selectedClient.postalCode) && (
                       <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 sm:col-span-2">
                         <MapPin className="h-3.5 w-3.5 text-[#32639b]" />
-                        {[selectedClient.address, selectedClient.city].filter(Boolean).join(', ')}
+                        {[selectedClient.address, selectedClient.city, selectedClient.postalCode].filter(Boolean).join(', ')}
                       </div>
                     )}
                     {selectedClient.projectTypes.length > 0 && (
@@ -471,6 +475,15 @@ export default function PortalClients() {
                       value={form.city}
                       onChange={(e) => updateForm('city', e.target.value)}
                       placeholder="Toronto"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Postal Code
+                    <input
+                      value={form.postalCode}
+                      onChange={(e) => updateForm('postalCode', e.target.value.toUpperCase())}
+                      placeholder="M5V 3A8"
+                      maxLength={7}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
