@@ -1039,7 +1039,7 @@ export default function PortalAppointments() {
   };
 
   const handleDeleteAppointment = () => {
-    if (!isAdmin || !selectedAppointment) return;
+    if (!selectedAppointment) return;
     if (
       window.confirm(
         'Delete this consultation? This cannot be undone in the local prototype.'
@@ -3339,7 +3339,7 @@ export default function PortalAppointments() {
                         ? 'Update Outcome Report'
                         : 'Submit Outcome Report'}
                     </button>
-                    {!form.dealId && isAdmin && (
+                    {!form.dealId && (
                       <button
                         type="button"
                         onClick={handleCreateDealFromAppointment}
@@ -3701,7 +3701,7 @@ export default function PortalAppointments() {
               )}
             </div>
             <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
-              {isAdmin && selectedAppointment && !selectedAppointment.dealId && (
+              {selectedAppointment && !selectedAppointment.dealId && (
                 <button
                   type="button"
                   onClick={handleCreateDealFromAppointment}
@@ -3710,7 +3710,7 @@ export default function PortalAppointments() {
                   Create Deal From Consultation
                 </button>
               )}
-              {isAdmin && selectedAppointment && (
+              {selectedAppointment && (
                 <button
                   type="button"
                   onClick={handleDeleteAppointment}
