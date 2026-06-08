@@ -10,7 +10,8 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import {
   ConsultationEmailPreview,
@@ -494,6 +495,10 @@ export default function PortalAppointments() {
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [notesModal, setNotesModal] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
+
+  // Auto-open a consultation when navigated here from the dashboard
+  const location = useLocation();
+  const handledNavState = useRef<string | null>(null);
   const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
   const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
@@ -526,6 +531,19 @@ export default function PortalAppointments() {
         `${second.appointmentDate}T${second.appointmentTime}`
       )
   );
+
+  // Auto-open a consultation when arriving from the dashboard
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const id = (location.state as { openAppointmentId?: string } | null)?.openAppointmentId;
+    if (!id || handledNavState.current === id) return;
+    handledNavState.current = id;
+    const apt = visibleAppointments.find((a) => a.id === id);
+    if (apt) openAppointment(apt);
+  // openAppointment is stable; visibleAppointments intentionally omitted to run once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
   const matchesConsultationFilter = (appointment: Appointment) => {
     if (consultationFilter === 'all') return true;
     if (consultationFilter === 'scheduled') {

@@ -7,7 +7,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
@@ -34,6 +34,7 @@ function getDaysSince(value: string) {
 }
 
 export default function PortalDashboard() {
+  const navigate = useNavigate();
   const { currentUser } = usePortalAuth();
   const {
     calculateOpenDealsForUser,
@@ -288,10 +289,11 @@ export default function PortalDashboard() {
           <div className="space-y-3">
             {upcomingAppointments.length > 0 ? (
               upcomingAppointments.map((appointment) => (
-                <Link
+                <button
                   key={appointment.id}
-                  to="/portal/appointments"
-                  className="block rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3 transition hover:border-slate-300 hover:shadow-sm"
+                  type="button"
+                  onClick={() => navigate('/portal/appointments', { state: { openAppointmentId: appointment.id } })}
+                  className="w-full rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3 text-left transition hover:border-slate-300 hover:shadow-sm"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -314,7 +316,7 @@ export default function PortalDashboard() {
                         : appointment.status}
                     </span>
                   </div>
-                </Link>
+                </button>
               ))
             ) : (
               <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
