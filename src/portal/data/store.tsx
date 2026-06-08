@@ -1124,10 +1124,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
           method: 'POST',
           body: JSON.stringify({ ...dealDraft, assignedRepId: repId }),
-        }).then((saved) => {
+        }).then(async (saved) => {
           if (!saved) return;
+          // Reload tracker rows so My Sales updates immediately
+          const trackerRows = await apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker') ?? [];
+          // Reload clients so the new client profile appears immediately
+          const clients = await apiCall<Client[]>('/api/appointments?_resource=clients') ?? [];
           setState((current) => ({
             ...current,
+            clients,
             deals: current.deals.map((d) => (d.id === tempId ? normalizeDeal(saved) : d)),
             commissions: current.commissions.map((c) => {
               if (c.dealId !== tempId) return c;
@@ -1138,6 +1143,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 ...(saved._commissionId ? { id: saved._commissionId } : {}),
               };
             }),
+            trackerRows,
           }));
         });
       },
@@ -2323,13 +2329,20 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             nextFollowUpDate: tempDeal.nextFollowUpDate,
             _fromAppointmentId: appointmentId,
           }),
-        }).then((saved) => {
+        }).then(async (saved) => {
           if (!saved) return;
           const realDealId = saved.id;
+
+          // Reload tracker rows and clients so UI reflects new records immediately
+          const [trackerRows, clients] = await Promise.all([
+            apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker').then((r) => r ?? []),
+            apiCall<Client[]>('/api/appointments?_resource=clients').then((r) => r ?? []),
+          ]);
 
           // Replace temp IDs with the real DB-assigned IDs
           setState((current) => ({
             ...current,
+            clients,
             deals: current.deals.map((d) =>
               d.id === tempId ? normalizeDeal(saved) : d
             ),
@@ -2344,6 +2357,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             appointments: current.appointments.map((a) =>
               a.id === appointmentId ? { ...a, dealId: realDealId } : a
             ),
+            trackerRows,
           }));
 
           // Persist the appointment → deal link in the DB
