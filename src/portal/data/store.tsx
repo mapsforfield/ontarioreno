@@ -34,7 +34,9 @@ type DealDraft = Pick<
   | 'homeownerName'
   | 'phone'
   | 'email'
+  | 'address'
   | 'city'
+  | 'postalCode'
   | 'projectType'
   | 'estimatedJobValue'
   | 'financingRequired'
@@ -235,7 +237,9 @@ function normalizeDealStatus(status: string): DealStatus {
 function normalizeDeal(deal: Deal): Deal {
   return {
     ...deal,
+    address: deal.address ?? '',
     activity: Array.isArray(deal.activity) ? deal.activity : [],
+    postalCode: deal.postalCode ?? '',
     status: normalizeDealStatus(deal.status),
   };
 }
@@ -2239,6 +2243,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           const now = new Date().toISOString();
           const deal: Deal = {
             activity: [],
+            address: appointment.address ?? '',
             assignedContractorId:
               appointment.recommendedContractorId ?? appointment.contractorId,
             assignedRepId: appointment.assignedRepId,
@@ -2254,6 +2259,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               appointment.followUpDate || appointment.appointmentDate,
             notes: appointment.internalNotes || appointment.notes,
             phone: appointment.phone,
+            postalCode: appointment.postalCode ?? '',
             projectType: appointment.projectType || 'Consultation',
             status: 'appointment_booked',
             updatedAt: now,
@@ -2306,7 +2312,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             homeownerName: tempDeal.homeownerName,
             phone: tempDeal.phone,
             email: tempDeal.email,
+            address: tempDeal.address ?? '',
             city: tempDeal.city,
+            postalCode: tempDeal.postalCode ?? '',
             projectType: tempDeal.projectType,
             estimatedJobValue: tempDeal.estimatedJobValue,
             financingRequired: tempDeal.financingRequired,
@@ -2315,6 +2323,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             status: tempDeal.status,
             notes: tempDeal.notes,
             nextFollowUpDate: tempDeal.nextFollowUpDate,
+            _fromAppointmentId: appointmentId,
           }),
         }).then((saved) => {
           if (!saved) return;

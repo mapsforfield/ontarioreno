@@ -158,7 +158,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE') {
-    if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+    // Allow the assigned rep or admin to delete their own deals
+    const dealToDelete = await prisma.deal.findUnique({ where: { id }, select: { assignedRepId: true } });
+    if (!dealToDelete) return res.status(404).json({ error: 'Deal not found.' });
+    if (user.role !== 'admin' && dealToDelete.assignedRepId !== user.id) {
+      return res.status(403).json({ error: 'You can only delete your own deals.' });
+    }
     await prisma.deal.delete({ where: { id } });
     return res.status(200).json({ ok: true });
   }

@@ -101,7 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         homeownerName: data.homeownerName,
         phone: data.phone ?? '',
         email: data.email ?? '',
+        address: data.address ?? '',
         city: data.city ?? '',
+        postalCode: data.postalCode ?? '',
         projectType: data.projectType,
         estimatedJobValue: jobValue,
         financingRequired: data.financingRequired ?? false,
@@ -130,6 +132,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         adminNetCommission: adminTotalEst - repEst,
       },
     });
+
+    // ── Auto-upsert client profile ──
+    try {
+      const email = deal.email?.trim();
+      let client = email
+        ? await prisma.client.findFirst({ where: { email } })
+        : null;
+
+      if (client) {
+        await prisma.client.update({
+          where: { id: client.id },
+          data: {
+            name: deal.homeownerName || client.name,
+            phone: deal.phone || client.phone,
+            address: (deal.address as string) || client.address,
+            city: deal.city || client.city,
+            postalCode: (deal.postalCode as string) || client.postalCode,
+            projectTypes: deal.projectType
+              ? Array.from(new Set([...client.projectTypes, deal.projectType]))
+              : client.projectTypes,
+          },
+        });
+      } else {
+        await prisma.client.create({
+          data: {
+            name: deal.homeownerName,
+            phone: deal.phone ?? '',
+            email: deal.email ?? '',
+            address: (deal.address as string) ?? '',
+            city: deal.city ?? '',
+            postalCode: (deal.postalCode as string) ?? '',
+            projectTypes: deal.projectType ? [deal.projectType] : [],
+            internalNotes: '',
+            source: 'deal',
+            createdByUserId: user.id,
+          },
+        });
+      }
+    } catch {
+      // Client auto-linking is non-critical
+    }
+
+    // ── Auto-create My Sales tracker row for the assigned rep ──
+    try {
+      const maxOrder = await prisma.saleTracker.aggregate({
+        where: { repId: deal.assignedRepId },
+        _max: { sortOrder: true },
+      });
+      await prisma.saleTracker.create({
+        data: {
+          repId: deal.assignedRepId,
+          dealId: deal.id,
+          clientName: deal.homeownerName,
+          projectTotal: jobValue,
+          city: deal.city ?? '',
+          paymentType: '',
+          startDate: '',
+          signingStatus: '',
+          approvalStatus: '',
+          fundedStatus: '',
+          amountLeftToPay: null,
+          notes: '',
+          onHold: false,
+          sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
+        },
+      });
+    } catch {
+      // Tracker row is non-critical
+    }
 
     // Return commission id so the client can reconcile the temp commission id
     return res.status(201).json({ ...deal, _commissionId: commission.id });

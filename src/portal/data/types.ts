@@ -186,7 +186,9 @@ export type Deal = {
   homeownerName: string;
   phone: string;
   email: string;
+  address: string;
   city: string;
+  postalCode: string;
   projectType: string;
   estimatedJobValue: number;
   financingRequired: boolean;

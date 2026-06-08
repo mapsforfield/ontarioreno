@@ -370,6 +370,7 @@ export default function PortalDeals() {
     if (!currentUser || !form.homeownerName.trim()) return;
 
     const dealPayload = {
+      address: (form as unknown as { address?: string }).address?.trim() ?? '',
       city: form.city.trim(),
       email: form.email.trim(),
       estimatedJobValue: Number(form.estimatedJobValue) || 0,
@@ -377,6 +378,7 @@ export default function PortalDeals() {
       homeownerName: form.homeownerName.trim(),
       notes: form.notes.trim(),
       phone: form.phone.trim(),
+      postalCode: (form as unknown as { postalCode?: string }).postalCode?.trim() ?? '',
       projectType: form.projectType.trim(),
       nextFollowUpDate: form.nextFollowUpDate,
     };

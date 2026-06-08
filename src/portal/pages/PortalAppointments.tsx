@@ -1496,6 +1496,26 @@ export default function PortalAppointments() {
           </button>
           {/* Extra action buttons — desktop only */}
           <div className="hidden lg:contents">
+            {!appointment.dealId && (
+              <button
+                type="button"
+                onClick={() => {
+                  createDealFromAppointment(appointment.id, currentUser);
+                }}
+                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+              >
+                Create Deal
+              </button>
+            )}
+            {appointment.dealId && (
+              <button
+                type="button"
+                onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
+                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+              >
+                View Deal
+              </button>
+            )}
             {isAdmin && (
               <>
                 <button

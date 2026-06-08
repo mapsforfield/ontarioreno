@@ -72,7 +72,9 @@ model Deal {
   homeownerName        String
   phone                String
   email                String
+  address              String   @default("")
   city                 String
+  postalCode           String   @default("")
   projectType          String
   estimatedJobValue    Float    @default(0)
   financingRequired    Boolean  @default(false)
