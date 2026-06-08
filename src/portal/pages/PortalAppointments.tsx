@@ -1637,10 +1637,18 @@ export default function PortalAppointments() {
     );
     const isOutsideMonth = date.getMonth() !== cursorDate.getMonth();
 
+    const openNewForDate = () => {
+      setSelectedAppointmentId(null);
+      setIsCreating(true);
+      setForm({ ...emptyForm, appointmentDate: dateKey, assignedRepId: currentUser?.id ?? '' });
+      setPanelTab('prep');
+    };
+
     return (
       <article
         key={dateKey}
-        className={`rounded-[0.5rem] border border-slate-200 bg-white ${
+        onClick={openNewForDate}
+        className={`cursor-pointer rounded-[0.5rem] border border-slate-200 bg-white transition hover:border-[#b8c9dd] hover:bg-[#f6faff] ${
           compact ? 'min-h-20 p-2' : 'min-h-32 p-3'
         } ${
           isOutsideMonth && calendarView === 'month' ? 'opacity-55' : ''
@@ -1661,22 +1669,23 @@ export default function PortalAppointments() {
         </div>
         <div className={`${compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}`}>
           {appointments.slice(0, compact ? 3 : 6).map((appointment) => (
-            <AppointmentPill
-              key={appointment.id}
-              appointment={appointment}
-              contractorName={
-                appointment.contractorId
-                  ? getContractorName(appointment.contractorId)
-                  : ''
-              }
-              projectType={getAppointmentProjectType(appointment)}
-              repName={getRepName(appointment.assignedRepId)}
-              onClick={() => openAppointment(appointment)}
-            />
+            <span key={appointment.id} onClick={(e) => e.stopPropagation()}>
+              <AppointmentPill
+                appointment={appointment}
+                contractorName={
+                  appointment.contractorId
+                    ? getContractorName(appointment.contractorId)
+                    : ''
+                }
+                projectType={getAppointmentProjectType(appointment)}
+                repName={getRepName(appointment.assignedRepId)}
+                onClick={() => openAppointment(appointment)}
+              />
+            </span>
           ))}
           {appointments.length === 0 && !compact && (
             <p className="rounded-[0.5rem] border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-400">
-              Open
+              + New consultation
             </p>
           )}
           {compact && appointments.length > 3 && (
