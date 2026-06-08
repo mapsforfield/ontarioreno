@@ -912,6 +912,8 @@ export default function PortalAppointments() {
       updateAppointment(
         selectedAppointment.id,
         {
+          appointmentDate: form.appointmentDate,
+          appointmentTime: form.appointmentTime,
           consultationStage: form.consultationStage,
           closeProbability: Number(form.closeProbability) || 0,
           estimatedProjectValue: Number(form.estimatedProjectValue) || 0,
