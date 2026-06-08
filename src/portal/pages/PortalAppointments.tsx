@@ -3068,20 +3068,20 @@ export default function PortalAppointments() {
                   <input
                     value={form.customerName}
                     onChange={(event) => updateForm('customerName', event.target.value)}
-                    readOnly={!isAdmin && !isCreating}
+                   
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Phone
-                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Email
-                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   City
-                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Postal Code
@@ -3089,27 +3089,27 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address
-                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Project Type
-                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Date
-                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Time
-                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Duration (minutes)
-                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Type
-                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)} disabled={!isAdmin && !isCreating}>
+                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)}>
                     {typeOptions.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -3136,7 +3136,7 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Assigned Sales Rep
-                  <select value={form.assignedRepId} onChange={(event) => updateForm('assignedRepId', event.target.value)} disabled={!isAdmin}>
+                  <select value={form.assignedRepId} onChange={(event) => updateForm('assignedRepId', event.target.value)}>
                     <option value="">Unassigned Rep</option>
                     {activeReps.map((rep) => (
                       <option key={rep.id} value={rep.id}>{rep.name}</option>
@@ -3145,7 +3145,7 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Assigned Contractor
-                  <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)} disabled={!isAdmin}>
+                  <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)}>
                     <option value="">Unassigned Contractor</option>
                     {contractorOptions.map((contractor) => (
                       <option key={contractor.id} value={contractor.id}>{contractor.companyName}</option>
@@ -3154,7 +3154,7 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Linked Deal
-                  <select value={form.dealId} onChange={(event) => handleLinkedDealChange(event.target.value)} disabled={!isAdmin}>
+                  <select value={form.dealId} onChange={(event) => handleLinkedDealChange(event.target.value)}>
                     <option value="">Unlinked</option>
                     {deals.map((deal) => (
                       <option key={deal.id} value={deal.id}>{deal.homeownerName} / {deal.projectType}</option>
@@ -3163,7 +3163,7 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Customer Notes
-                  <textarea rows={3} value={form.customerNotes} onChange={(event) => updateForm('customerNotes', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                  <textarea rows={3} value={form.customerNotes} onChange={(event) => updateForm('customerNotes', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">
                   Internal Notes — Not visible to customer
