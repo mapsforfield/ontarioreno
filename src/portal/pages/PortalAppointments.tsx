@@ -493,6 +493,7 @@ export default function PortalAppointments() {
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [notesModal, setNotesModal] = useState<string | null>(null);
+  const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
   const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
   const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
@@ -895,6 +896,7 @@ export default function PortalAppointments() {
     setIsCreating(false);
     setSelectedAppointmentId(appointment.id);
     setForm(appointmentToForm(appointment));
+    setPanelTab('prep');
   };
 
   const closePanel = () => {
@@ -2864,8 +2866,44 @@ export default function PortalAppointments() {
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {/* ── Tab bar (existing consultations only) ── */}
+            {!isCreating && (
+              <div className="flex overflow-x-auto border-b border-slate-200 scrollbar-hide">
+                {(
+                  [
+                    { id: 'prep',     label: 'Prep',     badge: null as string | null },
+                    { id: 'details',  label: 'Details',  badge: null as string | null },
+                    { id: 'outcome',  label: 'Outcome',  badge: selectedAppointment && !selectedAppointment.outcomeSubmitted && selectedAppointment.status === 'completed' ? '!' : null as string | null },
+                    { id: 'dispatch', label: 'Dispatch', badge: selectedDispatches.length > 0 ? String(selectedDispatches.length) : null as string | null },
+                    { id: 'emails',   label: 'Emails',   badge: emailPreviews.length > 0 ? String(emailPreviews.length) : null as string | null },
+                  ]
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setPanelTab(tab.id as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails')}
+                    className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-3 text-sm font-bold transition ${
+                      panelTab === tab.id
+                        ? 'text-[#1B3C6C] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#1B3C6C] after:content-[""]'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.badge && (
+                      <span className={`flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-black ${tab.badge === '!' ? 'bg-amber-100 text-amber-700' : 'bg-[#e8f1fb] text-[#1B3C6C]'}`}>
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <section className="mb-5 rounded-[0.5rem] border border-[#c9d9eb] bg-[#f6faff] p-4">
+
+              {/* ══ TAB: PREP (default) ══════════════════════════════════════ */}
+              {(isCreating || panelTab === 'prep') && !isCreating && (
+              <div className="space-y-4">
+              <section className="rounded-[0.5rem] border border-[#c9d9eb] bg-[#f6faff] p-4">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
                   Rep Prep Sheet
                 </p>
@@ -2943,7 +2981,7 @@ export default function PortalAppointments() {
                   </p>
                 </div>
               </section>
-              <section className="mb-5 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+              <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
@@ -3001,8 +3039,124 @@ export default function PortalAppointments() {
                   })}
                 </div>
               </section>
-              {selectedAppointment && (
-                <section className="mb-5 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+              </div>
+              )}
+
+              {/* ══ TAB: DETAILS ═════════════════════════════════════════════ */}
+              {(isCreating || panelTab === 'details') && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Customer Name
+                  <input
+                    value={form.customerName}
+                    onChange={(event) => updateForm('customerName', event.target.value)}
+                    readOnly={!isAdmin && !isCreating}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Phone
+                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Email
+                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  City
+                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Postal Code
+                  <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value)} placeholder="e.g. L6Y 4X2" />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Address
+                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Project Type
+                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Consultation Date
+                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Consultation Time
+                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Duration (minutes)
+                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Consultation Type
+                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)} disabled={!isAdmin && !isCreating}>
+                    {typeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Status
+                  <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
+                    {(isAdmin || isCreating
+                      ? statusOptions
+                      : statusOptions.filter((option) => ['completed', 'no_show', form.status].includes(option.value))
+                    ).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Consultation Stage
+                  <select value={form.consultationStage} onChange={(event) => updateForm('consultationStage', event.target.value as ConsultationStage)}>
+                    {stageSelectOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Assigned Sales Rep
+                  <select value={form.assignedRepId} onChange={(event) => updateForm('assignedRepId', event.target.value)} disabled={!isAdmin}>
+                    <option value="">Unassigned Rep</option>
+                    {activeReps.map((rep) => (
+                      <option key={rep.id} value={rep.id}>{rep.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Assigned Contractor
+                  <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)} disabled={!isAdmin}>
+                    <option value="">Unassigned Contractor</option>
+                    {contractorOptions.map((contractor) => (
+                      <option key={contractor.id} value={contractor.id}>{contractor.companyName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Linked Deal
+                  <select value={form.dealId} onChange={(event) => handleLinkedDealChange(event.target.value)} disabled={!isAdmin}>
+                    <option value="">Unlinked</option>
+                    {deals.map((deal) => (
+                      <option key={deal.id} value={deal.id}>{deal.homeownerName} / {deal.projectType}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Customer Notes
+                  <textarea rows={3} value={form.customerNotes} onChange={(event) => updateForm('customerNotes', event.target.value)} readOnly={!isAdmin && !isCreating} />
+                </label>
+                <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Internal Notes — Not visible to customer
+                  <textarea rows={4} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} />
+                </label>
+              </div>
+              )}
+
+              {/* ══ TAB: OUTCOME ═════════════════════════════════════════════ */}
+              {selectedAppointment && panelTab === 'outcome' && (
+                <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
@@ -3179,165 +3333,9 @@ export default function PortalAppointments() {
                   </div>
                 </section>
               )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Customer Name
-                  <input
-                    value={form.customerName}
-                    onChange={(event) => updateForm('customerName', event.target.value)}
-                    readOnly={!isAdmin && !isCreating}
-                  />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Phone
-                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Email
-                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  City
-                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Postal Code
-                  <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value)} placeholder="e.g. L6Y 4X2" />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                  Address
-                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Project Type
-                  <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Assigned Sales Rep
-                  <select value={form.assignedRepId} onChange={(event) => updateForm('assignedRepId', event.target.value)} disabled={!isAdmin}>
-                    <option value="">Unassigned Rep</option>
-                    {activeReps.map((rep) => (
-                      <option key={rep.id} value={rep.id}>
-                        {rep.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Assigned Contractor
-                  <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)} disabled={!isAdmin}>
-                    <option value="">Unassigned Contractor</option>
-                    {contractorOptions.map((contractor) => (
-                      <option key={contractor.id} value={contractor.id}>
-                        {contractor.companyName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Consultation Date
-                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Consultation Time
-                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Duration
-                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} readOnly={!isAdmin && !isCreating} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Consultation Type
-                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)} disabled={!isAdmin && !isCreating}>
-                    {typeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Status
-                  <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
-                    {(isAdmin || isCreating
-                      ? statusOptions
-                      : statusOptions.filter((option) =>
-                          ['completed', 'no_show', form.status].includes(option.value)
-                        )
-                    ).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Consultation Stage
-                  <select
-                    value={form.consultationStage}
-                    onChange={(event) =>
-                      updateForm(
-                        'consultationStage',
-                        event.target.value as ConsultationStage
-                      )
-                    }
-                  >
-                    {stageSelectOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Linked Deal
-                  <select value={form.dealId} onChange={(event) => handleLinkedDealChange(event.target.value)} disabled={!isAdmin}>
-                    <option value="">Unlinked</option>
-                    {deals.map((deal) => (
-                      <option key={deal.id} value={deal.id}>
-                        {deal.homeownerName} / {deal.projectType}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    Assigned Contractor
-                  </p>
-                  <p className="mt-2 text-sm font-black text-slate-950">
-                    {linkedContractor?.companyName ?? 'Unassigned Contractor'}
-                  </p>
-                </div>
-                <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    Linked Deal
-                  </p>
-                  <p className="mt-2 text-sm font-black text-slate-950">
-                    {linkedDeal
-                      ? `${linkedDeal.homeownerName} / ${formatDealStatus(linkedDeal.status)}`
-                      : 'No linked deal'}
-                  </p>
-                </div>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                  Customer Notes
-                  <textarea
-                    rows={3}
-                    value={form.customerNotes}
-                    onChange={(event) => updateForm('customerNotes', event.target.value)}
-                    readOnly={!isAdmin && !isCreating}
-                  />
-                </label>
-                <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">
-                  Internal Notes - Not visible to customer
-                  <textarea
-                    rows={4}
-                    value={form.internalNotes}
-                    onChange={(event) => updateForm('internalNotes', event.target.value)}
-                  />
-                </label>
-              </div>
-              {selectedAppointment && (
-                <section className="mt-5 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+              {/* ══ TAB: DISPATCH ════════════════════════════════════════════ */}
+              {selectedAppointment && panelTab === 'dispatch' && (
+                <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
@@ -3427,8 +3425,9 @@ export default function PortalAppointments() {
                   </div>
                 </section>
               )}
-              {selectedAppointment && emailPreviews.length > 0 && (
-                <section className="mt-5 rounded-[0.5rem] border border-slate-200 bg-white p-4">
+              {/* ══ TAB: EMAILS ══════════════════════════════════════════════ */}
+              {selectedAppointment && panelTab === 'emails' && (
+                <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
@@ -3446,6 +3445,11 @@ export default function PortalAppointments() {
                     <p className="mt-3 rounded-[0.5rem] border border-[#c9d9eb] bg-[#f6faff] p-3 text-sm font-bold text-[#1B3C6C]">
                       {emailActionMessage}
                     </p>
+                  )}
+                  {emailPreviews.length === 0 && (
+                    <div className="mt-4 rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                      No email templates available yet — link a deal to generate templates.
+                    </div>
                   )}
                   <div className="mt-4 space-y-4">
                     {emailPreviews.map((preview) => (

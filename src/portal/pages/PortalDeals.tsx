@@ -445,6 +445,7 @@ export default function PortalDeals() {
       contractorId:
         appointmentForm.contractorId || selectedDeal.assignedContractorId,
       city: selectedDeal.city,
+      postalCode: selectedAppointment?.postalCode ?? '',
       createdByUserId: selectedAppointment?.createdByUserId ?? currentUser.id,
       closeProbability: selectedAppointment?.closeProbability ?? 0,
       customerNotes: appointmentForm.customerNotes.trim(),
