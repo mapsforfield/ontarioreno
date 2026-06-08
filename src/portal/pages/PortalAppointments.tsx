@@ -461,6 +461,7 @@ export default function PortalAppointments() {
     addContractorDispatch,
     addAppointment,
     assignDispatchContractor,
+    clients,
     createDealFromAppointment,
     contractors,
     deals,
@@ -496,6 +497,9 @@ export default function PortalAppointments() {
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [notesModal, setNotesModal] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
+  // Client search/autofill for new consultation form
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
 
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
@@ -536,11 +540,32 @@ export default function PortalAppointments() {
   // Auto-open a consultation when arriving from the dashboard
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    const id = (location.state as { openAppointmentId?: string } | null)?.openAppointmentId;
-    if (!id || handledNavState.current === id) return;
-    handledNavState.current = id;
-    const apt = visibleAppointments.find((a) => a.id === id);
-    if (apt) openAppointment(apt);
+    const state = location.state as { openAppointmentId?: string; prefillClient?: import('../data/types').Client } | null;
+    const id = state?.openAppointmentId;
+    if (id && handledNavState.current !== id) {
+      handledNavState.current = id;
+      const apt = visibleAppointments.find((a) => a.id === id);
+      if (apt) openAppointment(apt);
+    }
+    // Pre-fill new consultation form from a client profile
+    const prefill = state?.prefillClient;
+    if (prefill && handledNavState.current !== `prefill-${prefill.id}`) {
+      handledNavState.current = `prefill-${prefill.id}`;
+      setIsCreating(true);
+      setSelectedAppointmentId(null);
+      setForm({
+        ...emptyForm,
+        customerName: prefill.name,
+        phone: prefill.phone ?? '',
+        email: prefill.email ?? '',
+        address: prefill.address ?? '',
+        city: prefill.city ?? '',
+        postalCode: prefill.postalCode ?? '',
+        projectType: prefill.projectTypes?.[0] ?? '',
+        assignedRepId: currentUser?.id ?? '',
+      });
+      setPanelTab('prep');
+    }
   // openAppointment is stable; visibleAppointments intentionally omitted to run once
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
@@ -3071,6 +3096,62 @@ export default function PortalAppointments() {
               {/* ══ TAB: DETAILS ═════════════════════════════════════════════ */}
               {(isCreating || panelTab === 'details') && (
               <div className="grid gap-4 sm:grid-cols-2">
+                {/* ── Client autofill search (new consultations only) ── */}
+                {isCreating && (
+                  <div className="sm:col-span-2 relative">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      Pull from existing client
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search by name, email, or phone…"
+                        value={clientSearch}
+                        onChange={(e) => { setClientSearch(e.target.value); setClientSearchOpen(true); }}
+                        onFocus={() => setClientSearchOpen(true)}
+                        className="w-full rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1B3C6C] focus:outline-none focus:ring-0"
+                      />
+                    </div>
+                    {clientSearchOpen && clientSearch.trim().length > 0 && (() => {
+                      const q = clientSearch.toLowerCase();
+                      const matches = clients.filter((c) =>
+                        c.name.toLowerCase().includes(q) ||
+                        (c.email ?? '').toLowerCase().includes(q) ||
+                        (c.phone ?? '').toLowerCase().includes(q)
+                      ).slice(0, 6);
+                      if (matches.length === 0) return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white p-3 shadow-lg">
+                          <p className="text-sm font-semibold text-slate-400">No clients found</p>
+                        </div>
+                      );
+                      return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
+                          {matches.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => {
+                                updateForm('customerName', c.name);
+                                updateForm('phone', c.phone ?? '');
+                                updateForm('email', c.email ?? '');
+                                updateForm('address', c.address ?? '');
+                                updateForm('city', c.city ?? '');
+                                updateForm('postalCode', c.postalCode ?? '');
+                                if (c.projectTypes?.[0]) updateForm('projectType', c.projectTypes[0]);
+                                setClientSearch('');
+                                setClientSearchOpen(false);
+                              }}
+                              className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]"
+                            >
+                              <span className="text-sm font-black text-slate-900">{c.name}</span>
+                              <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Customer Name
                   <input

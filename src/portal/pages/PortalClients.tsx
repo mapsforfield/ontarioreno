@@ -1,4 +1,5 @@
 import {
+  BadgeDollarSign,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
 import type { Client } from '../data/types';
@@ -90,6 +92,7 @@ function clientToForm(client: Client): ClientForm {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortalClients() {
+  const navigate = useNavigate();
   const { isAdmin, currentUser } = usePortalAuth();
   const { clients, addClient, updateClient, deleteClient, getAppointmentsForClient } =
     usePortalData();
@@ -521,6 +524,32 @@ export default function PortalClients() {
                 >
                   Delete Client
                 </button>
+              )}
+              {!isCreating && selectedClient && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closePanel();
+                      navigate('/portal/appointments', { state: { prefillClient: selectedClient } });
+                    }}
+                    className="flex items-center gap-2 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    Schedule Consultation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closePanel();
+                      navigate('/portal/deals', { state: { prefillClient: selectedClient } });
+                    }}
+                    className="flex items-center gap-2 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                  >
+                    <BadgeDollarSign className="h-4 w-4" />
+                    Convert to Deal
+                  </button>
+                </>
               )}
               <button
                 type="button"

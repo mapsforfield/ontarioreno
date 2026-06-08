@@ -1,6 +1,6 @@
 import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
-import { Fragment, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { getRecommendedContractors } from '../data/recommendations';
@@ -174,6 +174,8 @@ function getValueRange(value: number) {
 }
 
 export default function PortalDeals() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, isAdmin } = usePortalAuth();
   const {
     addContractorDispatch,
@@ -183,6 +185,7 @@ export default function PortalDeals() {
     addProposalHistory,
     assignDispatchContractor,
     assignContractorToDeal,
+    clients,
     contractors,
     deleteDeal,
     getActivitiesForUser,
@@ -226,6 +229,9 @@ export default function PortalDeals() {
   });
   const [appointmentForm, setAppointmentForm] =
     useState<AppointmentFormState>(emptyAppointmentForm);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const handledNavState = useRef<string | null>(null);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
   const selectedDealAppointments = selectedDeal
     ? getAppointmentsForDeal(selectedDeal.id)
@@ -332,6 +338,34 @@ export default function PortalDeals() {
           new Date(first.createdAt).getTime()
       )
     : [];
+
+  // Handle nav state: prefillClient (from Clients page) and openDealId (from Dashboard)
+  useEffect(() => {
+    const state = location.state as { prefillClient?: import('../data/types').Client; openDealId?: string } | null;
+    const prefill = state?.prefillClient;
+    if (prefill && handledNavState.current !== `prefill-${prefill.id}`) {
+      handledNavState.current = `prefill-${prefill.id}`;
+      setSelectedDealId(null);
+      setIsAddingDeal(true);
+      setForm({
+        ...emptyDealForm,
+        homeownerName: prefill.name,
+        phone: prefill.phone ?? '',
+        email: prefill.email ?? '',
+        address: prefill.address ?? '',
+        city: prefill.city ?? '',
+        postalCode: prefill.postalCode ?? '',
+        projectType: prefill.projectTypes?.[0] ?? '',
+      });
+    }
+    const dealId = state?.openDealId;
+    if (dealId && handledNavState.current !== dealId) {
+      handledNavState.current = dealId;
+      setSelectedDealId(dealId);
+      setIsAddingDeal(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const openAddDeal = () => {
     setSelectedDealId(null);
@@ -947,6 +981,60 @@ OntarioReno Broker Portal`;
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               <div className="grid gap-4 sm:grid-cols-2">
+                {/* ── Client autofill search (new deals only) ── */}
+                {isAddingDeal && (
+                  <div className="sm:col-span-2 relative">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      Pull from existing client
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or phone…"
+                      value={clientSearch}
+                      onChange={(e) => { setClientSearch(e.target.value); setClientSearchOpen(true); }}
+                      onFocus={() => setClientSearchOpen(true)}
+                      className="w-full rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1B3C6C] focus:outline-none focus:ring-0"
+                    />
+                    {clientSearchOpen && clientSearch.trim().length > 0 && (() => {
+                      const q = clientSearch.toLowerCase();
+                      const matches = clients.filter((c) =>
+                        c.name.toLowerCase().includes(q) ||
+                        (c.email ?? '').toLowerCase().includes(q) ||
+                        (c.phone ?? '').toLowerCase().includes(q)
+                      ).slice(0, 6);
+                      if (matches.length === 0) return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white p-3 shadow-lg">
+                          <p className="text-sm font-semibold text-slate-400">No clients found</p>
+                        </div>
+                      );
+                      return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
+                          {matches.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => {
+                                updateForm('homeownerName', c.name);
+                                updateForm('phone', c.phone ?? '');
+                                updateForm('email', c.email ?? '');
+                                updateForm('address', c.address ?? '');
+                                updateForm('city', c.city ?? '');
+                                updateForm('postalCode', c.postalCode ?? '');
+                                if (c.projectTypes?.[0]) updateForm('projectType', c.projectTypes[0]);
+                                setClientSearch('');
+                                setClientSearchOpen(false);
+                              }}
+                              className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]"
+                            >
+                              <span className="text-sm font-black text-slate-900">{c.name}</span>
+                              <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Homeowner Name
                   <input
