@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import {
   ConsultationEmailPreview,
@@ -994,8 +994,15 @@ export default function PortalAppointments() {
     }
   };
 
+  const navigate = useNavigate();
   const handleCreateDealFromAppointment = () => {
     if (!selectedAppointment) return;
+    if (selectedAppointment.dealId) {
+      // Already has a deal — navigate to it
+      closePanel();
+      navigate('/portal/deals', { state: { openDealId: selectedAppointment.dealId } });
+      return;
+    }
     createDealFromAppointment(selectedAppointment.id, currentUser);
     closePanel();
   };
@@ -3630,13 +3637,13 @@ export default function PortalAppointments() {
               )}
             </div>
             <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
-              {selectedAppointment && !selectedAppointment.dealId && (
+              {selectedAppointment && (
                 <button
                   type="button"
                   onClick={handleCreateDealFromAppointment}
                   className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] sm:mr-auto"
                 >
-                  Create Deal From Consultation
+                  {selectedAppointment.dealId ? 'View Linked Deal' : 'Create Deal From Consultation'}
                 </button>
               )}
               {selectedAppointment && (
