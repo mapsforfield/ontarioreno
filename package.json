@@ -49,6 +49,7 @@
     "@types/react-dom": "^19.2.3",
     "@vercel/node": "^5.8.12",
     "autoprefixer": "^10.4.21",
+    "playwright": "^1.60.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.22.4",
     "typescript": "~5.8.2",
