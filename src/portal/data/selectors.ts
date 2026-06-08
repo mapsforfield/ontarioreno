@@ -10,7 +10,6 @@ import { Commission, Contractor, Deal, DealStatus, User } from './types';
 
 const openDealStatuses: DealStatus[] = [
   'new_lead',
-  'contacted',
   'appointment_booked',
   'quoted',
   'negotiating',
@@ -128,7 +127,6 @@ export function formatFinancingStatus(status: Contractor['financingStatus']) {
 export function formatDealStatus(status: DealStatus) {
   const labels: Record<DealStatus, string> = {
     appointment_booked: 'Appointment Booked',
-    contacted: 'Contacted',
     lost: 'Lost',
     negotiating: 'Negotiating',
     new_lead: 'New Lead',

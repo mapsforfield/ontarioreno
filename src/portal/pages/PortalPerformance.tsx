@@ -15,7 +15,6 @@ type DateRange = 'all_time' | 'this_month' | 'last_30_days';
 
 const openDealStatuses = [
   'new_lead',
-  'contacted',
   'appointment_booked',
   'quoted',
   'negotiating',

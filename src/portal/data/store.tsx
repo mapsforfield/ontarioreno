@@ -186,7 +186,6 @@ type PortalDataContextValue = PortalDataState & {
 
 const openDealStatuses: DealStatus[] = [
   'new_lead',
-  'contacted',
   'appointment_booked',
   'quoted',
   'negotiating',
@@ -221,7 +220,6 @@ function normalizeDealStatus(status: string): DealStatus {
 
   const validStatuses: DealStatus[] = [
     'new_lead',
-    'contacted',
     'appointment_booked',
     'quoted',
     'negotiating',
@@ -1987,7 +1985,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             } else if (nextAppointment.consultationStage === 'estimate_requested') {
               actionType = 'consultation_estimate_requested';
               linkedDealStatusUpdate =
-                deal && ['new_lead', 'contacted', 'appointment_booked'].includes(deal.status)
+                deal && ['new_lead', 'appointment_booked'].includes(deal.status)
                   ? 'quoted'
                   : deal?.status === 'quoted'
                     ? 'negotiating'

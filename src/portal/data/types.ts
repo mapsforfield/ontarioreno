@@ -42,7 +42,6 @@ export type Contractor = {
 
 export type DealStatus =
   | 'new_lead'
-  | 'contacted'
   | 'appointment_booked'
   | 'quoted'
   | 'negotiating'

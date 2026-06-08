@@ -23,7 +23,6 @@ import {
 
 const columns: Array<{ label: string; status: DealStatus }> = [
   { label: 'New Lead', status: 'new_lead' },
-  { label: 'Contacted', status: 'contacted' },
   { label: 'Appointment Booked', status: 'appointment_booked' },
   { label: 'Quoted', status: 'quoted' },
   { label: 'Negotiating', status: 'negotiating' },

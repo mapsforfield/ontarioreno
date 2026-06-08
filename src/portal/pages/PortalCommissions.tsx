@@ -15,7 +15,6 @@ import { CommissionPayoutStatus, Deal } from '../data/types';
 
 const projectedStatuses = [
   'new_lead',
-  'contacted',
   'appointment_booked',
   'quoted',
   'negotiating',

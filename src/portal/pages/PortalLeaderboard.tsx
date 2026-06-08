@@ -17,7 +17,6 @@ export default function PortalLeaderboard() {
       const openDeals = getDealsForRep(rep.id).filter((deal) =>
         [
           'new_lead',
-          'contacted',
           'appointment_booked',
           'quoted',
           'negotiating',
