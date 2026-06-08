@@ -675,7 +675,7 @@ OntarioReno Broker Portal`;
             Pipeline workspace
           </h1>
         </div>
-        {currentUser?.role === 'rep' && (
+        {currentUser && (
           <button
             type="button"
             onClick={openAddDeal}
