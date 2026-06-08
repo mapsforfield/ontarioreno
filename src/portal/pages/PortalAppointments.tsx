@@ -700,29 +700,13 @@ export default function PortalAppointments() {
       recommendedContractorId: form.recommendedContractorId || null,
       status: form.status,
     };
-  const emailTemplateTypes: ConsultationEmailType[] = isAdmin
-    ? [
-        'booking_confirmation',
-        'reschedule_notice',
-        'cancellation_notice',
-        'rep_assignment',
-      ]
-    : selectedAppointment?.assignedRepId === currentUser.id
-      ? ['rep_assignment']
-      : [];
-  const stageSelectOptions = isAdmin
-    ? stageOptions
-    : Array.from(
-        new Map(
-          [
-            [
-              form.consultationStage,
-              formatConsultationStage(form.consultationStage),
-            ],
-            ...repStageOptions.map((option) => [option.value, option.label]),
-          ] as Array<[ConsultationStage, string]>
-        )
-      ).map(([value, label]) => ({ label, value }));
+  const emailTemplateTypes: ConsultationEmailType[] = [
+    'booking_confirmation',
+    'reschedule_notice',
+    'cancellation_notice',
+    'rep_assignment',
+  ];
+  const stageSelectOptions = stageOptions;
   const emailPreviews =
     previewAppointment && emailTemplateTypes.length > 0
       ? emailTemplateTypes.map((type) =>
@@ -930,57 +914,6 @@ export default function PortalAppointments() {
 
   const saveAppointment = () => {
     if (!currentUser) return;
-
-    if (!isAdmin && selectedAppointment) {
-      updateAppointment(
-        selectedAppointment.id,
-        {
-          address: form.address.trim(),
-          appointmentDate: form.appointmentDate,
-          appointmentTime: form.appointmentTime,
-          appointmentType: form.appointmentType,
-          city: form.city.trim(),
-          postalCode: form.postalCode.trim(),
-          consultationStage: form.consultationStage,
-          closeProbability: Number(form.closeProbability) || 0,
-          customerName: form.customerName.trim(),
-          customerNotes: form.customerNotes.trim(),
-          dealId: form.dealId,
-          durationMinutes: Number(form.durationMinutes) || 60,
-          email: form.email.trim(),
-          estimatedProjectValue: Number(form.estimatedProjectValue) || 0,
-          financingNeeded:
-            form.financingNeeded === 'unknown'
-              ? null
-              : form.financingNeeded === 'yes',
-          followUpDate: form.followUpDate,
-          homeownerInterestLevel: form.homeownerInterestLevel || null,
-          internalNotes: form.internalNotes.trim(),
-          location: [form.address.trim(), form.city.trim()].filter(Boolean).join(', '),
-          notes: form.internalNotes.trim(),
-          nextStep: form.nextStep,
-          objections: form.objections.trim(),
-          outcomeNotes: form.outcomeNotes.trim(),
-          outcomeSubmitted: form.outcomeSubmitted,
-          phone: form.phone.trim(),
-          projectType: form.projectType.trim(),
-          recommendedContractorId: form.recommendedContractorId || null,
-          status: form.status,
-        },
-        currentUser
-      );
-      if (form.status === 'completed' && !form.outcomeSubmitted) {
-        setForm((current) => ({
-          ...current,
-          consultationStage: 'consultation_completed',
-          status: 'completed',
-        }));
-        return;
-      }
-      closePanel();
-      return;
-    }
-
     if (!form.customerName.trim() || !form.appointmentDate) return;
 
     const payload = {
@@ -988,8 +921,7 @@ export default function PortalAppointments() {
       appointmentDate: form.appointmentDate,
       appointmentTime: form.appointmentTime,
       appointmentType: form.appointmentType,
-      // Non-admins are always assigned to themselves
-      assignedRepId: isAdmin ? form.assignedRepId : currentUser.id,
+      assignedRepId: form.assignedRepId || currentUser.id,
       contractorId: form.contractorId || null,
       city: form.city.trim(),
       postalCode: form.postalCode.trim(),
@@ -3118,10 +3050,7 @@ export default function PortalAppointments() {
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Status
                   <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
-                    {(isAdmin || isCreating
-                      ? statusOptions
-                      : statusOptions.filter((option) => ['completed', 'no_show', form.status].includes(option.value))
-                    ).map((option) => (
+                    {statusOptions.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
