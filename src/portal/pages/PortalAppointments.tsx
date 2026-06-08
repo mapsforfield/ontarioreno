@@ -485,6 +485,7 @@ export default function PortalAppointments() {
   const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
   // Per-template subject/body overrides — keyed by ConsultationEmailType
   const [emailEdits, setEmailEdits] = useState<Record<string, { subject: string; body: string }>>({});
+  const [emailRecipientOverrides, setEmailRecipientOverrides] = useState<Record<string, { to: string; cc: string }>>({});
   // Per-template file attachments — keyed by ConsultationEmailType
   const [emailAttachments, setEmailAttachments] = useState<Record<string, File[]>>({});
   const [dispatchActionMessage, setDispatchActionMessage] = useState('');
@@ -909,6 +910,7 @@ export default function PortalAppointments() {
     setTransferToRepId('');
     setEmailEdits({});
     setEmailAttachments({});
+    setEmailRecipientOverrides({});
     setEmailActionMessage('');
   };
 
@@ -1170,13 +1172,19 @@ export default function PortalAppointments() {
   };
 
   const openEmailClient = (preview: ConsultationEmailPreview) => {
-    if (!preview.metadata.recipientEmail) return;
+    const recipOverride = emailRecipientOverrides[preview.type];
+    const effectiveTo = recipOverride?.to?.trim() || preview.metadata.recipientEmail;
+    if (!effectiveTo) return;
 
-    const mailto = `mailto:${encodeURIComponent(
-      preview.metadata.recipientEmail
-    )}?subject=${encodeURIComponent(preview.subject)}&body=${encodeURIComponent(
-      preview.body
-    )}`;
+    const edits = emailEdits[preview.type];
+    const subject = edits?.subject ?? preview.subject;
+    const body = edits?.body ?? preview.body;
+    const cc = recipOverride?.cc?.trim();
+    const params = new URLSearchParams();
+    params.set('subject', subject);
+    params.set('body', body);
+    if (cc) params.set('cc', cc);
+    const mailto = `mailto:${encodeURIComponent(effectiveTo)}?${params.toString()}`;
     window.location.href = mailto;
     setEmailActionMessage(`${preview.metadata.templateLabel} opened in email client.`);
     logEmailPreviewActivity(
@@ -1217,16 +1225,20 @@ export default function PortalAppointments() {
       }
     }
 
+    const recipOverride = emailRecipientOverrides[preview.type];
+    const effectiveTo = recipOverride?.to?.trim() || preview.metadata.recipientEmail;
     const result = await sendEmail(preview, {
       subjectOverride: edits?.subject,
       bodyOverride: edits?.body,
       attachments: encodedAttachments,
+      toOverride: recipOverride?.to?.trim() || undefined,
+      ccOverride: recipOverride?.cc?.trim() || undefined,
     });
 
     setSendingEmailType(null);
 
     if (result.ok) {
-      setEmailActionMessage(`${preview.metadata.templateLabel} sent to ${preview.metadata.recipientEmail}.`);
+      setEmailActionMessage(`${preview.metadata.templateLabel} sent to ${effectiveTo}.`);
       logActivity(
         {
           actionLabel: `Email sent: ${preview.metadata.templateLabel} to ${preview.metadata.recipientLabel}`,
@@ -3453,6 +3465,48 @@ export default function PortalAppointments() {
                             />
                           </div>
                         )}
+                        {/* ── Recipient Overrides ── */}
+                        <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3 space-y-2">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                            Recipients
+                          </p>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">To</label>
+                            <input
+                              type="email"
+                              placeholder={preview.metadata.recipientEmail || 'Recipient email'}
+                              value={emailRecipientOverrides[preview.type]?.to ?? ''}
+                              onChange={(e) =>
+                                setEmailRecipientOverrides((prev) => ({
+                                  ...prev,
+                                  [preview.type]: {
+                                    to: e.target.value,
+                                    cc: prev[preview.type]?.cc ?? '',
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded border border-transparent bg-slate-50 text-sm font-semibold text-slate-900 focus:border-[#1B3C6C] focus:bg-white focus:outline-none focus:ring-0 px-2 py-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">CC <span className="font-normal">(optional, comma-separated)</span></label>
+                            <input
+                              type="text"
+                              placeholder="e.g. other@example.com, another@example.com"
+                              value={emailRecipientOverrides[preview.type]?.cc ?? ''}
+                              onChange={(e) =>
+                                setEmailRecipientOverrides((prev) => ({
+                                  ...prev,
+                                  [preview.type]: {
+                                    to: prev[preview.type]?.to ?? '',
+                                    cc: e.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded border border-transparent bg-slate-50 text-sm font-semibold text-slate-900 focus:border-[#1B3C6C] focus:bg-white focus:outline-none focus:ring-0 px-2 py-1"
+                            />
+                          </div>
+                        </div>
                         {/* ── Editable Subject ── */}
                         <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
                           <div className="flex items-center justify-between">
@@ -3612,7 +3666,7 @@ export default function PortalAppointments() {
                           <button
                             type="button"
                             onClick={() => openEmailClient(preview)}
-                            disabled={!preview.metadata.recipientEmail}
+                            disabled={!emailRecipientOverrides[preview.type]?.to?.trim() && !preview.metadata.recipientEmail}
                             className="rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Open Email Client
@@ -3621,7 +3675,7 @@ export default function PortalAppointments() {
                             type="button"
                             onClick={() => handleSendEmail(preview)}
                             disabled={
-                              !preview.metadata.recipientEmail ||
+                              (!emailRecipientOverrides[preview.type]?.to?.trim() && !preview.metadata.recipientEmail) ||
                               sendingEmailType !== null
                             }
                             className="flex items-center gap-2 rounded-[0.5rem] bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"

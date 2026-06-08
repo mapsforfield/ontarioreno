@@ -14,6 +14,8 @@ type EmailAttachment = {
 type SendEmailBody = {
   attachments?: EmailAttachment[];
   body: string;
+  /** CC recipient(s), comma-separated */
+  cc?: string;
   /** HTML version of the email. Sent alongside the plain-text fallback. */
   html?: string;
   replyTo?: string;
@@ -43,7 +45,7 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     return { error: 'Invalid request body.' };
   }
 
-  const { to, subject, body, html, replyTo, attachments } = data as Record<string, unknown>;
+  const { to, subject, body, html, cc, replyTo, attachments } = data as Record<string, unknown>;
 
   if (typeof to !== 'string' || !isValidEmail(to)) {
     return { error: 'Missing or invalid recipient email address.' };
@@ -65,6 +67,16 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
   }
   if (replyTo !== undefined && (typeof replyTo !== 'string' || !isValidEmail(replyTo))) {
     return { error: 'Invalid replyTo email address.' };
+  }
+  if (cc !== undefined && typeof cc !== 'string') {
+    return { error: 'Invalid cc field: must be a string.' };
+  }
+  // Validate each cc address if provided
+  if (cc && typeof cc === 'string') {
+    const ccAddresses = cc.split(',').map((a) => a.trim()).filter(Boolean);
+    for (const addr of ccAddresses) {
+      if (!isValidEmail(addr)) return { error: `Invalid CC email address: ${addr}` };
+    }
   }
 
   // Validate attachments
@@ -95,6 +107,7 @@ function validate(data: unknown): { error: string } | { ok: true; payload: SendE
     payload: {
       attachments: validatedAttachments,
       body: body.trim(),
+      cc: typeof cc === 'string' && cc.trim().length > 0 ? cc.trim() : undefined,
       html: typeof html === 'string' && html.trim().length > 0 ? html : undefined,
       replyTo: typeof replyTo === 'string' ? replyTo.trim() : undefined,
       subject: subject.trim(),
@@ -123,15 +136,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: result.error });
   }
 
-  const { to, subject, body, html, replyTo, attachments } = result.payload;
+  const { to, subject, body, html, cc, replyTo, attachments } = result.payload;
 
   try {
     const resend = new Resend(apiKey);
+    // Parse CC string into array for Resend
+    const ccAddresses = cc ? cc.split(',').map((a) => a.trim()).filter(Boolean) : undefined;
     const { error } = await resend.emails.send({
       attachments: attachments?.map((a) => ({
         filename: a.filename,
         content: Buffer.from(a.content, 'base64'),
       })),
+      cc: ccAddresses,
       from: EMAIL_FROM,
       html,
       replyTo,

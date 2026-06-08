@@ -17,13 +17,18 @@ export type SendEmailOptions = {
   bodyOverride?: string;
   /** Override the template subject */
   subjectOverride?: string;
+  /** Override the recipient email address */
+  toOverride?: string;
+  /** CC email address(es), comma-separated */
+  ccOverride?: string;
 };
 
 export async function sendEmail(
   preview: ConsultationEmailPreview,
   options: SendEmailOptions = {}
 ): Promise<SendEmailResult> {
-  if (!preview.metadata.recipientEmail) {
+  const effectiveTo = options.toOverride?.trim() || preview.metadata.recipientEmail;
+  if (!effectiveTo) {
     return { ok: false, error: 'No recipient email address on this template.' };
   }
 
@@ -37,12 +42,13 @@ export async function sendEmail(
       body: JSON.stringify({
         attachments: options.attachments?.length ? options.attachments : undefined,
         body,
+        cc: options.ccOverride?.trim() || undefined,
         html,
         // For customer-facing emails, set replyTo to the contractor's public email
         // so replies land with the contractor, not info@ontarioreno.ca.
         replyTo: preview.metadata.isCustomerFacing ? undefined : undefined,
         subject,
-        to: preview.metadata.recipientEmail,
+        to: effectiveTo,
       }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
