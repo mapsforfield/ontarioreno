@@ -116,6 +116,7 @@ export default function PortalClients() {
         c.email.toLowerCase().includes(q) ||
         c.phone.includes(q) ||
         c.city.toLowerCase().includes(q) ||
+        (c.postalCode ?? '').toLowerCase().includes(q) ||
         c.projectTypes.some((pt) => pt.toLowerCase().includes(q))
     );
   }, [clients, q]);
@@ -211,7 +212,7 @@ export default function PortalClients() {
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
-          placeholder="Search by name, email, phone, city, or project type…"
+          placeholder="Search by name, email, phone, city, postal code, or project type…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-[#32639b] focus:outline-none"
