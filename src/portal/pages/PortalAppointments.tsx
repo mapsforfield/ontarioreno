@@ -489,6 +489,7 @@ export default function PortalAppointments() {
   const [transferToRepId, setTransferToRepId] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
+  const [notesModal, setNotesModal] = useState<string | null>(null);
   const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
   const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
@@ -1656,6 +1657,31 @@ export default function PortalAppointments() {
 
   return (
     <div className="space-y-5">
+      {/* Notes full-preview modal */}
+      {notesModal !== null && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setNotesModal(null)}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-[0.75rem] border border-amber-200 bg-amber-50 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+              Internal Notes — Not visible to customer
+            </p>
+            <button
+              className="absolute right-4 top-4 text-amber-600 hover:text-amber-900"
+              onClick={() => setNotesModal(null)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <p className="mt-3 whitespace-pre-wrap text-sm font-semibold text-slate-800 max-h-[60vh] overflow-y-auto">
+              {notesModal}
+            </p>
+          </div>
+        </div>
+      )}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -2886,9 +2912,13 @@ export default function PortalAppointments() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
+                <div
+                  className={`mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 ${form.internalNotes?.trim() ? 'cursor-pointer hover:bg-amber-100 transition-colors' : ''}`}
+                  onClick={() => form.internalNotes?.trim() && setNotesModal(form.internalNotes)}
+                >
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
                     Internal Notes - Not visible to customer
+                    {form.internalNotes?.trim() && <span className="ml-2 normal-case font-normal opacity-60">(click to expand)</span>}
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-700">
                     {getPreview(form.internalNotes, 'No internal prep notes yet.')}
