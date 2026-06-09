@@ -504,6 +504,8 @@ export default function PortalAppointments() {
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   // Which agenda card's "•••" dropdown is open (keyed by appointment.id)
   const [openAgendaMenu, setOpenAgendaMenu] = useState<string | null>(null);
+  // Which today's agenda rows are expanded (desktop compact view)
+  const [expandedAgendaRows, setExpandedAgendaRows] = useState<Set<string>>(new Set());
 
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
@@ -1439,194 +1441,190 @@ export default function PortalAppointments() {
     const attentionReasons = getAttentionReasons(appointment);
     const canUseRepActions =
       currentUser.role === 'admin' || appointment.assignedRepId === currentUser.id;
+    const isRowExpanded = expandedAgendaRows.has(appointment.id);
+    const toggleRow = () =>
+      setExpandedAgendaRows((prev) => {
+        const next = new Set(prev);
+        if (next.has(appointment.id)) next.delete(appointment.id);
+        else next.add(appointment.id);
+        return next;
+      });
 
     return (
-      <article
+      <div
         key={appointment.id}
-        className={`rounded-[0.5rem] border bg-white p-4 shadow-sm ${
+        className={`rounded-[0.5rem] border bg-white shadow-sm ${
           options.attention ? 'border-amber-200' : 'border-slate-200'
         }`}
       >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-black uppercase tracking-[0.12em] text-[#32639b]">
-                {appointment.appointmentTime || 'Time TBD'}
-              </p>
-              <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-black ${statusClasses.badge}`}>
-                {formatAppointmentStatus(appointment.status)}
-              </span>
-              <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-[0.68rem] font-black text-[#1B3C6C]">
-                {formatConsultationStage(appointment.consultationStage)}
-              </span>
-              {outcomeBadge && (
-                <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-black ${outcomeBadge.className}`}>
-                  {outcomeBadge.label}
-                </span>
-              )}
-              {options.attention &&
-                attentionReasons.map((reason) => (
-                  <span
-                    key={reason}
-                    className="rounded-full bg-amber-100 px-2.5 py-1 text-[0.68rem] font-black text-amber-800"
-                  >
-                    {reason}
-                  </span>
+        {/* ── Compact summary row (always visible) ── */}
+        <button
+          type="button"
+          onClick={toggleRow}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50/80 rounded-[0.5rem]"
+        >
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusClasses.dot}`} />
+          <span className="w-[4.5rem] shrink-0 text-sm font-black tabular-nums text-[#32639b]">
+            {appointment.appointmentTime || 'TBD'}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
+            {appointment.customerName || appointment.title || 'Consultation'}
+          </span>
+          <span className="hidden shrink-0 text-xs font-semibold text-slate-500 sm:block">
+            {appointment.projectType || deal?.projectType || ''}
+            {(appointment.projectType || deal?.projectType) && (appointment.city || deal?.city) ? ' / ' : ''}
+            {appointment.city || deal?.city || ''}
+          </span>
+          {isAdmin && (
+            <span className="hidden shrink-0 text-xs font-semibold text-slate-400 lg:block">
+              {getRepName(appointment.assignedRepId)}
+            </span>
+          )}
+          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.62rem] font-black ${statusClasses.badge}`}>
+            {formatAppointmentStatus(appointment.status)}
+          </span>
+          {outcomeBadge && (
+            <span className={`hidden shrink-0 rounded-full px-2.5 py-0.5 text-[0.62rem] font-black sm:block ${outcomeBadge.className}`}>
+              {outcomeBadge.label}
+            </span>
+          )}
+          {options.attention && attentionReasons.length > 0 && (
+            <span className="hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.62rem] font-black text-amber-800 sm:block">
+              {attentionReasons[0]}
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-[0.68rem] font-bold text-slate-400 shrink-0">
+            {isRowExpanded ? 'Collapse' : 'Expand'}
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-150 ${isRowExpanded ? 'rotate-90' : ''}`} />
+          </span>
+        </button>
+
+        {/* ── Expanded detail panel ── */}
+        {isRowExpanded && (
+          <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+            {/* Rep / Contractor */}
+            <div className="mb-3 grid gap-2 text-sm font-bold text-slate-700 sm:grid-cols-2">
+              <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2">
+                Rep: {getRepName(appointment.assignedRepId)}
+              </div>
+              <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2">
+                Contractor: {getContractorName(appointment.contractorId)}
+              </div>
+            </div>
+            {/* Attention reasons */}
+            {options.attention && attentionReasons.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {attentionReasons.map((r) => (
+                  <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">{r}</span>
                 ))}
-            </div>
-            <h3 className="mt-2 text-lg font-black text-slate-950">
-              {appointment.customerName || appointment.title || 'Consultation'}
-            </h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              {appointment.projectType || deal?.projectType || 'Project type TBD'} /{' '}
-              {appointment.city || deal?.city || 'City TBD'}
-            </p>
-          </div>
-          <div className="grid gap-2 text-sm font-bold text-slate-700 sm:grid-cols-2 lg:min-w-[22rem]">
-            <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2">
-              Rep: {getRepName(appointment.assignedRepId)}
-            </div>
-            <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2">
-              Contractor: {getContractorName(appointment.contractorId)}
-            </div>
-          </div>
-        </div>
-
-        {/* Notes — desktop only */}
-        <div className="mt-3 hidden lg:grid gap-3 lg:grid-cols-2">
-          <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
-              Internal - Not visible to customer
-            </p>
-            <p className="mt-2 text-sm font-semibold text-slate-700">
-              {getPreview(
-                appointment.internalNotes || appointment.notes || '',
-                'No internal prep notes yet.'
-              )}
-            </p>
-          </div>
-          <div className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-              Customer Notes
-            </p>
-            <p className="mt-2 text-sm font-semibold text-slate-700">
-              {getPreview(appointment.customerNotes || '', 'No customer-facing notes.')}
-            </p>
-          </div>
-        </div>
-
-        {/* Action row: primary buttons + "•••" overflow menu (desktop only) */}
-        <div className="mt-4 flex items-center gap-2">
-          {/* Primary: Open Details */}
-          <button
-            type="button"
-            onClick={() => openAppointment(appointment)}
-            className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
-          >
-            Open Details
-          </button>
-          {/* Primary: Create Deal / View Deal (desktop only) */}
-          <div className="hidden lg:contents">
-            {!appointment.dealId ? (
-              <button
-                type="button"
-                onClick={() => createDealFromAppointment(appointment.id, currentUser)}
-                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
-              >
-                Create Deal
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
-                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
-              >
-                View Deal
-              </button>
-            )}
-            {/* "•••" overflow menu for secondary actions */}
-            {(isAdmin || canUseRepActions) && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setOpenAgendaMenu((prev) => prev === appointment.id ? null : appointment.id)}
-                  className="flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                  aria-label="More actions"
-                >
-                  More
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-                {openAgendaMenu === appointment.id && (
-                  <div
-                    className="absolute left-0 top-full z-50 mt-1.5 min-w-[13rem] rounded-[0.5rem] border border-slate-200 bg-white shadow-xl"
-                    onMouseLeave={() => setOpenAgendaMenu(null)}
-                  >
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => { openAppointment(appointment); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 first:rounded-t-[0.5rem]"
-                      >
-                        Edit Consultation
-                      </button>
-                    )}
-                    {isAdmin && !['completed', 'no_show'].includes(appointment.status) && (
-                      <button
-                        type="button"
-                        onClick={() => { markConsultationStatus(appointment, 'confirmed'); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-50"
-                      >
-                        Mark Confirmed
-                      </button>
-                    )}
-                    {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
-                      <button
-                        type="button"
-                        onClick={() => { markConsultationStatus(appointment, 'completed'); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
-                      >
-                        Mark Completed
-                      </button>
-                    )}
-                    {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
-                      <button
-                        type="button"
-                        onClick={() => { markConsultationStatus(appointment, 'no_show'); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50"
-                      >
-                        Mark No-show
-                      </button>
-                    )}
-                    {['completed', 'no_show'].includes(appointment.status) && (
-                      <div className="px-4 py-2.5 text-xs font-semibold text-slate-400">
-                        {appointment.status === 'completed' ? '✓ Completed' : '✗ No-show'} — no status changes
-                      </div>
-                    )}
-                    {canUseRepActions && (
-                      <button
-                        type="button"
-                        onClick={() => { updateInternalNotesFromAgenda(appointment); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-50"
-                      >
-                        Update Internal Notes
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => { openReschedule(appointment); setOpenAgendaMenu(null); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 last:rounded-b-[0.5rem]"
-                      >
-                        Reschedule
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
+            {/* Notes */}
+            <div className="mb-3 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+                  Internal — Not visible to customer
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-slate-700">
+                  {getPreview(appointment.internalNotes || appointment.notes || '', 'No internal prep notes yet.')}
+                </p>
+              </div>
+              <div className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">Customer Notes</p>
+                <p className="mt-1.5 text-sm font-semibold text-slate-700">
+                  {getPreview(appointment.customerNotes || '', 'No customer-facing notes.')}
+                </p>
+              </div>
+            </div>
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openAppointment(appointment)}
+                className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+              >
+                Open Details
+              </button>
+              {!appointment.dealId ? (
+                <button
+                  type="button"
+                  onClick={() => createDealFromAppointment(appointment.id, currentUser)}
+                  className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                >
+                  Create Deal
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
+                  className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                >
+                  View Deal
+                </button>
+              )}
+              {(isAdmin || canUseRepActions) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenAgendaMenu((prev) => prev === appointment.id ? null : appointment.id)}
+                    className="flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    More <ChevronDown className="h-3 w-3" />
+                  </button>
+                  {openAgendaMenu === appointment.id && (
+                    <div
+                      className="absolute left-0 top-full z-50 mt-1.5 min-w-[13rem] rounded-[0.5rem] border border-slate-200 bg-white shadow-xl"
+                      onMouseLeave={() => setOpenAgendaMenu(null)}
+                    >
+                      {isAdmin && (
+                        <button type="button" onClick={() => { openAppointment(appointment); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 rounded-t-[0.5rem] px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                          Edit Consultation
+                        </button>
+                      )}
+                      {isAdmin && !['completed', 'no_show'].includes(appointment.status) && (
+                        <button type="button" onClick={() => { markConsultationStatus(appointment, 'confirmed'); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-50">
+                          Mark Confirmed
+                        </button>
+                      )}
+                      {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
+                        <button type="button" onClick={() => { markConsultationStatus(appointment, 'completed'); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
+                          Mark Completed
+                        </button>
+                      )}
+                      {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
+                        <button type="button" onClick={() => { markConsultationStatus(appointment, 'no_show'); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50">
+                          Mark No-show
+                        </button>
+                      )}
+                      {['completed', 'no_show'].includes(appointment.status) && (
+                        <div className="px-4 py-2.5 text-xs font-semibold text-slate-400">
+                          {appointment.status === 'completed' ? '✓ Completed' : '✗ No-show'} — no status changes
+                        </div>
+                      )}
+                      {canUseRepActions && (
+                        <button type="button" onClick={() => { updateInternalNotesFromAgenda(appointment); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-50">
+                          Update Internal Notes
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button type="button" onClick={() => { openReschedule(appointment); setOpenAgendaMenu(null); }}
+                          className="flex w-full items-center gap-2 rounded-b-[0.5rem] px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                          Reschedule
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </article>
+        )}
+      </div>
     );
   };
 
