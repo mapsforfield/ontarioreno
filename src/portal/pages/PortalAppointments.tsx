@@ -379,24 +379,28 @@ function getStatusClasses(status: AppointmentStatus) {
 }
 
 function getStageSolidClasses(stage: ConsultationStage, status?: AppointmentStatus) {
-  let bg = 'bg-[#32639b]'; // default: consultation_scheduled blue
-  if (status === 'no_show') bg = 'bg-red-400';
-  else if (status === 'cancelled') bg = 'bg-slate-300';
-  else if (stage === 'won') bg = 'bg-emerald-500';
-  else if (stage === 'lost') bg = 'bg-red-500';
-  else if (stage === 'follow_up_required') bg = 'bg-orange-400';
-  else if (stage === 'contractor_review' || stage === 'proposal_sent' || stage === 'contractor_accepted') bg = 'bg-purple-500';
-  else if (stage === 'estimate_requested') bg = 'bg-amber-400';
-  else if (stage === 'consultation_completed') bg = 'bg-teal-500';
+  // Returns: pastel bg + matching left border stripe + dark readable text
+  type StageStyle = { card: string; time: string; name: string; sub: string; label: string };
 
-  const light = status === 'cancelled' || stage === 'estimate_requested';
-  return {
-    card: `${bg} border-transparent shadow-md hover:brightness-110`,
-    time: light ? 'text-slate-600' : 'text-white/70',
-    name: light ? 'text-slate-800' : 'text-white',
-    sub: light ? 'text-slate-600' : 'text-white/80',
-    label: light ? 'text-slate-500' : 'text-white/60',
-  };
+  const make = (bg: string, border: string): StageStyle => ({
+    card: `${bg} border border-l-[3px] ${border} hover:brightness-95 shadow-sm`,
+    time: 'text-slate-500',
+    name: 'text-slate-900',
+    sub: 'text-slate-600',
+    label: 'text-slate-500',
+  });
+
+  if (status === 'no_show')   return make('bg-red-50',      'border-red-400');
+  if (status === 'cancelled') return make('bg-slate-100',   'border-slate-400');
+  if (stage === 'won')        return make('bg-emerald-50',  'border-emerald-500');
+  if (stage === 'lost')       return make('bg-red-50',      'border-red-500');
+  if (stage === 'follow_up_required') return make('bg-orange-50', 'border-orange-400');
+  if (stage === 'contractor_review' || stage === 'proposal_sent' || stage === 'contractor_accepted')
+                              return make('bg-purple-50',   'border-purple-500');
+  if (stage === 'estimate_requested') return make('bg-amber-50', 'border-amber-400');
+  if (stage === 'consultation_completed') return make('bg-teal-50', 'border-teal-500');
+  // consultation_scheduled (default)
+  return make('bg-blue-50', 'border-[#32639b]');
 }
 
 function AppointmentPill({
@@ -439,7 +443,7 @@ function AppointmentPill({
         {formatConsultationStage(appointment.consultationStage)}
       </p>
       {outcomeBadge && (
-        <p className="mt-1 w-fit rounded-full bg-white/25 px-2 py-0.5 text-[0.6rem] font-black text-white">
+        <p className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[0.6rem] font-black ${outcomeBadge.className}`}>
           {outcomeBadge.label}
         </p>
       )}
