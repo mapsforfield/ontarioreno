@@ -423,7 +423,7 @@ function AppointmentPill({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-[0.5rem] border px-2.5 py-2 text-left transition ${solid.card}`}
+      className={`w-full rounded-xl border px-3.5 py-3 text-left transition ${solid.card}`}
     >
       <p className={`truncate text-[0.68rem] font-black uppercase ${solid.time}`}>
         {appointment.appointmentTime || 'Time TBD'}
@@ -439,7 +439,7 @@ function AppointmentPill({
           {contractorName}
         </p>
       )}
-      <p className={`mt-1 truncate text-[0.65rem] font-black uppercase ${solid.label}`}>
+      <p className={`mt-1.5 truncate text-[0.65rem] font-black uppercase tracking-wide ${solid.label}`}>
         {formatConsultationStage(appointment.consultationStage)}
       </p>
       {outcomeBadge && (
@@ -1782,7 +1782,7 @@ export default function PortalAppointments() {
             </span>
           )}
         </div>
-        <div className={`${compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}`}>
+        <div className={`${compact ? 'mt-2 space-y-2' : 'mt-3 space-y-2.5'}`}>
           {appointments.slice(0, compact ? 3 : 6).map((appointment) => (
             <span key={appointment.id} onClick={(e) => e.stopPropagation()}>
               <AppointmentPill
@@ -2708,7 +2708,7 @@ export default function PortalAppointments() {
           </div>
         )}
         {calendarView === 'day' && (
-          <div className="mt-4 hidden space-y-3 sm:block">
+          <div className="mt-4 hidden space-y-4 sm:block">
             {currentDayAppointments.length > 0 ? (
               currentDayAppointments.map((appointment) => (
                 <AppointmentPill
