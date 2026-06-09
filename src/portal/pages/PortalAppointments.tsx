@@ -418,7 +418,7 @@ function AppointmentPill({
       <button
         type="button"
         onClick={onClick}
-        className={`w-full rounded-lg ${bg} px-2 py-1.5 text-left shadow-md ring-1 ring-black/10 transition hover:brightness-110 active:brightness-90`}
+        className={`w-full rounded-lg ${bg} px-2 py-1 text-left shadow-sm ring-1 ring-black/10 transition hover:brightness-110 active:brightness-90`}
       >
         <p className={`truncate text-[0.6rem] font-bold ${lightText ? 'text-white/70' : 'text-slate-600'}`}>
           {time}
@@ -1799,7 +1799,7 @@ export default function PortalAppointments() {
             </span>
           )}
         </div>
-        <div className={`${compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}`}>
+        <div className={`${compact ? 'mt-2 space-y-2.5' : 'mt-3 space-y-3'}`}>
           {appointments.slice(0, compact ? 3 : 6).map((appointment) => (
             <span key={appointment.id} onClick={(e) => e.stopPropagation()}>
               <AppointmentPill
