@@ -307,7 +307,22 @@ function sourceLabel(source: Appointment['source']) {
   return source === 'google_calendar' ? 'Google Calendar' : 'Manual';
 }
 
-function getMobileDotColor(status: AppointmentStatus): string {
+// Stage-based dot color — used on calendar pills and month dots
+function getStageDotColor(stage: ConsultationStage, status?: AppointmentStatus): string {
+  if (status === 'no_show') return 'bg-red-400';
+  if (status === 'cancelled') return 'bg-slate-300';
+  if (stage === 'won') return 'bg-emerald-500';
+  if (stage === 'lost') return 'bg-red-500';
+  if (stage === 'follow_up_required') return 'bg-orange-400';
+  if (stage === 'contractor_review' || stage === 'proposal_sent' || stage === 'contractor_accepted') return 'bg-purple-500';
+  if (stage === 'estimate_requested') return 'bg-amber-400';
+  if (stage === 'consultation_completed') return 'bg-teal-500';
+  if (stage === 'consultation_scheduled') return 'bg-[#32639b]';
+  return 'bg-slate-400';
+}
+
+function getMobileDotColor(status: AppointmentStatus, stage?: ConsultationStage): string {
+  if (stage) return getStageDotColor(stage, status);
   if (status === 'completed') return 'bg-emerald-500';
   if (status === 'confirmed') return 'bg-sky-500';
   if (status === 'rescheduled') return 'bg-amber-500';
@@ -377,6 +392,7 @@ function AppointmentPill({
   onClick: () => void;
 }) {
   const statusClasses = getStatusClasses(appointment.status);
+  const stageDot = getStageDotColor(appointment.consultationStage, appointment.status);
   const outcomeBadge = getOutcomeBadge(appointment);
 
   return (
@@ -386,7 +402,7 @@ function AppointmentPill({
       className={`w-full rounded-[0.5rem] border px-2.5 py-2 text-left shadow-sm transition ${statusClasses.card}`}
     >
       <div className="flex items-start gap-2">
-        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${statusClasses.dot}`} />
+        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${stageDot}`} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[0.68rem] font-black uppercase text-slate-500">
             {appointment.appointmentTime || 'Time TBD'}
@@ -504,6 +520,9 @@ export default function PortalAppointments() {
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   // Which agenda card's "•••" dropdown is open (keyed by appointment.id)
   const [openAgendaMenu, setOpenAgendaMenu] = useState<string | null>(null);
+  // Which appointment is currently sending a reminder (keyed by id)
+  const [reminderSending, setReminderSending] = useState<string | null>(null);
+  const [reminderMessage, setReminderMessage] = useState<{ id: string; text: string } | null>(null);
   // Which today's agenda rows are expanded (desktop compact view)
   const [expandedAgendaRows, setExpandedAgendaRows] = useState<Set<string>>(new Set());
 
@@ -1040,6 +1059,39 @@ export default function PortalAppointments() {
     closePanel();
   };
 
+  const handleSendReminder = async (appointment: Appointment) => {
+    if (reminderSending) return;
+    if (!appointment.email) {
+      setReminderMessage({ id: appointment.id, text: 'No email address on file for this client.' });
+      return;
+    }
+    setReminderSending(appointment.id);
+    setReminderMessage(null);
+    const preview = generateConsultationEmailPreview('booking_confirmation', {
+      appointment,
+      contractor: appointment.contractorId ? contractors.find((c) => c.id === appointment.contractorId) : undefined,
+      deal: appointment.dealId ? getDeal(appointment.dealId) : undefined,
+      rep: appointment.assignedRepId ? users.find((u) => u.id === appointment.assignedRepId) : undefined,
+    });
+    const result = await sendEmail(preview, {
+      subjectOverride: `Reminder: ${preview.subject}`,
+    });
+    setReminderSending(null);
+    if (result.ok) {
+      setReminderMessage({ id: appointment.id, text: `Reminder sent to ${appointment.email}` });
+      logActivity({
+        actionLabel: `Reminder sent to ${appointment.customerName || appointment.email}`,
+        actionType: 'email_sent',
+        entityId: appointment.id,
+        entityLabel: appointment.customerName || appointment.title || 'Consultation',
+        entityType: 'appointment',
+        metadata: { recipient: appointment.email, templateType: 'booking_confirmation' },
+      }, currentUser);
+    } else {
+      setReminderMessage({ id: appointment.id, text: 'error' in result ? `Failed: ${result.error}` : 'Failed to send reminder.' });
+    }
+  };
+
   const markConsultationStatus = (
     appointment: Appointment,
     status: AppointmentStatus
@@ -1437,6 +1489,7 @@ export default function PortalAppointments() {
   ) => {
     const deal = getDeal(appointment.dealId);
     const statusClasses = getStatusClasses(appointment.status);
+    const stageDot = getStageDotColor(appointment.consultationStage, appointment.status);
     const outcomeBadge = getOutcomeBadge(appointment);
     const attentionReasons = getAttentionReasons(appointment);
     const canUseRepActions =
@@ -1463,7 +1516,7 @@ export default function PortalAppointments() {
           onClick={toggleRow}
           className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50/80 rounded-[0.5rem]"
         >
-          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusClasses.dot}`} />
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageDot}`} />
           <span className="w-[4.5rem] shrink-0 text-sm font-black tabular-nums text-[#32639b]">
             {appointment.appointmentTime || 'TBD'}
           </span>
@@ -1545,6 +1598,20 @@ export default function PortalAppointments() {
               >
                 Open Details
               </button>
+              {/* Send Reminder */}
+              <button
+                type="button"
+                onClick={() => handleSendReminder(appointment)}
+                disabled={reminderSending === appointment.id}
+                className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:opacity-60"
+              >
+                {reminderSending === appointment.id ? 'Sending…' : 'Send Reminder'}
+              </button>
+              {reminderMessage?.id === appointment.id && (
+                <span className={`text-xs font-semibold ${reminderMessage.text.startsWith('Reminder sent') ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {reminderMessage.text}
+                </span>
+              )}
               {!appointment.dealId ? (
                 <button
                   type="button"
@@ -2114,7 +2181,7 @@ export default function PortalAppointments() {
                       </span>
                       <div className="mt-0.5 flex h-2 items-center justify-center gap-px">
                         {dayApts.slice(0, 3).map((apt, idx) => (
-                          <span key={idx} className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status)}`} />
+                          <span key={idx} className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status, apt.consultationStage)}`} />
                         ))}
                         {dayApts.length > 3 && <span className="h-1 w-1 rounded-full bg-slate-300" />}
                       </div>
@@ -2755,7 +2822,7 @@ export default function PortalAppointments() {
                     {dayApts.slice(0, 3).map((apt, idx) => (
                       <span
                         key={idx}
-                        className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status)}`}
+                        className={`h-1.5 w-1.5 rounded-full ${getMobileDotColor(apt.status, apt.consultationStage)}`}
                       />
                     ))}
                     {dayApts.length > 3 && (
@@ -2869,6 +2936,7 @@ export default function PortalAppointments() {
               {visibleAppointments.slice(0, 20).map((appointment) => {
                 const deal = getDeal(appointment.dealId);
                 const statusClasses = getStatusClasses(appointment.status);
+                const schedStageDot = getStageDotColor(appointment.consultationStage, appointment.status);
                 const outcomeBadge = getOutcomeBadge(appointment);
                 const isRowExpanded = expandedAgendaRows.has(`sched-${appointment.id}`);
                 const toggleRow = () =>
@@ -2888,7 +2956,7 @@ export default function PortalAppointments() {
                       onClick={toggleRow}
                       className="flex w-full items-center gap-3 px-2 py-3 text-left transition hover:bg-slate-50/80"
                     >
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusClasses.dot}`} />
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${schedStageDot}`} />
                       <span className="w-[6.5rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
                         {appointment.appointmentDate}
                         {appointment.appointmentTime ? ` · ${appointment.appointmentTime}` : ''}
