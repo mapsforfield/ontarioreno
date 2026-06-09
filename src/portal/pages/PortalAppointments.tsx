@@ -1688,10 +1688,31 @@ export default function PortalAppointments() {
               + New consultation
             </p>
           )}
+          {!compact && appointments.length > 6 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCursorDate(date);
+                setCalendarView('day');
+              }}
+              className="text-xs font-bold text-[#1B3C6C] hover:underline"
+            >
+              +{appointments.length - 6} more
+            </button>
+          )}
           {compact && appointments.length > 3 && (
-            <p className="text-xs font-bold text-slate-500">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCursorDate(date);
+                setCalendarView('day');
+              }}
+              className="text-xs font-bold text-[#1B3C6C] hover:underline"
+            >
               +{appointments.length - 3} more
-            </p>
+            </button>
           )}
         </div>
       </article>
