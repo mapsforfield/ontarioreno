@@ -529,6 +529,7 @@ export default function PortalAppointments() {
     users,
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
+  const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
   const [cursorDate, setCursorDate] = useState(new Date());
   const [selectedAppointmentId, setSelectedAppointmentId] =
     useState<string | null>(null);
@@ -650,6 +651,11 @@ export default function PortalAppointments() {
   const filteredAppointments = visibleAppointments.filter(
     matchesConsultationFilter
   );
+  // Calendar-specific rep filter (admin only)
+  const calendarAppointments =
+    isAdmin && calendarRepFilter !== 'all'
+      ? filteredAppointments.filter((a) => a.assignedRepId === calendarRepFilter)
+      : filteredAppointments;
   const selectedAppointment = visibleAppointments.find(
     (appointment) => appointment.id === selectedAppointmentId
   );
@@ -717,7 +723,7 @@ export default function PortalAppointments() {
     date.setDate(weekStart.getDate() + index);
     return date;
   });
-  const currentDayAppointments = filteredAppointments.filter(
+  const currentDayAppointments = calendarAppointments.filter(
     (appointment) => appointment.appointmentDate === toDateKey(cursorDate)
   );
 
@@ -1764,7 +1770,7 @@ export default function PortalAppointments() {
 
   const renderDayColumn = (date: Date, compact = false) => {
     const dateKey = toDateKey(date);
-    const appointments = filteredAppointments.filter(
+    const appointments = calendarAppointments.filter(
       (appointment) => appointment.appointmentDate === dateKey
     );
     const isOutsideMonth = date.getMonth() !== cursorDate.getMonth();
@@ -2199,7 +2205,7 @@ export default function PortalAppointments() {
                   const isThisMonth = date.getMonth() === cursorDate.getMonth();
                   const isToday = dateKey === today;
                   const isSelected = dateKey === toDateKey(cursorDate);
-                  const dayApts = filteredAppointments.filter((a) => a.appointmentDate === dateKey);
+                  const dayApts = calendarAppointments.filter((a) => a.appointmentDate === dateKey);
                   return (
                     <button
                       key={dateKey}
@@ -2670,6 +2676,19 @@ export default function PortalAppointments() {
             </h2>
           </div>
           <div className="hidden flex-wrap items-center gap-2 sm:flex">
+            {/* Rep filter — admin only */}
+            {isAdmin && (
+              <select
+                value={calendarRepFilter}
+                onChange={(e) => setCalendarRepFilter(e.target.value)}
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#b8c9dd] focus:outline-none focus:ring-2 focus:ring-[#32639b]/30"
+              >
+                <option value="all">All reps</option>
+                {activeReps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>{rep.name}</option>
+                ))}
+              </select>
+            )}
             {(['month', 'week', 'day'] as CalendarView[]).map((view) => (
               <button
                 key={view}
