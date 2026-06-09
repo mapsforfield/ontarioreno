@@ -378,29 +378,18 @@ function getStatusClasses(status: AppointmentStatus) {
   };
 }
 
-function getStageSolidClasses(stage: ConsultationStage, status?: AppointmentStatus) {
-  // Returns: pastel bg + matching left border stripe + dark readable text
-  type StageStyle = { card: string; time: string; name: string; sub: string; label: string };
-
-  const make = (bg: string, border: string): StageStyle => ({
-    card: `${bg} border border-l-[3px] ${border} hover:brightness-95 shadow-sm`,
-    time: 'text-slate-500',
-    name: 'text-slate-900',
-    sub: 'text-slate-600',
-    label: 'text-slate-500',
-  });
-
-  if (status === 'no_show')   return make('bg-red-50',      'border-red-400');
-  if (status === 'cancelled') return make('bg-slate-100',   'border-slate-400');
-  if (stage === 'won')        return make('bg-emerald-50',  'border-emerald-500');
-  if (stage === 'lost')       return make('bg-red-50',      'border-red-500');
-  if (stage === 'follow_up_required') return make('bg-orange-50', 'border-orange-400');
+/** Returns a solid Tailwind bg class + whether text on it should be light or dark */
+function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus): { bg: string; lightText: boolean } {
+  if (status === 'no_show')   return { bg: 'bg-red-400',      lightText: true };
+  if (status === 'cancelled') return { bg: 'bg-slate-300',    lightText: false };
+  if (stage === 'won')        return { bg: 'bg-emerald-500',  lightText: true };
+  if (stage === 'lost')       return { bg: 'bg-red-500',      lightText: true };
+  if (stage === 'follow_up_required') return { bg: 'bg-orange-400', lightText: true };
   if (stage === 'contractor_review' || stage === 'proposal_sent' || stage === 'contractor_accepted')
-                              return make('bg-purple-50',   'border-purple-500');
-  if (stage === 'estimate_requested') return make('bg-amber-50', 'border-amber-400');
-  if (stage === 'consultation_completed') return make('bg-teal-50', 'border-teal-500');
-  // consultation_scheduled (default)
-  return make('bg-blue-50', 'border-[#32639b]');
+                              return { bg: 'bg-purple-500',   lightText: true };
+  if (stage === 'estimate_requested') return { bg: 'bg-amber-400', lightText: false };
+  if (stage === 'consultation_completed') return { bg: 'bg-teal-500', lightText: true };
+  return { bg: 'bg-[#32639b]', lightText: true }; // consultation_scheduled
 }
 
 function AppointmentPill({
@@ -409,44 +398,72 @@ function AppointmentPill({
   projectType,
   repName,
   onClick,
+  variant = 'compact',
 }: {
   appointment: Appointment;
   contractorName: string;
   projectType: string;
   repName: string;
   onClick: () => void;
+  variant?: 'compact' | 'full';
 }) {
-  const solid = getStageSolidClasses(appointment.consultationStage, appointment.status);
+  const { bg, lightText } = getStagePillBg(appointment.consultationStage, appointment.status);
   const outcomeBadge = getOutcomeBadge(appointment);
+  const name = appointment.customerName || appointment.title || 'Consultation';
+  const time = appointment.appointmentTime || 'TBD';
 
+  // ── Month / Week: compact solid-color pill (Google Calendar style) ──────────
+  if (variant === 'compact') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`w-full rounded-lg ${bg} px-2 py-1.5 text-left transition hover:brightness-110 active:brightness-90`}
+      >
+        <p className={`truncate text-[0.6rem] font-bold ${lightText ? 'text-white/70' : 'text-slate-600'}`}>
+          {time}
+        </p>
+        <p className={`truncate text-[0.7rem] font-black leading-tight ${lightText ? 'text-white' : 'text-slate-800'}`}>
+          {name}
+        </p>
+        <p className={`truncate text-[0.6rem] font-medium ${lightText ? 'text-white/60' : 'text-slate-500'}`}>
+          {projectType || 'Project TBD'} · {repName}
+        </p>
+      </button>
+    );
+  }
+
+  // ── Day/List: split-panel card — colored time column + white detail area ────
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl border px-3.5 py-3 text-left transition ${solid.card}`}
+      className="group w-full overflow-hidden rounded-xl border border-slate-100 bg-white text-left shadow-sm transition hover:shadow-md hover:-translate-y-px"
     >
-      <p className={`truncate text-[0.68rem] font-black uppercase ${solid.time}`}>
-        {appointment.appointmentTime || 'Time TBD'}
-      </p>
-      <p className={`truncate text-xs font-black ${solid.name}`}>
-        {appointment.customerName || appointment.title || 'Consultation'}
-      </p>
-      <p className={`mt-0.5 truncate text-[0.68rem] font-semibold ${solid.sub}`}>
-        {projectType || 'Project type TBD'} / {repName}
-      </p>
-      {contractorName && (
-        <p className={`mt-0.5 truncate text-[0.68rem] font-semibold ${solid.sub}`}>
-          {contractorName}
-        </p>
-      )}
-      <p className={`mt-1.5 truncate text-[0.65rem] font-black uppercase tracking-wide ${solid.label}`}>
-        {formatConsultationStage(appointment.consultationStage)}
-      </p>
-      {outcomeBadge && (
-        <p className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[0.6rem] font-black ${outcomeBadge.className}`}>
-          {outcomeBadge.label}
-        </p>
-      )}
+      <div className="flex items-stretch">
+        {/* Colored time panel */}
+        <div className={`${bg} flex min-w-[72px] flex-col items-center justify-center px-3 py-4`}>
+          <span className={`text-sm font-black tabular-nums leading-none ${lightText ? 'text-white' : 'text-slate-700'}`}>
+            {time}
+          </span>
+        </div>
+        {/* White detail panel */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-3">
+          <p className="truncate text-sm font-black text-slate-900">{name}</p>
+          <p className="truncate text-xs text-slate-500">
+            {projectType || 'Project type TBD'} · {repName}
+            {contractorName ? ` · ${contractorName}` : ''}
+          </p>
+          <p className="mt-1 truncate text-[0.65rem] font-bold uppercase tracking-widest text-slate-400">
+            {formatConsultationStage(appointment.consultationStage)}
+          </p>
+          {outcomeBadge && (
+            <p className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[0.6rem] font-black ${outcomeBadge.className}`}>
+              {outcomeBadge.label}
+            </p>
+          )}
+        </div>
+      </div>
     </button>
   );
 }
@@ -2722,6 +2739,7 @@ export default function PortalAppointments() {
                   projectType={getAppointmentProjectType(appointment)}
                   repName={getRepName(appointment.assignedRepId)}
                   onClick={() => openAppointment(appointment)}
+                  variant="full"
                 />
               ))
             ) : (
