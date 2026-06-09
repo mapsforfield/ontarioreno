@@ -378,6 +378,27 @@ function getStatusClasses(status: AppointmentStatus) {
   };
 }
 
+function getStageSolidClasses(stage: ConsultationStage, status?: AppointmentStatus) {
+  let bg = 'bg-[#32639b]'; // default: consultation_scheduled blue
+  if (status === 'no_show') bg = 'bg-red-400';
+  else if (status === 'cancelled') bg = 'bg-slate-300';
+  else if (stage === 'won') bg = 'bg-emerald-500';
+  else if (stage === 'lost') bg = 'bg-red-500';
+  else if (stage === 'follow_up_required') bg = 'bg-orange-400';
+  else if (stage === 'contractor_review' || stage === 'proposal_sent' || stage === 'contractor_accepted') bg = 'bg-purple-500';
+  else if (stage === 'estimate_requested') bg = 'bg-amber-400';
+  else if (stage === 'consultation_completed') bg = 'bg-teal-500';
+
+  const light = status === 'cancelled' || stage === 'estimate_requested';
+  return {
+    card: `${bg} border-transparent shadow-md hover:brightness-110`,
+    time: light ? 'text-slate-600' : 'text-white/70',
+    name: light ? 'text-slate-800' : 'text-white',
+    sub: light ? 'text-slate-600' : 'text-white/80',
+    label: light ? 'text-slate-500' : 'text-white/60',
+  };
+}
+
 function AppointmentPill({
   appointment,
   contractorName,
@@ -391,43 +412,37 @@ function AppointmentPill({
   repName: string;
   onClick: () => void;
 }) {
-  const statusClasses = getStatusClasses(appointment.status);
-  const stageDot = getStageDotColor(appointment.consultationStage, appointment.status);
+  const solid = getStageSolidClasses(appointment.consultationStage, appointment.status);
   const outcomeBadge = getOutcomeBadge(appointment);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-[0.5rem] border px-2.5 py-2 text-left shadow-sm transition ${statusClasses.card}`}
+      className={`w-full rounded-[0.5rem] border px-2.5 py-2 text-left transition ${solid.card}`}
     >
-      <div className="flex items-start gap-2">
-        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${stageDot}`} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[0.68rem] font-black uppercase text-slate-500">
-            {appointment.appointmentTime || 'Time TBD'}
-          </p>
-          <p className="truncate text-xs font-black text-slate-950">
-            {appointment.customerName || appointment.title || 'Consultation'}
-          </p>
-          <p className="mt-0.5 truncate text-[0.68rem] font-semibold text-slate-600">
-            {projectType || 'Project type TBD'} / {repName}
-          </p>
-          {contractorName && (
-            <p className="mt-0.5 truncate text-[0.68rem] font-semibold text-slate-500">
-              {contractorName}
-            </p>
-          )}
-          <p className="mt-1 truncate text-[0.65rem] font-black uppercase text-[#32639b]">
-            {formatConsultationStage(appointment.consultationStage)}
-          </p>
-          {outcomeBadge && (
-            <p className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[0.6rem] font-black ${outcomeBadge.className}`}>
-              {outcomeBadge.label}
-            </p>
-          )}
-        </div>
-      </div>
+      <p className={`truncate text-[0.68rem] font-black uppercase ${solid.time}`}>
+        {appointment.appointmentTime || 'Time TBD'}
+      </p>
+      <p className={`truncate text-xs font-black ${solid.name}`}>
+        {appointment.customerName || appointment.title || 'Consultation'}
+      </p>
+      <p className={`mt-0.5 truncate text-[0.68rem] font-semibold ${solid.sub}`}>
+        {projectType || 'Project type TBD'} / {repName}
+      </p>
+      {contractorName && (
+        <p className={`mt-0.5 truncate text-[0.68rem] font-semibold ${solid.sub}`}>
+          {contractorName}
+        </p>
+      )}
+      <p className={`mt-1 truncate text-[0.65rem] font-black uppercase ${solid.label}`}>
+        {formatConsultationStage(appointment.consultationStage)}
+      </p>
+      {outcomeBadge && (
+        <p className="mt-1 w-fit rounded-full bg-white/25 px-2 py-0.5 text-[0.6rem] font-black text-white">
+          {outcomeBadge.label}
+        </p>
+      )}
     </button>
   );
 }
