@@ -1,4 +1,4 @@
-import { Archive, ChevronRight, Plus, Trash2, X } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
@@ -86,11 +86,13 @@ type RowProps = {
   row: SaleTrackerRow;
   onSave: (id: string, updates: Partial<SaleTrackerRow>) => void;
   onDelete: (id: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   showRepName: boolean;
   repName: string;
 };
 
-function TrackerRow({ row, onSave, onDelete, showRepName, repName }: RowProps) {
+function TrackerRow({ row, onSave, onDelete, onMoveUp, onMoveDown, showRepName, repName }: RowProps) {
   const [local, setLocal] = useState<SaleTrackerRow>(row);
   const dirty = useRef<Partial<SaleTrackerRow>>({});
 
@@ -112,6 +114,29 @@ function TrackerRow({ row, onSave, onDelete, showRepName, repName }: RowProps) {
       'group border-b border-slate-100 hover:bg-slate-50/60 transition-colors',
       local.onHold && 'bg-amber-50/40'
     )}>
+      {/* ↑↓ reorder buttons */}
+      <td className="border-r border-slate-100 w-7 text-center">
+        <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={!onMoveUp}
+            className="p-0.5 text-slate-300 hover:text-[#1B3C6C] disabled:opacity-0 disabled:pointer-events-none transition"
+            aria-label="Move up"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={!onMoveDown}
+            className="p-0.5 text-slate-300 hover:text-[#1B3C6C] disabled:opacity-0 disabled:pointer-events-none transition"
+            aria-label="Move down"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
+      </td>
       {showRepName && (
         <td className={cls(td, 'px-2 text-xs font-semibold text-slate-500 whitespace-nowrap w-[90px]')}>
           {repName}
@@ -391,7 +416,7 @@ function EditSheet({ row, onSave, onDelete, onClose }: EditSheetProps) {
 
 // ── Mobile card ───────────────────────────────────────────────────────────────
 
-function MobileCard({ row, onTap }: { row: SaleTrackerRow; onTap: () => void }) {
+function MobileCard({ row, onTap, onMoveUp, onMoveDown }: { row: SaleTrackerRow; onTap: () => void; onMoveUp?: () => void; onMoveDown?: () => void }) {
   const badge = row.fundedStatus ? fundedBadge[row.fundedStatus] : '';
 
   return (
@@ -450,7 +475,26 @@ function MobileCard({ row, onTap }: { row: SaleTrackerRow; onTap: () => void }) 
               Owes {formatCurrency(row.amountLeftToPay)}
             </span>
           )}
-          <ChevronRight className="h-4 w-4 text-slate-300 mt-0.5" />
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+              disabled={!onMoveUp}
+              className="p-1 text-slate-300 hover:text-[#1B3C6C] disabled:opacity-30 transition"
+              aria-label="Move up"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+              disabled={!onMoveDown}
+              className="p-1 text-slate-300 hover:text-[#1B3C6C] disabled:opacity-30 transition"
+              aria-label="Move down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </button>
@@ -491,6 +535,17 @@ export default function PortalSalesTracker() {
 
   const handleSave = (id: string, updates: Partial<SaleTrackerRow>) => {
     void updateTrackerRow(id, updates);
+  };
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= filteredRows.length) return;
+    const a = filteredRows[index];
+    const b = filteredRows[swapIndex];
+    const aOrder = a.sortOrder || index;
+    const bOrder = b.sortOrder || swapIndex;
+    void updateTrackerRow(a.id, { sortOrder: bOrder });
+    void updateTrackerRow(b.id, { sortOrder: aOrder });
   };
 
   const handleDelete = (id: string) => {
@@ -602,6 +657,7 @@ export default function PortalSalesTracker() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="border-b-2 border-slate-200">
               <tr>
+                <th className="w-7 bg-slate-50 border-r border-slate-200" />
                 {isAdmin && <th className={thCls}>Rep</th>}
                 <th className={cls(thCls, 'min-w-[150px]')}>Client Name</th>
                 <th className={cls(thCls, 'text-right min-w-[110px]')}>Project Total</th>
@@ -628,12 +684,14 @@ export default function PortalSalesTracker() {
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => (
+                filteredRows.map((row, index) => (
                   <TrackerRow
                     key={row.id}
                     row={row}
                     onSave={handleSave}
                     onDelete={handleDelete}
+                    onMoveUp={index > 0 ? () => handleMove(index, 'up') : undefined}
+                    onMoveDown={index < filteredRows.length - 1 ? () => handleMove(index, 'down') : undefined}
                     showRepName={isAdmin}
                     repName={getRepName(row.repId)}
                   />
@@ -675,11 +733,13 @@ export default function PortalSalesTracker() {
             )}
           </div>
         ) : (
-          filteredRows.map((row) => (
+          filteredRows.map((row, index) => (
             <MobileCard
               key={row.id}
               row={row}
               onTap={() => setEditingRow(row)}
+              onMoveUp={index > 0 ? () => handleMove(index, 'up') : undefined}
+              onMoveDown={index < filteredRows.length - 1 ? () => handleMove(index, 'down') : undefined}
             />
           ))
         )}
