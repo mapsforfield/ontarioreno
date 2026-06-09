@@ -1,9 +1,11 @@
 import {
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   MapPin,
+  MoreVertical,
   Paperclip,
   Plus,
   Send,
@@ -500,6 +502,8 @@ export default function PortalAppointments() {
   // Client search/autofill for new consultation form
   const [clientSearch, setClientSearch] = useState('');
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  // Which agenda card's "•••" dropdown is open (keyed by appointment.id)
+  const [openAgendaMenu, setOpenAgendaMenu] = useState<string | null>(null);
 
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
@@ -1511,7 +1515,9 @@ export default function PortalAppointments() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        {/* Action row: primary buttons + "•••" overflow menu (desktop only) */}
+        <div className="mt-4 flex items-center gap-2">
+          {/* Primary: Open Details */}
           <button
             type="button"
             onClick={() => openAppointment(appointment)}
@@ -1519,20 +1525,17 @@ export default function PortalAppointments() {
           >
             Open Details
           </button>
-          {/* Extra action buttons — desktop only */}
+          {/* Primary: Create Deal / View Deal (desktop only) */}
           <div className="hidden lg:contents">
-            {!appointment.dealId && (
+            {!appointment.dealId ? (
               <button
                 type="button"
-                onClick={() => {
-                  createDealFromAppointment(appointment.id, currentUser);
-                }}
+                onClick={() => createDealFromAppointment(appointment.id, currentUser)}
                 className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
               >
                 Create Deal
               </button>
-            )}
-            {appointment.dealId && (
+            ) : (
               <button
                 type="button"
                 onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
@@ -1541,57 +1544,85 @@ export default function PortalAppointments() {
                 View Deal
               </button>
             )}
-            {isAdmin && (
-              <>
+            {/* "•••" overflow menu for secondary actions */}
+            {(isAdmin || canUseRepActions) && (
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => openAppointment(appointment)}
-                  className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setOpenAgendaMenu((prev) => prev === appointment.id ? null : appointment.id)}
+                  className="flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                  aria-label="More actions"
                 >
-                  Edit Consultation
+                  More
+                  <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => markConsultationStatus(appointment, 'confirmed')}
-                  className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 transition hover:bg-sky-100"
-                >
-                  Mark Confirmed
-                </button>
-              </>
-            )}
-            {canUseRepActions && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => markConsultationStatus(appointment, 'completed')}
-                  className="rounded-[0.5rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
-                >
-                  Mark Completed
-                </button>
-                <button
-                  type="button"
-                  onClick={() => markConsultationStatus(appointment, 'no_show')}
-                  className="rounded-[0.5rem] border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800 transition hover:bg-orange-100"
-                >
-                  Mark No-show
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateInternalNotesFromAgenda(appointment)}
-                  className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
-                >
-                  Update Internal Notes
-                </button>
-              </>
-            )}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => openReschedule(appointment)}
-                className="rounded-[0.5rem] border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-              >
-                Reschedule
-              </button>
+                {openAgendaMenu === appointment.id && (
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1.5 min-w-[13rem] rounded-[0.5rem] border border-slate-200 bg-white shadow-xl"
+                    onMouseLeave={() => setOpenAgendaMenu(null)}
+                  >
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => { openAppointment(appointment); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 first:rounded-t-[0.5rem]"
+                      >
+                        Edit Consultation
+                      </button>
+                    )}
+                    {isAdmin && !['completed', 'no_show'].includes(appointment.status) && (
+                      <button
+                        type="button"
+                        onClick={() => { markConsultationStatus(appointment, 'confirmed'); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-50"
+                      >
+                        Mark Confirmed
+                      </button>
+                    )}
+                    {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
+                      <button
+                        type="button"
+                        onClick={() => { markConsultationStatus(appointment, 'completed'); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+                      >
+                        Mark Completed
+                      </button>
+                    )}
+                    {canUseRepActions && !['completed', 'no_show'].includes(appointment.status) && (
+                      <button
+                        type="button"
+                        onClick={() => { markConsultationStatus(appointment, 'no_show'); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50"
+                      >
+                        Mark No-show
+                      </button>
+                    )}
+                    {['completed', 'no_show'].includes(appointment.status) && (
+                      <div className="px-4 py-2.5 text-xs font-semibold text-slate-400">
+                        {appointment.status === 'completed' ? '✓ Completed' : '✗ No-show'} — no status changes
+                      </div>
+                    )}
+                    {canUseRepActions && (
+                      <button
+                        type="button"
+                        onClick={() => { updateInternalNotesFromAgenda(appointment); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-50"
+                      >
+                        Update Internal Notes
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => { openReschedule(appointment); setOpenAgendaMenu(null); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 last:rounded-b-[0.5rem]"
+                      >
+                        Reschedule
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2396,9 +2427,12 @@ export default function PortalAppointments() {
                                     Attention
                                   </span>
                                 )}
-                                <ChevronRight
-                                  className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 ${isRowExpanded ? 'rotate-90' : ''}`}
-                                />
+                                <span className="flex items-center gap-1 text-[0.68rem] font-bold text-slate-400">
+                                  {isRowExpanded ? 'Collapse' : 'Expand'}
+                                  <ChevronRight
+                                    className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${isRowExpanded ? 'rotate-90' : ''}`}
+                                  />
+                                </span>
                               </button>
                               {isRowExpanded && (
                                 <div className="px-2 pb-3 pt-1">
@@ -2463,7 +2497,7 @@ export default function PortalAppointments() {
                                         Mark Confirmed
                                       </button>
                                     )}
-                                    {canUseRepActions && (
+                                    {canUseRepActions && !['completed', 'no_show'].includes(apt.status) && (
                                       <>
                                         <button
                                           type="button"
@@ -2479,14 +2513,21 @@ export default function PortalAppointments() {
                                         >
                                           Mark No-show
                                         </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => updateInternalNotesFromAgenda(apt)}
-                                          className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100"
-                                        >
-                                          Update Notes
-                                        </button>
                                       </>
+                                    )}
+                                    {['completed', 'no_show'].includes(apt.status) && (
+                                      <span className="rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400">
+                                        {apt.status === 'completed' ? '✓ Completed' : '✗ No-show'}
+                                      </span>
+                                    )}
+                                    {canUseRepActions && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateInternalNotesFromAgenda(apt)}
+                                        className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100"
+                                      >
+                                        Update Notes
+                                      </button>
                                     )}
                                     {isAdmin && (
                                       <button
@@ -2842,7 +2883,7 @@ export default function PortalAppointments() {
                     className="block w-full text-left"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3 className="text-lg font-black text-slate-950">
                           {getAppointmentLabel(appointment)}
                         </h3>
@@ -2851,17 +2892,21 @@ export default function PortalAppointments() {
                           {sourceLabel(appointment.source)}
                         </p>
                       </div>
-                      <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${statusClasses.badge}`}>
-                        {formatAppointmentStatus(appointment.status)}
-                      </span>
-                      <span className="w-fit rounded-full bg-[#e8f1fb] px-3 py-1 text-xs font-black text-[#1B3C6C]">
-                        {formatConsultationStage(appointment.consultationStage)}
-                      </span>
-                      {outcomeBadge && (
-                        <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${outcomeBadge.className}`}>
-                          {outcomeBadge.label}
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {appointment.projectType && (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
+                            {appointment.projectType}
+                          </span>
+                        )}
+                        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClasses.badge}`}>
+                          {formatAppointmentStatus(appointment.status)}
                         </span>
-                      )}
+                        {outcomeBadge && (
+                          <span className={`rounded-full px-3 py-1 text-xs font-black ${outcomeBadge.className}`}>
+                            {outcomeBadge.label}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
