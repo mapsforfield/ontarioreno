@@ -2863,101 +2863,122 @@ export default function PortalAppointments() {
             Upcoming and recent consultations
           </h2>
         </div>
-        <div className="mt-4 space-y-3">
+        <div className="mt-2">
           {visibleAppointments.length > 0 ? (
-            visibleAppointments.slice(0, 20).map((appointment) => {
-              const deal = getDeal(appointment.dealId);
-              const statusClasses = getStatusClasses(appointment.status);
-              const outcomeBadge = getOutcomeBadge(appointment);
+            <div>
+              {visibleAppointments.slice(0, 20).map((appointment) => {
+                const deal = getDeal(appointment.dealId);
+                const statusClasses = getStatusClasses(appointment.status);
+                const outcomeBadge = getOutcomeBadge(appointment);
+                const isRowExpanded = expandedAgendaRows.has(`sched-${appointment.id}`);
+                const toggleRow = () =>
+                  setExpandedAgendaRows((prev) => {
+                    const next = new Set(prev);
+                    const key = `sched-${appointment.id}`;
+                    if (next.has(key)) next.delete(key);
+                    else next.add(key);
+                    return next;
+                  });
 
-              return (
-                <article
-                  key={appointment.id}
-                  className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4"
-                >
-                  <button
-                    type="button"
-                    onClick={() => openAppointment(appointment)}
-                    className="block w-full text-left"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-black text-slate-950">
-                          {getAppointmentLabel(appointment)}
-                        </h3>
-                        <p className="mt-1 text-sm font-semibold text-slate-500">
-                          {formatAppointmentType(appointment.appointmentType)} /{' '}
-                          {sourceLabel(appointment.source)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {appointment.projectType && (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
-                            {appointment.projectType}
-                          </span>
-                        )}
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClasses.badge}`}>
-                          {formatAppointmentStatus(appointment.status)}
+                return (
+                  <div key={appointment.id} className="border-b border-slate-100 last:border-b-0">
+                    {/* Compact row */}
+                    <button
+                      type="button"
+                      onClick={toggleRow}
+                      className="flex w-full items-center gap-3 px-2 py-3 text-left transition hover:bg-slate-50/80"
+                    >
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusClasses.dot}`} />
+                      <span className="w-[6.5rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
+                        {appointment.appointmentDate}
+                        {appointment.appointmentTime ? ` · ${appointment.appointmentTime}` : ''}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
+                        {getAppointmentLabel(appointment)}
+                      </span>
+                      {appointment.projectType && (
+                        <span className="hidden shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.62rem] font-bold text-slate-600 xl:block">
+                          {appointment.projectType}
                         </span>
-                        {outcomeBadge && (
-                          <span className={`rounded-full px-3 py-1 text-xs font-black ${outcomeBadge.className}`}>
-                            {outcomeBadge.label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <CalendarDays className="h-4 w-4 text-[#32639b]" />
-                        {formatAppointmentDate(appointment.appointmentDate)}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <Clock className="h-4 w-4 text-[#32639b]" />
-                        {appointment.appointmentTime || 'Time not set'}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <UserRound className="h-4 w-4 text-[#32639b]" />
+                      )}
+                      <span className="hidden shrink-0 text-xs font-semibold text-slate-400 lg:block">
                         {getRepName(appointment.assignedRepId)}
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.62rem] font-black ${statusClasses.badge}`}>
+                        {formatAppointmentStatus(appointment.status)}
+                      </span>
+                      {outcomeBadge && (
+                        <span className={`hidden shrink-0 rounded-full px-2.5 py-0.5 text-[0.62rem] font-black sm:block ${outcomeBadge.className}`}>
+                          {outcomeBadge.label}
+                        </span>
+                      )}
+                      <span className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-slate-400">
+                        {isRowExpanded ? 'Collapse' : 'Expand'}
+                        <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-150 ${isRowExpanded ? 'rotate-90' : ''}`} />
+                      </span>
+                    </button>
+
+                    {/* Expanded detail */}
+                    {isRowExpanded && (
+                      <div className="px-2 pb-4 pt-1">
+                        <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <CalendarDays className="h-4 w-4 shrink-0 text-[#32639b]" />
+                            {formatAppointmentDate(appointment.appointmentDate)}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <Clock className="h-4 w-4 shrink-0 text-[#32639b]" />
+                            {appointment.appointmentTime || 'Time not set'}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <UserRound className="h-4 w-4 shrink-0 text-[#32639b]" />
+                            {getRepName(appointment.assignedRepId)}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <MapPin className="h-4 w-4 shrink-0 text-[#32639b]" />
+                            {appointment.location || appointment.city || 'Location not set'}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openAppointment(appointment)}
+                            className="rounded-[0.5rem] border border-[#b8c9dd] bg-white px-3 py-1.5 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                          >
+                            Open Details
+                          </button>
+                          {deal ? (
+                            <>
+                              <span className="text-xs font-semibold text-slate-500">
+                                Deal: {formatDealStatus(deal.status)} / {formatCurrency(deal.estimatedJobValue)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
+                                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-1.5 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                              >
+                                View Deal
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs font-semibold text-slate-400">Not linked to a deal yet.</span>
+                              <button
+                                type="button"
+                                onClick={() => createDealFromAppointment(appointment.id, currentUser)}
+                                className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-1.5 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                              >
+                                Create Deal
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <MapPin className="h-4 w-4 text-[#32639b]" />
-                        {appointment.location || appointment.city || 'Location not set'}
-                      </div>
-                    </div>
-                  </button>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {deal ? (
-                      <>
-                        <p className="text-xs font-semibold text-slate-500">
-                          Deal status: {formatDealStatus(deal.status)} / Value:{' '}
-                          {formatCurrency(deal.estimatedJobValue)}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => navigate('/portal/deals', { state: { openDealId: appointment.dealId } })}
-                          className="rounded-full border border-[#b8c9dd] bg-[#f6faff] px-3 py-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
-                        >
-                          View Deal
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-xs font-semibold text-slate-500">
-                          Not linked to a deal yet.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => createDealFromAppointment(appointment.id, currentUser)}
-                          className="rounded-full border border-[#b8c9dd] bg-[#f6faff] px-3 py-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
-                        >
-                          Create Deal
-                        </button>
-                      </>
                     )}
                   </div>
-                </article>
-              );
-            })
+                );
+              })}
+            </div>
           ) : (
             <div className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-slate-300" />
