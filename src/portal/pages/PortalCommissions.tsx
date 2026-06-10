@@ -5,6 +5,7 @@ import {
   HandCoins,
   TrendingUp,
 } from 'lucide-react';
+import { useState } from 'react';
 import { usePortalAuth } from '../auth';
 import {
   formatCurrency,
@@ -64,10 +65,14 @@ export default function PortalCommissions() {
     commissions,
     contractors,
     deals,
+    defaultCommissionRate,
     getDealsForRep,
+    setDefaultCommissionRate,
     updateCommission,
     users,
   } = usePortalData();
+  const [rateInput, setRateInput] = useState(String(Math.round(defaultCommissionRate * 100)));
+  const [rateSaved, setRateSaved] = useState(false);
 
   if (!currentUser) return null;
 
@@ -136,10 +141,49 @@ export default function PortalCommissions() {
         </section>
 
         <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-4">
-            <h2 className="text-lg font-black tracking-[-0.01em]">
-              Commission table
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-4">
+            <h2 className="text-lg font-black tracking-[-0.01em]">Commission table</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-500">Default rate:</span>
+              <div className="relative w-28">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  className="w-full rounded-[0.5rem] border border-slate-300 py-1.5 pl-3 pr-7 text-sm font-bold focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20"
+                />
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const val = parseFloat(rateInput);
+                  if (isNaN(val) || val < 0 || val > 100) return;
+                  const rate = val / 100;
+                  setDefaultCommissionRate(rate);
+                  // Update every commission row to the new rate
+                  visibleCommissions.forEach((c) => {
+                    const deal = getDeal(c.dealId);
+                    if (!deal) return;
+                    const newTotal = Math.round(deal.estimatedJobValue * rate);
+                    const repEst = Math.round(deal.estimatedJobValue * 0.05);
+                    updateCommission(c.id, {
+                      adminTotalCommissionRate: rate,
+                      adminTotalEstimatedCommission: newTotal,
+                    }, currentUser ?? undefined);
+                  });
+                  setRateSaved(true);
+                  setTimeout(() => setRateSaved(false), 3000);
+                }}
+                className="rounded-[0.5rem] bg-[#1B3C6C] px-3 py-1.5 text-sm font-bold text-white transition hover:bg-[#153158]"
+              >
+                Apply to All
+              </button>
+              {rateSaved && <span className="text-sm font-bold text-green-600">Saved!</span>}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-[76rem] w-full text-left text-sm">
