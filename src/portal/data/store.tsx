@@ -1150,6 +1150,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       updateDeal: (dealId, updates, actor) => {
         let clientIdForNotesSync: string | null = null;
+        let linkedAppointmentIdForNotes: string | null = null;
 
         setState((current) => {
           const previousDeal = current.deals.find((d) => d.id === dealId);
@@ -1159,11 +1160,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : d
           );
 
-          // Sync notes to the matching client record
-          if (updates.notes !== undefined && previousDeal?.email) {
-            const matchingClient = current.clients.find((c) => c.email === previousDeal.email);
+          if (updates.notes !== undefined) {
+            // Sync to linked appointment's internalNotes
+            const linkedApt = current.appointments.find((a) => a.dealId === dealId);
+            if (linkedApt) linkedAppointmentIdForNotes = linkedApt.id;
+
+            // Sync to client — match by email (deal or appointment) or homeowner name
+            const emailToMatch = previousDeal?.email || linkedApt?.email;
+            const matchingClient = emailToMatch
+              ? current.clients.find((c) => c.email === emailToMatch)
+              : current.clients.find((c) => c.name === previousDeal?.homeownerName);
             if (matchingClient) clientIdForNotesSync = matchingClient.id;
           }
+
           const nextDeal = deals.find((d) => d.id === dealId);
           let activities = current.activities;
 
@@ -1223,6 +1232,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             activities,
+            appointments: linkedAppointmentIdForNotes
+              ? current.appointments.map((a) =>
+                  a.id === linkedAppointmentIdForNotes
+                    ? { ...a, internalNotes: updates.notes!, notes: updates.notes!, updatedAt: new Date().toISOString() }
+                    : a
+                )
+              : current.appointments,
             clients: clientIdForNotesSync
               ? current.clients.map((c) =>
                   c.id === clientIdForNotesSync
@@ -1243,11 +1259,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(updates),
         });
 
-        if (clientIdForNotesSync && updates.notes !== undefined) {
-          apiCall('/api/appointments', {
-            method: 'POST',
-            body: JSON.stringify({ _action: 'update_client', id: clientIdForNotesSync, internalNotes: updates.notes }),
-          });
+        if (updates.notes !== undefined) {
+          if (linkedAppointmentIdForNotes) {
+            apiCall(`/api/appointments/${linkedAppointmentIdForNotes}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ internalNotes: updates.notes, notes: updates.notes }),
+            });
+          }
+          if (clientIdForNotesSync) {
+            apiCall('/api/appointments', {
+              method: 'POST',
+              body: JSON.stringify({ _action: 'update_client', id: clientIdForNotesSync, internalNotes: updates.notes }),
+            });
+          }
         }
       },
 
