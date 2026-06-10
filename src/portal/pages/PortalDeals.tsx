@@ -866,6 +866,10 @@ OntarioReno Broker Portal`;
             const columnDeals = visibleDeals.filter(
               (deal) => deal.status === column.status
             );
+            const columnTotal = columnDeals.reduce((sum, d) => sum + (d.estimatedJobValue || 0), 0);
+            const columnTotalLabel = columnTotal > 0
+              ? new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(columnTotal)
+              : null;
 
             return (
               <article
@@ -873,9 +877,14 @@ OntarioReno Broker Portal`;
                 className="min-h-[16rem] rounded-[0.5rem] border border-white bg-white p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                  <h2 className="whitespace-nowrap text-sm font-black uppercase leading-snug tracking-[0.12em] text-slate-700">
-                    {column.label}
-                  </h2>
+                  <div className="min-w-0">
+                    <h2 className="whitespace-nowrap text-sm font-black uppercase leading-snug tracking-[0.12em] text-slate-700">
+                      {column.label}
+                    </h2>
+                    {isAdmin && columnTotalLabel && (
+                      <p className="mt-0.5 text-xs font-bold text-slate-400">{columnTotalLabel}</p>
+                    )}
+                  </div>
                   <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500">
                     {columnDeals.length}
                   </span>
