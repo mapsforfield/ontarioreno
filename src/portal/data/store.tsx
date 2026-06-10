@@ -2079,6 +2079,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             }
           }
 
+          // Sync notes to linked deal when internalNotes/notes change on the appointment
+          const linkedDealNotesUpdate =
+            nextAppointment?.dealId &&
+            previousAppointment &&
+            (updates.internalNotes !== undefined || updates.notes !== undefined)
+              ? (updates.internalNotes ?? updates.notes ?? null)
+              : null;
+
           // Capture any linked deal mutations for persistence outside setState
           if (nextAppointment?.dealId) {
             capturedLinkedDealId = nextAppointment.dealId;
@@ -2088,6 +2096,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               ...(linkedDealFinancingRequired !== null ? { financingRequired: linkedDealFinancingRequired } : {}),
               ...(linkedDealFollowUpDate !== null ? { nextFollowUpDate: linkedDealFollowUpDate } : {}),
               ...(linkedDealContractorId !== undefined ? { assignedContractorId: linkedDealContractorId } : {}),
+              ...(linkedDealNotesUpdate !== null ? { notes: linkedDealNotesUpdate } : {}),
             };
           }
 
@@ -2152,6 +2161,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 ...(linkedDealContractorId !== undefined
                   ? { assignedContractorId: linkedDealContractorId }
                   : {}),
+                ...(linkedDealNotesUpdate !== null
+                  ? { notes: linkedDealNotesUpdate }
+                  : {}),
                 activity: activity
                   ? [activity, ...(candidate.activity ?? [])]
                   : candidate.activity,
@@ -2161,6 +2173,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   linkedDealFinancingRequired !== null ||
                   linkedDealFollowUpDate !== null ||
                   linkedDealContractorId !== undefined ||
+                  linkedDealNotesUpdate !== null ||
                   activity
                     ? new Date().toISOString()
                     : candidate.updatedAt,
@@ -2245,13 +2258,20 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           if (!appointment || appointment.dealId) return current;
 
           const now = new Date().toISOString();
+          // Fall back to matching client record if address fields are missing on the appointment
+          const linkedClient = appointment.email
+            ? current.clients?.find((c) => c.email === appointment.email)
+            : undefined;
+          const dealAddress = appointment.address?.trim() || linkedClient?.address?.trim() || '';
+          const dealCity = appointment.city?.trim() || linkedClient?.city?.trim() || '';
+          const dealPostalCode = appointment.postalCode?.trim() || linkedClient?.postalCode?.trim() || '';
           const deal: Deal = {
             activity: [],
-            address: appointment.address ?? '',
+            address: dealAddress,
             assignedContractorId:
               appointment.recommendedContractorId ?? appointment.contractorId,
             assignedRepId: appointment.assignedRepId,
-            city: appointment.city,
+            city: dealCity,
             createdAt: now,
             email: appointment.email,
             estimatedJobValue: appointment.estimatedProjectValue || 0,
@@ -2263,7 +2283,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               appointment.followUpDate || appointment.appointmentDate,
             notes: appointment.internalNotes || appointment.notes,
             phone: appointment.phone,
-            postalCode: appointment.postalCode ?? '',
+            postalCode: dealPostalCode,
             projectType: appointment.projectType || 'Consultation',
             status: 'appointment_booked',
             updatedAt: now,
