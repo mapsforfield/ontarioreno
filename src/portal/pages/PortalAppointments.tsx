@@ -392,6 +392,15 @@ function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus): {
   return { bg: 'bg-[#32639b]', lightText: true }; // consultation_scheduled
 }
 
+function fmt12(time: string | undefined): string {
+  if (!time) return 'TBD';
+  const [h, m] = time.split(':').map(Number);
+  if (isNaN(h)) return time;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return m === 0 ? `${hour}${suffix}` : `${hour}:${String(m).padStart(2, '0')}${suffix}`;
+}
+
 function AppointmentPill({
   appointment,
   contractorName,
@@ -410,7 +419,7 @@ function AppointmentPill({
   const { bg, lightText } = getStagePillBg(appointment.consultationStage, appointment.status);
   const outcomeBadge = getOutcomeBadge(appointment);
   const name = appointment.customerName || appointment.title || 'Consultation';
-  const time = appointment.appointmentTime || 'TBD';
+  const time = fmt12(appointment.appointmentTime);
 
   // ── Month / Week: compact solid-color pill (Google Calendar style) ──────────
   if (variant === 'compact') {
@@ -1582,7 +1591,7 @@ export default function PortalAppointments() {
         >
           <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageDot}`} />
           <span className="w-[4.5rem] shrink-0 text-sm font-black tabular-nums text-[#32639b]">
-            {appointment.appointmentTime || 'TBD'}
+            {fmt12(appointment.appointmentTime)}
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
             {appointment.customerName || appointment.title || 'Consultation'}
@@ -2015,7 +2024,7 @@ export default function PortalAppointments() {
                               {apt.customerName || apt.title || 'Consultation'}
                             </p>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums leading-tight text-slate-500">
-                              {apt.appointmentTime || 'TBD'}
+                              {fmt12(apt.appointmentTime)}
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -2092,7 +2101,7 @@ export default function PortalAppointments() {
                                       {apt.customerName || apt.title || 'Consultation'}
                                     </p>
                                     <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
-                                      {apt.appointmentTime || 'TBD'}
+                                      {fmt12(apt.appointmentTime)}
                                     </p>
                                   </div>
                                   <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -2284,7 +2293,7 @@ export default function PortalAppointments() {
                                   {apt.customerName || apt.title || 'Consultation'}
                                 </p>
                                 <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
-                                  {apt.appointmentTime || 'TBD'}
+                                  {fmt12(apt.appointmentTime)}
                                 </p>
                               </div>
                               <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -2538,7 +2547,7 @@ export default function PortalAppointments() {
                                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotColor}`} />
                                 <span className="w-[8rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
                                   {apt.appointmentDate}
-                                  {apt.appointmentTime ? ` · ${apt.appointmentTime}` : ''}
+                                  {apt.appointmentTime ? ` · ${fmt12(apt.appointmentTime)}` : ''}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
                                   {apt.customerName || apt.title || 'Consultation'}
@@ -2952,7 +2961,7 @@ export default function PortalAppointments() {
                                 'Consultation'}
                             </p>
                             <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500 leading-tight mt-px">
-                              {appointment.appointmentTime || 'TBD'}
+                              {fmt12(appointment.appointmentTime)}
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -3037,7 +3046,7 @@ export default function PortalAppointments() {
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${schedStageDot}`} />
                       <span className="w-[6.5rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
                         {appointment.appointmentDate}
-                        {appointment.appointmentTime ? ` · ${appointment.appointmentTime}` : ''}
+                        {appointment.appointmentTime ? ` · ${fmt12(appointment.appointmentTime)}` : ''}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
                         {getAppointmentLabel(appointment)}
@@ -3074,7 +3083,7 @@ export default function PortalAppointments() {
                           </div>
                           <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                             <Clock className="h-4 w-4 shrink-0 text-[#32639b]" />
-                            {appointment.appointmentTime || 'Time not set'}
+                            {fmt12(appointment.appointmentTime) || 'Time not set'}
                           </div>
                           <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                             <UserRound className="h-4 w-4 shrink-0 text-[#32639b]" />
