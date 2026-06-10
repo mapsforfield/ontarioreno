@@ -369,8 +369,10 @@ export default function PortalDeals() {
     const dealId = state?.openDealId;
     if (dealId && handledNavState.current !== dealId) {
       handledNavState.current = dealId;
+      const dealToOpen = visibleDeals.find((d) => d.id === dealId);
       setSelectedDealId(dealId);
       setIsAddingDeal(false);
+      if (dealToOpen) setForm(dealToForm(dealToOpen));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
