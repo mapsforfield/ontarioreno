@@ -113,11 +113,14 @@ export default function PortalAdmin() {
     calculatePipelineValue,
     calculateRepPendingCommission,
     calculateWonDeals,
+    defaultCommissionRate,
     resetUserPassword,
+    setDefaultCommissionRate,
     toggleUserActive,
     updateUser,
     users,
   } = usePortalData();
+  const [commissionInput, setCommissionInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const repManagementRef = useRef<HTMLElement>(null);
   const [activityFilter, setActivityFilter] = useState<
     'all' | ActivityEntityType
@@ -593,6 +596,40 @@ export default function PortalAdmin() {
           </div>
         </div>
       )}
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Commission Settings</p>
+        <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Default commission rate</h2>
+        <p className="mt-1 text-sm text-slate-500">Applied automatically when a new deal is created.</p>
+        <div className="mt-4 flex items-center gap-3">
+          <div className="relative w-36">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={commissionInput}
+              onChange={(e) => setCommissionInput(e.target.value)}
+              className="w-full rounded-[0.5rem] border border-slate-300 py-2.5 pl-3 pr-8 text-sm font-bold focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const val = parseFloat(commissionInput);
+              if (!isNaN(val) && val >= 0 && val <= 100) {
+                setDefaultCommissionRate(val / 100);
+                setCommissionInput(String(val));
+              }
+            }}
+            className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#153158]"
+          >
+            Save
+          </button>
+          <span className="text-sm text-slate-500">Current: <strong>{Math.round(defaultCommissionRate * 100)}%</strong></span>
+        </div>
+      </section>
     </div>
   );
 }

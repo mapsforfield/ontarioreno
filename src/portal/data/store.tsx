@@ -66,6 +66,7 @@ type PortalDataState = {
   commissions: Commission[];
   proposals: ProposalHistory[];
   trackerRows: SaleTrackerRow[];
+  defaultCommissionRate: number;
 };
 
 type ContractorDispatchDraft = Omit<
@@ -75,6 +76,7 @@ type ContractorDispatchDraft = Omit<
 
 type PortalDataContextValue = PortalDataState & {
   isLoading: boolean;
+  setDefaultCommissionRate: (rate: number) => void;
   addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => Promise<{ tempPassword: string } | { error: string } | null>;
   updateUser: (
     userId: string,
@@ -192,6 +194,16 @@ const openDealStatuses: DealStatus[] = [
 ];
 const projectedCommissionStatuses: DealStatus[] = [...openDealStatuses, 'won'];
 
+const DEFAULT_COMMISSION_RATE_KEY = 'portal_defaultCommissionRate';
+
+function loadDefaultCommissionRate(): number {
+  try {
+    const v = localStorage.getItem(DEFAULT_COMMISSION_RATE_KEY);
+    if (v !== null) return Math.min(1, Math.max(0, Number(v)));
+  } catch {}
+  return 0.1;
+}
+
 const emptyState: PortalDataState = {
   activities: [],
   appointments: [],
@@ -203,6 +215,7 @@ const emptyState: PortalDataState = {
   proposals: [],
   trackerRows: [],
   users: [],
+  defaultCommissionRate: loadDefaultCommissionRate(),
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
@@ -363,17 +376,17 @@ function normalizeSearchValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function createCommissionForDeal(deal: Deal): Commission {
+function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
   const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
   const adminTotalEstimatedCommission = Math.round(
-    deal.estimatedJobValue * 0.1
+    deal.estimatedJobValue * defaultRate
   );
 
   return {
     id: createId('commission'),
     adminNetCommission:
       adminTotalEstimatedCommission - repEstimatedCommission,
-    adminTotalCommissionRate: 0.1,
+    adminTotalCommissionRate: defaultRate,
     adminTotalEstimatedCommission,
     dealId: deal.id,
     payoutStatus: 'pending',
@@ -531,6 +544,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         proposals,
         clients: clients ?? [],
         trackerRows: trackerRows ?? [],
+        defaultCommissionRate: loadDefaultCommissionRate(),
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -737,6 +751,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       isLoading,
+
+      setDefaultCommissionRate: (rate: number) => {
+        const clamped = Math.min(1, Math.max(0, rate));
+        try { localStorage.setItem(DEFAULT_COMMISSION_RATE_KEY, String(clamped)); } catch {}
+        setState((current) => ({ ...current, defaultCommissionRate: clamped }));
+      },
 
       // ── User mutations ──────────────────────────────────────────────────────
 
@@ -1110,7 +1130,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             entityLabel: getDealLabel(deal),
             entityType: 'deal',
           }),
-          commissions: [...current.commissions, createCommissionForDeal(deal)],
+          commissions: [...current.commissions, createCommissionForDeal(deal, current.defaultCommissionRate)],
           appointments: current.appointments,
           clients: current.clients,
           contractors: current.contractors,
@@ -1119,6 +1139,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           proposals: current.proposals,
           trackerRows: current.trackerRows,
           users: current.users,
+          defaultCommissionRate: current.defaultCommissionRate,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
@@ -2395,7 +2416,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             ),
             commissions: [
               ...current.commissions,
-              createCommissionForDeal(deal),
+              createCommissionForDeal(deal, current.defaultCommissionRate),
             ],
             deals: [...current.deals, deal],
           };
