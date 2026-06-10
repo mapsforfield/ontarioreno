@@ -1149,6 +1149,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       updateDeal: (dealId, updates, actor) => {
+        let clientIdForNotesSync: string | null = null;
+
         setState((current) => {
           const previousDeal = current.deals.find((d) => d.id === dealId);
           const deals = current.deals.map((d) =>
@@ -1156,6 +1158,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               ? { ...d, ...updates, id: d.id, updatedAt: new Date().toISOString() }
               : d
           );
+
+          // Sync notes to the matching client record
+          if (updates.notes !== undefined && previousDeal?.email) {
+            const matchingClient = current.clients.find((c) => c.email === previousDeal.email);
+            if (matchingClient) clientIdForNotesSync = matchingClient.id;
+          }
           const nextDeal = deals.find((d) => d.id === dealId);
           let activities = current.activities;
 
@@ -1215,6 +1223,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             activities,
+            clients: clientIdForNotesSync
+              ? current.clients.map((c) =>
+                  c.id === clientIdForNotesSync
+                    ? { ...c, internalNotes: updates.notes!, updatedAt: new Date().toISOString() }
+                    : c
+                )
+              : current.clients,
             commissions: current.commissions.map((commission) => {
               const deal = deals.find((d) => d.id === commission.dealId);
               return deal ? normalizeCommissionWithDeal(commission, deal) : commission;
@@ -1227,6 +1242,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
+
+        if (clientIdForNotesSync && updates.notes !== undefined) {
+          apiCall('/api/appointments', {
+            method: 'POST',
+            body: JSON.stringify({ _action: 'update_client', id: clientIdForNotesSync, internalNotes: updates.notes }),
+          });
+        }
       },
 
       deleteDeal: (dealId, actor) => {
@@ -1873,6 +1895,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         // Capture linked deal updates so we can persist them after setState
         let capturedLinkedDealId: string | null = null;
         let capturedLinkedDealUpdates: Record<string, unknown> = {};
+        let capturedClientIdForNotes: string | null = null;
 
         setState((current) => {
           const previousAppointment = current.appointments.find(
@@ -2087,6 +2110,16 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               ? (updates.internalNotes ?? updates.notes ?? null)
               : null;
 
+          // Sync notes to matching client record
+          if (
+            previousAppointment &&
+            (updates.internalNotes !== undefined || updates.notes !== undefined) &&
+            nextAppointment?.email
+          ) {
+            const matchingClient = current.clients.find((c) => c.email === nextAppointment.email);
+            if (matchingClient) capturedClientIdForNotes = matchingClient.id;
+          }
+
           // Capture any linked deal mutations for persistence outside setState
           if (nextAppointment?.dealId) {
             capturedLinkedDealId = nextAppointment.dealId;
@@ -2126,6 +2159,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             appointments: current.appointments.map((a) =>
               a.id === appointmentId && nextAppointment ? nextAppointment : a
             ),
+            clients: capturedClientIdForNotes
+              ? current.clients.map((c) =>
+                  c.id === capturedClientIdForNotes
+                    ? { ...c, internalNotes: (updates.internalNotes ?? updates.notes ?? c.internalNotes), updatedAt: new Date().toISOString() }
+                    : c
+                )
+              : current.clients,
             deals: current.deals.map((candidate) => {
               if (!nextAppointment || candidate.id !== nextAppointment.dealId) {
                 return candidate;
@@ -2186,6 +2226,17 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
+
+        // Persist client notes sync
+        if (capturedClientIdForNotes) {
+          const notesValue = updates.internalNotes ?? updates.notes;
+          if (notesValue !== undefined) {
+            apiCall('/api/appointments', {
+              method: 'POST',
+              body: JSON.stringify({ _action: 'update_client', id: capturedClientIdForNotes, internalNotes: notesValue }),
+            });
+          }
+        }
 
         // If the outcome submission changed linked deal fields, persist those too
         if (capturedLinkedDealId && Object.keys(capturedLinkedDealUpdates).length > 0) {
