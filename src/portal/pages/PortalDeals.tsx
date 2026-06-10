@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
+import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Clock, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
@@ -171,6 +171,14 @@ function getValueRange(value: number) {
     `$${Math.round(rangeValue / 1000)}k`;
 
   return `${formatRangeValue(lower)}-${formatRangeValue(upper)}`;
+}
+
+function getDealRot(deal: Deal): { days: number; level: 'warn' | 'danger' } | null {
+  if (deal.status !== 'negotiating') return null;
+  const days = Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86_400_000);
+  if (days >= 14) return { days, level: 'danger' };
+  if (days >= 7)  return { days, level: 'warn' };
+  return null;
 }
 
 export default function PortalDeals() {
@@ -899,23 +907,42 @@ OntarioReno Broker Portal`;
                       const rep = deal.assignedRepId
                         ? users.find((u) => u.id === deal.assignedRepId)
                         : undefined;
+                      const rot = getDealRot(deal);
 
                       return (
                         <button
                           key={deal.id}
                           type="button"
                           onClick={() => openDeal(deal)}
-                          className="w-full rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3 text-left transition hover:border-[#b8c9dd] hover:bg-white"
+                          className={`w-full rounded-[0.5rem] border p-3 text-left transition hover:bg-white ${
+                            rot?.level === 'danger'
+                              ? 'border-red-200 bg-red-50 hover:border-red-300'
+                              : rot?.level === 'warn'
+                                ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
+                                : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd]'
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-black text-slate-950">
                               {deal.homeownerName}
                             </p>
-                            {deal.isHistorical && (
-                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-slate-400">
-                                Pre-portal
-                              </span>
-                            )}
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {rot && (
+                                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-black ${
+                                  rot.level === 'danger'
+                                    ? 'bg-red-100 text-red-600'
+                                    : 'bg-amber-100 text-amber-600'
+                                }`}>
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {rot.days}d idle
+                                </span>
+                              )}
+                              {deal.isHistorical && (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-slate-400">
+                                  Pre-portal
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <p className="mt-1 text-xs font-semibold text-slate-500">
                             {deal.city} - {deal.projectType}
