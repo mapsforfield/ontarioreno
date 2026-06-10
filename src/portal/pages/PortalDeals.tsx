@@ -372,7 +372,7 @@ export default function PortalDeals() {
       const dealToOpen = visibleDeals.find((d) => d.id === dealId);
       setSelectedDealId(dealId);
       setIsAddingDeal(false);
-      if (dealToOpen) setForm(dealToForm(dealToOpen));
+      if (dealToOpen) openDeal(dealToOpen);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
@@ -391,9 +391,18 @@ export default function PortalDeals() {
   const openDeal = (deal: Deal) => {
     setIsAddingDeal(false);
     setSelectedDealId(deal.id);
-    setForm(dealToForm(deal));
-    setActivityNote('');
     const appointment = getAppointmentsForDeal(deal.id)[0];
+    // Fall back to linked appointment for address fields missing on the deal
+    const baseForm = dealToForm(deal);
+    setForm({
+      ...baseForm,
+      address: baseForm.address || appointment?.address || '',
+      city: baseForm.city || appointment?.city || '',
+      postalCode: baseForm.postalCode || appointment?.postalCode || '',
+      phone: baseForm.phone || appointment?.phone || '',
+      email: baseForm.email || appointment?.email || '',
+    });
+    setActivityNote('');
     setAppointmentForm(
       appointment
         ? appointmentToForm(appointment)
