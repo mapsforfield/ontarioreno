@@ -121,6 +121,7 @@ export default function PortalAdmin() {
     users,
   } = usePortalData();
   const [commissionInput, setCommissionInput] = useState(String(Math.round(defaultCommissionRate * 100)));
+  const [commissionSaved, setCommissionSaved] = useState(false);
   const repManagementRef = useRef<HTMLElement>(null);
   const [activityFilter, setActivityFilter] = useState<
     'all' | ActivityEntityType
@@ -621,13 +622,17 @@ export default function PortalAdmin() {
               if (!isNaN(val) && val >= 0 && val <= 100) {
                 setDefaultCommissionRate(val / 100);
                 setCommissionInput(String(val));
+                setCommissionSaved(true);
+                setTimeout(() => setCommissionSaved(false), 3000);
               }
             }}
             className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#153158]"
           >
             Save
           </button>
-          <span className="text-sm text-slate-500">Current: <strong>{Math.round(defaultCommissionRate * 100)}%</strong></span>
+          {commissionSaved && (
+            <span className="text-sm font-bold text-green-600">Saved!</span>
+          )}
         </div>
       </section>
     </div>
