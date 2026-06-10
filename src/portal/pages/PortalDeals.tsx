@@ -896,6 +896,9 @@ OntarioReno Broker Portal`;
                         (candidate) =>
                           candidate.id === deal.assignedContractorId
                       );
+                      const rep = deal.assignedRepId
+                        ? users.find((u) => u.id === deal.assignedRepId)
+                        : undefined;
 
                       return (
                         <button
@@ -921,9 +924,16 @@ OntarioReno Broker Portal`;
                             <span className="text-sm font-black text-[#1B3C6C]">
                               {formatCurrency(deal.estimatedJobValue)}
                             </span>
-                            <span className="max-w-full rounded-full bg-slate-100 px-2 py-1 text-[0.65rem] font-bold text-slate-500">
-                              {contractor?.companyName ?? 'Unassigned'}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {isAdmin && rep && (
+                                <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-bold text-[#1B3C6C]">
+                                  {rep.name.split(' ')[0]}
+                                </span>
+                              )}
+                              <span className="max-w-full rounded-full bg-slate-100 px-2 py-1 text-[0.65rem] font-bold text-slate-500">
+                                {contractor?.companyName ?? 'Unassigned'}
+                              </span>
+                            </div>
                           </div>
                         </button>
                       );
