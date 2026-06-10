@@ -1165,11 +1165,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             const linkedApt = current.appointments.find((a) => a.dealId === dealId);
             if (linkedApt) linkedAppointmentIdForNotes = linkedApt.id;
 
-            // Sync to client — match by email (deal or appointment) or homeowner name
+            // Sync to client — try email first, then fall back to name
             const emailToMatch = previousDeal?.email || linkedApt?.email;
-            const matchingClient = emailToMatch
-              ? current.clients.find((c) => c.email === emailToMatch)
-              : current.clients.find((c) => c.name === previousDeal?.homeownerName);
+            const matchingClient =
+              (emailToMatch ? current.clients.find((c) => c.email === emailToMatch) : null) ||
+              current.clients.find((c) => c.name === previousDeal?.homeownerName);
             if (matchingClient) clientIdForNotesSync = matchingClient.id;
           }
 
@@ -2137,10 +2137,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           // Sync notes to matching client record
           if (
             previousAppointment &&
-            (updates.internalNotes !== undefined || updates.notes !== undefined) &&
-            nextAppointment?.email
+            (updates.internalNotes !== undefined || updates.notes !== undefined)
           ) {
-            const matchingClient = current.clients.find((c) => c.email === nextAppointment.email);
+            const matchingClient =
+              (nextAppointment?.email ? current.clients.find((c) => c.email === nextAppointment.email) : null) ||
+              current.clients.find((c) => c.name === nextAppointment?.customerName);
             if (matchingClient) capturedClientIdForNotes = matchingClient.id;
           }
 

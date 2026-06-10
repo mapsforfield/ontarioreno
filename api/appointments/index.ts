@@ -113,18 +113,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (data._action === 'update_client') {
       if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const patch: Record<string, unknown> = {};
+      if (data.name !== undefined) patch.name = data.name;
+      if (data.phone !== undefined) patch.phone = data.phone;
+      if (data.email !== undefined) patch.email = data.email;
+      if (data.address !== undefined) patch.address = data.address;
+      if (data.city !== undefined) patch.city = data.city;
+      if (data.postalCode !== undefined) patch.postalCode = data.postalCode;
+      if (data.projectTypes !== undefined) patch.projectTypes = data.projectTypes;
+      if (data.internalNotes !== undefined) patch.internalNotes = data.internalNotes;
       const client = await prisma.client.update({
         where: { id: data.id },
-        data: {
-          name: data.name,
-          phone: data.phone ?? '',
-          email: data.email ?? '',
-          address: data.address ?? '',
-          city: data.city ?? '',
-          postalCode: data.postalCode ?? '',
-          projectTypes: data.projectTypes ?? [],
-          internalNotes: data.internalNotes ?? '',
-        },
+        data: patch,
       });
       return res.status(200).json(client);
     }

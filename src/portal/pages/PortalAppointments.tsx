@@ -562,6 +562,8 @@ export default function PortalAppointments() {
   const [reminderMessage, setReminderMessage] = useState<{ id: string; text: string } | null>(null);
   // Which today's agenda rows are expanded (desktop compact view)
   const [expandedAgendaRows, setExpandedAgendaRows] = useState<Set<string>>(new Set());
+  const [conflictWarning, setConflictWarning] = useState<Appointment | null>(null);
+  const conflictOverrideRef = useRef(false);
 
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
@@ -1004,6 +1006,8 @@ export default function PortalAppointments() {
     setEmailAttachments({});
     setEmailRecipientOverrides({});
     setEmailActionMessage('');
+    setConflictWarning(null);
+    conflictOverrideRef.current = false;
   };
 
   const saveAppointment = () => {
@@ -1046,6 +1050,24 @@ export default function PortalAppointments() {
       recommendedContractorId: form.recommendedContractorId || null,
       status: form.status,
     };
+
+    // Conflict check: same rep, date, and time — skip current appointment when editing
+    const conflictingApt = visibleAppointments.find((a) => {
+      if (!isCreating && a.id === selectedAppointment?.id) return false;
+      return (
+        payload.appointmentDate &&
+        payload.appointmentTime &&
+        a.assignedRepId === payload.assignedRepId &&
+        a.appointmentDate === payload.appointmentDate &&
+        a.appointmentTime === payload.appointmentTime
+      );
+    });
+    if (conflictingApt && !conflictOverrideRef.current) {
+      setConflictWarning(conflictingApt);
+      return;
+    }
+    setConflictWarning(null);
+    conflictOverrideRef.current = false;
 
     if (isCreating) {
       addAppointment(payload, currentUser);
@@ -4105,6 +4127,30 @@ export default function PortalAppointments() {
                     Transfer
                   </button>
                 )
+              )}
+              {conflictWarning && (
+                <div className="flex w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <p className="font-semibold">Scheduling conflict detected</p>
+                  <p className="text-amber-700">
+                    {conflictWarning.customerName} is already booked on {conflictWarning.appointmentDate} at {conflictWarning.appointmentTime}.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { conflictOverrideRef.current = true; saveAppointment(); }}
+                      className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+                    >
+                      Save Anyway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConflictWarning(null)}
+                      className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                    >
+                      Go Back
+                    </button>
+                  </div>
+                </div>
               )}
               <button type="button" onClick={closePanel} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
                 Cancel
