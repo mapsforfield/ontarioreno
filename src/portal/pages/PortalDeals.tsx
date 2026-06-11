@@ -528,6 +528,7 @@ export default function PortalDeals() {
       projectType: selectedDeal.projectType,
       recommendedContractorId:
         selectedAppointment?.recommendedContractorId ?? null,
+      reminderMinutes: selectedAppointment?.reminderMinutes ?? 30,
       status: appointmentForm.status,
     };
 

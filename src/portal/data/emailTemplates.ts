@@ -575,6 +575,60 @@ ${bodyRow}
 `);
 }
 
+// ─── Appointment reminder template ───────────────────────────────────────────
+
+export type AppointmentReminderEmailInput = {
+  appointment: Appointment;
+  rep: User;
+  reminderMinutes: number;
+};
+
+/**
+ * Internal email sent to the assigned rep X minutes before their appointment.
+ */
+export function buildAppointmentReminderHtml(input: AppointmentReminderEmailInput): string {
+  const { appointment, rep, reminderMinutes } = input;
+
+  const location = [appointment.address, appointment.city].filter(Boolean).join(', ') || 'No location set';
+  const dateTime = `${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`;
+  const title = appointment.customerName || appointment.title || 'Appointment';
+
+  const detailRows = [
+    detailRow('Appointment', e(title), '#1B3C6C'),
+    detailRow('Date &amp; Time', e(dateTime), '#1B3C6C'),
+    detailRow('Location', e(location), '#1B3C6C'),
+    appointment.projectType ? detailRow('Project Type', e(appointment.projectType), '#1B3C6C') : '',
+    appointment.phone ? detailRow('Phone', e(appointment.phone), '#1B3C6C') : '',
+    detailRow('Reference', e(refId(appointment.id)), '#1B3C6C', true),
+  ].filter(Boolean);
+
+  const notesSection = appointment.internalNotes?.trim()
+    ? noteBlock('Prep Notes', appointment.internalNotes.trim(), '#f8fafc', '#1B3C6C', '#64748b', '#475569')
+    : '';
+
+  const bodyRow = `<tr>
+  <td class="body-cell" style="padding:28px 28px 36px 28px;background-color:#ffffff;">
+    <p style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Hi ${e(rep.name)}</p>
+    <p style="margin:0 0 24px 0;font-size:15px;color:#475569;line-height:1.65;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+      You have an appointment starting in <strong style="color:#0f172a;">${reminderMinutes} minutes</strong>. Here are the details:
+    </p>
+    ${detailCard(detailRows)}
+    ${notesSection}
+  </td>
+</tr>`;
+
+  return shell(`
+<tr>
+  <td align="center" bgcolor="#1B3C6C" style="padding:28px 24px;background-color:#1B3C6C;">
+    <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:rgba(255,255,255,0.55);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">OntarioReno &middot; Reminder</p>
+    <p style="margin:0;font-size:20px;font-weight:800;color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Appointment in ${reminderMinutes} minutes</p>
+  </td>
+</tr>
+${bodyRow}
+<tr><td>${emailFooter()}</td></tr>
+`);
+}
+
 // ─── Contractor dispatch template ─────────────────────────────────────────────
 
 export type ContractorDispatchHtmlInput = {

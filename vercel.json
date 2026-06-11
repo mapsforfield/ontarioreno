@@ -6,6 +6,10 @@
     {
       "path": "/api/appointments?_cron=morning-brief",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/appointments?_cron=reminder-check",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

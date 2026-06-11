@@ -74,6 +74,7 @@ type AppointmentFormState = {
   recommendedContractorId: string;
   phone: string;
   projectType: string;
+  reminderMinutes: string;
   status: AppointmentStatus;
 };
 
@@ -98,7 +99,14 @@ const typeOptions: Array<{ label: string; value: AppointmentType }> = [
   { label: 'Home Visit', value: 'home_visit' },
   { label: 'Phone Consultation', value: 'phone_consultation' },
   { label: 'Video Consultation', value: 'video_consultation' },
+  { label: 'Showroom Visit', value: 'showroom_visit' },
+  { label: 'Supplier Meeting', value: 'supplier_meeting' },
+  { label: 'Site Check', value: 'site_check' },
+  { label: 'Custom Event', value: 'custom_event' },
 ];
+
+const EVENT_TYPES: AppointmentType[] = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
+function isEventType(type: AppointmentType) { return EVENT_TYPES.includes(type); }
 
 const stageOptions: Array<{ label: string; value: ConsultationStage }> = [
   { label: 'Lead Qualified', value: 'lead_qualified' },
@@ -209,13 +217,19 @@ const emptyForm: AppointmentFormState = {
   phone: '',
   projectType: '',
   recommendedContractorId: '',
+  reminderMinutes: '30',
   status: 'scheduled',
 };
 
 function formatAppointmentType(type: AppointmentType) {
   if (type === 'home_visit') return 'Home Visit';
   if (type === 'phone_consultation') return 'Phone Consultation';
-  return 'Video Consultation';
+  if (type === 'video_consultation') return 'Video Consultation';
+  if (type === 'showroom_visit') return 'Showroom Visit';
+  if (type === 'supplier_meeting') return 'Supplier Meeting';
+  if (type === 'site_check') return 'Site Check';
+  if (type === 'custom_event') return 'Custom Event';
+  return type;
 }
 
 function formatAppointmentStatus(status: AppointmentStatus) {
@@ -299,6 +313,7 @@ function appointmentToForm(appointment: Appointment): AppointmentFormState {
     phone: appointment.phone,
     projectType: appointment.projectType,
     recommendedContractorId: appointment.recommendedContractorId ?? '',
+    reminderMinutes: String(appointment.reminderMinutes ?? 30),
     status: appointment.status,
   };
 }
@@ -319,6 +334,14 @@ function getStageDotColor(stage: ConsultationStage, status?: AppointmentStatus):
   if (stage === 'consultation_completed') return 'bg-teal-500';
   if (stage === 'consultation_scheduled') return 'bg-[#32639b]';
   return 'bg-slate-400';
+}
+
+function getEventTypePillBg(type: AppointmentType): { bg: string; lightText: boolean } {
+  if (type === 'showroom_visit') return { bg: 'bg-orange-500', lightText: true };
+  if (type === 'supplier_meeting') return { bg: 'bg-purple-600', lightText: true };
+  if (type === 'site_check') return { bg: 'bg-teal-700', lightText: true };
+  if (type === 'custom_event') return { bg: 'bg-indigo-500', lightText: true };
+  return { bg: 'bg-slate-500', lightText: true };
 }
 
 function getMobileDotColor(status: AppointmentStatus, stage?: ConsultationStage): string {
@@ -379,7 +402,8 @@ function getStatusClasses(status: AppointmentStatus) {
 }
 
 /** Returns a solid Tailwind bg class + whether text on it should be light or dark */
-function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus): { bg: string; lightText: boolean } {
+function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus, aptType?: AppointmentType): { bg: string; lightText: boolean } {
+  if (aptType && isEventType(aptType)) return getEventTypePillBg(aptType);
   if (status === 'no_show')   return { bg: 'bg-red-400',      lightText: true };
   if (status === 'cancelled') return { bg: 'bg-slate-300',    lightText: false };
   if (stage === 'won')        return { bg: 'bg-emerald-500',  lightText: true };
@@ -416,7 +440,7 @@ function AppointmentPill({
   onClick: () => void;
   variant?: 'compact' | 'full';
 }) {
-  const { bg, lightText } = getStagePillBg(appointment.consultationStage, appointment.status);
+  const { bg, lightText } = getStagePillBg(appointment.consultationStage, appointment.status, appointment.appointmentType);
   const outcomeBadge = getOutcomeBadge(appointment);
   const name = appointment.customerName || appointment.title || 'Consultation';
   const time = fmt12(appointment.appointmentTime);
@@ -1057,6 +1081,7 @@ export default function PortalAppointments() {
       phone: form.phone.trim(),
       projectType: form.projectType.trim(),
       recommendedContractorId: form.recommendedContractorId || null,
+      reminderMinutes: Number(form.reminderMinutes) || 30,
       status: form.status,
     };
 
@@ -3345,6 +3370,76 @@ export default function PortalAppointments() {
               {/* ══ TAB: DETAILS ═════════════════════════════════════════════ */}
               {(isCreating || panelTab === 'details') && (
               <div className="grid gap-4 sm:grid-cols-2">
+              {/* ── Event/Consultation type selector always shown first ── */}
+              <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                {isEventType(form.appointmentType) ? 'Event Type' : 'Appointment Type'}
+                <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)}>
+                  <optgroup label="Consultations">
+                    {typeOptions.filter((o) => !isEventType(o.value)).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Events">
+                    {typeOptions.filter((o) => isEventType(o.value)).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </label>
+              {/* Event-specific fields */}
+              {isEventType(form.appointmentType) && (<>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Event Title
+                  <input value={form.customerName} onChange={(event) => updateForm('customerName', event.target.value)} placeholder="e.g. Supplier meeting with ABC Co." />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Event Date
+                  <input type="date" value={form.appointmentDate} onChange={(event) => updateForm('appointmentDate', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Event Time
+                  <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Duration (minutes)
+                  <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Reminder (minutes before)
+                  <input type="number" min={5} step={5} value={form.reminderMinutes} onChange={(event) => updateForm('reminderMinutes', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Assigned Rep
+                  <select value={form.assignedRepId} onChange={(event) => updateForm('assignedRepId', event.target.value)}>
+                    <option value="">Unassigned</option>
+                    {activeReps.map((rep) => (
+                      <option key={rep.id} value={rep.id}>{rep.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Status
+                  <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {form.appointmentType === 'custom_event' && (
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Event Description
+                    <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} placeholder="Describe what this event is about…" />
+                  </label>
+                )}
+                {form.appointmentType !== 'custom_event' && (
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Notes
+                    <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} />
+                  </label>
+                )}
+              </>)}
+              {/* Consultation-specific fields */}
+              {!isEventType(form.appointmentType) && (<>
                 {/* ── Client autofill search (new consultations only) ── */}
                 {isCreating && (
                   <div className="sm:col-span-2 relative">
@@ -3446,12 +3541,8 @@ export default function PortalAppointments() {
                   <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Consultation Type
-                  <select value={form.appointmentType} onChange={(event) => updateForm('appointmentType', event.target.value as AppointmentType)}>
-                    {typeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
+                  Reminder (minutes before)
+                  <input type="number" min={5} step={5} value={form.reminderMinutes} onChange={(event) => updateForm('reminderMinutes', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Status
@@ -3504,6 +3595,7 @@ export default function PortalAppointments() {
                   Internal Notes — Not visible to customer
                   <textarea rows={4} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} />
                 </label>
+              </>)}
               </div>
               )}
 

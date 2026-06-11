@@ -1,6 +1,7 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { Resend } from 'resend';
 
 async function sendPush(
   endpoint: string,
@@ -69,6 +70,130 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const sent = results.filter((r) => r.status === 'fulfilled').length;
     return res.status(200).json({ ok: true, sent });
+  }
+
+  // ── Appointment reminder cron (runs every 5 min) ──────────────────────────
+  if (req.method === 'GET' && req.query['_cron'] === 'reminder-check') {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    // Work in Eastern time (Ontario). UTC-4 EDT / UTC-5 EST.
+    // We approximate with a runtime check using Intl so it handles DST automatically.
+    const nowUtc = new Date();
+    const easternStr = nowUtc.toLocaleString('en-CA', { timeZone: 'America/Toronto', hour12: false });
+    // "YYYY-MM-DD, HH:MM:SS"
+    const [datePart, timePart] = easternStr.split(', ');
+    const todayEastern = datePart.replace(/\//g, '-').trim();
+    const [hStr, mStr] = (timePart || '').split(':');
+    const nowMinutes = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+
+    // Fetch all unreminded, upcoming appointments today
+    const candidates = await prisma.appointment.findMany({
+      where: {
+        appointmentDate: todayEastern,
+        reminderSentAt: null,
+        status: { in: ['scheduled', 'confirmed'] },
+      },
+      include: { assignedRep: true },
+    });
+
+    const toRemind = candidates.filter((apt) => {
+      if (!apt.appointmentTime) return false;
+      const [ah, am] = apt.appointmentTime.split(':').map(Number);
+      const aptMinutes = ah * 60 + am;
+      const triggerMinutes = aptMinutes - (apt.reminderMinutes ?? 30);
+      const diff = nowMinutes - triggerMinutes;
+      // Fire within a ±3 min window around the trigger time
+      return diff >= -1 && diff <= 4;
+    });
+
+    if (toRemind.length === 0) return res.status(200).json({ ok: true, reminded: 0 });
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
+
+    // Build reminder HTML inline (avoids importing browser-only helpers server-side)
+    function fmtTime(t: string) {
+      const [h, m] = t.split(':').map(Number);
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+    function fmtDate(d: string) {
+      try {
+        return new Date(`${d}T12:00:00`).toLocaleDateString('en-CA', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        });
+      } catch { return d; }
+    }
+
+    const results = await Promise.allSettled(
+      toRemind.map(async (apt) => {
+        const rep = apt.assignedRep;
+        const title = apt.customerName || apt.title || 'Appointment';
+        const location = [apt.address, apt.city].filter(Boolean).join(', ') || 'No location set';
+        const dateTime = `${fmtDate(apt.appointmentDate)} at ${fmtTime(apt.appointmentTime)}`;
+        const mins = apt.reminderMinutes ?? 30;
+
+        const tasks: Promise<unknown>[] = [];
+
+        // Email to rep
+        if (rep?.email) {
+          const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4f8;padding:32px 12px;">
+<div style="max-width:580px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+  <div style="background:#1B3C6C;padding:28px 24px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55);">OntarioReno · Reminder</p>
+    <p style="margin:0;font-size:20px;font-weight:800;color:#fff;">Appointment in ${mins} minutes</p>
+  </div>
+  <div style="padding:28px;">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;">Hi ${rep.name}</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.65;">You have an appointment starting in <strong style="color:#0f172a;">${mins} minutes</strong>.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+      <tr><td width="4" bgcolor="#1B3C6C" style="width:4px;background:#1B3C6C;">&nbsp;</td><td style="padding:13px 18px;border-bottom:1px solid #f1f5f9;"><p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Appointment</p><p style="margin:0;font-size:15px;font-weight:600;color:#0f172a;">${title}</p></td></tr>
+      <tr><td width="4" bgcolor="#1B3C6C" style="width:4px;background:#1B3C6C;">&nbsp;</td><td style="padding:13px 18px;border-bottom:1px solid #f1f5f9;"><p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Date &amp; Time</p><p style="margin:0;font-size:15px;font-weight:600;color:#0f172a;">${dateTime}</p></td></tr>
+      <tr><td width="4" bgcolor="#1B3C6C" style="width:4px;background:#1B3C6C;">&nbsp;</td><td style="padding:13px 18px;"><p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Location</p><p style="margin:0;font-size:15px;font-weight:600;color:#0f172a;">${location}</p></td></tr>
+    </table>
+    ${apt.internalNotes?.trim() ? `<div style="margin-top:18px;padding:15px 18px;background:#f8fafc;border-left:3px solid #1B3C6C;border-radius:0 8px 8px 0;"><p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">Prep Notes</p><p style="margin:0;font-size:14px;color:#475569;line-height:1.65;">${apt.internalNotes.trim()}</p></div>` : ''}
+  </div>
+  <div style="padding:18px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">Appointment managed through <strong style="color:#64748b;">OntarioReno</strong></p></div>
+</div></body></html>`;
+
+          tasks.push(resend.emails.send({
+            from,
+            to: rep.email,
+            subject: `Reminder: ${title} in ${mins} minutes`,
+            html,
+            text: `Hi ${rep.name},\n\nYou have an appointment in ${mins} minutes.\n\nAppointment: ${title}\nDate & Time: ${dateTime}\nLocation: ${location}\n\nOntarioReno`,
+          }));
+        }
+
+        // Push notification to rep
+        const subs = await prisma.pushSubscription.findMany({ where: { userId: apt.assignedRepId } });
+        if (subs.length > 0) {
+          tasks.push(...subs.map((sub) =>
+            sendPush(sub.endpoint, sub.p256dh, sub.auth, {
+              title: `Reminder: ${title} in ${mins} min`,
+              body: `${dateTime} · ${location}`,
+              url: '/portal/appointments',
+              tag: `reminder-${apt.id}`,
+            })
+          ));
+        }
+
+        await Promise.allSettled(tasks);
+
+        // Mark reminder as sent
+        await prisma.appointment.update({
+          where: { id: apt.id },
+          data: { reminderSentAt: nowUtc.toISOString() },
+        });
+      })
+    );
+
+    const reminded = results.filter((r) => r.status === 'fulfilled').length;
+    return res.status(200).json({ ok: true, reminded });
   }
 
   const user = await requireAuth(req, res);
@@ -177,6 +302,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appointmentTime: data.appointmentTime,
         durationMinutes: data.durationMinutes ?? 60,
         appointmentType: data.appointmentType ?? 'home_visit',
+        reminderMinutes: data.reminderMinutes ?? 30,
         status: data.status ?? 'scheduled',
         consultationStage: data.consultationStage ?? 'consultation_scheduled',
         location: data.location ?? '',

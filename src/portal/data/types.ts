@@ -65,7 +65,11 @@ export type ActivityEntityType =
 export type AppointmentType =
   | 'home_visit'
   | 'phone_consultation'
-  | 'video_consultation';
+  | 'video_consultation'
+  | 'showroom_visit'
+  | 'supplier_meeting'
+  | 'site_check'
+  | 'custom_event';
 
 export type AppointmentStatus =
   | 'scheduled'
@@ -143,6 +147,8 @@ export type Appointment = {
   externalCalendarId?: string;
   externalEventId?: string;
   syncedAt?: string;
+  reminderMinutes: number;
+  reminderSentAt?: string;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

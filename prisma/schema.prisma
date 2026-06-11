@@ -170,6 +170,8 @@ model Appointment {
   externalCalendarId       String?
   externalEventId          String?
   syncedAt                 String?
+  reminderMinutes          Int      @default(30)
+  reminderSentAt           String?
   createdByUserId          String
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
