@@ -1,6 +1,6 @@
 import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { put } from '@vercel/blob/client';
+import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
@@ -251,7 +251,6 @@ export default function PortalDeals() {
     calculateHistoricalSalesTotal,
     calculateHistoricalSalesCount,
     salesAgreements,
-    getUploadToken,
     addSalesAgreement,
     deleteSalesAgreement,
   } = usePortalData();
@@ -2243,15 +2242,17 @@ OntarioReno Broker Portal`;
                   setAgreementError('');
                   setAgreementUploading(true);
                   try {
-                    const tokenData = await getUploadToken(selectedDeal.id);
-                    if (!tokenData) { setAgreementError('Could not get upload token. Check blob storage configuration.'); setAgreementUploading(false); return; }
-                    // put() uploads with a pre-issued client token; upload()
-                    // would try to fetch its own token and fail
-                    const blob = await put(tokenData.pathname, file, {
-                      access: 'public',
-                      token: tokenData.clientToken,
-                      contentType: file.type || 'application/pdf',
-                    });
+                    // upload() requests its token from our API (handleUpload
+                    // handshake), then uploads straight to Vercel Blob
+                    const blob = await upload(
+                      `agreements/${selectedDeal.id}/${file.name}`,
+                      file,
+                      {
+                        access: 'public',
+                        handleUploadUrl: `/api/deals/${selectedDeal.id}`,
+                        contentType: file.type || 'application/pdf',
+                      }
+                    );
                     await addSalesAgreement(selectedDeal.id, file.name, blob.url);
                   } catch (err) {
                     setAgreementError(err instanceof Error ? err.message : 'Upload failed.');

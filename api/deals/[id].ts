@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
-import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { del } from '@vercel/blob';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -102,6 +102,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     const body = req.body as Record<string, unknown>;
     const action = body._action as string | undefined;
+
+    // ── Vercel Blob upload handshake (sent by upload() from @vercel/blob/client).
+    // The SDK generates its own token request shape — let handleUpload answer it.
+    if (body.type === 'blob.generate-client-token' || body.type === 'blob.upload-completed') {
+      try {
+        const jsonResponse = await handleUpload({
+          body: body as unknown as HandleUploadBody,
+          request: req,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          onBeforeGenerateToken: async () => ({
+            allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+            maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
+            addRandomSuffix: true,
+          }),
+          onUploadCompleted: async () => {
+            // DB record is created by the client via add_agreement
+          },
+        });
+        return res.status(200).json(jsonResponse);
+      } catch (err) {
+        console.error('[deals/[id]] blob upload handshake failed:', err);
+        return res.status(400).json({ error: 'Upload handshake failed.' });
+      }
+    }
 
     // Legacy: plain note (no _action)
     if (!action || action === 'add_note') {
@@ -226,23 +250,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(200).json({ ok: true });
-    }
-
-    // Generate a short-lived client upload token for Vercel Blob
-    if (action === 'agreement_upload_token') {
-      const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
-      if (!rwToken) return res.status(500).json({ error: 'Blob storage not configured.' });
-      const pathname = `agreements/${id}/${Date.now()}.pdf`;
-      const clientToken = await generateClientTokenFromReadWriteToken({
-        token: rwToken,
-        pathname,
-        // Random suffix makes the final URL long and unguessable
-        addRandomSuffix: true,
-        maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
-        allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
-        validUntil: Date.now() + 5 * 60 * 1000, // 5 minutes
-      });
-      return res.status(200).json({ clientToken, pathname });
     }
 
     // Save an uploaded agreement URL to the database

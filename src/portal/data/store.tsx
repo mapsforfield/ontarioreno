@@ -152,7 +152,6 @@ type PortalDataContextValue = PortalDataState & {
   updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
   deleteClient: (clientId: string) => Promise<void>;
   addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
-  getUploadToken: (dealId: string) => Promise<{ clientToken: string; pathname: string } | null>;
   addSalesAgreement: (dealId: string, fileName: string, url: string) => Promise<SalesAgreement | null>;
   deleteSalesAgreement: (id: string) => Promise<void>;
   removeDayOff: (id: string) => Promise<void>;
@@ -1948,14 +1947,6 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       // ── Sales Agreement mutations ───────────────────────────────────────────
-
-      getUploadToken: async (dealId) => {
-        const result = await apiCall<{ clientToken: string; pathname: string }>(
-          `/api/deals/${dealId}`,
-          { method: 'POST', body: JSON.stringify({ _action: 'agreement_upload_token', dealId }) }
-        );
-        return result ?? null;
-      },
 
       addSalesAgreement: async (dealId, fileName, url) => {
         const agreement = await apiCall<SalesAgreement>(`/api/deals/${dealId}`, {
