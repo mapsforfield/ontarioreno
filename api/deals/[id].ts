@@ -43,38 +43,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
 
-      // ── Keep the commission record in sync ──
+      // ── Keep the commission record in sync (creates it if missing —
+      // some early deals were created before commissions were automatic) ──
       const jobValueChanged = safeData.estimatedJobValue !== undefined;
       const contractorChanged = safeData.assignedContractorId !== undefined;
       if (jobValueChanged || contractorChanged) {
         try {
           const commission = await prisma.commission.findUnique({ where: { dealId: id } });
-          if (commission) {
-            const jobValue = deal.estimatedJobValue;
-            const repEst = Math.round(jobValue * 0.05);
-            // The contractor's negotiated rate locks in at assignment time.
-            // Won deals are frozen — reassignment never rewrites a closed payout.
-            let totalRate = commission.adminTotalCommissionRate;
-            if (contractorChanged && deal.assignedContractorId && deal.status !== 'won') {
-              const contractor = await prisma.contractor
-                .findUnique({
-                  where: { id: deal.assignedContractorId },
-                  select: { commissionRate: true },
-                })
-                .catch(() => null);
-              if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
-            }
-            const adminTotalEst = Math.round(jobValue * totalRate);
-            await prisma.commission.update({
-              where: { dealId: id },
-              data: {
-                repEstimatedCommission: repEst,
-                adminTotalCommissionRate: totalRate,
-                adminTotalEstimatedCommission: adminTotalEst,
-                adminNetCommission: adminTotalEst - repEst,
-              },
-            });
+          const jobValue = deal.estimatedJobValue;
+          const repEst = Math.round(jobValue * 0.05);
+          // The contractor's negotiated rate locks in at assignment time.
+          // Won deals are frozen — reassignment never rewrites a closed payout.
+          let totalRate = commission?.adminTotalCommissionRate ?? 0.1;
+          const needsRateLookup =
+            deal.assignedContractorId &&
+            deal.status !== 'won' &&
+            (contractorChanged || !commission);
+          if (needsRateLookup) {
+            const contractor = await prisma.contractor
+              .findUnique({
+                where: { id: deal.assignedContractorId! },
+                select: { commissionRate: true },
+              })
+              .catch(() => null);
+            if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
           }
+          const adminTotalEst = Math.round(jobValue * totalRate);
+          const computed = {
+            repEstimatedCommission: repEst,
+            adminTotalCommissionRate: totalRate,
+            adminTotalEstimatedCommission: adminTotalEst,
+            adminNetCommission: adminTotalEst - repEst,
+          };
+          await prisma.commission.upsert({
+            where: { dealId: id },
+            update: computed,
+            create: {
+              dealId: id,
+              repId: deal.assignedRepId,
+              repCommissionRate: 0.05,
+              repPaidCommission: 0,
+              payoutStatus: 'pending',
+              ...computed,
+            },
+          });
         } catch {
           // commission sync is non-critical
         }
