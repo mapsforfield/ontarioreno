@@ -1,8 +1,10 @@
 import {
   CalendarCheck,
+  CalendarClock,
   HandCoins,
   Send,
   Target,
+  Timer,
   TrendingUp,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -48,6 +50,42 @@ function calculateRepEstimatedCommission(deal: Deal) {
   if (deal.status === 'lost') return 0;
   return Math.round(deal.estimatedJobValue * 0.05);
 }
+
+function isoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** Deals with a follow-up date within the next 7 days — overdue ones included, they need attention most. */
+function countFollowUpsDueThisWeek(deals: Deal[]) {
+  const weekOut = new Date();
+  weekOut.setDate(weekOut.getDate() + 7);
+  const limit = isoDate(weekOut);
+  return deals.filter(
+    (deal) =>
+      openDealStatuses.includes(deal.status) &&
+      deal.nextFollowUpDate !== '' &&
+      deal.nextFollowUpDate <= limit
+  ).length;
+}
+
+/** Average days from deal creation to won, for won deals. */
+function calculateAvgDaysToClose(wonDeals: Deal[]) {
+  if (wonDeals.length === 0) return 0;
+  const totalDays = wonDeals.reduce((total, deal) => {
+    const created = new Date(deal.createdAt).getTime();
+    const closed = new Date(deal.updatedAt).getTime();
+    return total + Math.max(Math.round((closed - created) / 86_400_000), 0);
+  }, 0);
+  return Math.round(totalDays / wonDeals.length);
+}
+
+const funnelStages: Array<{ label: string; status: string }> = [
+  { label: 'New Lead', status: 'new_lead' },
+  { label: 'Appt Booked', status: 'appointment_booked' },
+  { label: 'Quoted', status: 'quoted' },
+  { label: 'Negotiating', status: 'negotiating' },
+  { label: 'Won', status: 'won' },
+];
 
 function metricCard(
   label: string,
@@ -141,7 +179,15 @@ function buildRepPerformance({
     0
   );
 
+  const stageCounts = funnelStages.map((stage) => ({
+    ...stage,
+    count: repDeals.filter((deal) => deal.status === stage.status).length,
+  }));
+
   return {
+    avgDaysToClose: calculateAvgDaysToClose(wonDeals),
+    followUpsDueThisWeek: countFollowUpsDueThisWeek(repDeals),
+    stageCounts,
     appointmentsAssigned: repAppointments.length,
     appointmentsCompleted: completedConsultations.length,
     contractorReviewConsultations: repAppointments.filter(
@@ -261,12 +307,47 @@ export default function PortalPerformance() {
 
       {!isAdmin && primary && (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {metricCard('My Open Deals', String(primary.openDeals), 'Pipeline Health', Target)}
             {metricCard('My Pipeline Value', formatCurrency(primary.pipelineValue), 'Pipeline Health', TrendingUp)}
+            {metricCard('Follow-Ups Due This Week', String(primary.followUpsDueThisWeek), 'Includes overdue follow-ups', CalendarClock)}
+            {metricCard('Avg Days to Close', primary.avgDaysToClose > 0 ? `${primary.avgDaysToClose}d` : '—', 'Created → won', Timer)}
             {metricCard('My Consultations', String(primary.appointmentsAssigned), 'Consultation Activity', CalendarCheck)}
             {metricCard('My Proposals Sent', String(primary.proposalsSent), 'Proposal Activity', Send)}
             {metricCard('My Won Deals', String(primary.wonDeals), 'Performance Snapshot', Target)}
+            {metricCard('Win Rate', `${primary.winRate}%`, 'Won vs closed deals', TrendingUp)}
+          </section>
+
+          {/* ── Pipeline funnel: where my deals sit right now ── */}
+          <section className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-black tracking-[-0.01em]">Pipeline by Stage</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Where your deals are sitting right now
+            </p>
+            <div className="mt-4 space-y-2.5">
+              {(() => {
+                const maxCount = Math.max(...primary.stageCounts.map((stage) => stage.count), 1);
+                return primary.stageCounts.map((stage) => (
+                  <div key={stage.status} className="flex items-center gap-3">
+                    <span className="w-28 shrink-0 text-xs font-bold text-slate-500">{stage.label}</span>
+                    <div className="h-7 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={
+                          stage.status === 'won'
+                            ? 'flex h-full items-center rounded-full bg-emerald-500 px-2.5'
+                            : 'flex h-full items-center rounded-full bg-[#1B3C6C] px-2.5'
+                        }
+                        style={{ width: `${Math.max((stage.count / maxCount) * 100, stage.count > 0 ? 9 : 0)}%` }}
+                      >
+                        {stage.count > 0 && (
+                          <span className="text-[0.65rem] font-black text-white">{stage.count}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
@@ -370,6 +451,9 @@ export default function PortalPerformance() {
                     <th className="px-4 py-3">Consultations Completed</th>
                     <th className="px-4 py-3">Proposals Sent</th>
                     <th className="px-4 py-3">Won Deals</th>
+                    <th className="px-4 py-3">Win Rate</th>
+                    <th className="px-4 py-3">Follow-Ups Due</th>
+                    <th className="px-4 py-3">Avg Days to Close</th>
                     <th className="px-4 py-3">Pending Commission</th>
                     <th className="px-4 py-3">Closed Volume</th>
                   </tr>
@@ -382,6 +466,9 @@ export default function PortalPerformance() {
                       <td className="px-4 py-4 font-semibold">{rep.appointmentsCompleted}</td>
                       <td className="px-4 py-4 font-semibold">{rep.proposalsSent}</td>
                       <td className="px-4 py-4 font-semibold">{rep.wonDeals}</td>
+                      <td className="px-4 py-4 font-semibold">{rep.winRate}%</td>
+                      <td className="px-4 py-4 font-semibold">{rep.followUpsDueThisWeek}</td>
+                      <td className="px-4 py-4 font-semibold">{rep.avgDaysToClose > 0 ? `${rep.avgDaysToClose}d` : '—'}</td>
                       <td className="px-4 py-4 font-bold">{formatCurrency(rep.pendingCommission)}</td>
                       <td className="px-4 py-4 font-black">{formatCurrency(rep.closedVolume)}</td>
                     </tr>

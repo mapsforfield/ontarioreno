@@ -45,32 +45,117 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const repIds = Object.keys(byRep);
-    if (repIds.length === 0) return res.status(200).json({ ok: true, sent: 0 });
 
-    const subs = await prisma.pushSubscription.findMany({
-      where: { userId: { in: repIds } },
-    });
+    let sent = 0;
+    if (repIds.length > 0) {
+      const subs = await prisma.pushSubscription.findMany({
+        where: { userId: { in: repIds } },
+      });
 
-    const results = await Promise.allSettled(
-      subs.map((sub) => {
-        const repApts = byRep[sub.userId] ?? [];
-        const count = repApts.length;
-        const first = repApts[0];
-        const body =
-          count === 1
-            ? `${first.customerName} at ${first.appointmentTime || 'time TBD'}`
-            : `${count} consultations — first at ${first.appointmentTime || 'time TBD'}`;
-        return sendPush(sub.endpoint, sub.p256dh, sub.auth, {
-          title: `Good morning — ${count} consultation${count !== 1 ? 's' : ''} today`,
-          body,
-          url: '/portal/appointments',
-          tag: 'daily-brief',
+      const results = await Promise.allSettled(
+        subs.map((sub) => {
+          const repApts = byRep[sub.userId] ?? [];
+          const count = repApts.length;
+          const first = repApts[0];
+          const body =
+            count === 1
+              ? `${first.customerName} at ${first.appointmentTime || 'time TBD'}`
+              : `${count} consultations — first at ${first.appointmentTime || 'time TBD'}`;
+          return sendPush(sub.endpoint, sub.p256dh, sub.auth, {
+            title: `Good morning — ${count} consultation${count !== 1 ? 's' : ''} today`,
+            body,
+            url: '/portal/appointments',
+            tag: 'daily-brief',
+          });
+        })
+      );
+      sent = results.filter((r) => r.status === 'fulfilled').length;
+    }
+
+    // ── Follow-up digest: email each rep their deals due (or overdue) today ──
+    let followUpEmailsSent = 0;
+    try {
+      const openStatuses = ['new_lead', 'appointment_booked', 'quoted', 'negotiating'];
+      const dueDeals = await prisma.deal.findMany({
+        where: {
+          nextFollowUpDate: { lte: today, gt: '' },
+          status: { in: openStatuses },
+          isHistorical: false,
+        },
+        orderBy: { nextFollowUpDate: 'asc' },
+      });
+
+      const dealsByRep: Record<string, typeof dueDeals> = {};
+      for (const deal of dueDeals) {
+        if (!dealsByRep[deal.assignedRepId]) dealsByRep[deal.assignedRepId] = [];
+        dealsByRep[deal.assignedRepId].push(deal);
+      }
+
+      const dueRepIds = Object.keys(dealsByRep);
+      if (dueRepIds.length > 0 && process.env.RESEND_API_KEY) {
+        const reps = await prisma.user.findMany({
+          where: { id: { in: dueRepIds }, active: true },
+          select: { id: true, name: true, email: true },
         });
-      })
-    );
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
+        const fmtMoney = (v: number) =>
+          new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(v);
 
-    const sent = results.filter((r) => r.status === 'fulfilled').length;
-    return res.status(200).json({ ok: true, sent });
+        const emailResults = await Promise.allSettled(
+          reps
+            .filter((rep) => rep.email)
+            .map((rep) => {
+              const repDeals = dealsByRep[rep.id];
+              const rows = repDeals
+                .map((deal) => {
+                  const overdue = deal.nextFollowUpDate < today;
+                  return `<tr>
+                    <td width="4" style="width:4px;background:${overdue ? '#b91c1c' : '#1B3C6C'};">&nbsp;</td>
+                    <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+                      <p style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">${deal.homeownerName}</p>
+                      <p style="margin:2px 0 0;font-size:13px;color:#64748b;">${[deal.city, deal.projectType].filter(Boolean).join(' · ')} · ${fmtMoney(deal.estimatedJobValue)}</p>
+                      <p style="margin:4px 0 0;font-size:12px;font-weight:700;color:${overdue ? '#b91c1c' : '#475569'};">${overdue ? `Overdue — was due ${deal.nextFollowUpDate}` : 'Due today'}</p>
+                    </td>
+                  </tr>`;
+                })
+                .join('');
+              const count = repDeals.length;
+              const subject = `Follow-ups due today: ${count} deal${count !== 1 ? 's' : ''}`;
+              const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4f8;padding:32px 12px;">
+<div style="max-width:580px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+  <div style="background:#1B3C6C;padding:28px 24px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);">OntarioReno · Daily Follow-Ups</p>
+    <p style="margin:0;font-size:20px;font-weight:800;color:#fff;">${count} follow-up${count !== 1 ? 's' : ''} need${count === 1 ? 's' : ''} your attention</p>
+  </div>
+  <div style="padding:28px;">
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${rep.name}, here are the deals with follow-ups due today or overdue:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">${rows}</table>
+    <p style="margin:20px 0 0;text-align:center;"><a href="https://ontarioreno.ca/portal/deals" style="display:inline-block;background:#1B3C6C;color:#fff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:8px;">Open Pipeline</a></p>
+  </div>
+  <div style="padding:18px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">Sent automatically by <strong style="color:#64748b;">OntarioReno</strong> each morning</p></div>
+</div></body></html>`;
+              const text = [
+                `Hi ${rep.name},`,
+                '',
+                `You have ${count} follow-up${count !== 1 ? 's' : ''} due:`,
+                ...repDeals.map((deal) => {
+                  const overdue = deal.nextFollowUpDate < today;
+                  return `- ${deal.homeownerName} (${[deal.city, deal.projectType].filter(Boolean).join(', ')}) — ${fmtMoney(deal.estimatedJobValue)}${overdue ? ` — OVERDUE since ${deal.nextFollowUpDate}` : ' — due today'}`;
+                }),
+                '',
+                'Open the pipeline: https://ontarioreno.ca/portal/deals',
+              ].join('\n');
+              return resend.emails.send({ from, to: rep.email, subject, html, text });
+            })
+        );
+        followUpEmailsSent = emailResults.filter((r) => r.status === 'fulfilled').length;
+      }
+    } catch (err) {
+      console.error('[morning-brief] follow-up digest failed:', err);
+    }
+
+    return res.status(200).json({ ok: true, sent, followUpEmailsSent });
   }
 
   // ── Appointment reminder cron (runs every 5 min) ──────────────────────────

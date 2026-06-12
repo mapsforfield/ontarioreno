@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -174,12 +174,52 @@ function getValueRange(value: number) {
   return `${formatRangeValue(lower)}-${formatRangeValue(upper)}`;
 }
 
+const openDealStatuses: DealStatus[] = ['new_lead', 'appointment_booked', 'quoted', 'negotiating'];
+
+function getDaysSinceUpdate(deal: Deal): number {
+  return Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86_400_000);
+}
+
 function getDealRot(deal: Deal): { days: number; level: 'warn' | 'danger' } | null {
-  if (deal.status !== 'negotiating') return null;
-  const days = Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86_400_000);
-  if (days >= 14) return { days, level: 'danger' };
-  if (days >= 7)  return { days, level: 'warn' };
+  if (!openDealStatuses.includes(deal.status)) return null;
+  const days = getDaysSinceUpdate(deal);
+  if (days >= 30) return { days, level: 'danger' };
+  if (days >= 14) return { days, level: 'warn' };
   return null;
+}
+
+function formatShortDate(iso: string) {
+  if (!iso) return '';
+  try {
+    return new Intl.DateTimeFormat('en-CA', { month: 'short', day: 'numeric' }).format(
+      new Date(`${iso}T00:00:00`)
+    );
+  } catch {
+    return iso;
+  }
+}
+
+function todayIso() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+type ValueFilter = 'all' | 'under50' | '50to100' | 'over100';
+type WonRange = 'month' | 'quarter' | 'all';
+
+function isWonDealInRange(deal: Deal, range: WonRange): boolean {
+  if (range === 'all') return true;
+  const updated = new Date(deal.updatedAt);
+  const now = new Date();
+  if (range === 'month') {
+    return updated.getFullYear() === now.getFullYear() && updated.getMonth() === now.getMonth();
+  }
+  // quarter
+  const quarter = Math.floor(now.getMonth() / 3);
+  return (
+    updated.getFullYear() === now.getFullYear() &&
+    Math.floor(updated.getMonth() / 3) === quarter
+  );
 }
 
 export default function PortalDeals() {
@@ -223,6 +263,77 @@ export default function PortalDeals() {
   const columnsToRender = mobileStageFilter
     ? columns.filter((col) => col.status === mobileStageFilter)
     : columns;
+
+  // ── Search + filters ──────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const [repFilter, setRepFilter] = useState('all');
+  const [contractorFilter, setContractorFilter] = useState('all');
+  const [valueFilter, setValueFilter] = useState<ValueFilter>('all');
+  const [staleOnly, setStaleOnly] = useState(false);
+  const [wonRange, setWonRange] = useState<WonRange>('all');
+  const [showOlderWon, setShowOlderWon] = useState(false);
+
+  // ── Drag-and-drop + context menu ──────────────────────────────
+  const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<DealStatus | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; deal: Deal } | null>(null);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const hasActiveFilters =
+    normalizedQuery !== '' ||
+    repFilter !== 'all' ||
+    contractorFilter !== 'all' ||
+    valueFilter !== 'all' ||
+    staleOnly;
+  const filteredDeals = visibleDeals.filter((deal) => {
+    if (normalizedQuery) {
+      const haystack =
+        `${deal.homeownerName} ${deal.city} ${deal.projectType} ${deal.address} ${deal.email} ${deal.phone}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+    if (repFilter !== 'all' && deal.assignedRepId !== repFilter) return false;
+    if (contractorFilter === 'unassigned') {
+      if (deal.assignedContractorId) return false;
+    } else if (contractorFilter !== 'all' && deal.assignedContractorId !== contractorFilter) {
+      return false;
+    }
+    if (valueFilter === 'under50' && deal.estimatedJobValue >= 50_000) return false;
+    if (valueFilter === '50to100' && (deal.estimatedJobValue < 50_000 || deal.estimatedJobValue > 100_000)) return false;
+    if (valueFilter === 'over100' && deal.estimatedJobValue <= 100_000) return false;
+    if (staleOnly && !getDealRot(deal)) return false;
+    return true;
+  });
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setRepFilter('all');
+    setContractorFilter('all');
+    setValueFilter('all');
+    setStaleOnly(false);
+  };
+
+  const moveDealToStatus = (deal: Deal, status: DealStatus) => {
+    setContextMenu(null);
+    if (deal.status === status || !currentUser) return;
+    updateDeal(deal.id, { status }, currentUser);
+  };
+
+  // Close the right-click context menu on outside click, Escape, or scroll
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [contextMenu]);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [isAddingDeal, setIsAddingDeal] = useState(false);
   const [form, setForm] = useState<DealFormState>(emptyDealForm);
@@ -787,9 +898,102 @@ OntarioReno Broker Portal`;
       })()}
 
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-500">
-          <Search className="h-4 w-4" />
-          <span className="text-sm font-semibold">Search deals placeholder</span>
+        <div className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2.5 transition focus-within:border-[#1B3C6C] focus-within:bg-white">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search by name, city, project type, address…"
+            className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <select
+              value={repFilter}
+              onChange={(event) => setRepFilter(event.target.value)}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+                repFilter !== 'all'
+                  ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
+                  : 'border-slate-200 bg-white text-slate-600'
+              )}
+            >
+              <option value="all">All Reps</option>
+              {reps.map((rep) => (
+                <option key={rep.id} value={rep.id}>
+                  {rep.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <select
+            value={contractorFilter}
+            onChange={(event) => setContractorFilter(event.target.value)}
+            className={cn(
+              'max-w-[11rem] rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              contractorFilter !== 'all'
+                ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
+                : 'border-slate-200 bg-white text-slate-600'
+            )}
+          >
+            <option value="all">All Contractors</option>
+            <option value="unassigned">Unassigned</option>
+            {contractors.map((contractor) => (
+              <option key={contractor.id} value={contractor.id}>
+                {contractor.companyName}
+              </option>
+            ))}
+          </select>
+          <select
+            value={valueFilter}
+            onChange={(event) => setValueFilter(event.target.value as ValueFilter)}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              valueFilter !== 'all'
+                ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
+                : 'border-slate-200 bg-white text-slate-600'
+            )}
+          >
+            <option value="all">Any Value</option>
+            <option value="under50">Under $50k</option>
+            <option value="50to100">$50k – $100k</option>
+            <option value="over100">Over $100k</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setStaleOnly((current) => !current)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+              staleOnly
+                ? 'border-amber-400 bg-amber-50 text-amber-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300'
+            )}
+          >
+            <Clock className="h-3 w-3" />
+            Stale only
+          </button>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-slate-400 transition hover:text-slate-600"
+            >
+              <X className="h-3 w-3" />
+              Clear ({filteredDeals.length} of {visibleDeals.length} shown)
+            </button>
+          )}
         </div>
       </section>
 
@@ -802,7 +1006,7 @@ OntarioReno Broker Portal`;
               type="button"
               onClick={() => setMobileStageFilter(null)}
               className={cn(
-                'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[0.68rem] font-bold transition',
+                'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[0.68rem] font-bold transition',
                 mobileStageFilter === null
                   ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
@@ -815,12 +1019,12 @@ OntarioReno Broker Portal`;
                   mobileStageFilter === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                 )}
               >
-                {visibleDeals.length}
+                {filteredDeals.length}
               </span>
             </button>
 
             {columns.map((col, colIndex) => {
-              const stageCount = visibleDeals.filter((d) => d.status === col.status).length;
+              const stageCount = filteredDeals.filter((d) => d.status === col.status).length;
               const isActive = mobileStageFilter === col.status;
               const isWon = col.status === 'won';
               const isLost = col.status === 'lost';
@@ -838,7 +1042,7 @@ OntarioReno Broker Portal`;
                     type="button"
                     onClick={() => setMobileStageFilter(isActive ? null : col.status)}
                     className={cn(
-                      'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[0.68rem] font-bold transition',
+                      'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[0.68rem] font-bold transition',
                       isActive
                         ? isWon
                           ? 'border-emerald-600 bg-emerald-600 text-white'
@@ -870,7 +1074,7 @@ OntarioReno Broker Portal`;
 
         {/* Stage summary when a filter is active */}
         {mobileStageFilter && (() => {
-          const stageDeals = visibleDeals.filter((d) => d.status === mobileStageFilter);
+          const stageDeals = filteredDeals.filter((d) => d.status === mobileStageFilter);
           const stageValue = stageDeals.reduce((sum, d) => sum + d.estimatedJobValue, 0);
           const stageLabel = columns.find((c) => c.status === mobileStageFilter)?.label ?? '';
           return (
@@ -890,18 +1094,53 @@ OntarioReno Broker Portal`;
       <section className="w-full overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]">
         <div className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
           {columnsToRender.map((column) => {
-            const columnDeals = visibleDeals.filter(
+            const isWonColumn = column.status === 'won';
+            const allColumnDeals = filteredDeals.filter(
               (deal) => deal.status === column.status
             );
-            const columnTotal = columnDeals.reduce((sum, d) => sum + (d.estimatedJobValue || 0), 0);
+            // Won column: date-range toggle + collapse deals older than 90 days
+            const rangeFiltered = isWonColumn
+              ? allColumnDeals.filter((deal) => isWonDealInRange(deal, wonRange))
+              : allColumnDeals;
+            const recentDeals =
+              isWonColumn && wonRange === 'all' && !showOlderWon
+                ? rangeFiltered.filter((deal) => getDaysSinceUpdate(deal) < 90)
+                : rangeFiltered;
+            const hiddenOlderCount = rangeFiltered.length - recentDeals.length;
+            const columnDeals = recentDeals;
+            const columnTotal = rangeFiltered.reduce((sum, d) => sum + (d.estimatedJobValue || 0), 0);
             const columnTotalLabel = columnTotal > 0
               ? new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(columnTotal)
               : null;
+            const isDropTarget = dragOverColumn === column.status && draggingDealId !== null;
 
             return (
               <article
                 key={column.status}
-                className="min-h-[16rem] rounded-[0.5rem] border border-white bg-white p-4 shadow-sm"
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  if (dragOverColumn !== column.status) setDragOverColumn(column.status);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                    setDragOverColumn(null);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOverColumn(null);
+                  const dealId = event.dataTransfer.getData('text/deal-id') || draggingDealId;
+                  setDraggingDealId(null);
+                  const deal = visibleDeals.find((d) => d.id === dealId);
+                  if (deal) moveDealToStatus(deal, column.status);
+                }}
+                className={cn(
+                  'min-h-[16rem] rounded-[0.5rem] border bg-white p-4 shadow-sm transition',
+                  isDropTarget
+                    ? 'border-[#1B3C6C] ring-2 ring-[#1B3C6C]/25'
+                    : 'border-white'
+                )}
               >
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
                   <div className="min-w-0">
@@ -913,9 +1152,32 @@ OntarioReno Broker Portal`;
                     )}
                   </div>
                   <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500">
-                    {columnDeals.length}
+                    {rangeFiltered.length}
                   </span>
                 </div>
+                {isWonColumn && allColumnDeals.length > 0 && (
+                  <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                    {([
+                      { label: 'Month', value: 'month' },
+                      { label: 'Quarter', value: 'quarter' },
+                      { label: 'All', value: 'all' },
+                    ] as Array<{ label: string; value: WonRange }>).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setWonRange(option.value)}
+                        className={cn(
+                          'flex-1 rounded-full px-2 py-1 text-[0.65rem] font-black transition',
+                          wonRange === option.value
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {columnDeals.length > 0 ? (
                   <div className="mt-4 space-y-3">
                     {columnDeals.map((deal) => {
@@ -928,18 +1190,51 @@ OntarioReno Broker Portal`;
                         : undefined;
                       const rot = getDealRot(deal);
 
+                      const daysInStage = getDaysSinceUpdate(deal);
+                      const isOpenDeal = openDealStatuses.includes(deal.status);
+                      const followUpOverdue =
+                        isOpenDeal && deal.nextFollowUpDate !== '' && deal.nextFollowUpDate < todayIso();
+
                       return (
-                        <button
+                        <div
                           key={deal.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData('text/deal-id', deal.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            setDraggingDealId(deal.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingDealId(null);
+                            setDragOverColumn(null);
+                          }}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setContextMenu({
+                              x: Math.min(event.clientX, window.innerWidth - 230),
+                              y: Math.min(event.clientY, window.innerHeight - 300),
+                              deal,
+                            });
+                          }}
                           onClick={() => openDeal(deal)}
-                          className={`w-full rounded-[0.5rem] border p-3 text-left transition hover:bg-white ${
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              openDeal(deal);
+                            }
+                          }}
+                          className={cn(
+                            'w-full cursor-grab rounded-[0.5rem] border p-3 text-left transition hover:bg-white active:cursor-grabbing',
+                            draggingDealId === deal.id && 'opacity-40',
                             rot?.level === 'danger'
                               ? 'border-red-200 bg-red-50 hover:border-red-300'
                               : rot?.level === 'warn'
                                 ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
                                 : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd]'
-                          }`}
+                          )}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-black text-slate-950">
@@ -966,10 +1261,52 @@ OntarioReno Broker Portal`;
                           <p className="mt-1 text-xs font-semibold text-slate-500">
                             {deal.city} - {deal.projectType}
                           </p>
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-black text-[#1B3C6C]">
-                              {formatCurrency(deal.estimatedJobValue)}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] font-bold text-slate-400">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-2.5 w-2.5" />
+                              {daysInStage === 0 ? 'Updated today' : `${daysInStage}d in stage`}
                             </span>
+                            {isOpenDeal && deal.nextFollowUpDate && (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1',
+                                  followUpOverdue ? 'text-red-500' : 'text-slate-400'
+                                )}
+                              >
+                                <CalendarClock className="h-2.5 w-2.5" />
+                                Follow-up {formatShortDate(deal.nextFollowUpDate)}
+                                {followUpOverdue && ' (overdue)'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-black text-[#1B3C6C]">
+                                {formatCurrency(deal.estimatedJobValue)}
+                              </span>
+                              {deal.phone && (
+                                <a
+                                  href={`tel:${deal.phone.replace(/[^+\d]/g, '')}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  draggable={false}
+                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] sm:h-7 sm:w-7"
+                                  aria-label={`Call ${deal.homeownerName}`}
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              {deal.email && (
+                                <a
+                                  href={`mailto:${deal.email}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  draggable={false}
+                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] sm:h-7 sm:w-7"
+                                  aria-label={`Email ${deal.homeownerName}`}
+                                >
+                                  <Mail className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                            </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                               {isAdmin && rep && (
                                 <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-bold text-[#1B3C6C]">
@@ -981,9 +1318,27 @@ OntarioReno Broker Portal`;
                               </span>
                             </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
+                    {isWonColumn && hiddenOlderCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowOlderWon(true)}
+                        className="w-full rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                      >
+                        Show {hiddenOlderCount} older deal{hiddenOlderCount !== 1 ? 's' : ''} (90+ days)
+                      </button>
+                    )}
+                    {isWonColumn && showOlderWon && wonRange === 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowOlderWon(false)}
+                        className="w-full rounded-[0.5rem] px-3 py-2 text-xs font-bold text-slate-400 transition hover:text-slate-600"
+                      >
+                        Hide older deals
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-6 flex min-h-36 flex-col items-center justify-center rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
@@ -1019,6 +1374,52 @@ OntarioReno Broker Portal`;
           })}
         </div>
       </section>
+
+      {/* ── Right-click context menu: quick status move ── */}
+      {contextMenu && (
+        <div
+          className="fixed z-[120] w-52 overflow-hidden rounded-[0.5rem] border border-slate-200 bg-white py-1 shadow-[0_12px_40px_rgba(15,23,42,0.18)]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <p className="truncate border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-900">
+            {contextMenu.deal.homeownerName}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setContextMenu(null);
+              openDeal(contextMenu.deal);
+            }}
+            className="block w-full px-3 py-2 text-left text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            Open deal
+          </button>
+          <p className="px-3 pb-1 pt-2 text-[0.6rem] font-black uppercase tracking-[0.12em] text-slate-400">
+            Move to
+          </p>
+          {columns
+            .filter((column) => column.status !== contextMenu.deal.status)
+            .map((column) => (
+              <button
+                key={column.status}
+                type="button"
+                onClick={() => moveDealToStatus(contextMenu.deal, column.status)}
+                className={cn(
+                  'block w-full px-3 py-2 text-left text-xs font-bold transition hover:bg-slate-50',
+                  column.status === 'won'
+                    ? 'text-emerald-700'
+                    : column.status === 'lost'
+                      ? 'text-red-600'
+                      : 'text-slate-700'
+                )}
+              >
+                {column.label}
+              </button>
+            ))}
+        </div>
+      )}
 
       {isPanelOpen && (
         <div className="fixed inset-0 z-[90] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">

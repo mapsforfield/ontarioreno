@@ -6,7 +6,7 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
@@ -36,6 +36,16 @@ function getDaysSince(value: string) {
 export default function PortalDashboard() {
   const navigate = useNavigate();
   const { currentUser } = usePortalAuth();
+
+  // Reps on mobile land on the appointments view — that's where their day starts.
+  // Only once per session so they can still visit the dashboard deliberately.
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'rep') return;
+    if (window.innerWidth >= 768) return;
+    if (sessionStorage.getItem('or-mobile-landed')) return;
+    sessionStorage.setItem('or-mobile-landed', '1');
+    navigate('/portal/appointments', { replace: true });
+  }, [currentUser, navigate]);
   const {
     calculateOpenDealsForUser,
     calculatePipelineValueForUser,
