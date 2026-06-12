@@ -1,16 +1,40 @@
-﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+
+/** commissionRate is confidential — only admins ever receive it. */
+function stripRate<T extends { commissionRate?: number }>(
+  contractor: T,
+  role: string
+): Omit<T, 'commissionRate'> | T {
+  if (role === 'admin') return contractor;
+  const { commissionRate, ...safe } = contractor;
+  void commissionRate;
+  return safe;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
   if (!user) return;
 
   if (req.method === 'GET') {
-    const contractors = await prisma.contractor.findMany({
-      orderBy: { companyName: 'asc' },
-    });
-    return res.status(200).json(contractors);
+    let contractors;
+    try {
+      contractors = await prisma.contractor.findMany({
+        orderBy: { companyName: 'asc' },
+      });
+    } catch {
+      // Self-healing migration: the commissionRate column may not exist yet
+      // (schema can't be pushed from local env — DB credentials live only in
+      // the Neon integration). Idempotent, runs at most once.
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "Contractor" ADD COLUMN IF NOT EXISTS "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0.085'
+      );
+      contractors = await prisma.contractor.findMany({
+        orderBy: { companyName: 'asc' },
+      });
+    }
+    return res.status(200).json(contractors.map((c) => stripRate(c, user.role)));
   }
 
   if (req.method === 'POST') {
@@ -18,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Admin only.' });
     }
     const data = req.body;
+    const rate = Number(data.commissionRate);
     const contractor = await prisma.contractor.create({
       data: {
         companyName: data.companyName,
@@ -38,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         averageProjectSize: data.averageProjectSize ?? 0,
         notes: data.notes ?? '',
         priorityScore: data.priorityScore ?? 0,
+        commissionRate: Number.isFinite(rate) ? Math.min(Math.max(rate, 0), 1) : 0.085,
       },
     });
     return res.status(201).json(contractor);

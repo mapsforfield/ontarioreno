@@ -1381,9 +1381,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           const contractor = current.contractors.find(
             (c) => c.id === contractorId
           );
+          // Lock the contractor's negotiated rate into the deal's commission
+          // (admin clients have the rate; reps don't receive it — the server
+          // performs the authoritative update either way). Won deals frozen.
+          const lockedRate =
+            deal && deal.status !== 'won' && contractor?.commissionRate != null
+              ? contractor.commissionRate
+              : null;
+          const commissions =
+            lockedRate !== null && deal
+              ? current.commissions.map((c) => {
+                  if (c.dealId !== dealId) return c;
+                  const repEst = Math.round(deal.estimatedJobValue * 0.05);
+                  const totalEst = Math.round(deal.estimatedJobValue * lockedRate);
+                  return {
+                    ...c,
+                    adminTotalCommissionRate: lockedRate,
+                    adminTotalEstimatedCommission: totalEst,
+                    adminNetCommission: totalEst - repEst,
+                  };
+                })
+              : current.commissions;
 
           return {
             ...current,
+            commissions,
             activities: deal
               ? prependActivity(current.activities, actor, {
                   actionLabel: contractor

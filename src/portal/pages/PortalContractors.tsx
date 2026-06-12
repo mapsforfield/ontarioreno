@@ -28,6 +28,8 @@ import { Deal, ProposalTemplateType } from '../data/types';
 
 type ContractorFormState = {
   averageProjectSize: string;
+  /** Percent string, e.g. "8.5" — stored on the contractor as a fraction (0.085) */
+  commissionRate: string;
   companyName: string;
   contactName: string;
   contractorStatus: Contractor['contractorStatus'];
@@ -73,6 +75,7 @@ const proposalTemplates: Array<{
 
 const emptyContractorForm: ContractorFormState = {
   averageProjectSize: '0',
+  commissionRate: '8.5',
   companyName: '',
   contactName: '',
   contractorStatus: 'active',
@@ -95,6 +98,9 @@ const emptyContractorForm: ContractorFormState = {
 function contractorToForm(contractor: Contractor): ContractorFormState {
   return {
     averageProjectSize: String(contractor.averageProjectSize),
+    commissionRate: String(
+      Math.round((contractor.commissionRate ?? 0.085) * 10000) / 100
+    ),
     companyName: contractor.companyName,
     contactName: contractor.contactName,
     contractorStatus: contractor.contractorStatus,
@@ -118,6 +124,9 @@ function contractorToForm(contractor: Contractor): ContractorFormState {
 function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
   return {
     averageProjectSize: Number(form.averageProjectSize) || 0,
+    // Percent → fraction, clamped to 0–100%
+    commissionRate:
+      Math.min(Math.max(Number(form.commissionRate) || 8.5, 0), 100) / 100,
     companyName: form.companyName.trim(),
     contactName: form.contactName.trim(),
     contractorStatus: form.contractorStatus,
@@ -921,6 +930,31 @@ export default function PortalContractors() {
                       }
                     />
                   </label>
+                  {isAdmin && (
+                    <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                      <span className="flex items-center gap-2">
+                        Total Commission Rate (%)
+                        <span className="rounded-full bg-[#fff6df] px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-[#8a6418]">
+                          Admin only
+                        </span>
+                      </span>
+                      <input
+                        max={100}
+                        min={0}
+                        step={0.1}
+                        type="number"
+                        value={form.commissionRate}
+                        onChange={(event) =>
+                          updateForm('commissionRate', event.target.value)
+                        }
+                      />
+                      <span className="text-xs font-medium text-slate-400">
+                        Reps always earn 5% — your net is everything above it.
+                        Applies to newly assigned deals only; existing deals keep
+                        the rate they locked in.
+                      </span>
+                    </label>
+                  )}
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     Email Footer Text
                     <textarea
@@ -1002,6 +1036,15 @@ export default function PortalContractors() {
                         'Priority Score',
                         String(selectedContractor.priorityScore),
                       ],
+                      // commissionRate is admin-only — the API strips it for reps
+                      ...(isAdmin
+                        ? [
+                            [
+                              'Total Commission Rate',
+                              `${Math.round((selectedContractor.commissionRate ?? 0.085) * 10000) / 100}%`,
+                            ],
+                          ]
+                        : []),
                       ['Internal Notes', selectedContractor.notes],
                     ].map(([label, value]) => {
                       const telHref =

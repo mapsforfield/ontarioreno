@@ -38,6 +38,9 @@ export type Contractor = {
   averageProjectSize: number;
   notes: string;
   priorityScore: number;
+  /** Total commission rate negotiated with this contractor (fraction, e.g. 0.085).
+   *  Admin-only — the API strips this field for non-admin users. */
+  commissionRate?: number;
 };
 
 export type DealStatus =

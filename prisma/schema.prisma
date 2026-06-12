@@ -59,6 +59,11 @@ model Contractor {
   averageProjectSize Float    @default(0)
   notes              String   @default("")
   priorityScore      Int      @default(0)
+  /// Total commission rate negotiated with this contractor (admin-only —
+  /// stripped from API responses for non-admins). Rep share is always 5%;
+  /// admin net is everything above it. Locks into a deal's commission record
+  /// at contractor-assignment time; renegotiations only affect new deals.
+  commissionRate     Float    @default(0.085)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

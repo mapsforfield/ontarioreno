@@ -104,7 +104,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const jobValue = data.estimatedJobValue ?? 0;
     const repEst = Math.round(jobValue * 0.05);
-    const adminTotalEst = Math.round(jobValue * 0.1);
+    // Total rate comes from the assigned contractor's negotiated rate;
+    // falls back to 10% until a contractor is assigned
+    let totalRate = 0.1;
+    if (data.assignedContractorId) {
+      const contractor = await prisma.contractor
+        .findUnique({
+          where: { id: data.assignedContractorId as string },
+          select: { commissionRate: true },
+        })
+        .catch(() => null);
+      if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
+    }
+    const adminTotalEst = Math.round(jobValue * totalRate);
 
     const deal = await prisma.deal.create({
       data: {

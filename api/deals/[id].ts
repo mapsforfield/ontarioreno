@@ -25,8 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'PUT' || req.method === 'PATCH') {
     const rawBody = req.body as Record<string, unknown> | null | undefined;
-    console.log('[deals/[id]] PATCH body keys:', Object.keys(rawBody ?? {}));
-    console.log('[deals/[id]] PATCH status value:', rawBody?.status);
     if (!rawBody || typeof rawBody !== 'object') {
       return res.status(400).json({ error: 'Invalid or missing request body.' });
     }
@@ -34,21 +32,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     void _act; void _ca; void _ua; void _id; void _p; void _d;
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
-    console.log('[deals/[id]] safeData status:', (safeData as Record<string, unknown>)?.status);
-    // If estimatedJobValue changed, update the commission record too
-    if (safeData.estimatedJobValue !== undefined) {
-      const jobValue = Number(safeData.estimatedJobValue);
-      const repEst = Math.round(jobValue * 0.05);
-      const adminTotalEst = Math.round(jobValue * 0.1);
-      await prisma.commission.updateMany({
-        where: { dealId: id },
-        data: {
-          repEstimatedCommission: repEst,
-          adminTotalEstimatedCommission: adminTotalEst,
-          adminNetCommission: adminTotalEst - repEst,
-        },
-      }).catch(() => { /* commission may not exist yet */ });
-    }
     try {
       const deal = await prisma.deal.update({
         where: { id },
@@ -59,9 +42,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           dispatches: { orderBy: { createdAt: 'desc' } },
         },
       });
-      // Verify what's actually in the DB after the update
-      const verify = await prisma.deal.findUnique({ where: { id }, select: { status: true } });
-      console.log('[deals/[id]] PATCH update.status:', deal.status, '| verify.status:', verify?.status, '| input was:', (safeData as Record<string, unknown>).status);
+
+      // ── Keep the commission record in sync ──
+      const jobValueChanged = safeData.estimatedJobValue !== undefined;
+      const contractorChanged = safeData.assignedContractorId !== undefined;
+      if (jobValueChanged || contractorChanged) {
+        try {
+          const commission = await prisma.commission.findUnique({ where: { dealId: id } });
+          if (commission) {
+            const jobValue = deal.estimatedJobValue;
+            const repEst = Math.round(jobValue * 0.05);
+            // The contractor's negotiated rate locks in at assignment time.
+            // Won deals are frozen — reassignment never rewrites a closed payout.
+            let totalRate = commission.adminTotalCommissionRate;
+            if (contractorChanged && deal.assignedContractorId && deal.status !== 'won') {
+              const contractor = await prisma.contractor
+                .findUnique({
+                  where: { id: deal.assignedContractorId },
+                  select: { commissionRate: true },
+                })
+                .catch(() => null);
+              if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
+            }
+            const adminTotalEst = Math.round(jobValue * totalRate);
+            await prisma.commission.update({
+              where: { dealId: id },
+              data: {
+                repEstimatedCommission: repEst,
+                adminTotalCommissionRate: totalRate,
+                adminTotalEstimatedCommission: adminTotalEst,
+                adminNetCommission: adminTotalEst - repEst,
+              },
+            });
+          }
+        } catch {
+          // commission sync is non-critical
+        }
+      }
+
       return res.status(200).json(deal);
     } catch (err) {
       console.error('[deals/[id]] PATCH failed:', err);
@@ -145,10 +163,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         data: { status: 'accepted', updatedAt: new Date() },
       });
 
-      await prisma.deal.update({
+      const updatedDeal = await prisma.deal.update({
         where: { id },
         data: { assignedContractorId: dispatch.contractorId },
       });
+
+      // Lock the contractor's negotiated rate into this deal's commission
+      // (won deals are frozen — never rewrite a closed payout)
+      if (updatedDeal.status !== 'won') {
+        try {
+          const contractor = await prisma.contractor.findUnique({
+            where: { id: dispatch.contractorId },
+            select: { commissionRate: true },
+          });
+          if (contractor?.commissionRate != null) {
+            const jobValue = updatedDeal.estimatedJobValue;
+            const repEst = Math.round(jobValue * 0.05);
+            const adminTotalEst = Math.round(jobValue * contractor.commissionRate);
+            await prisma.commission.updateMany({
+              where: { dealId: id },
+              data: {
+                repEstimatedCommission: repEst,
+                adminTotalCommissionRate: contractor.commissionRate,
+                adminTotalEstimatedCommission: adminTotalEst,
+                adminNetCommission: adminTotalEst - repEst,
+              },
+            });
+          }
+        } catch {
+          // commission sync is non-critical
+        }
+      }
 
       if (dispatch.consultationId) {
         // Only update consultationStage if it hasn't already been closed (won/lost)

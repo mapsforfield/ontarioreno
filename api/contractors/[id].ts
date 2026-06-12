@@ -11,6 +11,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const contractor = await prisma.contractor.findUnique({ where: { id } });
     if (!contractor) return res.status(404).json({ error: 'Not found.' });
+    if (user.role !== 'admin') {
+      // commissionRate is confidential — only admins ever receive it
+      const { commissionRate, ...safe } = contractor;
+      void commissionRate;
+      return res.status(200).json(safe);
+    }
     return res.status(200).json(contractor);
   }
 
@@ -18,9 +24,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin only.' });
     }
-    const { createdAt, updatedAt, id: _id, ...data } = req.body;
+    const { createdAt, updatedAt, id: _id, commissionRate: rawRate, ...data } = req.body;
     void createdAt; void updatedAt; void _id;
-    const contractor = await prisma.contractor.update({ where: { id }, data });
+    const rate = Number(rawRate);
+    const safeData = {
+      ...data,
+      ...(rawRate !== undefined && Number.isFinite(rate)
+        ? { commissionRate: Math.min(Math.max(rate, 0), 1) }
+        : {}),
+    };
+    const contractor = await prisma.contractor.update({ where: { id }, data: safeData });
     return res.status(200).json(contractor);
   }
 
