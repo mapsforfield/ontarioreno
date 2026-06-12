@@ -23,10 +23,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT' || req.method === 'PATCH') {
-    console.log('[deals/[id]] PATCH body keys:', Object.keys(req.body ?? {}));
-    console.log('[deals/[id]] PATCH status value:', (req.body as Record<string, unknown>)?.status);
-    const { activity, createdAt, updatedAt, id: _id, proposals: _p, dispatches: _d, assignedRepId: _repId, ...data } = req.body;
-    void activity; void createdAt; void updatedAt; void _id; void _p; void _d;
+    const rawBody = req.body as Record<string, unknown> | null | undefined;
+    console.log('[deals/[id]] PATCH body keys:', Object.keys(rawBody ?? {}));
+    console.log('[deals/[id]] PATCH status value:', rawBody?.status);
+    if (!rawBody || typeof rawBody !== 'object') {
+      return res.status(400).json({ error: 'Invalid or missing request body.' });
+    }
+    const { activity: _act, createdAt: _ca, updatedAt: _ua, id: _id, proposals: _p, dispatches: _d, assignedRepId: _repId, ...data } = rawBody;
+    void _act; void _ca; void _ua; void _id; void _p; void _d;
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
     console.log('[deals/[id]] safeData status:', (safeData as Record<string, unknown>)?.status);
@@ -54,7 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           dispatches: { orderBy: { createdAt: 'desc' } },
         },
       });
-      console.log('[deals/[id]] PATCH result status:', deal.status);
+      // Verify what's actually in the DB after the update
+      const verify = await prisma.deal.findUnique({ where: { id }, select: { status: true } });
+      console.log('[deals/[id]] PATCH update.status:', deal.status, '| verify.status:', verify?.status, '| input was:', (safeData as Record<string, unknown>).status);
       return res.status(200).json(deal);
     } catch (err) {
       console.error('[deals/[id]] PATCH failed:', err);
