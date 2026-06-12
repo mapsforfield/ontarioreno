@@ -23,10 +23,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT' || req.method === 'PATCH') {
+    console.log('[deals/[id]] PATCH body keys:', Object.keys(req.body ?? {}));
+    console.log('[deals/[id]] PATCH status value:', (req.body as Record<string, unknown>)?.status);
     const { activity, createdAt, updatedAt, id: _id, proposals: _p, dispatches: _d, assignedRepId: _repId, ...data } = req.body;
     void activity; void createdAt; void updatedAt; void _id; void _p; void _d;
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
+    console.log('[deals/[id]] safeData status:', (safeData as Record<string, unknown>)?.status);
     // If estimatedJobValue changed, update the commission record too
     if (safeData.estimatedJobValue !== undefined) {
       const jobValue = Number(safeData.estimatedJobValue);
@@ -51,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           dispatches: { orderBy: { createdAt: 'desc' } },
         },
       });
+      console.log('[deals/[id]] PATCH result status:', deal.status);
       return res.status(200).json(deal);
     } catch (err) {
       console.error('[deals/[id]] PATCH failed:', err);

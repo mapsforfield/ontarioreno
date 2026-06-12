@@ -1302,10 +1302,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         });
 
+        console.log('[updateDeal] sending status:', (updates as Record<string, unknown>).status, 'for deal:', dealId);
         apiCall<Deal>(`/api/deals/${dealId}`, {
           method: 'PATCH',
           body: JSON.stringify(updates),
         }).then((saved) => {
+          console.log('[updateDeal] response status:', saved?.status ?? 'null (failed)');
           if (saved) {
             // Update the deal with the authoritative server response
             setState((current) => ({
