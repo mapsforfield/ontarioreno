@@ -38,6 +38,7 @@ import {
 type CalendarView = 'day' | 'month' | 'week';
 type ConsultationFilter =
   | 'all'
+  | 'cancelled'
   | 'completed'
   | 'contractor_review'
   | 'lost'
@@ -151,6 +152,7 @@ const consultationFilters: Array<{ label: string; value: ConsultationFilter }> =
   { label: 'Contractor Review', value: 'contractor_review' },
   { label: 'Won', value: 'won' },
   { label: 'Lost', value: 'lost' },
+  { label: 'Cancelled', value: 'cancelled' },
 ];
 
 const interestOptions: Array<{
@@ -681,6 +683,9 @@ export default function PortalAppointments() {
     if (consultationFilter === 'needs_follow_up') {
       return appointment.consultationStage === 'follow_up_required';
     }
+    if (consultationFilter === 'cancelled') {
+      return appointment.status === 'cancelled';
+    }
     return appointment.consultationStage === consultationFilter;
   };
   const filteredAppointments = visibleAppointments.filter(
@@ -1124,7 +1129,7 @@ export default function PortalAppointments() {
     if (!selectedAppointment) return;
     if (
       window.confirm(
-        'Delete this consultation? This cannot be undone in the local prototype.'
+        'Delete this consultation? This cannot be undone.'
       )
     ) {
       deleteAppointment(selectedAppointment.id, currentUser);
@@ -4234,7 +4239,7 @@ export default function PortalAppointments() {
                   {selectedAppointment.dealId ? 'View Linked Deal' : 'Create Deal From Consultation'}
                 </button>
               )}
-              {selectedAppointment && (
+              {selectedAppointment && isAdmin && (
                 <button
                   type="button"
                   onClick={handleDeleteAppointment}
