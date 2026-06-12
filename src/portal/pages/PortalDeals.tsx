@@ -315,7 +315,8 @@ export default function PortalDeals() {
   const moveDealToStatus = (deal: Deal, status: DealStatus) => {
     setContextMenu(null);
     if (deal.status === status || !currentUser) return;
-    updateDeal(deal.id, { status }, currentUser);
+    // Moving stages implies the pending follow-up was completed — clear it
+    updateDeal(deal.id, { status, nextFollowUpDate: '' }, currentUser);
   };
 
   // Close the right-click context menu on outside click, Escape, or scroll
@@ -562,9 +563,15 @@ export default function PortalDeals() {
     if (isAddingDeal) {
       addDeal(dealPayload, currentUser.id, currentUser);
     } else if (selectedDeal) {
+      // Stage changed without setting a new follow-up date → the old
+      // follow-up belonged to the previous stage, assume it was completed
+      const statusChanged = form.status !== selectedDeal.status;
+      const followUpUntouched = form.nextFollowUpDate === selectedDeal.nextFollowUpDate;
       updateDeal(selectedDeal.id, {
         ...dealPayload,
         status: form.status,
+        nextFollowUpDate:
+          statusChanged && followUpUntouched ? '' : form.nextFollowUpDate,
       }, currentUser);
     }
 
