@@ -153,6 +153,8 @@ type PortalDataContextValue = PortalDataState & {
   deleteClient: (clientId: string) => Promise<void>;
   addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
   addSalesAgreement: (dealId: string, fileName: string, url: string) => Promise<SalesAgreement | null>;
+  /** Returns a short-lived signed URL for viewing/downloading a private agreement blob. */
+  getAgreementLink: (agreementId: string, dealId: string) => Promise<string | null>;
   deleteSalesAgreement: (id: string) => Promise<void>;
   removeDayOff: (id: string) => Promise<void>;
   addHousehold: (name: string, notes: string, memberIds: string[]) => Promise<Household | null>;
@@ -1947,6 +1949,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       // ── Sales Agreement mutations ───────────────────────────────────────────
+
+      getAgreementLink: async (agreementId, dealId) => {
+        const result = await apiCall<{ url: string }>(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'agreement_link', id: agreementId }),
+        });
+        return result?.url ?? null;
+      },
 
       addSalesAgreement: async (dealId, fileName, url) => {
         const agreement = await apiCall<SalesAgreement>(`/api/deals/${dealId}`, {

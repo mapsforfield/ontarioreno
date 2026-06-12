@@ -252,6 +252,7 @@ export default function PortalDeals() {
     calculateHistoricalSalesCount,
     salesAgreements,
     addSalesAgreement,
+    getAgreementLink,
     deleteSalesAgreement,
   } = usePortalData();
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
@@ -2238,6 +2239,20 @@ OntarioReno Broker Portal`;
 
               {!isAddingDeal && selectedDeal && (() => {
                 const dealAgreements = salesAgreements.filter((a) => a.dealId === selectedDeal.id);
+                const openAgreement = async (agreementId: string) => {
+                  setAgreementError('');
+                  // Open the tab synchronously so popup blockers allow it,
+                  // then point it at the signed URL once we have it
+                  const tab = window.open('about:blank', '_blank');
+                  const url = await getAgreementLink(agreementId, selectedDeal.id);
+                  if (url) {
+                    if (tab) tab.location.href = url;
+                    else window.location.href = url;
+                  } else {
+                    tab?.close();
+                    setAgreementError('Could not open the agreement. Try again.');
+                  }
+                };
                 const handleAgreementUpload = async (file: File) => {
                   setAgreementError('');
                   setAgreementUploading(true);
@@ -2248,7 +2263,8 @@ OntarioReno Broker Portal`;
                       `agreements/${selectedDeal.id}/${file.name}`,
                       file,
                       {
-                        access: 'public',
+                        // The store is configured private — public uploads are rejected
+                        access: 'private',
                         handleUploadUrl: `/api/deals/${selectedDeal.id}`,
                         contentType: file.type || 'application/pdf',
                       }
@@ -2297,23 +2313,22 @@ OntarioReno Broker Portal`;
                               <span className="shrink-0 text-xs text-slate-400">{new Date(agreement.createdAt).toLocaleDateString()}</span>
                             </div>
                             <div className="flex shrink-0 items-center gap-1">
-                              <a
-                                href={agreement.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openAgreement(agreement.id)}
                                 className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-                                title="View"
+                                title="View / Download"
                               >
                                 <FileText className="h-3.5 w-3.5" />
-                              </a>
-                              <a
-                                href={agreement.url}
-                                download={agreement.fileName}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAgreement(agreement.id)}
                                 className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                                 title="Download"
                               >
                                 <Download className="h-3.5 w-3.5" />
-                              </a>
+                              </button>
                               {isAdmin && (
                                 <button
                                   type="button"
