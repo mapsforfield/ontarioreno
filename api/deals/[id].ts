@@ -236,7 +236,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const clientToken = await generateClientTokenFromReadWriteToken({
         token: rwToken,
         pathname,
-        onUploadCompleted: { callbackUrl: '' },
+        // Random suffix makes the final URL long and unguessable
+        addRandomSuffix: true,
         maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
         allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
         validUntil: Date.now() + 5 * 60 * 1000, // 5 minutes

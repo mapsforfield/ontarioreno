@@ -1,6 +1,6 @@
 import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { upload } from '@vercel/blob/client';
+import { put } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
@@ -2245,12 +2245,12 @@ OntarioReno Broker Portal`;
                   try {
                     const tokenData = await getUploadToken(selectedDeal.id);
                     if (!tokenData) { setAgreementError('Could not get upload token. Check blob storage configuration.'); setAgreementUploading(false); return; }
-                    const blob = await upload(tokenData.pathname, file, {
-                      access: 'private',
-                      handleUploadUrl: '',
-                      clientPayload: '',
-                      // @ts-expect-error — pass token directly
+                    // put() uploads with a pre-issued client token; upload()
+                    // would try to fetch its own token and fail
+                    const blob = await put(tokenData.pathname, file, {
+                      access: 'public',
                       token: tokenData.clientToken,
+                      contentType: file.type || 'application/pdf',
                     });
                     await addSalesAgreement(selectedDeal.id, file.name, blob.url);
                   } catch (err) {
