@@ -3388,9 +3388,72 @@ export default function PortalAppointments() {
               </label>
               {/* Event-specific fields */}
               {isEventType(form.appointmentType) && (<>
+                {/* ── Client autofill search for events ── */}
+                {isCreating && (
+                  <div className="sm:col-span-2 relative">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      Invite existing client (optional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search by name, email, or phone…"
+                        value={clientSearch}
+                        onChange={(e) => { setClientSearch(e.target.value); setClientSearchOpen(true); }}
+                        onFocus={() => setClientSearchOpen(true)}
+                        className="w-full rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1B3C6C] focus:outline-none focus:ring-0"
+                      />
+                    </div>
+                    {clientSearchOpen && clientSearch.trim().length > 0 && (() => {
+                      const q = clientSearch.toLowerCase();
+                      const matches = clients.filter((c) =>
+                        c.name.toLowerCase().includes(q) ||
+                        (c.email ?? '').toLowerCase().includes(q) ||
+                        (c.phone ?? '').toLowerCase().includes(q)
+                      ).slice(0, 6);
+                      if (matches.length === 0) return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white p-3 shadow-lg">
+                          <p className="text-sm font-semibold text-slate-400">No clients found</p>
+                        </div>
+                      );
+                      return (
+                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
+                          {matches.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => {
+                                updateForm('customerName', c.name);
+                                updateForm('phone', c.phone ?? '');
+                                updateForm('email', c.email ?? '');
+                                updateForm('address', c.address ?? '');
+                                updateForm('city', c.city ?? '');
+                                updateForm('postalCode', c.postalCode ?? '');
+                                setClientSearch('');
+                                setClientSearchOpen(false);
+                              }}
+                              className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]"
+                            >
+                              <span className="text-sm font-black text-slate-900">{c.name}</span>
+                              <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Event Title
                   <input value={form.customerName} onChange={(event) => updateForm('customerName', event.target.value)} placeholder="e.g. Supplier meeting with ABC Co." />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Client Phone
+                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="Optional" />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Client Email
+                  <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} placeholder="Optional" />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Event Date
@@ -3425,18 +3488,10 @@ export default function PortalAppointments() {
                     ))}
                   </select>
                 </label>
-                {form.appointmentType === 'custom_event' && (
-                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                    Event Description
-                    <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} placeholder="Describe what this event is about…" />
-                  </label>
-                )}
-                {form.appointmentType !== 'custom_event' && (
-                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                    Notes
-                    <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} />
-                  </label>
-                )}
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  {form.appointmentType === 'custom_event' ? 'Event Description' : 'Notes'}
+                  <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} placeholder={form.appointmentType === 'custom_event' ? 'Describe what this event is about…' : ''} />
+                </label>
               </>)}
               {/* Consultation-specific fields */}
               {!isEventType(form.appointmentType) && (<>
