@@ -209,6 +209,9 @@ type WonRange = 'month' | 'quarter' | 'all';
 
 function isWonDealInRange(deal: Deal, range: WonRange): boolean {
   if (range === 'all') return true;
+  // Pre-portal imports don't carry real win dates (updatedAt = import date),
+  // so they only appear under "All" — Month/Quarter is for portal-era deals
+  if (deal.isHistorical) return false;
   const updated = new Date(deal.updatedAt);
   const now = new Date();
   if (range === 'month') {
