@@ -22,7 +22,10 @@ import {
   Activity,
   Appointment,
   ConsultationStage,
+  Household,
   ProposalHistory,
+  RepDayOff,
+  SalesAgreement,
   SaleTrackerRow,
   User,
 } from './types';
@@ -59,6 +62,9 @@ type PortalDataState = {
   activities: Activity[];
   appointments: Appointment[];
   clients: Client[];
+  daysOff: RepDayOff[];
+  households: Household[];
+  salesAgreements: SalesAgreement[];
   users: User[];
   contractors: Contractor[];
   dispatches: ContractorDispatch[];
@@ -145,6 +151,14 @@ type PortalDataContextValue = PortalDataState & {
   addClient: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'source' | 'createdByUserId'>) => Promise<Client | null>;
   updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
   deleteClient: (clientId: string) => Promise<void>;
+  addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
+  getUploadToken: (dealId: string) => Promise<{ clientToken: string; pathname: string } | null>;
+  addSalesAgreement: (dealId: string, fileName: string, url: string) => Promise<SalesAgreement | null>;
+  deleteSalesAgreement: (id: string) => Promise<void>;
+  removeDayOff: (id: string) => Promise<void>;
+  addHousehold: (name: string, notes: string, memberIds: string[]) => Promise<Household | null>;
+  updateHousehold: (householdId: string, updates: { name?: string; notes?: string; addMemberId?: string; removeMemberId?: string }) => Promise<Household | null>;
+  deleteHousehold: (householdId: string) => Promise<void>;
   getAppointmentsForClient: (clientId: string) => Appointment[];
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
@@ -208,6 +222,9 @@ const emptyState: PortalDataState = {
   activities: [],
   appointments: [],
   clients: [],
+  daysOff: [],
+  households: [],
+  salesAgreements: [],
   commissions: [],
   contractors: [],
   deals: [],
@@ -525,7 +542,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Activity[]>('/api/auth/activities'),
       apiCall<Client[]>('/api/appointments?_resource=clients'),
       apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows]) => {
+      apiCall<Household[]>('/api/appointments?_resource=households'),
+      apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
+      apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -543,6 +563,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         dispatches,
         proposals,
         clients: clients ?? [],
+        daysOff: daysOff ?? [],
+        households: households ?? [],
+        salesAgreements: salesAgreements ?? [],
         trackerRows: trackerRows ?? [],
         defaultCommissionRate: loadDefaultCommissionRate(),
       });
@@ -1133,6 +1156,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           commissions: [...current.commissions, createCommissionForDeal(deal, current.defaultCommissionRate)],
           appointments: current.appointments,
           clients: current.clients,
+          daysOff: current.daysOff,
+          households: current.households,
+          salesAgreements: current.salesAgreements,
           contractors: current.contractors,
           deals: [...current.deals, deal],
           dispatches: current.dispatches,
@@ -1172,6 +1198,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       updateDeal: (dealId, updates, actor) => {
         let clientIdForNotesSync: string | null = null;
         let linkedAppointmentIdForNotes: string | null = null;
+        const snapshotDeals = state.deals;
 
         setState((current) => {
           const previousDeal = current.deals.find((d) => d.id === dealId);
@@ -1275,9 +1302,20 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         });
 
-        apiCall(`/api/deals/${dealId}`, {
+        apiCall<Deal>(`/api/deals/${dealId}`, {
           method: 'PATCH',
           body: JSON.stringify(updates),
+        }).then((saved) => {
+          if (saved) {
+            // Update the deal with the authoritative server response
+            setState((current) => ({
+              ...current,
+              deals: current.deals.map((d) => d.id === dealId ? normalizeDeal(saved) : d),
+            }));
+          } else if (snapshotDeals) {
+            // PATCH failed — revert the optimistic update
+            setState((current) => ({ ...current, deals: snapshotDeals! }));
+          }
         });
 
         if (updates.notes !== undefined) {
@@ -1801,6 +1839,125 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
+      },
+
+      // ── Days off mutations ──────────────────────────────────────────────────
+
+      addDaysOff: async (dates, note, targetUserId) => {
+        const created = await apiCall<RepDayOff[]>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'add_days_off', dates, note, targetUserId }),
+        });
+        if (created) {
+          setState((current) => ({
+            ...current,
+            daysOff: [
+              ...current.daysOff.filter((d) => !created.some((c) => c.id === d.id)),
+              ...created,
+            ],
+          }));
+        }
+        return created ?? [];
+      },
+
+      removeDayOff: async (id) => {
+        await apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'remove_day_off', id }),
+        });
+        setState((current) => ({
+          ...current,
+          daysOff: current.daysOff.filter((d) => d.id !== id),
+        }));
+      },
+
+      // ── Household mutations ─────────────────────────────────────────────────
+
+      addHousehold: async (name, notes, memberIds) => {
+        const h = await apiCall<Household>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'create_household', name, notes, memberIds }),
+        });
+        if (h) {
+          setState((current) => ({
+            ...current,
+            households: [h, ...current.households],
+            clients: current.clients.map((c) =>
+              memberIds.includes(c.id) ? { ...c, householdId: h.id } : c
+            ),
+          }));
+        }
+        return h;
+      },
+
+      updateHousehold: async (householdId, updates) => {
+        const h = await apiCall<Household>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'update_household', id: householdId, ...updates }),
+        });
+        if (h) {
+          setState((current) => ({
+            ...current,
+            households: current.households.map((hh) => (hh.id === householdId ? h : hh)),
+            clients: current.clients.map((c) => {
+              if (updates.addMemberId && c.id === updates.addMemberId) return { ...c, householdId };
+              if (updates.removeMemberId && c.id === updates.removeMemberId) return { ...c, householdId: null };
+              return c;
+            }),
+          }));
+        }
+        return h;
+      },
+
+      deleteHousehold: async (householdId) => {
+        await apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_household', id: householdId }),
+        });
+        setState((current) => ({
+          ...current,
+          households: current.households.filter((h) => h.id !== householdId),
+          clients: current.clients.map((c) =>
+            c.householdId === householdId ? { ...c, householdId: null } : c
+          ),
+        }));
+      },
+
+      // ── Sales Agreement mutations ───────────────────────────────────────────
+
+      getUploadToken: async (dealId) => {
+        const result = await apiCall<{ clientToken: string; pathname: string }>(
+          `/api/deals/${dealId}`,
+          { method: 'POST', body: JSON.stringify({ _action: 'agreement_upload_token', dealId }) }
+        );
+        return result ?? null;
+      },
+
+      addSalesAgreement: async (dealId, fileName, url) => {
+        const agreement = await apiCall<SalesAgreement>(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'add_agreement', dealId, fileName, url }),
+        });
+        if (agreement) {
+          setState((current) => ({
+            ...current,
+            salesAgreements: [agreement, ...current.salesAgreements],
+          }));
+        }
+        return agreement ?? null;
+      },
+
+      deleteSalesAgreement: async (id) => {
+        const agreement = state.salesAgreements.find((a) => a.id === id);
+        if (!agreement) return;
+        await apiCall(`/api/deals/${agreement.dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_agreement', id }),
+        });
+        setState((current) => ({
+          ...current,
+          salesAgreements: current.salesAgreements.filter((a) => a.id !== id),
+        }));
       },
 
       // ── Client mutations ────────────────────────────────────────────────────

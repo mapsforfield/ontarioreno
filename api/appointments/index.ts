@@ -2,6 +2,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 import { Resend } from 'resend';
+import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 
 async function sendPush(
   endpoint: string,
@@ -208,6 +209,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(clients);
     }
 
+    // ── Days off list ──
+    if (req.query['_resource'] === 'days_off') {
+      const daysOff = await prisma.repDayOff.findMany({ orderBy: { date: 'asc' } });
+      return res.status(200).json(daysOff);
+    }
+
+    // ── Household list ──
+    if (req.query['_resource'] === 'households') {
+      const households = await prisma.household.findMany({
+        include: { members: { select: { id: true } } },
+        orderBy: { name: 'asc' },
+      });
+      return res.status(200).json(
+        households.map(({ members, ...h }) => ({ ...h, memberIds: members.map((m) => m.id) }))
+      );
+    }
+
     const appointments = await prisma.appointment.findMany({
       orderBy: { appointmentDate: 'desc' },
     });
@@ -259,6 +277,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Admin only
       if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
       await prisma.client.delete({ where: { id: data.id } });
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Days off CRUD actions ──
+    if (data._action === 'add_days_off') {
+      // dates: string[]  (YYYY-MM-DD), targetUserId optional (admin only)
+      const dates: string[] = Array.isArray(data.dates) ? data.dates : [];
+      if (dates.length === 0) return res.status(400).json({ error: 'No dates provided.' });
+      const targetUserId: string = (user.role === 'admin' && data.targetUserId) ? data.targetUserId : user.id;
+      const note: string = (data.note as string | undefined)?.trim() ?? '';
+      // upsert each date — skip duplicates
+      const created = await Promise.all(
+        dates.map((date) =>
+          prisma.repDayOff.upsert({
+            where: { userId_date: { userId: targetUserId, date } },
+            update: { note },
+            create: { userId: targetUserId, date, note },
+          })
+        )
+      );
+      return res.status(201).json(created);
+    }
+
+    if (data._action === 'remove_day_off') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const dayOff = await prisma.repDayOff.findUnique({ where: { id: data.id } });
+      if (!dayOff) return res.status(404).json({ error: 'Not found.' });
+      // Only the owning rep or an admin can remove
+      if (user.role !== 'admin' && dayOff.userId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden.' });
+      }
+      await prisma.repDayOff.delete({ where: { id: data.id } });
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Household CRUD actions ──
+    if (data._action === 'create_household') {
+      if (!data.name?.trim()) return res.status(400).json({ error: 'Household name is required.' });
+      const memberIds: string[] = Array.isArray(data.memberIds) ? data.memberIds : [];
+      const household = await prisma.household.create({
+        data: {
+          name: (data.name as string).trim(),
+          notes: (data.notes as string | undefined)?.trim() ?? '',
+          ...(memberIds.length ? { members: { connect: memberIds.map((id: string) => ({ id })) } } : {}),
+        },
+        include: { members: { select: { id: true } } },
+      });
+      return res.status(201).json({ ...household, memberIds: household.members.map((m) => m.id), members: undefined });
+    }
+
+    if (data._action === 'update_household') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const household = await prisma.household.update({
+        where: { id: data.id },
+        data: {
+          ...(data.name !== undefined ? { name: (data.name as string).trim() } : {}),
+          ...(data.notes !== undefined ? { notes: (data.notes as string).trim() } : {}),
+          ...(data.addMemberId ? { members: { connect: { id: data.addMemberId } } } : {}),
+          ...(data.removeMemberId ? { members: { disconnect: { id: data.removeMemberId } } } : {}),
+          updatedAt: new Date(),
+        },
+        include: { members: { select: { id: true } } },
+      });
+      return res.status(200).json({ ...household, memberIds: household.members.map((m) => m.id), members: undefined });
+    }
+
+    if (data._action === 'delete_household') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      await prisma.client.updateMany({ where: { householdId: data.id }, data: { householdId: null } });
+      await prisma.household.delete({ where: { id: data.id } });
       return res.status(200).json({ ok: true });
     }
 
@@ -373,11 +461,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Client auto-linking is non-critical
     }
 
-    // Best-effort push to assigned rep
+    // Best-effort push + email to assigned rep
     try {
-      const subs = await prisma.pushSubscription.findMany({
-        where: { userId: appointment.assignedRepId },
-      });
+      const rep = await prisma.user.findUnique({ where: { id: appointment.assignedRepId }, select: { name: true, email: true } });
+
+      // Push notification
+      const subs = await prisma.pushSubscription.findMany({ where: { userId: appointment.assignedRepId } });
       if (subs.length > 0) {
         await Promise.allSettled(
           subs.map((sub) =>
@@ -390,8 +479,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           )
         );
       }
+
+      // Email notification
+      if (rep?.email) {
+        await sendAppointmentNotification({
+          event: 'scheduled',
+          repName: rep.name,
+          repEmail: rep.email,
+          customerName: appointment.customerName,
+          appointmentDate: appointment.appointmentDate,
+          appointmentTime: appointment.appointmentTime,
+          address: appointment.address,
+          city: appointment.city,
+          title: appointment.title,
+        });
+      }
     } catch {
-      // push is non-critical
+      // notifications are non-critical
     }
 
     return res.status(201).json(appointment);

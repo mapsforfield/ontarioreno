@@ -33,6 +33,8 @@ model User {
   pushSubscriptions    PushSubscription[]
   clients              Client[]
   trackerRows          SaleTracker[]
+  daysOff              RepDayOff[]
+  salesAgreements      SalesAgreement[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -96,6 +98,7 @@ model Deal {
   dispatches         ContractorDispatch[]
   proposals          ProposalHistory[]
   activity           DealActivity[]
+  salesAgreements    SalesAgreement[]
 }
 
 model DealActivity {
@@ -107,23 +110,37 @@ model DealActivity {
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }
 
+// ─── Households ──────────────────────────────────────────────────────────────
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members Client[]
+}
+
 // ─── Clients ─────────────────────────────────────────────────────────────────
 
 model Client {
-  id            String   @id @default(cuid())
-  name          String
-  phone         String   @default("")
-  email         String   @default("")
-  address       String   @default("")
-  city          String   @default("")
-  postalCode    String   @default("")
-  projectTypes  String[]
-  internalNotes String   @default("")
-  source        String   @default("manual")
+  id              String    @id @default(cuid())
+  name            String
+  phone           String    @default("")
+  email           String    @default("")
+  address         String    @default("")
+  city            String    @default("")
+  postalCode      String    @default("")
+  projectTypes    String[]
+  internalNotes   String    @default("")
+  source          String    @default("manual")
+  householdId     String?
   createdByUserId String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
+  household    Household?    @relation(fields: [householdId], references: [id], onDelete: SetNull)
   createdBy    User          @relation(fields: [createdByUserId], references: [id])
   appointments Appointment[]
 }
@@ -176,8 +193,8 @@ model Appointment {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  deal        Deal?       @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  client      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
   assignedRep User        @relation("AssignedRep", fields: [assignedRepId], references: [id])
   contractor  Contractor? @relation(fields: [contractorId], references: [id])
   createdBy   User        @relation("CreatedBy", fields: [createdByUserId], references: [id])
@@ -267,6 +284,34 @@ model SaleTracker {
   updatedAt       DateTime @updatedAt
 
   rep  User  @relation(fields: [repId], references: [id])
+}
+
+// ─── Sales Agreements ────────────────────────────────────────────────────────
+
+model SalesAgreement {
+  id               String   @id @default(cuid())
+  dealId           String
+  fileName         String
+  url              String
+  uploadedByUserId String
+  createdAt        DateTime @default(now())
+
+  deal         Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  uploadedBy   User @relation(fields: [uploadedByUserId], references: [id])
+}
+
+// ─── Rep Days Off ─────────────────────────────────────────────────────────────
+
+model RepDayOff {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }
 
 // ─── Push Subscriptions ──────────────────────────────────────────────────────

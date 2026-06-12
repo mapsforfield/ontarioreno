@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { generateClientTokenFromReadWriteToken, del } from '@vercel/blob';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
@@ -40,16 +41,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       }).catch(() => { /* commission may not exist yet */ });
     }
-    const deal = await prisma.deal.update({
-      where: { id },
-      data: safeData,
-      include: {
-        activity: { orderBy: { createdAt: 'desc' } },
-        proposals: { orderBy: { sentAt: 'desc' } },
-        dispatches: { orderBy: { createdAt: 'desc' } },
-      },
-    });
-    return res.status(200).json(deal);
+    try {
+      const deal = await prisma.deal.update({
+        where: { id },
+        data: safeData,
+        include: {
+          activity: { orderBy: { createdAt: 'desc' } },
+          proposals: { orderBy: { sentAt: 'desc' } },
+          dispatches: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+      return res.status(200).json(deal);
+    } catch (err) {
+      console.error('[deals/[id]] PATCH failed:', err);
+      return res.status(500).json({ error: 'Failed to update deal.' });
+    }
   }
 
   if (req.method === 'POST') {
@@ -151,6 +157,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }).catch(() => { /* appointment may not exist */ });
       }
 
+      return res.status(200).json({ ok: true });
+    }
+
+    // Generate a short-lived client upload token for Vercel Blob
+    if (action === 'agreement_upload_token') {
+      const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (!rwToken) return res.status(500).json({ error: 'Blob storage not configured.' });
+      const pathname = `agreements/${id}/${Date.now()}.pdf`;
+      const clientToken = await generateClientTokenFromReadWriteToken({
+        token: rwToken,
+        pathname,
+        onUploadCompleted: { callbackUrl: '' },
+        maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
+        allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+        validUntil: Date.now() + 5 * 60 * 1000, // 5 minutes
+      });
+      return res.status(200).json({ clientToken, pathname });
+    }
+
+    // Save an uploaded agreement URL to the database
+    if (action === 'add_agreement') {
+      if (!body.url || !body.fileName) return res.status(400).json({ error: 'url and fileName required.' });
+      const agreement = await prisma.salesAgreement.create({
+        data: {
+          dealId: id,
+          fileName: body.fileName as string,
+          url: body.url as string,
+          uploadedByUserId: user.id,
+        },
+      });
+      return res.status(201).json(agreement);
+    }
+
+    // Delete an agreement record (and its blob)
+    if (action === 'delete_agreement') {
+      if (!body.id) return res.status(400).json({ error: 'Missing id.' });
+      const agreement = await prisma.salesAgreement.findUnique({ where: { id: body.id as string } });
+      if (!agreement) return res.status(404).json({ error: 'Not found.' });
+      await prisma.salesAgreement.delete({ where: { id: body.id as string } });
+      const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (rwToken) {
+        await del(agreement.url, { token: rwToken }).catch(() => { /* non-critical */ });
+      }
       return res.status(200).json({ ok: true });
     }
 

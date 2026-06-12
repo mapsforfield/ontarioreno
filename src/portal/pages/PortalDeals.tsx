@@ -1,5 +1,6 @@
-import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Clock, Mail, Plus, Search, Send, Trash2, X } from 'lucide-react';
+import { Archive, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
@@ -206,6 +207,10 @@ export default function PortalDeals() {
     users,
     calculateHistoricalSalesTotal,
     calculateHistoricalSalesCount,
+    salesAgreements,
+    getUploadToken,
+    addSalesAgreement,
+    deleteSalesAgreement,
   } = usePortalData();
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
   const visibleActivities = currentUser ? getActivitiesForUser(currentUser) : [];
@@ -224,6 +229,8 @@ export default function PortalDeals() {
   const [activityNote, setActivityNote] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [dealPendingDelete, setDealPendingDelete] = useState<Deal | null>(null);
+  const [agreementUploading, setAgreementUploading] = useState(false);
+  const [agreementError, setAgreementError] = useState('');
   const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
     useState<string | null>(null);
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
@@ -1818,6 +1825,101 @@ OntarioReno Broker Portal`;
                   )}
                 </section>
               )}
+
+              {!isAddingDeal && selectedDeal && (() => {
+                const dealAgreements = salesAgreements.filter((a) => a.dealId === selectedDeal.id);
+                const handleAgreementUpload = async (file: File) => {
+                  setAgreementError('');
+                  setAgreementUploading(true);
+                  try {
+                    const tokenData = await getUploadToken(selectedDeal.id);
+                    if (!tokenData) { setAgreementError('Could not get upload token. Check blob storage configuration.'); setAgreementUploading(false); return; }
+                    const blob = await upload(tokenData.pathname, file, {
+                      access: 'private',
+                      handleUploadUrl: '',
+                      clientPayload: '',
+                      // @ts-expect-error — pass token directly
+                      token: tokenData.clientToken,
+                    });
+                    await addSalesAgreement(selectedDeal.id, file.name, blob.url);
+                  } catch (err) {
+                    setAgreementError(err instanceof Error ? err.message : 'Upload failed.');
+                  }
+                  setAgreementUploading(false);
+                };
+                return (
+                  <section className="mt-6 rounded-[0.5rem] border border-emerald-200 bg-emerald-50/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Sales Agreement</p>
+                        <h3 className="mt-1 text-lg font-black text-slate-950">Signed Agreement</h3>
+                      </div>
+                      <label className={`inline-flex cursor-pointer items-center gap-2 rounded-[0.5rem] border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 ${agreementUploading ? 'pointer-events-none opacity-50' : ''}`}>
+                        <Upload className="h-4 w-4" />
+                        {agreementUploading ? 'Uploading…' : 'Attach PDF'}
+                        <input
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          className="sr-only"
+                          disabled={agreementUploading}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAgreementUpload(f); e.target.value = ''; }}
+                        />
+                      </label>
+                    </div>
+
+                    {agreementError && (
+                      <p className="mt-2 text-sm font-semibold text-red-600">{agreementError}</p>
+                    )}
+
+                    {dealAgreements.length === 0 ? (
+                      <p className="mt-3 rounded-[0.5rem] border border-dashed border-emerald-300 bg-white p-4 text-sm font-semibold text-slate-500">
+                        No agreements attached yet.
+                      </p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {dealAgreements.map((agreement) => (
+                          <div key={agreement.id} className="flex items-center justify-between gap-3 rounded-[0.5rem] border border-emerald-200 bg-white px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
+                              <span className="truncate text-sm font-bold text-slate-800">{agreement.fileName}</span>
+                              <span className="shrink-0 text-xs text-slate-400">{new Date(agreement.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <a
+                                href={agreement.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                                title="View"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                              </a>
+                              <a
+                                href={agreement.url}
+                                download={agreement.fileName}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                                title="Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteSalesAgreement(agreement.id)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
 
               {!isAddingDeal && selectedDeal && (
                 <section className="mt-6 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">

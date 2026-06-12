@@ -7,6 +7,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   if (req.method === 'GET') {
+    // ── Sales Agreements ──
+    if (req.query['_resource'] === 'agreements') {
+      const where = user.role === 'admin' ? {} : { deal: { assignedRepId: user.id } };
+      const agreements = await prisma.salesAgreement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
+      return res.status(200).json(agreements);
+    }
+
     // ── Sales Tracker rows ──
     if (req.query['_resource'] === 'tracker') {
       const where = user.role === 'admin' ? {} : { repId: user.id };

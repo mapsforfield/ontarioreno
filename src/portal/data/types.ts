@@ -165,7 +165,34 @@ export type Client = {
   projectTypes: string[];
   internalNotes: string;
   source: string;
+  householdId?: string | null;
   createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RepDayOff = {
+  id: string;
+  userId: string;
+  date: string;
+  note: string;
+  createdAt: string;
+};
+
+export type SalesAgreement = {
+  id: string;
+  dealId: string;
+  fileName: string;
+  url: string;
+  uploadedByUserId: string;
+  createdAt: string;
+};
+
+export type Household = {
+  id: string;
+  name: string;
+  notes: string;
+  memberIds: string[];
   createdAt: string;
   updatedAt: string;
 };

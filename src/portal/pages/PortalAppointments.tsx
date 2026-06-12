@@ -1,14 +1,17 @@
 import {
+  ArrowRightLeft,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Mail,
   MapPin,
   MoreVertical,
   Paperclip,
   Plus,
   Send,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
@@ -553,6 +556,7 @@ export default function PortalAppointments() {
     clients,
     createDealFromAppointment,
     contractors,
+    daysOff,
     deals,
     deleteAppointment,
     transferAppointment,
@@ -561,10 +565,21 @@ export default function PortalAppointments() {
     logActivity,
     updateContractorDispatch,
     updateAppointment,
+    addDaysOff,
+    removeDayOff,
     users,
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
+
+  // ── Days off panel ──
+  const [daysOffPanelOpen, setDaysOffPanelOpen] = useState(false);
+  const [daysOffRepFilter, setDaysOffRepFilter] = useState<string>('');
+  const [daysOffFromDate, setDaysOffFromDate] = useState('');
+  const [daysOffToDate, setDaysOffToDate] = useState('');
+  const [daysOffNote, setDaysOffNote] = useState('');
+  const [daysOffSaving, setDaysOffSaving] = useState(false);
+  const [daysOffError, setDaysOffError] = useState('');
   const [cursorDate, setCursorDate] = useState(new Date());
   const [selectedAppointmentId, setSelectedAppointmentId] =
     useState<string | null>(null);
@@ -595,6 +610,7 @@ export default function PortalAppointments() {
   // Which appointment is currently sending a reminder (keyed by id)
   const [reminderSending, setReminderSending] = useState<string | null>(null);
   const [reminderMessage, setReminderMessage] = useState<{ id: string; text: string } | null>(null);
+  const [reminderPreview, setReminderPreview] = useState<{ appointment: Appointment; preview: ConsultationEmailPreview; subjectOverride: string } | null>(null);
   // Which today's agenda rows are expanded (desktop compact view)
   const [expandedAgendaRows, setExpandedAgendaRows] = useState<Set<string>>(new Set());
   const [conflictWarning, setConflictWarning] = useState<Appointment | null>(null);
@@ -1162,23 +1178,30 @@ export default function PortalAppointments() {
     closePanel();
   };
 
-  const handleSendReminder = async (appointment: Appointment) => {
-    if (reminderSending) return;
+  const handleSendReminder = (appointment: Appointment) => {
     if (!appointment.email) {
       setReminderMessage({ id: appointment.id, text: 'No email address on file for this client.' });
       return;
     }
-    setReminderSending(appointment.id);
-    setReminderMessage(null);
     const preview = generateConsultationEmailPreview('booking_confirmation', {
       appointment,
       contractor: appointment.contractorId ? contractors.find((c) => c.id === appointment.contractorId) : undefined,
       deal: appointment.dealId ? getDeal(appointment.dealId) : undefined,
       rep: appointment.assignedRepId ? users.find((u) => u.id === appointment.assignedRepId) : undefined,
     });
-    const result = await sendEmail(preview, {
+    setReminderPreview({
+      appointment,
+      preview,
       subjectOverride: `Reminder: ${preview.subject}`,
     });
+  };
+
+  const handleConfirmSendReminder = async () => {
+    if (!reminderPreview || reminderSending) return;
+    const { appointment, preview, subjectOverride } = reminderPreview;
+    setReminderSending(appointment.id);
+    setReminderPreview(null);
+    const result = await sendEmail(preview, { subjectOverride });
     setReminderSending(null);
     if (result.ok) {
       setReminderMessage({ id: appointment.id, text: `Reminder sent to ${appointment.email}` });
@@ -1835,6 +1858,10 @@ export default function PortalAppointments() {
       (appointment) => appointment.appointmentDate === dateKey
     );
     const isOutsideMonth = date.getMonth() !== cursorDate.getMonth();
+    const repsOffToday = daysOff
+      .filter((d) => d.date === dateKey)
+      .map((d) => users.find((u) => u.id === d.userId))
+      .filter(Boolean) as typeof users;
 
     const openNewForDate = () => {
       setSelectedAppointmentId(null);
@@ -1860,11 +1887,28 @@ export default function PortalAppointments() {
               weekday: compact ? 'short' : 'long',
             }).format(date)}
           </p>
-          {dateKey === today && (
-            <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-black text-[#1B3C6C]">
-              Today
-            </span>
-          )}
+          <div className="flex items-center gap-1">
+            {dateKey === today && (
+              <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-black text-[#1B3C6C]">
+                Today
+              </span>
+            )}
+            {repsOffToday.length > 0 && (
+              <div className="flex items-center gap-0.5" title={repsOffToday.map((r) => `${r.name} — off`).join(', ')}>
+                {repsOffToday.slice(0, 3).map((rep) => (
+                  <span
+                    key={rep.id}
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-[0.55rem] font-black text-red-700"
+                  >
+                    {rep.avatarInitial}
+                  </span>
+                ))}
+                {repsOffToday.length > 3 && (
+                  <span className="text-[0.55rem] font-bold text-red-500">+{repsOffToday.length - 3}</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className={`${compact ? 'mt-2 space-y-2.5' : 'mt-3 space-y-3'}`}>
           {appointments.slice(0, compact ? 3 : 6).map((appointment) => (
@@ -1955,6 +1999,20 @@ export default function PortalAppointments() {
           </h1>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => {
+              setDaysOffRepFilter(isAdmin ? 'all' : (currentUser?.id ?? ''));
+              setDaysOffFromDate('');
+              setDaysOffToDate('');
+              setDaysOffNote('');
+              setDaysOffError('');
+              setDaysOffPanelOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            Days Off
+          </button>
           <button
             type="button"
             onClick={openCreatePanel}
@@ -3452,6 +3510,10 @@ export default function PortalAppointments() {
                   Event Title
                   <input value={form.customerName} onChange={(event) => updateForm('customerName', event.target.value)} placeholder="e.g. Supplier meeting with ABC Co." />
                 </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Address / Location
+                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="e.g. 123 Main St, showroom address, client's home…" />
+                </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Client Phone
                   <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="Optional" />
@@ -3485,6 +3547,11 @@ export default function PortalAppointments() {
                     ))}
                   </select>
                 </label>
+                {form.assignedRepId && form.appointmentDate && daysOff.some((d) => d.userId === form.assignedRepId && d.date === form.appointmentDate) && (
+                  <div className="sm:col-span-2 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                    ⚠ This rep has marked {form.appointmentDate} as a day off.
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Status
                   <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
@@ -4229,66 +4296,8 @@ export default function PortalAppointments() {
                 </section>
               )}
             </div>
-            <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
-              {selectedAppointment && (
-                <button
-                  type="button"
-                  onClick={handleCreateDealFromAppointment}
-                  className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] sm:mr-auto"
-                >
-                  {selectedAppointment.dealId ? 'View Linked Deal' : 'Create Deal From Consultation'}
-                </button>
-              )}
-              {selectedAppointment && isAdmin && (
-                <button
-                  type="button"
-                  onClick={handleDeleteAppointment}
-                  className="rounded-[0.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100"
-                >
-                  Delete
-                </button>
-              )}
-              {!isCreating && selectedAppointment && (isAdmin || selectedAppointment.assignedRepId === currentUser.id) && (
-                showTransferUI ? (
-                  <div className="flex items-center gap-2 sm:mr-auto">
-                    <select
-                      value={transferToRepId}
-                      onChange={(e) => setTransferToRepId(e.target.value)}
-                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-[#1B3C6C] focus:outline-none"
-                    >
-                      <option value="">Select rep…</option>
-                      {users
-                        .filter((u) => u.id !== selectedAppointment.assignedRepId)
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={handleTransfer}
-                      disabled={!transferToRepId || transferring}
-                      className="rounded-[0.5rem] bg-amber-500 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
-                    >
-                      {transferring ? 'Transferring…' : 'Confirm'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowTransferUI(false); setTransferToRepId(''); }}
-                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowTransferUI(true)}
-                    className="rounded-[0.5rem] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 sm:mr-auto"
-                  >
-                    Transfer
-                  </button>
-                )
-              )}
+            <div className="flex flex-col gap-3 border-t border-slate-200 p-5">
+              {/* Conflict warning — full width above buttons */}
               {conflictWarning && (
                 <div className="flex w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   <p className="font-semibold">Scheduling conflict detected</p>
@@ -4296,29 +4305,86 @@ export default function PortalAppointments() {
                     {conflictWarning.customerName} is already booked on {conflictWarning.appointmentDate} at {conflictWarning.appointmentTime}.
                   </p>
                   <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => { conflictOverrideRef.current = true; saveAppointment(); }}
-                      className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
-                    >
-                      Save Anyway
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConflictWarning(null)}
-                      className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
-                    >
-                      Go Back
-                    </button>
+                    <button type="button" onClick={() => { conflictOverrideRef.current = true; saveAppointment(); }} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Save Anyway</button>
+                    <button type="button" onClick={() => setConflictWarning(null)} className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100">Go Back</button>
                   </div>
                 </div>
               )}
-              <button type="button" onClick={closePanel} className="rounded-[0.5rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                Cancel
-              </button>
-              <button type="button" onClick={saveAppointment} className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#153158]">
-                {isCreating ? 'Schedule Consultation' : 'Save Consultation'}
-              </button>
+
+              {/* Secondary actions row */}
+              {!isCreating && selectedAppointment && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Send Reminder */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSendReminder(selectedAppointment)}
+                      disabled={reminderSending === selectedAppointment.id}
+                      className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:opacity-60"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      {reminderSending === selectedAppointment.id ? 'Sending…' : 'Send Reminder'}
+                    </button>
+                    {reminderMessage?.id === selectedAppointment.id && (
+                      <span className={`text-xs font-semibold ${reminderMessage.text.startsWith('Reminder sent') ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {reminderMessage.text}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Transfer */}
+                  {(isAdmin || selectedAppointment.assignedRepId === currentUser.id) && (
+                    showTransferUI ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={transferToRepId}
+                          onChange={(e) => setTransferToRepId(e.target.value)}
+                          className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-xs text-slate-700 focus:border-[#1B3C6C] focus:outline-none"
+                        >
+                          <option value="">Select rep…</option>
+                          {users.filter((u) => u.id !== selectedAppointment.assignedRepId).map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" onClick={handleTransfer} disabled={!transferToRepId || transferring} className="rounded-[0.5rem] bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50">
+                          {transferring ? 'Transferring…' : 'Confirm'}
+                        </button>
+                        <button type="button" onClick={() => { setShowTransferUI(false); setTransferToRepId(''); }} className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-50">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => setShowTransferUI(true)} className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100">
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        Transfer
+                      </button>
+                    )
+                  )}
+
+                  {/* Create / View Deal */}
+                  <button type="button" onClick={handleCreateDealFromAppointment} className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]">
+                    {selectedAppointment.dealId ? 'View Deal' : 'Create Deal'}
+                  </button>
+
+                  {/* Delete — rep can delete their own, admin can delete any */}
+                  {(isAdmin || selectedAppointment.assignedRepId === currentUser.id) && (
+                    <button type="button" onClick={handleDeleteAppointment} className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Primary actions row */}
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" onClick={closePanel} className="rounded-[0.5rem] border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                  Cancel
+                </button>
+                <button type="button" onClick={saveAppointment} className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#153158]">
+                  {isCreating ? 'Schedule Consultation' : 'Save Consultation'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -4523,6 +4589,236 @@ export default function PortalAppointments() {
               >
                 Mark as Sent
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reminder Email Preview Modal ── */}
+      {reminderPreview && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-[0.75rem] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.3)]" style={{ maxHeight: '90vh' }}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-600">Email Preview</p>
+                <p className="mt-1 text-base font-black text-slate-900">{reminderPreview.subjectOverride}</p>
+                <p className="mt-0.5 text-xs font-semibold text-slate-500">To: {reminderPreview.appointment.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReminderPreview(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <iframe
+                srcDoc={reminderPreview.preview.html}
+                className="h-full w-full border-0"
+                style={{ minHeight: '420px' }}
+                sandbox="allow-same-origin"
+                title="Email preview"
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setReminderPreview(null)}
+                className="rounded-[0.5rem] border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSendReminder}
+                className="rounded-[0.5rem] bg-sky-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700"
+              >
+                Send to Client
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Days Off Panel ── */}
+      {daysOffPanelOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Scheduling</p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Days Off</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDaysOffPanelOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-6">
+              {/* Mark dates off */}
+              <div className="rounded-[0.5rem] border border-slate-200 p-4 space-y-4">
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-slate-500">Mark Dates Off</p>
+
+                {isAdmin && (
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Rep
+                    <select
+                      value={daysOffRepFilter}
+                      onChange={(e) => setDaysOffRepFilter(e.target.value)}
+                      className="rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Select a rep…</option>
+                      {activeReps.map((rep) => (
+                        <option key={rep.id} value={rep.id}>{rep.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {/* Quick picks */}
+                <div className="flex gap-2">
+                  {[
+                    { label: 'Today', offset: 0 },
+                    { label: 'Tomorrow', offset: 1 },
+                  ].map(({ label, offset }) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + offset);
+                    const iso = d.toISOString().slice(0, 10);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => { setDaysOffFromDate(iso); setDaysOffToDate(''); }}
+                        className={`rounded-[0.5rem] border px-3 py-1.5 text-xs font-bold transition ${daysOffFromDate === iso && !daysOffToDate ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Date
+                    <input
+                      type="date"
+                      value={daysOffFromDate}
+                      onChange={(e) => setDaysOffFromDate(e.target.value)}
+                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    <span>To <span className="font-normal text-slate-400">(optional range)</span></span>
+                    <input
+                      type="date"
+                      value={daysOffToDate}
+                      min={daysOffFromDate}
+                      onChange={(e) => setDaysOffToDate(e.target.value)}
+                      className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Note (optional)
+                  <input
+                    type="text"
+                    value={daysOffNote}
+                    onChange={(e) => setDaysOffNote(e.target.value)}
+                    placeholder="e.g. Vacation, sick day…"
+                    className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+
+                {daysOffError && (
+                  <p className="text-sm font-semibold text-red-600">{daysOffError}</p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={daysOffSaving || !daysOffFromDate}
+                  onClick={async () => {
+                    const repId = isAdmin ? daysOffRepFilter : (currentUser?.id ?? '');
+                    if (isAdmin && !repId) { setDaysOffError('Please select a rep.'); return; }
+                    if (!daysOffFromDate) { setDaysOffError('Please select a start date.'); return; }
+                    setDaysOffError('');
+                    setDaysOffSaving(true);
+                    // Generate all dates in range
+                    const dates: string[] = [];
+                    const cursor = new Date(daysOffFromDate + 'T00:00:00');
+                    const end = new Date((daysOffToDate || daysOffFromDate) + 'T00:00:00');
+                    while (cursor <= end) {
+                      dates.push(cursor.toISOString().slice(0, 10));
+                      cursor.setDate(cursor.getDate() + 1);
+                    }
+                    await addDaysOff(dates, daysOffNote.trim(), isAdmin ? repId : undefined);
+                    setDaysOffFromDate('');
+                    setDaysOffToDate('');
+                    setDaysOffNote('');
+                    setDaysOffSaving(false);
+                  }}
+                  className="w-full rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-black text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {daysOffSaving ? 'Saving…' : 'Mark as Off'}
+                </button>
+              </div>
+
+              {/* Existing days off list */}
+              <div className="space-y-3">
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-slate-500">
+                  {isAdmin ? 'All Days Off' : 'Your Days Off'}
+                </p>
+                {(() => {
+                  const filtered = daysOff
+                    .filter((d) => isAdmin || d.userId === currentUser?.id)
+                    .sort((a, b) => a.date.localeCompare(b.date));
+                  if (filtered.length === 0) {
+                    return <p className="text-sm text-slate-400">No days off recorded.</p>;
+                  }
+                  // Group by userId for admin view
+                  const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, d) => {
+                    (acc[d.userId] ??= []).push(d);
+                    return acc;
+                  }, {});
+                  return Object.entries(grouped).map(([uid, entries]) => {
+                    const rep = users.find((u) => u.id === uid);
+                    return (
+                      <div key={uid}>
+                        {isAdmin && (
+                          <p className="mb-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                            {rep?.name ?? 'Unknown Rep'}
+                          </p>
+                        )}
+                        <div className="space-y-1.5">
+                          {entries.map((d) => (
+                            <div key={d.id} className="flex items-center justify-between gap-3 rounded-[0.5rem] border border-slate-100 bg-slate-50 px-3 py-2">
+                              <div>
+                                <span className="text-sm font-bold text-slate-800">{d.date}</span>
+                                {d.note && <span className="ml-2 text-xs text-slate-500">{d.note}</span>}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeDayOff(d.id)}
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                                aria-label="Remove"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
             </div>
           </div>
         </div>
