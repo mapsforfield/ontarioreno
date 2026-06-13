@@ -2329,7 +2329,7 @@ OntarioReno Broker Portal`;
                               >
                                 <Download className="h-3.5 w-3.5" />
                               </button>
-                              {isAdmin && (
+                              {canDeleteSelectedDeal && (
                                 <button
                                   type="button"
                                   onClick={() => deleteSalesAgreement(agreement.id)}

@@ -306,6 +306,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.id) return res.status(400).json({ error: 'Missing id.' });
       const agreement = await prisma.salesAgreement.findUnique({ where: { id: body.id as string } });
       if (!agreement) return res.status(404).json({ error: 'Not found.' });
+      // Admins, or the rep the deal is assigned to, may delete an agreement.
+      const agreementDeal = await prisma.deal.findUnique({
+        where: { id: agreement.dealId },
+        select: { assignedRepId: true },
+      });
+      if (user.role !== 'admin' && agreementDeal?.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'You can only delete agreements on your own deals.' });
+      }
       await prisma.salesAgreement.delete({ where: { id: body.id as string } });
       const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
       if (rwToken) {
