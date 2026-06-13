@@ -69,6 +69,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── /api/auth/ably-token ──────────────────────────────────────────────────────
+  // Issues a short-lived Ably token so the browser can connect to the realtime
+  // "doorbell" channel without ever seeing the root API key. Returns 503 when
+  // realtime isn't configured so the client can quietly fall back.
+  if (action === 'ably-token') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    const apiKey = process.env.ABLY_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'Realtime not configured.' });
+    try {
+      const { Rest } = await import('ably');
+      const client = new Rest(apiKey);
+      const tokenRequest = await client.auth.createTokenRequest({ clientId: user.id });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(tokenRequest);
+    } catch (err) {
+      console.error('[auth] ably-token failed:', err);
+      return res.status(500).json({ error: 'Could not issue realtime token.' });
+    }
+  }
+
   // ── /api/auth/me ─────────────────────────────────────────────────────────────
   if (action === 'me') {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });

@@ -1,6 +1,7 @@
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -485,6 +486,14 @@ function syncCommissionsWithDeals(
 
 // ─── API helper ───────────────────────────────────────────────────────────────
 
+// ── Realtime "doorbell" publisher ───────────────────────────────────────────
+// The Ably connection (set up in the provider) registers a publisher here.
+// Any successful write rings the doorbell so other open portals refetch.
+let changePublisher: (() => void) | null = null;
+export function setChangePublisher(fn: (() => void) | null) {
+  changePublisher = fn;
+}
+
 async function apiCall<T>(
   url: string,
   options?: RequestInit
@@ -498,6 +507,12 @@ async function apiCall<T>(
     if (!res.ok) {
       console.error(`[store] apiCall ${url} → ${res.status}`, await res.text().catch(() => ''));
       return null;
+    }
+    // After a successful mutating request, ring the realtime doorbell so other
+    // clients know to refetch. GETs don't change anything, so they stay quiet.
+    const method = (options?.method ?? 'GET').toUpperCase();
+    if (method !== 'GET') {
+      try { changePublisher?.(); } catch { /* realtime is best-effort */ }
     }
     return (await res.json()) as T;
   } catch (err) {
@@ -513,28 +528,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PortalDataState>(emptyState);
   const [isLoading, setIsLoading] = useState(true);
   const hasFetched = useRef(false);
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load all portal data from the API on mount.
-  // We only run this when on a /portal route so public pages don't fire
-  // unauthenticated API calls unnecessarily.
-  useEffect(() => {
-    if (!window.location.pathname.startsWith('/portal')) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Wait until auth check resolves and a user is confirmed before fetching.
-    // This prevents a race where GET /api/users fires before the JWT cookie
-    // is verified, causing a 401 and leaving the store empty.
-    if (isAuthLoading) return;
-    if (!currentUser) {
-      setIsLoading(false);
-      return;
-    }
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-
-    Promise.all([
+  // Fetch the full portal dataset. `silent` skips the loading flag so
+  // background refreshes (realtime pings, tab focus) don't flash a spinner.
+  const loadData = useCallback((silent = false) => {
+    if (!silent) setIsLoading(true);
+    return Promise.all([
       apiCall<User[]>('/api/users'),
       apiCall<Contractor[]>('/api/contractors'),
       apiCall<Deal[]>('/api/deals'),
@@ -572,8 +572,101 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
+  }, []);
+
+  // Debounced background refresh — collapses a burst of pings/focus events
+  // into a single refetch a beat later.
+  const scheduleRefetch = useCallback(() => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => { loadData(true); }, 600);
+  }, [loadData]);
+
+  // Initial load on mount.
+  // We only run this when on a /portal route so public pages don't fire
+  // unauthenticated API calls unnecessarily.
+  useEffect(() => {
+    if (!window.location.pathname.startsWith('/portal')) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Wait until auth check resolves and a user is confirmed before fetching.
+    // This prevents a race where GET /api/users fires before the JWT cookie
+    // is verified, causing a 401 and leaving the store empty.
+    if (isAuthLoading) return;
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, currentUser?.id]);
+
+  // Refresh when the rep returns to the tab — the zero-cost safety net that
+  // keeps data fresh even if realtime is unavailable.
+  useEffect(() => {
+    if (!currentUser) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefetch();
+    };
+    window.addEventListener('focus', scheduleRefetch);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', scheduleRefetch);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [currentUser?.id, scheduleRefetch]);
+
+  // Realtime "doorbell": subscribe to change pings and refetch instantly when
+  // another user changes something. Falls back silently (focus-refresh still
+  // works) when ABLY_API_KEY isn't configured — the token probe returns 503.
+  useEffect(() => {
+    if (!currentUser) return;
+    let realtime: { close: () => void; connection: { id?: string } } | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // Probe first so we never spin up a retry loop when realtime is off.
+      const probe = await fetch('/api/auth/ably-token', { credentials: 'include' })
+        .catch(() => null);
+      if (cancelled || !probe || !probe.ok) return;
+
+      const { Realtime } = await import('ably');
+      const client = new Realtime({
+        authCallback: async (_params, callback) => {
+          try {
+            const r = await fetch('/api/auth/ably-token', { credentials: 'include' });
+            if (!r.ok) throw new Error(`token ${r.status}`);
+            callback(null, await r.json());
+          } catch (err) {
+            callback(err instanceof Error ? err.message : 'token error', null);
+          }
+        },
+      });
+      if (cancelled) { client.close(); return; }
+      realtime = client as unknown as typeof realtime;
+
+      const channel = client.channels.get('portal-changes');
+      channel.subscribe('change', (msg) => {
+        // Ignore our own pings — we already applied the change optimistically.
+        if (msg.connectionId && msg.connectionId === client.connection.id) return;
+        scheduleRefetch();
+      });
+
+      // Register the publisher so every write rings the doorbell.
+      setChangePublisher(() => {
+        channel.publish('change', { at: Date.now() }).catch(() => { /* best-effort */ });
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      setChangePublisher(null);
+      if (realtime) realtime.close();
+    };
+  }, [currentUser?.id, scheduleRefetch]);
 
   const value = useMemo<PortalDataContextValue>(() => {
     const getDealsForRep = (repId: string) =>
