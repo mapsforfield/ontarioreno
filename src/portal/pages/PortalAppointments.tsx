@@ -3696,6 +3696,11 @@ export default function PortalAppointments() {
                     ))}
                   </select>
                 </label>
+                {form.assignedRepId && form.appointmentDate && daysOff.some((d) => d.userId === form.assignedRepId && d.date === form.appointmentDate) && (
+                  <div className="sm:col-span-2 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                    ⚠ This rep has marked {form.appointmentDate} as a day off.
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Assigned Contractor
                   <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)}>
