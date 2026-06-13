@@ -2269,7 +2269,7 @@ OntarioReno Broker Portal`;
                         contentType: file.type || 'application/pdf',
                       }
                     );
-                    await addSalesAgreement(selectedDeal.id, file.name, blob.url);
+                    await addSalesAgreement(selectedDeal.id, file.name, blob.url, currentUser);
                   } catch (err) {
                     setAgreementError(err instanceof Error ? err.message : 'Upload failed.');
                   }

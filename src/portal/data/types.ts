@@ -214,6 +214,9 @@ export type Activity = {
   contractorId?: string;
   createdAt: string;
   metadata?: Record<string, string | number | boolean | null>;
+  /** Client-only flag: a locally-created activity awaiting persistence to the
+   *  DB. Stripped before POST; never present on server-returned activities. */
+  pendingSync?: boolean;
 };
 
 export type Deal = {

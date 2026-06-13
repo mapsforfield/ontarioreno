@@ -153,7 +153,7 @@ type PortalDataContextValue = PortalDataState & {
   updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
   deleteClient: (clientId: string) => Promise<void>;
   addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
-  addSalesAgreement: (dealId: string, fileName: string, url: string) => Promise<SalesAgreement | null>;
+  addSalesAgreement: (dealId: string, fileName: string, url: string, actor?: User) => Promise<SalesAgreement | null>;
   /** Returns a short-lived signed URL for viewing/downloading a private agreement blob. */
   getAgreementLink: (agreementId: string, dealId: string) => Promise<string | null>;
   deleteSalesAgreement: (id: string) => Promise<void>;
@@ -351,6 +351,9 @@ function createActivity(actor: User | undefined, draft: ActivityDraft): Activity
     actorUserId: actor?.id ?? 'system',
     createdAt: new Date().toISOString(),
     id: createId('activity'),
+    // Mark for persistence — a flush effect posts these to the DB so other
+    // users (esp. the admin activity feed) eventually see them.
+    pendingSync: true,
   };
 }
 
@@ -667,6 +670,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       if (realtime) realtime.close();
     };
   }, [currentUser?.id, scheduleRefetch]);
+
+  // Persist locally-created activities to the DB so other users (the admin
+  // activity feed especially) can see what reps did. Each pending activity is
+  // posted once; a ref guards against re-posting after re-renders/refetches.
+  const postedActivityIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const toPost = state.activities.filter(
+      (a) => a.pendingSync && !postedActivityIds.current.has(a.id)
+    );
+    if (toPost.length === 0) return;
+    for (const activity of toPost) {
+      postedActivityIds.current.add(activity.id);
+      const { id, actorName, actorRole, actorUserId, createdAt, pendingSync, ...draft } = activity;
+      void id; void actorName; void actorRole; void actorUserId; void createdAt; void pendingSync;
+      apiCall('/api/auth/activities', {
+        method: 'POST',
+        body: JSON.stringify(draft),
+      });
+    }
+  }, [state.activities]);
 
   const value = useMemo<PortalDataContextValue>(() => {
     const getDealsForRep = (repId: string) =>
@@ -1062,15 +1085,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       logActivity: (activity, actor) => {
+        // Persistence is handled centrally by the activity flush effect, which
+        // posts every locally-created (pendingSync) activity to the DB.
         setState((current) => ({
           ...current,
           activities: prependActivity(current.activities, actor, activity),
         }));
-
-        apiCall('/api/auth/activities', {
-          method: 'POST',
-          body: JSON.stringify(activity),
-        });
       },
 
       // ── Contractor mutations ────────────────────────────────────────────────
@@ -2051,16 +2071,28 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         return result?.url ?? null;
       },
 
-      addSalesAgreement: async (dealId, fileName, url) => {
+      addSalesAgreement: async (dealId, fileName, url, actor) => {
         const agreement = await apiCall<SalesAgreement>(`/api/deals/${dealId}`, {
           method: 'POST',
           body: JSON.stringify({ _action: 'add_agreement', dealId, fileName, url }),
         });
         if (agreement) {
-          setState((current) => ({
-            ...current,
-            salesAgreements: [agreement, ...current.salesAgreements],
-          }));
+          setState((current) => {
+            const deal = current.deals.find((d) => d.id === dealId);
+            const label = getDealLabel(deal);
+            return {
+              ...current,
+              salesAgreements: [agreement, ...current.salesAgreements],
+              activities: prependActivity(current.activities, actor, {
+                actionLabel: `Signed agreement attached for ${label}`,
+                actionType: 'agreement_attached',
+                dealId,
+                entityId: dealId,
+                entityLabel: label,
+                entityType: 'deal',
+              }),
+            };
+          });
         }
         return agreement ?? null;
       },

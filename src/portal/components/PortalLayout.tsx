@@ -28,6 +28,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
+import AdminActivityCenter from './AdminActivityCenter';
 
 const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
@@ -241,6 +242,7 @@ export default function PortalLayout() {
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
+            <AdminActivityCenter variant="mobile" />
             <label className="relative flex h-10 w-10 cursor-pointer shrink-0 overflow-visible rounded-full">
               <span className="flex h-10 w-10 overflow-hidden rounded-full bg-[#f4c35a] text-[#071525]">
                 <span className="flex h-full w-full items-center justify-center text-sm font-black">
@@ -400,11 +402,14 @@ export default function PortalLayout() {
                 OntarioReno Broker Portal
               </h2>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-white bg-white px-4 py-2 shadow-sm">
-              <BarChart3 className="h-4 w-4 text-[#1B3C6C]" />
-              <span className="text-sm font-semibold text-slate-700">
-                Broker Portal Beta
-              </span>
+            <div className="flex items-center gap-3">
+              <AdminActivityCenter variant="desktop" />
+              <div className="flex items-center gap-2 rounded-full border border-white bg-white px-4 py-2 shadow-sm">
+                <BarChart3 className="h-4 w-4 text-[#1B3C6C]" />
+                <span className="text-sm font-semibold text-slate-700">
+                  Broker Portal Beta
+                </span>
+              </div>
             </div>
           </div>
           <Outlet />
