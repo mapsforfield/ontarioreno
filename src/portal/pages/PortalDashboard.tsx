@@ -199,22 +199,22 @@ export default function PortalDashboard() {
           <Link
             key={card.label}
             to={card.href}
-            className="block rounded-[0.5rem] border border-white bg-white p-4 shadow-sm transition hover:border-slate-200 hover:shadow-md sm:p-5"
+            className="flex flex-col rounded-[0.5rem] border border-white bg-white p-4 shadow-sm transition hover:border-slate-200 hover:shadow-md sm:p-5"
           >
+            {/* Label + icon share the top row; the value sits on its own line
+                below so a large amount can never collide with the icon. */}
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 sm:text-sm">
-                  {card.label}
-                </p>
-                <p className="mt-2 text-2xl font-black tracking-[-0.02em] sm:mt-3 sm:text-3xl">
-                  {card.value}
-                </p>
-              </div>
+              <p className="min-h-[2rem] text-xs font-semibold leading-snug text-slate-500 sm:min-h-[2.5rem] sm:text-sm">
+                {card.label}
+              </p>
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.5rem] bg-[#e8f1fb] text-[#1B3C6C] sm:h-11 sm:w-11">
                 <card.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
             </div>
-            <p className="mt-3 text-xs font-medium text-slate-500 sm:mt-4 sm:text-sm">
+            <p className="mt-1 text-2xl font-black tracking-[-0.02em] sm:text-3xl">
+              {card.value}
+            </p>
+            <p className="mt-auto pt-3 text-xs font-medium text-slate-500 sm:pt-4 sm:text-sm">
               {card.detail}
             </p>
           </Link>
