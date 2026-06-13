@@ -202,28 +202,19 @@ export default function Home() {
       const activeWidgetIdRef = isDesktopGuideLayout
         ? desktopTurnstileWidgetId
         : mobileTurnstileWidgetId;
-      const activeLayoutLabel = isDesktopGuideLayout ? 'desktop' : 'mobile';
 
       if (activeRef && !activeWidgetIdRef.current) {
-        console.log(`[Turnstile] render requested for ${activeLayoutLabel} guide form`);
         activeWidgetIdRef.current = turnstile.render(activeRef, {
           sitekey: TURNSTILE_SITE_KEY,
           callback: (token: string) => {
-            console.log(`[Turnstile] success callback fired on ${activeLayoutLabel} guide form`);
-            console.log('[Turnstile] token received', {
-              layout: activeLayoutLabel,
-              tokenLength: token?.length ?? 0,
-            });
             setTurnstileToken(token);
             setTurnstileStatus('verified');
           },
           'expired-callback': () => {
-            console.log(`[Turnstile] token expired on ${activeLayoutLabel} guide form`);
             setTurnstileToken('');
             setTurnstileStatus('expired');
           },
           'error-callback': () => {
-            console.log(`[Turnstile] widget error on ${activeLayoutLabel} guide form`);
             setTurnstileToken('');
             setTurnstileStatus('error');
           },
@@ -239,21 +230,12 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isDesktopGuideLayout]);
 
-  useEffect(() => {
-    console.log('[Turnstile] active guide form layout', isDesktopGuideLayout ? 'desktop' : 'mobile');
-  }, [isDesktopGuideLayout]);
-
   const resetTurnstile = () => {
     if (!window.turnstile) return;
 
     const activeWidgetId = isDesktopGuideLayout
       ? desktopTurnstileWidgetId.current
       : mobileTurnstileWidgetId.current;
-
-    console.log('[Turnstile] manual reset requested', {
-      layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
-      hasWidget: Boolean(activeWidgetId),
-    });
 
     if (activeWidgetId) {
       window.turnstile.reset(activeWidgetId);
@@ -299,12 +281,6 @@ export default function Home() {
 
   const handleGuideSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    console.log('[Turnstile] submit clicked', {
-      layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
-      hasToken: Boolean(turnstileToken),
-      tokenLength: turnstileToken.length,
-    });
 
     setGuideStatus({ type: null, message: '' });
 
@@ -363,9 +339,6 @@ export default function Home() {
     }
 
     if (!turnstileToken) {
-      console.log('[Turnstile] submit blocked due to missing token', {
-        layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
-      });
       setGuideStatus({
         type: 'error',
         message: 'Please complete the verification first.',
@@ -398,7 +371,6 @@ export default function Home() {
       });
 
       const result = await response.json();
-      console.log('Guide response:', result);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Submission failed.');
@@ -427,9 +399,6 @@ export default function Home() {
         resetTurnstile();
       }
     } catch (error) {
-      console.log('[Turnstile] submit failed after verification', {
-        layout: isDesktopGuideLayout ? 'desktop' : 'mobile',
-      });
       setGuideStatus({
         type: 'error',
         message: 'Something went wrong. Please try again.',
@@ -1332,22 +1301,37 @@ export default function Home() {
             ].map((faq, index) => (
               <div key={index} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <button
-                  className="w-full px-6 py-4 text-left flex justify-between items-center focus:outline-none"
+                  type="button"
+                  aria-expanded={activeFaq === index}
+                  aria-controls={`faq-panel-${index}`}
+                  id={`faq-trigger-${index}`}
+                  className="w-full px-6 py-4 text-left flex justify-between items-center gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1B3C6C]/40"
                   onClick={() => toggleFaq(index)}
                 >
                   <span className="font-semibold text-slate-900">{faq.q}</span>
                   <ChevronDown
+                    aria-hidden="true"
                     className={cn(
-                      "w-5 h-5 text-slate-500 transition-transform",
+                      "w-5 h-5 shrink-0 text-slate-500 transition-transform duration-200",
                       activeFaq === index && "rotate-180"
                     )}
                   />
                 </button>
-                {activeFaq === index && (
-                  <div className="px-6 pb-4 text-slate-600 leading-relaxed">
-                    {faq.a}
+                <div
+                  id={`faq-panel-${index}`}
+                  role="region"
+                  aria-labelledby={`faq-trigger-${index}`}
+                  className={cn(
+                    "grid transition-[grid-template-rows] duration-200 ease-out",
+                    activeFaq === index ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="px-6 pb-4 text-slate-600 leading-relaxed">
+                      {faq.a}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>

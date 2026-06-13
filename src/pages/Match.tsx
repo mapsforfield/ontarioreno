@@ -149,6 +149,14 @@ const timingOptions: Option[] = [
 
 const phoneDigits = (value: string) => value.replace(/\D/g, '');
 
+const formatPhoneInput = (value: string) => {
+  const digits = phoneDigits(value).slice(0, 10);
+
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
 const isFullQualificationProject = (projectType: ProjectType) =>
   projectType === 'Basement renovation' ||
   projectType === 'Legal basement / secondary suite' ||
@@ -262,10 +270,12 @@ function OptionCards({
 function Field({
   label,
   optional,
+  error,
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   optional?: boolean;
+  error?: string;
 }) {
   return (
     <div>
@@ -275,7 +285,16 @@ function Field({
           <span className="ml-2 font-normal text-slate-400">Optional</span>
         )}
       </label>
-      <input {...props} className={cn(formStyles.field, props.className)} />
+      <input
+        {...props}
+        aria-invalid={error ? true : undefined}
+        className={cn(
+          formStyles.field,
+          error && 'border-red-300 focus:border-red-400 focus:ring-red-100',
+          props.className
+        )}
+      />
+      {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
@@ -284,6 +303,7 @@ export default function Match() {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<IntakeData>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<{ fullName?: boolean; phone?: boolean }>({});
   const [submitStatus, setSubmitStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
@@ -705,13 +725,27 @@ export default function Match() {
             placeholder="Jane Homeowner"
             value={data.fullName}
             onChange={(event) => updateData('fullName', event.target.value)}
+            onBlur={() => setTouched((current) => ({ ...current, fullName: true }))}
+            error={
+              touched.fullName && !data.fullName.trim()
+                ? 'Please enter your name.'
+                : undefined
+            }
             autoComplete="name"
           />
           <Field
             label="Phone Number"
             placeholder="(416) 123-4567"
             value={data.phone}
-            onChange={(event) => updateData('phone', event.target.value)}
+            onChange={(event) =>
+              updateData('phone', formatPhoneInput(event.target.value))
+            }
+            onBlur={() => setTouched((current) => ({ ...current, phone: true }))}
+            error={
+              touched.phone && phoneDigits(data.phone).length < 10
+                ? 'Enter a valid 10-digit phone number.'
+                : undefined
+            }
             autoComplete="tel"
             inputMode="tel"
           />
