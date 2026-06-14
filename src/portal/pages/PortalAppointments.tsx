@@ -747,8 +747,7 @@ export default function PortalAppointments() {
         getDaysSince(appointment.updatedAt) > 3) ||
       (appointment.consultationStage === 'contractor_review' &&
         getDaysSince(appointment.updatedAt) > 3) ||
-      !appointment.assignedRepId ||
-      !appointment.contractorId
+      !appointment.assignedRepId
   );
   // Combined list for the desktop "Upcoming & Dispatch Gaps" section
   const needsAttentionIds = new Set(needsAttentionAppointments.map((a) => a.id));
@@ -979,7 +978,6 @@ export default function PortalAppointments() {
       reasons.push('Contractor review over 3 days old');
     }
     if (!appointment.assignedRepId) reasons.push('Missing sales rep');
-    if (!appointment.contractorId) reasons.push('Missing contractor');
     return reasons;
   };
   const groupByRep = (appointments: Appointment[]) => {
@@ -2557,9 +2555,6 @@ export default function PortalAppointments() {
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> Good
             </span>
             <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-amber-400" /> Missing contractor
-            </span>
-            <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
               <span className="h-2 w-2 rounded-full bg-red-500" /> Needs attention
             </span>
           </div>
@@ -2608,12 +2603,7 @@ export default function PortalAppointments() {
                         {group.appointments.map((apt) => {
                           const isRowExpanded = expandedUpcomingRows.has(apt.id);
                           const isAttention = needsAttentionIds.has(apt.id);
-                          const isMissingContractor = !apt.contractorId;
-                          const dotColor = isAttention
-                            ? 'bg-red-500'
-                            : isMissingContractor
-                              ? 'bg-amber-400'
-                              : 'bg-emerald-500';
+                          const dotColor = isAttention ? 'bg-red-500' : 'bg-emerald-500';
                           const sc = getStatusClasses(apt.status);
                           const canUseRepActions =
                             currentUser.role === 'admin' || apt.assignedRepId === currentUser.id;

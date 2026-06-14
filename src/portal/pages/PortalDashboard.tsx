@@ -95,8 +95,7 @@ export default function PortalDashboard() {
         getDaysSince(appointment.updatedAt) > 3) ||
       (appointment.consultationStage === 'contractor_review' &&
         getDaysSince(appointment.updatedAt) > 3) ||
-      !appointment.assignedRepId ||
-      !appointment.contractorId
+      !appointment.assignedRepId
   );
   const upcomingAppointments = visibleAppointments
     .filter(
