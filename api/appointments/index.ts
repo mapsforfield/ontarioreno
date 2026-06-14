@@ -695,7 +695,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Auto-upsert client profile ──
     // Match by email if provided, otherwise create a new profile.
     // Link the appointment back to the client.
+    //
+    // IMPORTANT: skip this entirely for events (showroom visit, supplier
+    // meeting, site check, custom event). An event's address is the event
+    // location, not the invited client's home — syncing it would overwrite
+    // the client's real address/name on file.
+    const EVENT_APPOINTMENT_TYPES = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
+    const isEventAppointment = EVENT_APPOINTMENT_TYPES.includes(appointment.appointmentType);
     try {
+      if (!isEventAppointment) {
       let client = appointment.email
         ? await prisma.client.findFirst({ where: { email: appointment.email } })
         : null;
@@ -737,6 +745,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where: { id: appointment.id },
         data: { clientId: client.id },
       });
+      }
     } catch {
       // Client auto-linking is non-critical
     }
