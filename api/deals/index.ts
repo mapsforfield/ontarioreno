@@ -27,14 +27,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(rows);
     }
 
-    const deals = await prisma.deal.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        activity: { orderBy: { createdAt: 'desc' } },
-        proposals: { orderBy: { sentAt: 'desc' } },
-        dispatches: { orderBy: { createdAt: 'desc' } },
-      },
-    });
+    // ── Trash bin — soft-deleted deals (admin: all; rep: their own) ──
+    if (req.query['_resource'] === 'trash') {
+      const where = {
+        deletedAt: { not: null },
+        ...(user.role === 'admin' ? {} : { assignedRepId: user.id }),
+      };
+      try {
+        const trashed = await prisma.deal.findMany({
+          where,
+          orderBy: { deletedAt: 'desc' },
+        });
+        return res.status(200).json(trashed);
+      } catch {
+        await prisma.$executeRawUnsafe(
+          'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+        );
+        const trashed = await prisma.deal.findMany({ where, orderBy: { deletedAt: 'desc' } });
+        return res.status(200).json(trashed);
+      }
+    }
+
+    const activeWhere = { deletedAt: null };
+    let deals;
+    try {
+      deals = await prisma.deal.findMany({
+        where: activeWhere,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          activity: { orderBy: { createdAt: 'desc' } },
+          proposals: { orderBy: { sentAt: 'desc' } },
+          dispatches: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+    } catch {
+      // Self-healing: the deletedAt column may not exist yet (schema can't be
+      // pushed from local env). Add it, then retry. Idempotent.
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+      );
+      deals = await prisma.deal.findMany({
+        where: activeWhere,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          activity: { orderBy: { createdAt: 'desc' } },
+          proposals: { orderBy: { sentAt: 'desc' } },
+          dispatches: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+    }
     return res.status(200).json(deals);
   }
 

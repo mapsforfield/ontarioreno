@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { usePortalAuth } from '../auth';
+import { showToast } from '../lib/toast';
 import {
   Client,
   Commission,
@@ -116,6 +117,10 @@ type PortalDataContextValue = PortalDataState & {
   addDeal: (deal: DealDraft, repId: string, actor?: User) => void;
   updateDeal: (dealId: string, updates: Partial<Deal>, actor?: User) => void;
   deleteDeal: (dealId: string, actor?: User) => void;
+  restoreDeal: (dealId: string) => Promise<void>;
+  purgeDeal: (dealId: string) => Promise<void>;
+  fetchTrashedDeals: () => Promise<Deal[]>;
+  refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
     contractorId: string | null,
@@ -1451,43 +1456,76 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       deleteDeal: (dealId, actor) => {
-        setState((current) => {
-          const deal = current.deals.find((d) => d.id === dealId);
+        // Snapshot everything tied to this deal so an Undo can fully restore it.
+        const snapshot = {
+          deals: state.deals,
+          appointments: state.appointments,
+          commissions: state.commissions,
+          dispatches: state.dispatches,
+          proposals: state.proposals,
+          activities: state.activities,
+        };
+        const deal = state.deals.find((d) => d.id === dealId);
+        const dealLabel = getDealLabel(deal);
 
-          return {
-            ...current,
-            activities: deal
-              ? prependActivity(
-                  current.activities.filter((a) => a.dealId !== dealId),
-                  actor,
-                  {
-                    actionLabel: `Deal deleted: ${getDealLabel(deal)}`,
-                    actionType: 'deal_deleted',
-                    dealId,
-                    entityId: dealId,
-                    entityLabel: getDealLabel(deal),
-                    entityType: 'deal',
-                  }
-                )
-              : current.activities,
-            appointments: current.appointments.filter(
-              (a) => a.dealId !== dealId
-            ),
-            commissions: current.commissions.filter(
-              (c) => c.dealId !== dealId
-            ),
-            deals: current.deals.filter((d) => d.id !== dealId),
-            dispatches: current.dispatches.filter(
-              (dispatch) => dispatch.dealId !== dealId
-            ),
-            proposals: current.proposals.filter(
-              (proposal) => proposal.dealId !== dealId
-            ),
-          };
-        });
+        setState((current) => ({
+          ...current,
+          appointments: current.appointments.filter((a) => a.dealId !== dealId),
+          commissions: current.commissions.filter((c) => c.dealId !== dealId),
+          deals: current.deals.filter((d) => d.id !== dealId),
+          dispatches: current.dispatches.filter((dispatch) => dispatch.dealId !== dealId),
+          proposals: current.proposals.filter((proposal) => proposal.dealId !== dealId),
+        }));
 
+        // Soft-delete on the server (moves it to the trash bin).
         apiCall(`/api/deals/${dealId}`, { method: 'DELETE' });
+
+        // Offer an immediate Undo.
+        showToast({
+          message: `Deal moved to trash`,
+          description: dealLabel,
+          duration: 7000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              // Restore the local snapshot instantly, then un-delete on the server.
+              setState((current) => ({
+                ...current,
+                deals: snapshot.deals,
+                appointments: snapshot.appointments,
+                commissions: snapshot.commissions,
+                dispatches: snapshot.dispatches,
+                proposals: snapshot.proposals,
+                activities: snapshot.activities,
+              }));
+              apiCall(`/api/deals/${dealId}`, {
+                method: 'POST',
+                body: JSON.stringify({ _action: 'restore_deal' }),
+              });
+            },
+          },
+        });
+        void actor;
       },
+
+      restoreDeal: async (dealId) => {
+        await apiCall(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'restore_deal' }),
+        });
+        loadData(true);
+      },
+
+      purgeDeal: async (dealId) => {
+        await apiCall(`/api/deals/${dealId}?purge=1`, { method: 'DELETE' });
+      },
+
+      fetchTrashedDeals: async () => {
+        const trashed = await apiCall<Deal[]>('/api/deals?_resource=trash');
+        return (trashed ?? []).map(normalizeDeal);
+      },
+
+      refetch: () => { loadData(true); },
 
       assignContractorToDeal: (dealId, contractorId, actor) => {
         setState((current) => {

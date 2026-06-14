@@ -322,6 +322,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    // Restore a soft-deleted deal from the trash bin
+    if (action === 'restore_deal') {
+      const dealToRestore = await prisma.deal.findUnique({ where: { id }, select: { assignedRepId: true } });
+      if (!dealToRestore) return res.status(404).json({ error: 'Deal not found.' });
+      if (user.role !== 'admin' && dealToRestore.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'You can only restore your own deals.' });
+      }
+      const restored = await prisma.deal.update({
+        where: { id },
+        data: { deletedAt: null },
+        include: {
+          activity: { orderBy: { createdAt: 'desc' } },
+          proposals: { orderBy: { sentAt: 'desc' } },
+          dispatches: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+      return res.status(200).json(restored);
+    }
+
     return res.status(400).json({ error: 'Unknown _action.' });
   }
 
@@ -332,8 +351,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (user.role !== 'admin' && dealToDelete.assignedRepId !== user.id) {
       return res.status(403).json({ error: 'You can only delete your own deals.' });
     }
-    await prisma.deal.delete({ where: { id } });
-    return res.status(200).json({ ok: true });
+    // `?purge=1` permanently removes; default is a soft-delete (trash bin).
+    if (req.query['purge'] === '1') {
+      await prisma.deal.delete({ where: { id } });
+      return res.status(200).json({ ok: true, purged: true });
+    }
+    try {
+      await prisma.deal.update({ where: { id }, data: { deletedAt: new Date() } });
+    } catch {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+      );
+      await prisma.deal.update({ where: { id }, data: { deletedAt: new Date() } });
+    }
+    return res.status(200).json({ ok: true, trashed: true });
   }
 
   return res.status(405).json({ error: 'Method not allowed.' });

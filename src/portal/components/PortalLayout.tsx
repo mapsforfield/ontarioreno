@@ -29,6 +29,7 @@ import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
 import AdminActivityCenter from './AdminActivityCenter';
+import Toaster from './Toaster';
 
 const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
@@ -617,6 +618,8 @@ export default function PortalLayout() {
           </div>
         </div>
       )}
+
+      <Toaster />
     </div>
   );
 }

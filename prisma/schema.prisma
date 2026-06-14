@@ -93,6 +93,9 @@ model Deal {
   /// True for deals imported from before the portal existed.
   /// Historical deals are excluded from the leaderboard so they don't skew rep rankings.
   isHistorical         Boolean  @default(false)
+  /// Soft-delete timestamp. Non-null means the deal is in the trash bin —
+  /// excluded from all normal views, restorable, or purged permanently.
+  deletedAt            DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

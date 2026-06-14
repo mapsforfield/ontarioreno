@@ -1,8 +1,10 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { celebrateWin } from '../lib/celebrate';
+import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
 import { getRecommendedContractors } from '../data/recommendations';
 import {
@@ -129,6 +131,18 @@ function formatTimelineTime(value: string) {
   }).format(new Date(value));
 }
 
+/** A dot color for the per-deal history timeline, keyed by activity type. */
+function timelineDotColor(actionType: string): string {
+  if (actionType === 'deal_status_changed') return 'bg-[#1B3C6C]';
+  if (actionType === 'deal_contractor_assigned' || actionType === 'contractor_dispatch_assigned') return 'bg-amber-500';
+  if (actionType === 'agreement_attached') return 'bg-emerald-500';
+  if (actionType === 'deal_created' || actionType === 'deal_created_from_consultation') return 'bg-violet-500';
+  if (actionType === 'deal_activity_note_added') return 'bg-slate-400';
+  if (actionType.startsWith('consultation')) return 'bg-sky-500';
+  if (actionType === 'proposal_sent' || actionType === 'contractor_dispatch_sent') return 'bg-sky-500';
+  return 'bg-slate-300';
+}
+
 function appointmentToForm(appointment: Appointment): AppointmentFormState {
   return {
     appointmentDate: appointment.appointmentDate,
@@ -240,6 +254,9 @@ export default function PortalDeals() {
     clients,
     contractors,
     deleteDeal,
+    restoreDeal,
+    purgeDeal,
+    fetchTrashedDeals,
     getActivitiesForUser,
     getAppointmentsForDeal,
     getDispatchesForDeal,
@@ -315,11 +332,48 @@ export default function PortalDeals() {
     setStaleOnly(false);
   };
 
+  const celebrateIfWon = (prevStatus: DealStatus, nextStatus: DealStatus, deal: Deal) => {
+    if (nextStatus === 'won' && prevStatus !== 'won') {
+      celebrateWin();
+      showToast({
+        variant: 'success',
+        message: `🎉 Deal won — ${deal.homeownerName}!`,
+        description: formatCurrency(deal.estimatedJobValue),
+        duration: 6000,
+      });
+    }
+  };
+
   const moveDealToStatus = (deal: Deal, status: DealStatus) => {
     setContextMenu(null);
     if (deal.status === status || !currentUser) return;
+    celebrateIfWon(deal.status, status, deal);
     // Moving stages implies the pending follow-up was completed — clear it
     updateDeal(deal.id, { status, nextFollowUpDate: '' }, currentUser);
+  };
+
+  const loadTrash = async () => {
+    setTrashLoading(true);
+    const trashed = await fetchTrashedDeals();
+    setTrashedDeals(trashed);
+    setTrashLoading(false);
+  };
+  // Fetch trash once on mount so the header badge reflects the count.
+  useEffect(() => {
+    fetchTrashedDeals().then(setTrashedDeals).catch(() => {});
+  }, [fetchTrashedDeals]);
+
+  const handleRestoreDeal = async (deal: Deal) => {
+    setTrashedDeals((current) => current.filter((d) => d.id !== deal.id));
+    await restoreDeal(deal.id);
+    showToast({ variant: 'success', message: 'Deal restored', description: deal.homeownerName });
+  };
+
+  const handlePurgeDeal = async (deal: Deal) => {
+    if (!window.confirm(`Permanently delete "${deal.homeownerName}"? This cannot be undone.`)) return;
+    setTrashedDeals((current) => current.filter((d) => d.id !== deal.id));
+    await purgeDeal(deal.id);
+    showToast({ variant: 'error', message: 'Deal permanently deleted', description: deal.homeownerName });
   };
 
   // Close the right-click context menu on outside click, Escape, or scroll
@@ -344,6 +398,9 @@ export default function PortalDeals() {
   const [activityNote, setActivityNote] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [dealPendingDelete, setDealPendingDelete] = useState<Deal | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashedDeals, setTrashedDeals] = useState<Deal[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
   const [agreementUploading, setAgreementUploading] = useState(false);
   const [agreementError, setAgreementError] = useState('');
   const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
@@ -441,10 +498,12 @@ export default function PortalDeals() {
           .filter((activity) => activity.dealId === selectedDeal.id)
           .map((activity) => ({
             actor: `${activity.actorName} / ${activity.actorRole}`,
+            actorName: activity.actorName,
             createdAt: activity.createdAt,
             id: activity.id,
             label: activity.actionLabel,
             type: activity.entityType,
+            actionType: activity.actionType,
           })),
         ...(selectedDeal.activity ?? [])
           .filter(
@@ -457,10 +516,12 @@ export default function PortalDeals() {
           )
           .map((dealActivity) => ({
             actor: 'Legacy note',
+            actorName: 'Note',
             createdAt: dealActivity.createdAt,
             id: dealActivity.id,
             label: dealActivity.note,
             type: 'deal',
+            actionType: 'deal_activity_note_added',
           })),
       ].sort(
         (first, second) =>
@@ -570,6 +631,7 @@ export default function PortalDeals() {
       // follow-up belonged to the previous stage, assume it was completed
       const statusChanged = form.status !== selectedDeal.status;
       const followUpUntouched = form.nextFollowUpDate === selectedDeal.nextFollowUpDate;
+      celebrateIfWon(selectedDeal.status, form.status, { ...selectedDeal, estimatedJobValue: Number(form.estimatedJobValue) || selectedDeal.estimatedJobValue });
       updateDeal(selectedDeal.id, {
         ...dealPayload,
         status: form.status,
@@ -864,14 +926,30 @@ OntarioReno Broker Portal`;
           </h1>
         </div>
         {currentUser && (
-          <button
-            type="button"
-            onClick={openAddDeal}
-            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
-          >
-            <Plus className="h-4 w-4" />
-            Add Deal
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setTrashOpen(true); loadTrash(); }}
+              className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3.5 py-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              title="Trash bin"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Trash</span>
+              {trashedDeals.length > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1 text-[0.65rem] font-black text-slate-600">
+                  {trashedDeals.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={openAddDeal}
+              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
+            >
+              <Plus className="h-4 w-4" />
+              Add Deal
+            </button>
+          </div>
         )}
       </header>
 
@@ -2375,36 +2453,29 @@ OntarioReno Broker Portal`;
                       </button>
                     </div>
                   </div>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4">
                     {selectedDealTimeline.length > 0 ? (
-                      selectedDealTimeline.map((activity) => (
-                        <article
-                          key={activity.id}
-                          className="rounded-[0.5rem] border border-slate-200 bg-white p-3"
-                        >
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p className="text-sm font-black text-slate-900">
-                                {activity.label}
-                              </p>
-                              <p className="mt-1 text-xs font-semibold text-slate-500">
-                                {activity.actor}
-                              </p>
+                      <ol className="relative ml-1.5 space-y-4 border-l-2 border-slate-100 pl-5">
+                        {selectedDealTimeline.map((activity) => (
+                          <li key={activity.id} className="relative">
+                            {/* Timeline node sitting on the connector line */}
+                            <span
+                              className={`absolute -left-[1.625rem] top-1 h-3 w-3 rounded-full ring-4 ring-white ${timelineDotColor(activity.actionType)}`}
+                            />
+                            <p className="text-sm font-bold leading-snug text-slate-900">
+                              {activity.label}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-slate-400">
+                              <span className="text-slate-500">{activity.actorName}</span>
+                              <span className="text-slate-300">·</span>
+                              <span>{formatTimelineTime(activity.createdAt)}</span>
                             </div>
-                            <div className="flex flex-wrap gap-2 sm:justify-end">
-                              <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-[0.65rem] font-black capitalize text-[#1B3C6C]">
-                                {activity.type}
-                              </span>
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-bold text-slate-500">
-                                {formatTimelineTime(activity.createdAt)}
-                              </span>
-                            </div>
-                          </div>
-                        </article>
-                      ))
+                          </li>
+                        ))}
+                      </ol>
                     ) : (
                       <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500">
-                        No activity notes yet
+                        No activity yet
                       </p>
                     )}
                   </div>
@@ -2416,7 +2487,11 @@ OntarioReno Broker Portal`;
               {canDeleteSelectedDeal && selectedDeal && (
                 <button
                   type="button"
-                  onClick={() => setDealPendingDelete(selectedDeal)}
+                  onClick={() => {
+                    if (!selectedDeal || !currentUser) return;
+                    deleteDeal(selectedDeal.id, currentUser);
+                    closePanel();
+                  }}
                   className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 sm:mr-auto"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -2637,6 +2712,73 @@ OntarioReno Broker Portal`;
               >
                 Mark as Sent
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Trash bin ── */}
+      {trashOpen && (
+        <div className="fixed inset-0 z-[105] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
+          <div className="ml-auto flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Recently Deleted</p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Trash bin</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Restore a deal, or delete it permanently.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrashOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close trash"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {trashLoading ? (
+                <p className="text-sm font-semibold text-slate-400">Loading…</p>
+              ) : trashedDeals.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                    <Trash2 className="h-6 w-6" />
+                  </span>
+                  <p className="mt-3 text-sm font-bold text-slate-600">Trash is empty</p>
+                  <p className="mt-1 text-xs font-medium text-slate-400">Deleted deals show up here so you can recover them.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {trashedDeals.map((deal) => (
+                    <div key={deal.id} className="flex items-center justify-between gap-3 rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-900">{deal.homeownerName}</p>
+                        <p className="truncate text-xs font-semibold text-slate-500">
+                          {[deal.city, deal.projectType].filter(Boolean).join(' · ')} · {formatCurrency(deal.estimatedJobValue)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreDeal(deal)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-[#1B3C6C] px-3 py-1.5 text-xs font-black text-white transition hover:bg-[#153158]"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Restore
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePurgeDeal(deal)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
