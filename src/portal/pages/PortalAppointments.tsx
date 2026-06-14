@@ -421,6 +421,29 @@ function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus, ap
   return { bg: 'bg-[#32639b]', lightText: true }; // consultation_scheduled
 }
 
+/** Canonical legend for calendar pill colors — ordered by consultation
+ *  lifecycle, then event types. Each `bg` must exactly match what
+ *  getStagePillBg() returns so the "smart" legend can show only what's on screen. */
+const CALENDAR_LEGEND: Array<{ bg: string; label: string }> = [
+  { bg: 'bg-[#32639b]', label: 'Scheduled' },
+  { bg: 'bg-amber-400', label: 'Estimate Requested' },
+  { bg: 'bg-purple-500', label: 'In Review' },
+  { bg: 'bg-orange-400', label: 'Needs Follow-up' },
+  { bg: 'bg-teal-500', label: 'Completed' },
+  { bg: 'bg-emerald-500', label: 'Won' },
+  { bg: 'bg-red-500', label: 'Lost' },
+  { bg: 'bg-red-400', label: 'No-show' },
+  { bg: 'bg-slate-300', label: 'Cancelled' },
+  { bg: 'bg-orange-500', label: 'Showroom Visit' },
+  { bg: 'bg-purple-600', label: 'Supplier Meeting' },
+  { bg: 'bg-teal-700', label: 'Site Check' },
+  { bg: 'bg-indigo-500', label: 'Custom Event' },
+];
+
+function appointmentPillBg(a: Appointment): string {
+  return getStagePillBg(a.consultationStage, a.status, a.appointmentType).bg;
+}
+
 function fmt12(time: string | undefined): string {
   if (!time) return 'TBD';
   const [h, m] = time.split(':').map(Number);
@@ -781,6 +804,18 @@ export default function PortalAppointments() {
   const currentDayAppointments = calendarAppointments.filter(
     (appointment) => appointment.appointmentDate === toDateKey(cursorDate)
   );
+
+  // Smart legend: only the colors actually present in the dates currently on
+  // screen, so it adapts as the admin navigates months / weeks / days.
+  const legendEntries = useMemo(() => {
+    const visibleDates =
+      calendarView === 'month' ? monthDays : calendarView === 'week' ? weekDays : [cursorDate];
+    const keys = new Set(visibleDates.map(toDateKey));
+    const present = new Set(
+      calendarAppointments.filter((a) => keys.has(a.appointmentDate)).map(appointmentPillBg)
+    );
+    return CALENDAR_LEGEND.filter((entry) => present.has(entry.bg));
+  }, [calendarAppointments, calendarView, monthDays, weekDays, cursorDate]);
 
   const getDeal = (dealId: string) => deals.find((deal) => deal.id === dealId);
   const activeContractors = contractors.filter(
@@ -2309,6 +2344,28 @@ export default function PortalAppointments() {
                   </button>
                 </div>
               </div>
+              {/* Smart legend — scrollable strip, only colors shown this month */}
+              {(() => {
+                const keys = new Set(monthDays.map(toDateKey));
+                const present = new Set(
+                  calendarAppointments.filter((a) => keys.has(a.appointmentDate)).map(appointmentPillBg)
+                );
+                const entries = CALENDAR_LEGEND.filter((e) => present.has(e.bg));
+                if (entries.length === 0) return null;
+                return (
+                  <div className="-mx-1 mb-2.5 flex gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {entries.map((entry) => (
+                      <span
+                        key={entry.bg}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.65rem] font-bold text-slate-600"
+                      >
+                        <span className={`h-2 w-2 rounded-full ${entry.bg}`} />
+                        {entry.label}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* Day-of-week headers */}
               <div className="mb-1 grid grid-cols-7">
                 {['S','M','T','W','T','F','S'].map((l, i) => (
@@ -2837,6 +2894,24 @@ export default function PortalAppointments() {
             </button>
           </div>
         </div>
+
+        {/* Smart legend — adapts to the colors visible in the current view */}
+        {legendEntries.length > 0 && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span className="mr-0.5 text-[0.6rem] font-black uppercase tracking-[0.16em] text-slate-400">
+              Legend
+            </span>
+            {legendEntries.map((entry) => (
+              <span
+                key={entry.bg}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.7rem] font-bold text-slate-600"
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${entry.bg}`} />
+                {entry.label}
+              </span>
+            ))}
+          </div>
+        )}
 
         {calendarView === 'month' && (
           <div className="mt-4 hidden overflow-x-auto sm:block">
