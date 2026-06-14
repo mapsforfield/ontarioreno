@@ -177,6 +177,7 @@ type PortalDataContextValue = PortalDataState & {
     actor?: User
   ) => void;
   deleteAppointment: (appointmentId: string, actor?: User) => void;
+  geocodeAppointments: (ids: string[]) => Promise<void>;
   transferAppointment: (appointmentId: string, toRepId: string) => Promise<boolean>;
   createDealFromAppointment: (appointmentId: string, actor?: User) => void;
   getActivitiesForUser: (user: User) => Activity[];
@@ -2672,6 +2673,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         });
 
         apiCall(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+      },
+
+      geocodeAppointments: async (ids) => {
+        if (ids.length === 0) return;
+        const data = await apiCall<{ results: Array<{ id: string; latitude: number | null; longitude: number | null }> }>(
+          '/api/appointments',
+          { method: 'POST', body: JSON.stringify({ _action: 'geocode_appointments', ids }) }
+        );
+        const results = data?.results ?? [];
+        if (results.length === 0) return;
+        const byId = new Map(results.map((r) => [r.id, r]));
+        setState((current) => ({
+          ...current,
+          appointments: current.appointments.map((a) => {
+            const hit = byId.get(a.id);
+            return hit && hit.latitude != null
+              ? { ...a, latitude: hit.latitude, longitude: hit.longitude }
+              : a;
+          }),
+        }));
       },
 
       transferAppointment: async (appointmentId, toRepId) => {

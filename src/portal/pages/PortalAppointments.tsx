@@ -15,9 +15,11 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
+
+const AppointmentsMap = lazy(() => import('../components/AppointmentsMap'));
 import {
   ConsultationEmailPreview,
   ConsultationEmailType,
@@ -38,7 +40,7 @@ import {
   ConsultationNextStep,
 } from '../data/types';
 
-type CalendarView = 'day' | 'month' | 'week';
+type CalendarView = 'day' | 'month' | 'week' | 'map';
 type ConsultationFilter =
   | 'all'
   | 'cancelled'
@@ -582,6 +584,7 @@ export default function PortalAppointments() {
     daysOff,
     deals,
     deleteAppointment,
+    geocodeAppointments,
     transferAppointment,
     getDispatchesForConsultation,
     getVisibleAppointmentsForUser,
@@ -623,6 +626,7 @@ export default function PortalAppointments() {
   const [transferToRepId, setTransferToRepId] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
+  const [mobileCalMode, setMobileCalMode] = useState<'grid' | 'map'>('grid');
   const [notesModal, setNotesModal] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
   // Client search/autofill for new consultation form
@@ -804,6 +808,18 @@ export default function PortalAppointments() {
   const currentDayAppointments = calendarAppointments.filter(
     (appointment) => appointment.appointmentDate === toDateKey(cursorDate)
   );
+
+  // When the map view is open, geocode any of the day's consultations that
+  // have an address but no cached coordinates yet (cached server-side after).
+  useEffect(() => {
+    const mapActive = calendarView === 'map' || (mobileConsultTab === 'calendar' && mobileCalMode === 'map');
+    if (!mapActive) return;
+    const needGeocoding = currentDayAppointments
+      .filter((a) => (a.address?.trim() || a.city?.trim()) && (a.latitude == null || a.longitude == null))
+      .map((a) => a.id);
+    if (needGeocoding.length > 0) geocodeAppointments(needGeocoding);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarView, mobileConsultTab, mobileCalMode, toDateKey(cursorDate), currentDayAppointments.length]);
 
   // Smart legend: only the colors actually present in the dates currently on
   // screen, so it adapts as the admin navigates months / weeks / days.
@@ -2412,12 +2428,34 @@ export default function PortalAppointments() {
                     {new Intl.DateTimeFormat('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }).format(cursorDate)}
                   </p>
                   {currentDayAppointments.length > 0 && (
-                    <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">
-                      {currentDayAppointments.length}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setMobileCalMode('grid')}
+                          className={`rounded-full px-2.5 py-1 text-[0.62rem] font-black transition ${mobileCalMode === 'grid' ? 'bg-[#1B3C6C] text-white' : 'text-slate-500'}`}
+                        >
+                          List
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMobileCalMode('map')}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.62rem] font-black transition ${mobileCalMode === 'map' ? 'bg-[#1B3C6C] text-white' : 'text-slate-500'}`}
+                        >
+                          <MapPin className="h-3 w-3" /> Map
+                        </button>
+                      </div>
+                      <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">
+                        {currentDayAppointments.length}
+                      </span>
+                    </div>
                   )}
                 </div>
-                {currentDayAppointments.length > 0 ? (
+                {currentDayAppointments.length > 0 && mobileCalMode === 'map' ? (
+                  <Suspense fallback={<div className="flex h-72 items-center justify-center rounded-[0.5rem] border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">Loading map…</div>}>
+                    <AppointmentsMap appointments={currentDayAppointments} getRepName={getRepName} />
+                  </Suspense>
+                ) : currentDayAppointments.length > 0 ? (
                   <div className="space-y-2">
                     {currentDayAppointments.map((apt) => {
                       const sc = getStatusClasses(apt.status);
@@ -2855,17 +2893,18 @@ export default function PortalAppointments() {
                 ))}
               </select>
             )}
-            {(['month', 'week', 'day'] as CalendarView[]).map((view) => (
+            {(['month', 'week', 'day', 'map'] as CalendarView[]).map((view) => (
               <button
                 key={view}
                 type="button"
                 onClick={() => setCalendarView(view)}
-                className={`${view !== 'day' ? 'hidden sm:inline-flex' : ''} ${
+                className={`${view !== 'day' && view !== 'map' ? 'hidden sm:inline-flex' : 'inline-flex'} items-center gap-1.5 ${
                   calendarView === view
                     ? 'rounded-full bg-[#1B3C6C] px-4 py-2 text-sm font-black capitalize text-white'
                     : 'rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black capitalize text-slate-600 transition hover:text-[#1B3C6C]'
                 }`}
               >
+                {view === 'map' && <MapPin className="h-3.5 w-3.5" />}
                 {view === 'day' ? 'Day/list' : view}
               </button>
             ))}
@@ -2896,7 +2935,7 @@ export default function PortalAppointments() {
         </div>
 
         {/* Smart legend — adapts to the colors visible in the current view */}
-        {legendEntries.length > 0 && (
+        {calendarView !== 'map' && legendEntries.length > 0 && (
           <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
             <span className="mr-0.5 text-[0.6rem] font-black uppercase tracking-[0.16em] text-slate-400">
               Legend
@@ -2952,6 +2991,21 @@ export default function PortalAppointments() {
                   No consultations for this day.
                 </p>
               </div>
+            )}
+          </div>
+        )}
+        {calendarView === 'map' && (
+          <div className="mt-4">
+            {currentDayAppointments.length === 0 ? (
+              <div className="rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <MapPin className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-3 text-sm font-semibold text-slate-500">No consultations to map for this day.</p>
+                <p className="mt-1 text-xs text-slate-400">Use the arrows to pick a day with home visits.</p>
+              </div>
+            ) : (
+              <Suspense fallback={<div className="flex h-[26rem] items-center justify-center rounded-[0.5rem] border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">Loading map…</div>}>
+                <AppointmentsMap appointments={currentDayAppointments} getRepName={getRepName} />
+              </Suspense>
             )}
           </div>
         )}

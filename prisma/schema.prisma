@@ -192,6 +192,10 @@ model Appointment {
   objections               String   @default("")
   followUpDate             String   @default("")
   clientId                 String?
+  /// Cached geocoded coordinates for the map/route view (Nominatim lookup,
+  /// stored so we never re-geocode the same address).
+  latitude                 Float?
+  longitude                Float?
   externalCalendarId       String?
   externalEventId          String?
   syncedAt                 String?

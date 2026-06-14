@@ -147,6 +147,8 @@ export type Appointment = {
   objections: string;
   followUpDate: string;
   clientId?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   externalCalendarId?: string;
   externalEventId?: string;
   syncedAt?: string;

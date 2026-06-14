@@ -435,14 +435,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    const appointments = await prisma.appointment.findMany({
-      orderBy: { appointmentDate: 'desc' },
-    });
+    let appointments;
+    try {
+      appointments = await prisma.appointment.findMany({
+        orderBy: { appointmentDate: 'desc' },
+      });
+    } catch {
+      // Self-healing: latitude/longitude columns may not exist yet.
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+      );
+      appointments = await prisma.appointment.findMany({
+        orderBy: { appointmentDate: 'desc' },
+      });
+    }
     return res.status(200).json(appointments);
   }
 
   if (req.method === 'POST') {
     const data = req.body;
+
+    // ── Geocode appointments for the map view (cached to DB) ──
+    if (data._action === 'geocode_appointments') {
+      const ids: string[] = Array.isArray(data.ids) ? data.ids.slice(0, 10) : [];
+      if (ids.length === 0) return res.status(200).json({ results: [] });
+
+      let rows;
+      try {
+        rows = await prisma.appointment.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true },
+        });
+      } catch {
+        await prisma.$executeRawUnsafe(
+          'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+        );
+        rows = await prisma.appointment.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true },
+        });
+      }
+
+      const results: Array<{ id: string; latitude: number | null; longitude: number | null }> = [];
+      for (const row of rows) {
+        // Already cached → return as-is
+        if (row.latitude != null && row.longitude != null) {
+          results.push({ id: row.id, latitude: row.latitude, longitude: row.longitude });
+          continue;
+        }
+        const query = [row.address, row.city, row.postalCode, 'Ontario, Canada']
+          .map((p) => (p ?? '').trim())
+          .filter(Boolean)
+          .join(', ');
+        if (!query) {
+          results.push({ id: row.id, latitude: null, longitude: null });
+          continue;
+        }
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'OntarioReno-Portal/1.0 (info@ontarioreno.ca)' },
+          });
+          const json = (await resp.json()) as Array<{ lat: string; lon: string }>;
+          const hit = json[0];
+          if (hit) {
+            const lat = parseFloat(hit.lat);
+            const lon = parseFloat(hit.lon);
+            await prisma.appointment.update({ where: { id: row.id }, data: { latitude: lat, longitude: lon } });
+            results.push({ id: row.id, latitude: lat, longitude: lon });
+          } else {
+            results.push({ id: row.id, latitude: null, longitude: null });
+          }
+        } catch {
+          results.push({ id: row.id, latitude: null, longitude: null });
+        }
+        // Respect Nominatim's 1 request/second usage policy
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+      return res.status(200).json({ results });
+    }
 
     // ── Client CRUD actions ──
     if (data._action === 'create_client') {
