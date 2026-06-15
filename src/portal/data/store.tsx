@@ -157,6 +157,9 @@ type PortalDataContextValue = PortalDataState & {
   addClient: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'source' | 'createdByUserId'>) => Promise<Client | null>;
   updateClient: (clientId: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'createdByUserId' | 'source'>>) => Promise<Client | null>;
   deleteClient: (clientId: string) => Promise<void>;
+  restoreClient: (clientId: string) => Promise<void>;
+  purgeClient: (clientId: string) => Promise<void>;
+  fetchTrashedClients: () => Promise<Client[]>;
   addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
   addSalesAgreement: (dealId: string, fileName: string, url: string, actor?: User) => Promise<SalesAgreement | null>;
   /** Returns a short-lived signed URL for viewing/downloading a private agreement blob. */
@@ -177,6 +180,9 @@ type PortalDataContextValue = PortalDataState & {
     actor?: User
   ) => void;
   deleteAppointment: (appointmentId: string, actor?: User) => void;
+  restoreAppointment: (appointmentId: string) => Promise<void>;
+  purgeAppointment: (appointmentId: string) => Promise<void>;
+  fetchTrashedAppointments: () => Promise<Appointment[]>;
   geocodeAppointments: (ids: string[]) => Promise<void>;
   transferAppointment: (appointmentId: string, toRepId: string) => Promise<boolean>;
   createDealFromAppointment: (appointmentId: string, actor?: User) => void;
@@ -2180,14 +2186,51 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       deleteClient: async (clientId) => {
-        await apiCall('/api/appointments', {
-          method: 'POST',
-          body: JSON.stringify({ _action: 'delete_client', id: clientId }),
-        });
+        const snapshot = state.clients;
+        const client = state.clients.find((c) => c.id === clientId);
         setState((current) => ({
           ...current,
           clients: current.clients.filter((c) => c.id !== clientId),
         }));
+        apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_client', id: clientId }),
+        });
+        showToast({
+          message: 'Client moved to trash',
+          description: client?.name,
+          duration: 7000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              setState((current) => ({ ...current, clients: snapshot }));
+              apiCall('/api/appointments', {
+                method: 'POST',
+                body: JSON.stringify({ _action: 'restore_client', id: clientId }),
+              });
+            },
+          },
+        });
+      },
+
+      restoreClient: async (clientId) => {
+        await apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'restore_client', id: clientId }),
+        });
+        loadData(true);
+      },
+
+      purgeClient: async (clientId) => {
+        await apiCall('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_client', id: clientId, purge: true }),
+        });
+      },
+
+      fetchTrashedClients: async () => {
+        const trashed = await apiCall<Client[]>('/api/appointments?_resource=trash_clients');
+        return trashed ?? [];
       },
 
       // ── Sales Tracker mutations ─────────────────────────────────────────────
@@ -2640,39 +2683,53 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       deleteAppointment: (appointmentId, actor) => {
-        setState((current) => {
-          const appointment = current.appointments.find(
-            (a) => a.id === appointmentId
-          );
-          const deal = current.deals.find(
-            (d) => d.id === appointment?.dealId
-          );
+        void actor;
+        const snapshot = state.appointments;
+        const appointment = state.appointments.find((a) => a.id === appointmentId);
+        const label =
+          appointment?.customerName ||
+          appointment?.title ||
+          getDealLabel(state.deals.find((d) => d.id === appointment?.dealId));
 
-          return {
-            ...current,
-            activities: appointment
-              ? prependActivity(current.activities, actor, {
-                  actionLabel: `Consultation deleted: ${
-                    appointment.customerName || appointment.title || getDealLabel(deal)
-                  }`,
-                  actionType: 'consultation_deleted',
-                  contractorId: appointment.contractorId || undefined,
-                  dealId: appointment.dealId || undefined,
-                  entityId: appointment.id,
-                  entityLabel:
-                    appointment.customerName ||
-                    appointment.title ||
-                    getDealLabel(deal),
-                  entityType: 'appointment',
-                })
-              : current.activities,
-            appointments: current.appointments.filter(
-              (a) => a.id !== appointmentId
-            ),
-          };
-        });
+        setState((current) => ({
+          ...current,
+          appointments: current.appointments.filter((a) => a.id !== appointmentId),
+        }));
 
         apiCall(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+
+        showToast({
+          message: 'Consultation moved to trash',
+          description: label,
+          duration: 7000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              setState((current) => ({ ...current, appointments: snapshot }));
+              apiCall(`/api/appointments/${appointmentId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ deletedAt: null }),
+              });
+            },
+          },
+        });
+      },
+
+      restoreAppointment: async (appointmentId) => {
+        await apiCall(`/api/appointments/${appointmentId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ deletedAt: null }),
+        });
+        loadData(true);
+      },
+
+      purgeAppointment: async (appointmentId) => {
+        await apiCall(`/api/appointments/${appointmentId}?purge=1`, { method: 'DELETE' });
+      },
+
+      fetchTrashedAppointments: async () => {
+        const trashed = await apiCall<Appointment[]>('/api/appointments?_resource=trash');
+        return (trashed ?? []).map((a) => normalizeAppointment(a, state.deals));
       },
 
       geocodeAppointments: async (ids) => {

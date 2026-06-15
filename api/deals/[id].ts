@@ -92,6 +92,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // ── Notes sync: a deal, its linked consultations, and the client all
+      // share one note. Propagate a notes edit to the linked records. ──
+      if (safeData.notes !== undefined) {
+        const notes = String(safeData.notes ?? '');
+        try {
+          await prisma.appointment.updateMany({
+            where: { dealId: id },
+            data: { internalNotes: notes, notes },
+          });
+          if (deal.email?.trim()) {
+            await prisma.client.updateMany({
+              where: { email: deal.email.trim() },
+              data: { internalNotes: notes },
+            });
+          }
+        } catch {
+          // notes sync is non-critical
+        }
+      }
+
       return res.status(200).json(deal);
     } catch (err) {
       console.error('[deals/[id]] PATCH failed:', err);

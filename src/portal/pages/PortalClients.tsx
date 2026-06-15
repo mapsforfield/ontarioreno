@@ -8,14 +8,17 @@ import {
   Phone,
   Plus,
   Search,
+  Trash2,
   UserRound,
   Users,
   X,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
+import TrashPanel from '../components/TrashPanel';
+import { showToast } from '../lib/toast';
 import type { Client, Household } from '../data/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -101,6 +104,9 @@ export default function PortalClients() {
     addClient,
     updateClient,
     deleteClient,
+    restoreClient,
+    purgeClient,
+    fetchTrashedClients,
     getAppointmentsForClient,
     addHousehold,
     updateHousehold,
@@ -113,6 +119,30 @@ export default function PortalClients() {
   const [form, setForm] = useState<ClientForm>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashedClients, setTrashedClients] = useState<Client[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) fetchTrashedClients().then(setTrashedClients).catch(() => {});
+  }, [isAdmin, fetchTrashedClients]);
+  const openTrash = async () => {
+    setTrashOpen(true);
+    setTrashLoading(true);
+    setTrashedClients(await fetchTrashedClients());
+    setTrashLoading(false);
+  };
+  const handleRestoreClient = async (client: Client) => {
+    setTrashedClients((cur) => cur.filter((c) => c.id !== client.id));
+    await restoreClient(client.id);
+    showToast({ variant: 'success', message: 'Client restored', description: client.name });
+  };
+  const handlePurgeClient = async (client: Client) => {
+    if (!window.confirm(`Permanently delete "${client.name}"? This cannot be undone.`)) return;
+    setTrashedClients((cur) => cur.filter((c) => c.id !== client.id));
+    await purgeClient(client.id);
+    showToast({ variant: 'error', message: 'Client permanently deleted', description: client.name });
+  };
 
   // ── Household panel state ──
   type HouseholdMode = 'none' | 'view' | 'create' | 'join';
@@ -353,6 +383,19 @@ export default function PortalClients() {
 
   return (
     <div className="space-y-4 pb-16 lg:pb-6">
+      <TrashPanel
+        open={trashOpen}
+        onClose={() => setTrashOpen(false)}
+        title="Clients"
+        subtitle="Restore a client, or delete them permanently."
+        emptyLabel="Deleted clients show up here so you can recover them."
+        items={trashedClients}
+        loading={trashLoading}
+        primary={(c) => c.name}
+        secondary={(c) => [c.email, c.phone, c.city].filter(Boolean).join(' · ') || 'No contact details'}
+        onRestore={handleRestoreClient}
+        onPurge={handlePurgeClient}
+      />
       {/* Header */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -363,14 +406,32 @@ export default function PortalClients() {
             Clients
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
-        >
-          <Plus className="h-4 w-4" />
-          + New Client
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={openTrash}
+              className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+              title="Trash bin"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Trash</span>
+              {trashedClients.length > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1 text-[0.65rem] font-black text-slate-600">
+                  {trashedClients.length}
+                </span>
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
+          >
+            <Plus className="h-4 w-4" />
+            + New Client
+          </button>
+        </div>
       </header>
 
       {/* Search */}

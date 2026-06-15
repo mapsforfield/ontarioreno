@@ -144,6 +144,8 @@ model Client {
   internalNotes   String    @default("")
   source          String    @default("manual")
   householdId     String?
+  /// Soft-delete timestamp — non-null means it's in the trash bin.
+  deletedAt       DateTime?
   createdByUserId String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -192,6 +194,8 @@ model Appointment {
   objections               String   @default("")
   followUpDate             String   @default("")
   clientId                 String?
+  /// Soft-delete timestamp — non-null means it's in the trash bin.
+  deletedAt                DateTime?
   /// Cached geocoded coordinates for the map/route view (Nominatim lookup,
   /// stored so we never re-geocode the same address).
   latitude                 Float?

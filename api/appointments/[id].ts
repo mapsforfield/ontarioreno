@@ -31,6 +31,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data,
     });
 
+    // ── Notes sync: propagate a note edit to the linked deal and client ──
+    if (data.internalNotes !== undefined || data.notes !== undefined) {
+      const notes = String(data.internalNotes ?? data.notes ?? '');
+      try {
+        if (appointment.dealId) {
+          await prisma.deal.update({ where: { id: appointment.dealId }, data: { notes } }).catch(() => {});
+        }
+        if (appointment.clientId) {
+          await prisma.client.update({ where: { id: appointment.clientId }, data: { internalNotes: notes } }).catch(() => {});
+        } else if (appointment.email?.trim()) {
+          await prisma.client.updateMany({ where: { email: appointment.email.trim() }, data: { internalNotes: notes } });
+        }
+      } catch {
+        // notes sync is non-critical
+      }
+    }
+
     // Best-effort notification to assigned rep
     try {
       const repId = appointment.assignedRepId;
@@ -97,11 +114,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE') {
-    if (user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin only.' });
+    const existing = await prisma.appointment.findUnique({ where: { id }, select: { assignedRepId: true } });
+    if (!existing) return res.status(404).json({ error: 'Not found.' });
+    if (user.role !== 'admin' && existing.assignedRepId !== user.id) {
+      return res.status(403).json({ error: 'You can only delete your own consultations.' });
     }
-    await prisma.appointment.delete({ where: { id } });
-    return res.status(200).json({ ok: true });
+    // `?purge=1` permanently removes; default is a soft-delete (trash bin).
+    if (req.query['purge'] === '1') {
+      await prisma.appointment.delete({ where: { id } });
+      return res.status(200).json({ ok: true, purged: true });
+    }
+    try {
+      await prisma.appointment.update({ where: { id }, data: { deletedAt: new Date() } });
+    } catch {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+      );
+      await prisma.appointment.update({ where: { id }, data: { deletedAt: new Date() } });
+    }
+    return res.status(200).json({ ok: true, trashed: true });
   }
 
   return res.status(405).json({ error: 'Method not allowed.' });

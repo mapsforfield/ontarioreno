@@ -149,6 +149,7 @@ export type Appointment = {
   clientId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  deletedAt?: string | null;
   externalCalendarId?: string;
   externalEventId?: string;
   syncedAt?: string;
@@ -171,6 +172,7 @@ export type Client = {
   internalNotes: string;
   source: string;
   householdId?: string | null;
+  deletedAt?: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

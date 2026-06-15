@@ -412,10 +412,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     // ── Client list ──
     if (req.query['_resource'] === 'clients') {
-      const clients = await prisma.client.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
-      return res.status(200).json(clients);
+      try {
+        const clients = await prisma.client.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+        });
+        return res.status(200).json(clients);
+      } catch {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)');
+        const clients = await prisma.client.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+        });
+        return res.status(200).json(clients);
+      }
+    }
+
+    // ── Trash bin — soft-deleted clients ──
+    if (req.query['_resource'] === 'trash_clients') {
+      try {
+        const trashed = await prisma.client.findMany({
+          where: { deletedAt: { not: null } },
+          orderBy: { deletedAt: 'desc' },
+        });
+        return res.status(200).json(trashed);
+      } catch {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)');
+        const trashed = await prisma.client.findMany({
+          where: { deletedAt: { not: null } },
+          orderBy: { deletedAt: 'desc' },
+        });
+        return res.status(200).json(trashed);
+      }
     }
 
     // ── Days off list ──
@@ -435,17 +463,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
+    // ── Trash bin — soft-deleted consultations ──
+    if (req.query['_resource'] === 'trash') {
+      try {
+        const trashed = await prisma.appointment.findMany({
+          where: { deletedAt: { not: null } },
+          orderBy: { deletedAt: 'desc' },
+        });
+        return res.status(200).json(trashed);
+      } catch {
+        await prisma.$executeRawUnsafe(
+          'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+        );
+        const trashed = await prisma.appointment.findMany({
+          where: { deletedAt: { not: null } },
+          orderBy: { deletedAt: 'desc' },
+        });
+        return res.status(200).json(trashed);
+      }
+    }
+
     let appointments;
     try {
       appointments = await prisma.appointment.findMany({
+        where: { deletedAt: null },
         orderBy: { appointmentDate: 'desc' },
       });
     } catch {
-      // Self-healing: latitude/longitude columns may not exist yet.
+      // Self-healing: deletedAt / latitude / longitude columns may not exist yet.
       await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
       );
       appointments = await prisma.appointment.findMany({
+        where: { deletedAt: null },
         orderBy: { appointmentDate: 'desc' },
       });
     }
@@ -549,6 +599,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where: { id: data.id },
         data: patch,
       });
+
+      // ── Notes sync: propagate a client note edit to linked consultations
+      // (by clientId or matching email) and their deals (by email). ──
+      if (data.internalNotes !== undefined) {
+        const notes = String(data.internalNotes ?? '');
+        try {
+          await prisma.appointment.updateMany({
+            where: {
+              OR: [
+                { clientId: client.id },
+                ...(client.email?.trim() ? [{ email: client.email.trim() }] : []),
+              ],
+            },
+            data: { internalNotes: notes, notes },
+          });
+          if (client.email?.trim()) {
+            await prisma.deal.updateMany({
+              where: { email: client.email.trim() },
+              data: { notes },
+            });
+          }
+        } catch {
+          // notes sync is non-critical
+        }
+      }
       return res.status(200).json(client);
     }
 
@@ -556,8 +631,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!data.id) return res.status(400).json({ error: 'Missing id.' });
       // Admin only
       if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
-      await prisma.client.delete({ where: { id: data.id } });
-      return res.status(200).json({ ok: true });
+      if (data.purge === true) {
+        await prisma.client.delete({ where: { id: data.id } });
+        return res.status(200).json({ ok: true, purged: true });
+      }
+      try {
+        await prisma.client.update({ where: { id: data.id }, data: { deletedAt: new Date() } });
+      } catch {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)');
+        await prisma.client.update({ where: { id: data.id }, data: { deletedAt: new Date() } });
+      }
+      return res.status(200).json({ ok: true, trashed: true });
+    }
+
+    if (data._action === 'restore_client') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
+      const client = await prisma.client.update({ where: { id: data.id }, data: { deletedAt: null } });
+      return res.status(200).json(client);
     }
 
     // ── Days off CRUD actions ──

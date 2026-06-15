@@ -19,6 +19,9 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 
+import TrashPanel from '../components/TrashPanel';
+import { showToast } from '../lib/toast';
+
 const AppointmentsMap = lazy(() => import('../components/AppointmentsMap'));
 import {
   ConsultationEmailPreview,
@@ -584,6 +587,9 @@ export default function PortalAppointments() {
     daysOff,
     deals,
     deleteAppointment,
+    restoreAppointment,
+    purgeAppointment,
+    fetchTrashedAppointments,
     geocodeAppointments,
     transferAppointment,
     getDispatchesForConsultation,
@@ -627,6 +633,9 @@ export default function PortalAppointments() {
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [mobileCalMode, setMobileCalMode] = useState<'grid' | 'map'>('grid');
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashedAppointments, setTrashedAppointments] = useState<Appointment[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
   const [notesModal, setNotesModal] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
   // Client search/autofill for new consultation form
@@ -820,6 +829,28 @@ export default function PortalAppointments() {
     if (needGeocoding.length > 0) geocodeAppointments(needGeocoding);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarView, mobileConsultTab, mobileCalMode, toDateKey(cursorDate), currentDayAppointments.length]);
+
+  // ── Trash bin ──
+  useEffect(() => {
+    fetchTrashedAppointments().then(setTrashedAppointments).catch(() => {});
+  }, [fetchTrashedAppointments]);
+  const openTrash = async () => {
+    setTrashOpen(true);
+    setTrashLoading(true);
+    setTrashedAppointments(await fetchTrashedAppointments());
+    setTrashLoading(false);
+  };
+  const handleRestoreAppointment = async (apt: Appointment) => {
+    setTrashedAppointments((cur) => cur.filter((a) => a.id !== apt.id));
+    await restoreAppointment(apt.id);
+    showToast({ variant: 'success', message: 'Consultation restored', description: apt.customerName || apt.title || '' });
+  };
+  const handlePurgeAppointment = async (apt: Appointment) => {
+    if (!window.confirm(`Permanently delete this consultation? This cannot be undone.`)) return;
+    setTrashedAppointments((cur) => cur.filter((a) => a.id !== apt.id));
+    await purgeAppointment(apt.id);
+    showToast({ variant: 'error', message: 'Consultation permanently deleted' });
+  };
 
   // Smart legend: only the colors actually present in the dates currently on
   // screen, so it adapts as the admin navigates months / weeks / days.
@@ -2061,6 +2092,20 @@ export default function PortalAppointments() {
             className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             Days Off
+          </button>
+          <button
+            type="button"
+            onClick={openTrash}
+            className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            title="Trash bin"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Trash</span>
+            {trashedAppointments.length > 0 && (
+              <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1 text-[0.65rem] font-black text-slate-600">
+                {trashedAppointments.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -4764,6 +4809,20 @@ export default function PortalAppointments() {
           </div>
         </div>
       )}
+
+      <TrashPanel
+        open={trashOpen}
+        onClose={() => setTrashOpen(false)}
+        title="Consultations"
+        subtitle="Restore a consultation, or delete it permanently."
+        emptyLabel="Deleted consultations show up here so you can recover them."
+        items={trashedAppointments}
+        loading={trashLoading}
+        primary={(a) => a.customerName || a.title || 'Consultation'}
+        secondary={(a) => `${a.appointmentDate}${a.appointmentTime ? ` · ${fmt12(a.appointmentTime)}` : ''} · ${getRepName(a.assignedRepId)}`}
+        onRestore={handleRestoreAppointment}
+        onPurge={handlePurgeAppointment}
+      />
 
       {/* ── Days Off Panel ── */}
       {daysOffPanelOpen && (
