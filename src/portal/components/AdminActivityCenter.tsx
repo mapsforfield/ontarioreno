@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
@@ -243,7 +244,7 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
         )}
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
           <button
             type="button"
@@ -318,7 +319,8 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
