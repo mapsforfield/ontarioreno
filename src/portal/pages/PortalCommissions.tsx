@@ -12,7 +12,7 @@ import {
   formatDealStatus,
 } from '../data/selectors';
 import { usePortalData } from '../data/store';
-import { CommissionPayoutStatus, Deal } from '../data/types';
+import { CommissionPayoutStatus, Deal, DealStatus } from '../data/types';
 
 const projectedStatuses = [
   'new_lead',
@@ -20,6 +20,16 @@ const projectedStatuses = [
   'quoted',
   'negotiating',
   'won',
+];
+
+const statusFilterOptions: Array<{ label: string; value: DealStatus | 'all' }> = [
+  { label: 'All statuses', value: 'all' },
+  { label: 'Won', value: 'won' },
+  { label: 'Negotiating', value: 'negotiating' },
+  { label: 'Quoted', value: 'quoted' },
+  { label: 'Appointment Booked', value: 'appointment_booked' },
+  { label: 'New Lead', value: 'new_lead' },
+  { label: 'Lost', value: 'lost' },
 ];
 
 function calculateRepEstimatedCommission(deal: Deal) {
@@ -73,6 +83,7 @@ export default function PortalCommissions() {
   } = usePortalData();
   const [rateInput, setRateInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const [rateSaved, setRateSaved] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
 
   if (!currentUser) return null;
 
@@ -102,6 +113,35 @@ export default function PortalCommissions() {
       }))
       .filter((row) => row.deal);
 
+    // Filter rows by deal status, and recompute the summary totals so the
+    // cards reflect exactly what's shown in the table below.
+    const filteredRows = adminRows.filter(
+      (row) => statusFilter === 'all' || row.deal!.status === statusFilter
+    );
+
+    const totals = filteredRows.reduce(
+      (acc, { commission, deal }) => {
+        if (!deal) return acc;
+        acc.paidOut += commission.repPaidCommission;
+        if (!deal.isHistorical && projectedStatuses.includes(deal.status)) {
+          acc.projected += commission.adminTotalEstimatedCommission;
+        }
+        if (deal.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid') {
+          acc.pendingRep += Math.max(
+            commission.repEstimatedCommission - commission.repPaidCommission,
+            0
+          );
+          acc.adminNetPending += commission.adminNetCommission;
+        }
+        return acc;
+      },
+      { projected: 0, pendingRep: 0, adminNetPending: 0, paidOut: 0 }
+    );
+
+    const filterLabel =
+      statusFilterOptions.find((o) => o.value === statusFilter)?.label ?? 'All statuses';
+    const isFiltered = statusFilter !== 'all';
+
     return (
       <div className="space-y-6">
         <header>
@@ -113,36 +153,60 @@ export default function PortalCommissions() {
           </h1>
         </header>
 
+        {/* Status filter — drives both the cards and the table */}
+        <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
+          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Showing</span>
+          {statusFilterOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setStatusFilter(option.value)}
+              className={
+                statusFilter === option.value
+                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </section>
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {metricCard(
             'Total Pending Rep Commission',
-            formatCurrency(calculateAdminPendingRepCommission()),
-            'Won deals still owed',
+            formatCurrency(totals.pendingRep),
+            isFiltered ? `${filterLabel} · won deals still owed` : 'Won deals still owed',
             HandCoins
           )}
           {metricCard(
             'Total Admin Net Pending',
-            formatCurrency(calculateAdminPendingNetCommission()),
-            'Admin net on unpaid won deals',
+            formatCurrency(totals.adminNetPending),
+            isFiltered ? `${filterLabel} · admin net on unpaid won` : 'Admin net on unpaid won deals',
             BadgeDollarSign
           )}
           {metricCard(
             'Total Projected Commission',
-            formatCurrency(calculateAdminProjectedCommission()),
-            'All active projected deals',
+            formatCurrency(totals.projected),
+            isFiltered ? `${filterLabel} deals only` : 'All active projected deals',
             TrendingUp
           )}
           {metricCard(
             'Paid Out to Reps',
-            formatCurrency(calculateAdminPaidRepCommission()),
-            'Recorded rep payouts',
+            formatCurrency(totals.paidOut),
+            isFiltered ? `${filterLabel} · recorded payouts` : 'Recorded rep payouts',
             Banknote
           )}
         </section>
 
         <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-4">
-            <h2 className="text-lg font-black tracking-[-0.01em]">Commission table</h2>
+            <h2 className="text-lg font-black tracking-[-0.01em]">
+              Commission table
+              <span className="ml-2 text-sm font-bold text-slate-400">
+                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}
+              </span>
+            </h2>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-slate-500">Default rate:</span>
               <div className="relative w-28">
@@ -202,7 +266,7 @@ export default function PortalCommissions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {adminRows.map(({ commission, deal }) => {
+                {filteredRows.map(({ commission, deal }) => {
                   if (!deal) return null;
                   const repEstimatedCommission =
                     calculateRepEstimatedCommission(deal);
