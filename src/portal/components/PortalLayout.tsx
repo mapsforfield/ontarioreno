@@ -305,10 +305,10 @@ export default function PortalLayout() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[17.5rem] border-r border-white/70 bg-[#071525] px-5 py-6 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)] lg:block">
         <div className="flex h-full flex-col">
           <div>
-            <div className="rounded-[0.5rem] bg-white px-4 py-3">
-              <img src="/logo.png" alt="OntarioReno" className="h-10 w-auto" />
+            <div className="px-1 pt-1">
+              <img src="/logo-sidebar.png" alt="OntarioReno" className="h-11 w-auto" />
             </div>
-            <div className="mt-7 rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
+            <div className="mt-8 rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-100/70">
                 Broker Portal
               </p>
