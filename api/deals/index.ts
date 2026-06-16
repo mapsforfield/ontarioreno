@@ -2,11 +2,39 @@
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 
+// Default "FROM" box for the commission invoice — editable & stored in Setting.
+const DEFAULT_BUSINESS_PROFILE = {
+  legalName: '9664327 CANADA INC.',
+  addressLine1: '172 Silver Maple Rd',
+  addressLine2: 'Richmond Hill, Ontario L4E 4Y8',
+  hstNumber: '779706696RT0001',
+};
+
+async function readBusinessProfile() {
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: 'business_profile' } });
+    if (row?.value) return { ...DEFAULT_BUSINESS_PROFILE, ...JSON.parse(row.value) };
+  } catch {
+    // Setting table may not exist yet
+    await prisma.$executeRawUnsafe(
+      'CREATE TABLE IF NOT EXISTS "Setting" ("key" TEXT PRIMARY KEY, "value" TEXT NOT NULL DEFAULT \'\', "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+    );
+  }
+  return DEFAULT_BUSINESS_PROFILE;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
   if (!user) return;
 
   if (req.method === 'GET') {
+    // ── Commission invoice config (admin only) ──
+    if (req.query['_resource'] === 'invoice_config') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const businessProfile = await readBusinessProfile();
+      return res.status(200).json({ businessProfile });
+    }
+
     // ── Sales Agreements ──
     if (req.query['_resource'] === 'agreements') {
       const where = user.role === 'admin' ? {} : { deal: { assignedRepId: user.id } };
@@ -41,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(trashed);
       } catch {
         await prisma.$executeRawUnsafe(
-          'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+          'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER'
         );
         const trashed = await prisma.deal.findMany({ where, orderBy: { deletedAt: 'desc' } });
         return res.status(200).json(trashed);
@@ -64,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Self-healing: the deletedAt column may not exist yet (schema can't be
       // pushed from local env). Add it, then retry. Idempotent.
       await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)'
+        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER'
       );
       deals = await prisma.deal.findMany({
         where: activeWhere,
@@ -81,6 +109,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const data = req.body;
+
+    // ── Save the commission-invoice business profile (admin only) ──
+    if (data._action === 'save_business_profile') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const profile = {
+        legalName: String(data.legalName ?? '').slice(0, 200),
+        addressLine1: String(data.addressLine1 ?? '').slice(0, 200),
+        addressLine2: String(data.addressLine2 ?? '').slice(0, 200),
+        hstNumber: String(data.hstNumber ?? '').slice(0, 100),
+      };
+      try {
+        await prisma.setting.upsert({
+          where: { key: 'business_profile' },
+          update: { value: JSON.stringify(profile) },
+          create: { key: 'business_profile', value: JSON.stringify(profile) },
+        });
+      } catch {
+        await prisma.$executeRawUnsafe(
+          'CREATE TABLE IF NOT EXISTS "Setting" ("key" TEXT PRIMARY KEY, "value" TEXT NOT NULL DEFAULT \'\', "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+        );
+        await prisma.setting.upsert({
+          where: { key: 'business_profile' },
+          update: { value: JSON.stringify(profile) },
+          create: { key: 'business_profile', value: JSON.stringify(profile) },
+        });
+      }
+      return res.status(200).json(profile);
+    }
 
     // ── Tracker CRUD ──
     if (data._action === 'create_tracker_row') {

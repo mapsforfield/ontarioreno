@@ -342,6 +342,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    // Assign (once) a sequential commission-invoice number to this deal.
+    if (action === 'assign_invoice_number') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const assign = async () => {
+        const existing = await prisma.deal.findUnique({ where: { id }, select: { invoiceNumber: true } });
+        if (existing?.invoiceNumber) return existing.invoiceNumber;
+        const maxAgg = await prisma.deal.aggregate({ _max: { invoiceNumber: true } });
+        const next = Math.max(maxAgg._max.invoiceNumber ?? 0, 4043) + 1; // first invoice = 4044
+        await prisma.deal.update({ where: { id }, data: { invoiceNumber: next } });
+        return next;
+      };
+      try {
+        return res.status(200).json({ invoiceNumber: await assign() });
+      } catch {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER');
+        return res.status(200).json({ invoiceNumber: await assign() });
+      }
+    }
+
     // Restore a soft-deleted deal from the trash bin
     if (action === 'restore_deal') {
       const dealToRestore = await prisma.deal.findUnique({ where: { id }, select: { assignedRepId: true } });

@@ -1,0 +1,364 @@
+import { jsPDF } from 'jspdf';
+import { Download, Loader2, Send, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePortalData } from '../data/store';
+import { showToast } from '../lib/toast';
+import type { Contractor, Deal } from '../data/types';
+
+// ── Layout constants (points; Letter page = 612 × 792). Tweak to fine-tune. ──
+const PAGE_W = 612;
+const PAGE_H = 792;
+const BLUE: [number, number, number] = [42, 77, 160];
+const INK: [number, number, number] = [25, 25, 25];
+const LINE_BLUE: [number, number, number] = [150, 175, 215];
+
+type InvoiceData = {
+  invoiceNumber: string;
+  fromLegalName: string;
+  fromAddr1: string;
+  fromAddr2: string;
+  fromHst: string;
+  toContact: string;
+  toCompany: string;
+  toAddr1: string;
+  toAddr2: string;
+  customerName: string;
+  salesPrice: number;
+  commissionRate: number; // percent, e.g. 8.5
+  amount: number;
+};
+
+function money(v: number) {
+  return `CAD $${v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+async function loadLetterhead(): Promise<string | null> {
+  try {
+    const res = await fetch('/invoice-letterhead.png');
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  if (letterhead) doc.addImage(letterhead, 'PNG', 0, 0, PAGE_W, PAGE_H);
+
+  // INVOICE number on the band
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`INVOICE: #${d.invoiceNumber}`, 49, 104);
+
+  // FROM / TO boxes
+  doc.setDrawColor(40, 40, 40);
+  doc.setLineWidth(0.8);
+  doc.rect(43, 135, 257, 120);
+  doc.rect(312, 135, 257, 120);
+
+  // FROM
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('FROM:', 59, 162);
+  doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
+  doc.setFontSize(13);
+  doc.text(d.fromLegalName, 59, 184);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.setFontSize(9.5);
+  doc.text(d.fromAddr1, 59, 208);
+  doc.text(d.fromAddr2, 59, 221);
+  doc.text(`HST number: ${d.fromHst}`, 59, 234);
+
+  // TO
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.setFontSize(11);
+  doc.text('TO:', 328, 162);
+  doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
+  doc.setFontSize(12.5);
+  doc.text(d.toContact, 328, 184);
+  doc.text(d.toCompany, 328, 202);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.setFontSize(9.5);
+  doc.text(d.toAddr1, 328, 224);
+  doc.text(d.toAddr2, 328, 237);
+
+  // Description / Amount headers
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.text('Description', 43, 300);
+  doc.text('Amount', 569, 300, { align: 'right' });
+  doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
+  doc.setLineWidth(1);
+  doc.line(43, 309, 569, 309);
+
+  // Description rows
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(d.customerName, 43, 328);
+  doc.text(`Sales price: $${d.salesPrice.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 43, 343);
+  doc.text(`Commission ${d.commissionRate}%`, 43, 358);
+  doc.text(money(d.amount), 569, 328, { align: 'right' });
+
+  // Totals
+  doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
+  doc.line(43, 395, 569, 395);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Sub Total', 400, 428);
+  doc.setFont('helvetica', 'normal');
+  doc.text(money(d.amount), 569, 428, { align: 'right' });
+  doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
+  doc.line(400, 438, 569, 438);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total (CAD)', 400, 466);
+  doc.setFont('helvetica', 'normal');
+  doc.text(money(d.amount), 569, 466, { align: 'right' });
+
+  return doc;
+}
+
+function ab2base64(buf: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+  }
+  return btoa(binary);
+}
+
+export default function CommissionInvoice({
+  deal,
+  contractor,
+  onClose,
+}: {
+  deal: Deal;
+  contractor: Contractor | undefined;
+  onClose: () => void;
+}) {
+  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber } = usePortalData();
+
+  const [letterhead, setLetterhead] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  const rate = Math.round((contractor?.commissionRate ?? 0.085) * 10000) / 100;
+  const [data, setData] = useState<InvoiceData>({
+    invoiceNumber: deal.invoiceNumber ? String(deal.invoiceNumber) : '…',
+    fromLegalName: '9664327 CANADA INC.',
+    fromAddr1: '172 Silver Maple Rd',
+    fromAddr2: 'Richmond Hill, Ontario L4E 4Y8',
+    fromHst: '779706696RT0001',
+    toContact: contractor?.contactName ?? '',
+    toCompany: contractor?.companyName ?? '',
+    toAddr1: contractor?.address ?? '',
+    toAddr2: [contractor?.city, contractor?.province, contractor?.postalCode].filter(Boolean).join(' '),
+    customerName: deal.homeownerName,
+    salesPrice: deal.estimatedJobValue,
+    commissionRate: rate,
+    amount: Math.round(deal.estimatedJobValue * (rate / 100) * 100) / 100,
+  });
+  const [saveProfileDefault, setSaveProfileDefault] = useState(false);
+
+  const set = <K extends keyof InvoiceData>(key: K, value: InvoiceData[K]) =>
+    setData((cur) => ({ ...cur, [key]: value }));
+
+  // Recompute amount when price or rate changes
+  useEffect(() => {
+    setData((cur) => ({
+      ...cur,
+      amount: Math.round(cur.salesPrice * (cur.commissionRate / 100) * 100) / 100,
+    }));
+  }, [data.salesPrice, data.commissionRate]);
+
+  // Initial load: letterhead, business profile, invoice number
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [lh, config, num] = await Promise.all([
+        loadLetterhead(),
+        getInvoiceConfig(),
+        deal.invoiceNumber ? Promise.resolve(deal.invoiceNumber) : assignInvoiceNumber(deal.id),
+      ]);
+      if (cancelled) return;
+      setLetterhead(lh);
+      setData((cur) => ({
+        ...cur,
+        invoiceNumber: String(num ?? deal.invoiceNumber ?? ''),
+        ...(config?.businessProfile
+          ? {
+              fromLegalName: config.businessProfile.legalName,
+              fromAddr1: config.businessProfile.addressLine1,
+              fromAddr2: config.businessProfile.addressLine2,
+              fromHst: config.businessProfile.hstNumber,
+            }
+          : {}),
+      }));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Regenerate the live preview whenever data changes
+  const lastUrl = useRef('');
+  useEffect(() => {
+    if (loading) return;
+    const doc = buildPdf(letterhead, data);
+    const url = doc.output('bloburl') as unknown as string;
+    if (lastUrl.current) URL.revokeObjectURL(lastUrl.current);
+    lastUrl.current = url;
+    setPreviewUrl(url);
+    return () => { /* revoked on next gen */ };
+  }, [data, letterhead, loading]);
+
+  const fileName = useMemo(
+    () => `Commission Invoice - ${data.customerName || 'Deal'}.pdf`,
+    [data.customerName]
+  );
+
+  const handleDownload = () => {
+    buildPdf(letterhead, data).save(fileName);
+  };
+
+  const persistProfileIfNeeded = async () => {
+    if (saveProfileDefault) {
+      await saveBusinessProfile({
+        legalName: data.fromLegalName,
+        addressLine1: data.fromAddr1,
+        addressLine2: data.fromAddr2,
+        hstNumber: data.fromHst,
+      });
+    }
+  };
+
+  const handleSend = async () => {
+    const to = contractor?.email?.trim();
+    if (!to) {
+      showToast({ variant: 'error', message: 'This contractor has no email on file.' });
+      return;
+    }
+    setSending(true);
+    try {
+      await persistProfileIfNeeded();
+      const base64 = ab2base64(buildPdf(letterhead, data).output('arraybuffer'));
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          cc: 'info@ontarioreno.ca',
+          subject: `Commission Invoice #${data.invoiceNumber} — ${data.customerName}`,
+          body: `Hi ${data.toContact || 'there'},\n\nPlease find attached the commission invoice for ${data.customerName}.\n\nInvoice #${data.invoiceNumber}\nAmount: ${money(data.amount)}\n\nThank you,\nMarketPlug`,
+          attachments: [{ filename: fileName, content: base64 }],
+        }),
+      });
+      if (!res.ok) throw new Error('send failed');
+      showToast({ variant: 'success', message: 'Invoice sent', description: `${data.toCompany} · ${money(data.amount)}` });
+      onClose();
+    } catch {
+      showToast({ variant: 'error', message: 'Could not send the invoice. Try again.' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const field = (label: string, key: keyof InvoiceData, opts: { type?: string; full?: boolean } = {}) => (
+    <label className={`grid gap-1 text-xs font-bold text-slate-600 ${opts.full ? 'sm:col-span-2' : ''}`}>
+      {label}
+      <input
+        type={opts.type ?? 'text'}
+        value={String(data[key])}
+        onChange={(e) => set(key, (opts.type === 'number' ? Number(e.target.value) : e.target.value) as InvoiceData[typeof key])}
+        className="rounded-[0.4rem] border border-slate-200 px-2.5 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+      />
+    </label>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[115] flex flex-col bg-slate-950/55 p-0 backdrop-blur-sm sm:p-5">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.3)] sm:rounded-[0.5rem]">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4" style={{ paddingTop: 'max(1rem, calc(1rem + env(safe-area-inset-top, 0px)))' }}>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Commission Invoice</p>
+            <h2 className="mt-0.5 text-xl font-black tracking-[-0.02em]">#{data.invoiceNumber} · {data.customerName}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center text-slate-400">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] gap-0 overflow-hidden lg:grid-cols-[22rem_1fr] lg:grid-rows-1">
+            {/* Editable fields */}
+            <div className="overflow-y-auto border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
+              <p className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">From (your details)</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {field('Legal name', 'fromLegalName', { full: true })}
+                {field('Address line 1', 'fromAddr1', { full: true })}
+                {field('Address line 2', 'fromAddr2', { full: true })}
+                {field('HST number', 'fromHst', { full: true })}
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+                <input type="checkbox" checked={saveProfileDefault} onChange={(e) => setSaveProfileDefault(e.target.checked)} />
+                Save these as my default
+              </label>
+
+              <p className="mb-2 mt-4 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">To (contractor)</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {field('Contact', 'toContact', { full: true })}
+                {field('Company', 'toCompany', { full: true })}
+                {field('Address line 1', 'toAddr1', { full: true })}
+                {field('Address line 2', 'toAddr2', { full: true })}
+              </div>
+
+              <p className="mb-2 mt-4 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Invoice details</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {field('Invoice #', 'invoiceNumber')}
+                {field('Customer', 'customerName')}
+                {field('Sales price (incl. HST)', 'salesPrice', { type: 'number' })}
+                {field('Commission %', 'commissionRate', { type: 'number' })}
+                {field('Amount (CAD)', 'amount', { type: 'number' })}
+              </div>
+            </div>
+
+            {/* Live preview */}
+            <div className="flex min-h-0 flex-col bg-slate-100">
+              <div className="min-h-0 flex-1 overflow-hidden p-3">
+                {previewUrl && (
+                  <iframe title="Invoice preview" src={previewUrl} className="h-full w-full rounded-[0.4rem] border border-slate-200 bg-white" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2 border-t border-slate-200 bg-white p-3 sm:flex-row sm:justify-end">
+                <button type="button" onClick={handleDownload} className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                  <Download className="h-4 w-4" /> Download PDF
+                </button>
+                <button type="button" onClick={handleSend} disabled={sending} className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#153158] disabled:opacity-50">
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {sending ? 'Sending…' : `Send to ${contractor?.companyName || 'contractor'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -59,6 +59,11 @@ model Contractor {
   averageProjectSize Float    @default(0)
   notes              String   @default("")
   priorityScore      Int      @default(0)
+  /// Mailing address for the commission-invoice "TO" box (admin-editable).
+  address            String?
+  city               String?
+  province           String?
+  postalCode         String?
   /// Total commission rate negotiated with this contractor (admin-only —
   /// stripped from API responses for non-admins). Rep share is always 5%;
   /// admin net is everything above it. Locks into a deal's commission record
@@ -96,6 +101,9 @@ model Deal {
   /// Soft-delete timestamp. Non-null means the deal is in the trash bin —
   /// excluded from all normal views, restorable, or purged permanently.
   deletedAt            DateTime?
+  /// Sequential commission-invoice number, assigned once when the admin first
+  /// generates the invoice for this deal (starts at 4044).
+  invoiceNumber        Int?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -357,4 +365,12 @@ model ProposalHistory {
   createdAt       DateTime @default(now())
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+// ─── Settings (key/value store for admin config like the business profile) ────
+
+model Setting {
+  key       String   @id
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
 }

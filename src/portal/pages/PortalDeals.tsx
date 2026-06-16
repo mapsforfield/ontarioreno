@@ -1,5 +1,5 @@
 import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
@@ -23,6 +23,8 @@ import {
   Deal,
   DealStatus,
 } from '../data/types';
+
+const CommissionInvoice = lazy(() => import('../components/CommissionInvoice'));
 
 const columns: Array<{ label: string; status: DealStatus }> = [
   { label: 'New Lead', status: 'new_lead' },
@@ -401,6 +403,7 @@ export default function PortalDeals() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashedDeals, setTrashedDeals] = useState<Deal[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [agreementUploading, setAgreementUploading] = useState(false);
   const [agreementError, setAgreementError] = useState('');
   const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
@@ -2498,6 +2501,16 @@ OntarioReno Broker Portal`;
                   Delete Deal
                 </button>
               )}
+              {isAdmin && !isAddingDeal && selectedDeal?.status === 'won' && (
+                <button
+                  type="button"
+                  onClick={() => setInvoiceOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-bold text-violet-800 transition hover:bg-violet-100"
+                >
+                  <FileText className="h-4 w-4" />
+                  Commission Invoice
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closePanel}
@@ -2715,6 +2728,16 @@ OntarioReno Broker Portal`;
             </div>
           </div>
         </div>
+      )}
+
+      {invoiceOpen && selectedDeal && (
+        <Suspense fallback={null}>
+          <CommissionInvoice
+            deal={selectedDeal}
+            contractor={contractors.find((c) => c.id === selectedDeal.assignedContractorId)}
+            onClose={() => setInvoiceOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* ── Trash bin ── */}

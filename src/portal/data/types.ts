@@ -38,6 +38,11 @@ export type Contractor = {
   averageProjectSize: number;
   notes: string;
   priorityScore: number;
+  /** Mailing address — used for the commission-invoice "TO" box. */
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
   /** Total commission rate negotiated with this contractor (fraction, e.g. 0.085).
    *  Admin-only — the API strips this field for non-admin users. */
   commissionRate?: number;
@@ -241,9 +246,19 @@ export type Deal = {
   nextFollowUpDate: string;
   /** Deals imported from before the portal existed. Excluded from leaderboard rankings. */
   isHistorical?: boolean;
+  /** Sequential commission-invoice number, assigned on first invoice generation. */
+  invoiceNumber?: number | null;
   activity: DealActivity[];
   createdAt: string;
   updatedAt: string;
+};
+
+/** The "FROM" box on the commission invoice — your incorporation details. */
+export type BusinessProfile = {
+  legalName: string;
+  addressLine1: string;
+  addressLine2: string;
+  hstNumber: string;
 };
 
 export type SaleTrackerFundedStatus = 'YES' | 'PARTIALLY' | 'NO' | '';

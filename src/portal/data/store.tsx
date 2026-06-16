@@ -23,6 +23,7 @@ import {
   FinancingStatus,
   Activity,
   Appointment,
+  BusinessProfile,
   ConsultationStage,
   Household,
   ProposalHistory,
@@ -120,6 +121,9 @@ type PortalDataContextValue = PortalDataState & {
   restoreDeal: (dealId: string) => Promise<void>;
   purgeDeal: (dealId: string) => Promise<void>;
   fetchTrashedDeals: () => Promise<Deal[]>;
+  getInvoiceConfig: () => Promise<{ businessProfile: BusinessProfile } | null>;
+  saveBusinessProfile: (profile: BusinessProfile) => Promise<void>;
+  assignInvoiceNumber: (dealId: string) => Promise<number | null>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -1530,6 +1534,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       fetchTrashedDeals: async () => {
         const trashed = await apiCall<Deal[]>('/api/deals?_resource=trash');
         return (trashed ?? []).map(normalizeDeal);
+      },
+
+      getInvoiceConfig: async () => {
+        return apiCall<{ businessProfile: BusinessProfile }>('/api/deals?_resource=invoice_config');
+      },
+
+      saveBusinessProfile: async (profile) => {
+        await apiCall('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'save_business_profile', ...profile }),
+        });
+      },
+
+      assignInvoiceNumber: async (dealId) => {
+        const result = await apiCall<{ invoiceNumber: number }>(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'assign_invoice_number' }),
+        });
+        if (result?.invoiceNumber) {
+          setState((current) => ({
+            ...current,
+            deals: current.deals.map((d) => (d.id === dealId ? { ...d, invoiceNumber: result.invoiceNumber } : d)),
+          }));
+        }
+        return result?.invoiceNumber ?? null;
       },
 
       refetch: () => { loadData(true); },

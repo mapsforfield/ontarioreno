@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // (schema can't be pushed from local env — DB credentials live only in
       // the Neon integration). Idempotent, runs at most once.
       await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Contractor" ADD COLUMN IF NOT EXISTS "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0.085'
+        'ALTER TABLE "Contractor" ADD COLUMN IF NOT EXISTS "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0.085, ADD COLUMN IF NOT EXISTS "address" TEXT, ADD COLUMN IF NOT EXISTS "city" TEXT, ADD COLUMN IF NOT EXISTS "province" TEXT, ADD COLUMN IF NOT EXISTS "postalCode" TEXT'
       );
       contractors = await prisma.contractor.findMany({
         orderBy: { companyName: 'asc' },
@@ -63,6 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         averageProjectSize: data.averageProjectSize ?? 0,
         notes: data.notes ?? '',
         priorityScore: data.priorityScore ?? 0,
+        address: data.address ?? null,
+        city: data.city ?? null,
+        province: data.province ?? null,
+        postalCode: data.postalCode ?? null,
         commissionRate: Number.isFinite(rate) ? Math.min(Math.max(rate, 0), 1) : 0.085,
       },
     });

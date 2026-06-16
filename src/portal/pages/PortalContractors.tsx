@@ -27,10 +27,14 @@ import { Contractor } from '../data/types';
 import { Deal, ProposalTemplateType } from '../data/types';
 
 type ContractorFormState = {
+  address: string;
   averageProjectSize: string;
+  city: string;
   /** Percent string, e.g. "8.5" — stored on the contractor as a fraction (0.085) */
   commissionRate: string;
   companyName: string;
+  postalCode: string;
+  province: string;
   contactName: string;
   contractorStatus: Contractor['contractorStatus'];
   email: string;
@@ -74,9 +78,13 @@ const proposalTemplates: Array<{
 ];
 
 const emptyContractorForm: ContractorFormState = {
+  address: '',
   averageProjectSize: '0',
+  city: '',
   commissionRate: '8.5',
   companyName: '',
+  postalCode: '',
+  province: '',
   contactName: '',
   contractorStatus: 'active',
   email: '',
@@ -97,11 +105,15 @@ const emptyContractorForm: ContractorFormState = {
 
 function contractorToForm(contractor: Contractor): ContractorFormState {
   return {
+    address: contractor.address ?? '',
     averageProjectSize: String(contractor.averageProjectSize),
+    city: contractor.city ?? '',
     commissionRate: String(
       Math.round((contractor.commissionRate ?? 0.085) * 10000) / 100
     ),
     companyName: contractor.companyName,
+    postalCode: contractor.postalCode ?? '',
+    province: contractor.province ?? '',
     contactName: contractor.contactName,
     contractorStatus: contractor.contractorStatus,
     email: contractor.email,
@@ -123,11 +135,15 @@ function contractorToForm(contractor: Contractor): ContractorFormState {
 
 function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
   return {
+    address: form.address.trim(),
     averageProjectSize: Number(form.averageProjectSize) || 0,
+    city: form.city.trim(),
     // Percent → fraction, clamped to 0–100%
     commissionRate:
       Math.min(Math.max(Number(form.commissionRate) || 8.5, 0), 100) / 100,
     companyName: form.companyName.trim(),
+    postalCode: form.postalCode.trim(),
+    province: form.province.trim(),
     contactName: form.contactName.trim(),
     contractorStatus: form.contractorStatus,
     email: form.email.trim(),
@@ -748,6 +764,26 @@ export default function PortalContractors() {
                         updateForm('website', event.target.value)
                       }
                     />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                    Mailing Address <span className="font-medium text-slate-400">(used on commission invoices)</span>
+                    <input
+                      value={form.address}
+                      onChange={(event) => updateForm('address', event.target.value)}
+                      placeholder="103 Dolomite Dr"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    City
+                    <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} placeholder="North York" />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Province
+                    <input value={form.province} onChange={(event) => updateForm('province', event.target.value)} placeholder="ON" />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Postal Code
+                    <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value.toUpperCase())} placeholder="M3J 2N1" />
                   </label>
                   {/* ── Company logo upload ── */}
                   <div className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
