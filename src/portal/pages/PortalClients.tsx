@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
 import { showToast } from '../lib/toast';
@@ -97,7 +96,6 @@ function clientToForm(client: Client): ClientForm {
 
 export default function PortalClients() {
   const navigate = useNavigate();
-  const { isAdmin } = usePortalAuth();
   const {
     clients,
     households,
@@ -124,8 +122,8 @@ export default function PortalClients() {
   const [trashLoading, setTrashLoading] = useState(false);
 
   useEffect(() => {
-    if (isAdmin) fetchTrashedClients().then(setTrashedClients).catch(() => {});
-  }, [isAdmin, fetchTrashedClients]);
+    fetchTrashedClients().then(setTrashedClients).catch(() => {});
+  }, [fetchTrashedClients]);
   const openTrash = async () => {
     setTrashOpen(true);
     setTrashLoading(true);
@@ -277,7 +275,7 @@ export default function PortalClients() {
 
   const handleDelete = async () => {
     if (!selectedClientId) return;
-    if (!window.confirm('Delete this client profile? This cannot be undone.')) return;
+    // Soft-delete with an Undo toast + recoverable from the trash bin.
     await deleteClient(selectedClientId);
     closePanel();
   };
@@ -407,22 +405,20 @@ export default function PortalClients() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={openTrash}
-              className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-              title="Trash bin"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Trash</span>
-              {trashedClients.length > 0 && (
-                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1 text-[0.65rem] font-black text-slate-600">
-                  {trashedClients.length}
-                </span>
-              )}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openTrash}
+            className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            title="Trash bin"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Trash</span>
+            {trashedClients.length > 0 && (
+              <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1 text-[0.65rem] font-black text-slate-600">
+                {trashedClients.length}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={openCreate}
@@ -692,7 +688,7 @@ export default function PortalClients() {
             </div>
 
             <div className="flex flex-col gap-2 border-t border-slate-200 p-5 sm:flex-row sm:flex-wrap sm:justify-end">
-              {isAdmin && !isCreating && selectedClientId && (
+              {!isCreating && selectedClientId && (
                 <button
                   type="button"
                   onClick={handleDelete}

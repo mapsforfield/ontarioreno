@@ -629,8 +629,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (data._action === 'delete_client') {
       if (!data.id) return res.status(400).json({ error: 'Missing id.' });
-      // Admin only
-      if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
       if (data.purge === true) {
         await prisma.client.delete({ where: { id: data.id } });
         return res.status(200).json({ ok: true, purged: true });
@@ -646,7 +644,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (data._action === 'restore_client') {
       if (!data.id) return res.status(400).json({ error: 'Missing id.' });
-      if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden.' });
       const client = await prisma.client.update({ where: { id: data.id }, data: { deletedAt: null } });
       return res.status(200).json(client);
     }
