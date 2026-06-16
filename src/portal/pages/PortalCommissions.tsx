@@ -22,6 +22,8 @@ const projectedStatuses = [
   'won',
 ];
 
+const openDealStatuses = ['new_lead', 'appointment_booked', 'quoted', 'negotiating'];
+
 const statusFilterOptions: Array<{ label: string; value: DealStatus | 'all' }> = [
   { label: 'All statuses', value: 'all' },
   { label: 'Won', value: 'won' },
@@ -382,6 +384,40 @@ export default function PortalCommissions() {
     }))
     .filter((row) => row.deal);
 
+  const repFilteredRows = repRows.filter(
+    (row) => statusFilter === 'all' || row.deal!.status === statusFilter
+  );
+  const repIsFiltered = statusFilter !== 'all';
+  const repFilterLabel =
+    statusFilterOptions.find((o) => o.value === statusFilter)?.label ?? 'All statuses';
+
+  // When filtered, recompute the cards from the visible rows; otherwise keep the
+  // exact store totals so the default view is unchanged.
+  const repTotals = repIsFiltered
+    ? repFilteredRows.reduce(
+        (acc, { commission, deal }) => {
+          if (!deal) return acc;
+          acc.paid += commission.repPaidCommission;
+          if (!deal.isHistorical && projectedStatuses.includes(deal.status)) {
+            acc.projected += commission.repEstimatedCommission;
+          }
+          if (deal.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid') {
+            acc.pending += Math.max(commission.repEstimatedCommission - commission.repPaidCommission, 0);
+          }
+          if (!deal.isHistorical && openDealStatuses.includes(deal.status)) {
+            acc.pipeline += deal.estimatedJobValue;
+          }
+          return acc;
+        },
+        { pending: 0, projected: 0, paid: 0, pipeline: 0 }
+      )
+    : {
+        pending: calculateRepPendingCommission(currentUser.id),
+        projected: calculateRepProjectedCommission(currentUser.id),
+        paid: calculateRepPaidCommission(currentUser.id),
+        pipeline: calculatePipelineValue(currentUser.id),
+      };
+
   return (
     <div className="space-y-6">
       <header className="rounded-[0.5rem] border border-white bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_55%,#ecf4fd_100%)] p-5 shadow-md sm:p-7">
@@ -397,28 +433,47 @@ export default function PortalCommissions() {
         </p>
       </header>
 
+      {/* Status filter — drives both the cards and the deal list */}
+      <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
+        <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Showing</span>
+        {statusFilterOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setStatusFilter(option.value)}
+            className={
+              statusFilter === option.value
+                ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+            }
+          >
+            {option.label}
+          </button>
+        ))}
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metricCard(
           'Pending Commission',
-          formatCurrency(calculateRepPendingCommission(currentUser.id)),
-          'Unpaid or partial won deals',
+          formatCurrency(repTotals.pending),
+          repIsFiltered ? `${repFilterLabel} · unpaid won deals` : 'Unpaid or partial won deals',
           HandCoins
         )}
         {metricCard(
           'Projected Commission',
-          formatCurrency(calculateRepProjectedCommission(currentUser.id)),
-          'Active deals at 5%',
+          formatCurrency(repTotals.projected),
+          repIsFiltered ? `${repFilterLabel} deals at 5%` : 'Active deals at 5%',
           TrendingUp
         )}
         {metricCard(
           'Paid Commission',
-          formatCurrency(calculateRepPaidCommission(currentUser.id)),
-          'Recorded payouts',
+          formatCurrency(repTotals.paid),
+          repIsFiltered ? `${repFilterLabel} · recorded payouts` : 'Recorded payouts',
           Banknote
         )}
         {metricCard(
           'Pipeline Value',
-          formatCurrency(calculatePipelineValue(currentUser.id)),
+          formatCurrency(repTotals.pipeline),
           'Open renovation deal value',
           CircleDollarSign
         )}
@@ -428,10 +483,18 @@ export default function PortalCommissions() {
         <div className="border-b border-slate-200 pb-4">
           <h2 className="text-lg font-black tracking-[-0.01em]">
             Commission by Deal
+            <span className="ml-2 text-sm font-bold text-slate-400">
+              {repFilteredRows.length} {repIsFiltered ? repFilterLabel.toLowerCase() : ''} deal{repFilteredRows.length !== 1 ? 's' : ''}
+            </span>
           </h2>
         </div>
+        {repFilteredRows.length === 0 ? (
+          <p className="mt-4 rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">
+            No {repIsFiltered ? repFilterLabel.toLowerCase() : ''} deals to show.
+          </p>
+        ) : (
         <div className="mt-4 grid gap-3">
-          {repRows.map(({ commission, deal }) => {
+          {repFilteredRows.map(({ commission, deal }) => {
             if (!deal) return null;
             const repEstimatedCommission = calculateRepEstimatedCommission(deal);
             const remaining = Math.max(
@@ -511,6 +574,7 @@ export default function PortalCommissions() {
             );
           })}
         </div>
+        )}
       </section>
     </div>
   );
