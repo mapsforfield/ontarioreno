@@ -4,6 +4,7 @@ import {
   buildRepAssignmentHtml,
   buildContractorDispatchHtml,
 } from './emailTemplates';
+import { getCustomerFacingConsultantPhone } from './customerContactRouting';
 
 export type ConsultationEmailType =
   | 'booking_confirmation'
@@ -47,8 +48,8 @@ function contractorPublicName(contractor?: Contractor) {
   return contractor?.publicCompanyName?.trim() || contractor?.companyName || 'Your Renovation Contractor';
 }
 
-function contractorPublicPhone(contractor?: Contractor) {
-  return contractor?.publicPhone?.trim() || contractor?.phone || '';
+function contractorPublicPhone(contractor?: Contractor, rep?: User) {
+  return getCustomerFacingConsultantPhone(contractor, rep);
 }
 
 function contractorPublicEmail(contractor?: Contractor) {
@@ -65,10 +66,11 @@ function formatDateTime(appointment: Appointment) {
   return `${date} at ${time}`;
 }
 
-function customerFooter(contractor?: Contractor) {
+function customerFooter(contractor?: Contractor, rep?: User) {
+  const phone = contractorPublicPhone(contractor, rep);
   const lines = [
     contractor?.emailFooterText?.trim(),
-    contractorPublicPhone(contractor) ? `Phone: ${contractorPublicPhone(contractor)}` : '',
+    phone ? `Phone: ${phone}` : '',
     contractorPublicEmail(contractor) ? `Email: ${contractorPublicEmail(contractor)}` : '',
     contractorPublicWebsite(contractor) ? `Website: ${contractorPublicWebsite(contractor)}` : '',
   ].filter(Boolean);
@@ -116,7 +118,7 @@ function buildCustomerEmail(
     '',
     `Reschedule: /portal/consultation/${input.appointment.id}/reschedule`,
     `Cancel: /portal/consultation/${input.appointment.id}/cancel`,
-    customerFooter(input.contractor),
+    customerFooter(input.contractor, input.rep),
   ]
     .filter((line) => line !== '')
     .join('\n');

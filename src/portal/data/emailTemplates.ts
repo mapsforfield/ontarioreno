@@ -13,6 +13,7 @@
  */
 
 import type { Appointment, Contractor, ContractorDispatch, Deal, User } from './types';
+import { getCustomerFacingConsultantPhone } from './customerContactRouting';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -259,9 +260,9 @@ function statusBadge(cfg: StatusCfg): string {
  * Contractor contact strip shown below the main body on customer-facing emails.
  * Renders phone, email, website, and optional custom footer text.
  */
-function contactStrip(contractor: Contractor | undefined): string {
+function contactStrip(contractor: Contractor | undefined, rep?: User): string {
   if (!contractor) return '';
-  const phone = contractor.publicPhone?.trim() || contractor.phone || '';
+  const phone = getCustomerFacingConsultantPhone(contractor, rep);
   const email = contractor.publicEmail?.trim() || contractor.email || '';
   const website = contractor.publicWebsite?.trim() || contractor.website || '';
   const footer = contractor.emailFooterText?.trim() || '';
@@ -457,7 +458,7 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
         </div>
        </div>`;
 
-  const phone = contractor?.publicPhone?.trim() || contractor?.phone || '';
+  const phone = getCustomerFacingConsultantPhone(contractor, rep);
   const email = contractor?.publicEmail?.trim() || contractor?.email || '';
   const website = contractor?.publicWebsite?.trim() || contractor?.website || '';
   const websiteDisplay = website.replace(/^https?:\/\//, '').replace(/\/$/, '');
