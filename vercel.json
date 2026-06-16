@@ -8,8 +8,8 @@
       "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/appointments?_cron=weekly-recap",
-      "schedule": "0 13 * * 1"
+      "path": "/api/appointments?_cron=daily-recap",
+      "schedule": "15 13 * * *"
     }
   ]
 }
