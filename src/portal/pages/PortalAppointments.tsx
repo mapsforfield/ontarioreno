@@ -783,7 +783,13 @@ export default function PortalAppointments() {
   };
   const getAttentionInfo = (appointment: Appointment) => {
     const actions: string[] = [];
-    if (appointment.status === 'completed' && !appointment.outcomeSubmitted) {
+    // Events (showroom visit, supplier meeting, etc.) don't have outcome
+    // reports — only real consultations do.
+    if (
+      appointment.status === 'completed' &&
+      !appointment.outcomeSubmitted &&
+      !isEventType(appointment.appointmentType)
+    ) {
       actions.push('Outcome not logged');
     }
     if (
@@ -1220,7 +1226,13 @@ export default function PortalAppointments() {
       addAppointment(payload, currentUser);
     } else if (selectedAppointment) {
       updateAppointment(selectedAppointment.id, payload, currentUser);
-      if (form.status === 'completed' && !form.outcomeSubmitted) {
+      // Real consultations nudge for an outcome report when marked complete;
+      // events just close out (no outcome report needed).
+      if (
+        form.status === 'completed' &&
+        !form.outcomeSubmitted &&
+        !isEventType(form.appointmentType)
+      ) {
         setForm((current) => ({
           ...current,
           consultationStage: 'consultation_completed',
@@ -3429,7 +3441,10 @@ export default function PortalAppointments() {
                   [
                     { id: 'prep',     label: 'Prep',     badge: null as string | null },
                     { id: 'details',  label: 'Details',  badge: null as string | null },
-                    { id: 'outcome',  label: 'Outcome',  badge: selectedAppointment && !selectedAppointment.outcomeSubmitted && selectedAppointment.status === 'completed' ? '!' : null as string | null },
+                    // Events have no outcome report — only real consultations do.
+                    ...(isEventType(form.appointmentType)
+                      ? []
+                      : [{ id: 'outcome', label: 'Outcome', badge: selectedAppointment && !selectedAppointment.outcomeSubmitted && selectedAppointment.status === 'completed' ? '!' : null as string | null }]),
                     { id: 'dispatch', label: 'Dispatch', badge: selectedDispatches.length > 0 ? String(selectedDispatches.length) : null as string | null },
                     { id: 'emails',   label: 'Emails',   badge: emailPreviews.length > 0 ? String(emailPreviews.length) : null as string | null },
                   ]
@@ -3900,7 +3915,7 @@ export default function PortalAppointments() {
               )}
 
               {/* ══ TAB: OUTCOME ═════════════════════════════════════════════ */}
-              {selectedAppointment && panelTab === 'outcome' && (
+              {selectedAppointment && panelTab === 'outcome' && !isEventType(form.appointmentType) && (
                 <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
