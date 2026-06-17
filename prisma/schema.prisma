@@ -35,6 +35,7 @@ model User {
   trackerRows          SaleTracker[]
   daysOff              RepDayOff[]
   salesAgreements      SalesAgreement[]
+  tasks                Task[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -373,4 +374,19 @@ model Setting {
   key       String   @id
   value     String   @default("")
   updatedAt DateTime @updatedAt
+}
+
+// ─── Tasks (personal to-do list per user) ────────────────────────────────────
+
+model Task {
+  id             String   @id @default(cuid())
+  userId         String
+  title          String
+  dueAt          String?
+  done           Boolean  @default(false)
+  reminderSentAt String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 }

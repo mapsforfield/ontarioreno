@@ -1,8 +1,12 @@
 import {
   BadgeDollarSign,
   Building2,
+  CalendarClock,
   CalendarDays,
+  Check,
   HandCoins,
+  ListTodo,
+  Plus,
   Trophy,
   TrendingUp,
 } from 'lucide-react';
@@ -55,8 +59,23 @@ export default function PortalDashboard() {
     deals,
     getVisibleAppointmentsForUser,
     getVisibleDealsForUser,
+    tasks,
+    addTask,
+    updateTask,
     users,
   } = usePortalData();
+  const [quickTask, setQuickTask] = useState('');
+  const myOpenTasks = currentUser
+    ? tasks
+        .filter((t) => t.userId === currentUser.id && !t.done)
+        .sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'))
+    : [];
+  const submitQuickTask = async () => {
+    const v = quickTask.trim();
+    if (!v) return;
+    setQuickTask('');
+    await addTask(v, null);
+  };
   const activeContractors = contractors.filter(
     (contractor) => contractor.contractorStatus === 'active'
   ).length;
@@ -218,6 +237,74 @@ export default function PortalDashboard() {
             </p>
           </Link>
         ))}
+      </section>
+
+      {/* ── My Tasks widget ── */}
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[0.5rem] bg-[#e8f1fb] text-[#1B3C6C]">
+              <ListTodo className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">My To-Do</p>
+              <h2 className="text-xl font-black tracking-[-0.02em]">
+                {myOpenTasks.length} open task{myOpenTasks.length !== 1 ? 's' : ''}
+              </h2>
+            </div>
+          </div>
+          <Link to="/portal/tasks" className="text-sm font-bold text-[#1B3C6C] transition hover:underline">
+            View all →
+          </Link>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={quickTask}
+            onChange={(e) => setQuickTask(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitQuickTask(); }}
+            placeholder="Quick add a task…"
+            className="flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+          />
+          <button
+            type="button"
+            onClick={submitQuickTask}
+            disabled={!quickTask.trim()}
+            className="inline-flex items-center justify-center gap-1.5 rounded-[0.5rem] bg-[#1B3C6C] px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> Add
+          </button>
+        </div>
+        {myOpenTasks.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {myOpenTasks.slice(0, 5).map((task) => {
+              const overdue = !!task.dueAt && new Date(task.dueAt.includes('T') ? task.dueAt : `${task.dueAt}T23:59:59`).getTime() < Date.now();
+              return (
+                <div key={task.id} className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => updateTask(task.id, { done: true })}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-slate-300 transition hover:border-emerald-500 hover:bg-emerald-500 hover:text-white"
+                    aria-label="Mark done"
+                  >
+                    <Check className="h-3 w-3 opacity-0 hover:opacity-100" />
+                  </button>
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-800">{task.title}</span>
+                  {task.dueAt && (
+                    <span className={`inline-flex shrink-0 items-center gap-1 text-xs font-bold ${overdue ? 'text-red-500' : 'text-slate-400'}`}>
+                      <CalendarClock className="h-3 w-3" />
+                      {new Date(task.dueAt.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {myOpenTasks.length > 5 && (
+              <Link to="/portal/tasks" className="block pt-1 text-center text-xs font-bold text-slate-400 hover:text-[#1B3C6C]">
+                +{myOpenTasks.length - 5} more
+              </Link>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">

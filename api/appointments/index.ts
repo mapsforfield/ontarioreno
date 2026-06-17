@@ -155,7 +155,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[morning-brief] follow-up digest failed:', err);
     }
 
-    return res.status(200).json({ ok: true, sent, followUpEmailsSent });
+    // ── Task reminders: email each rep their to-do items due today / overdue ──
+    let taskEmailsSent = 0;
+    try {
+      const todayEnd = `${today}T23:59:59`;
+      let dueTasks: Array<{ userId: string; title: string; dueAt: string | null }> = [];
+      try {
+        dueTasks = await prisma.task.findMany({
+          where: { done: false, dueAt: { not: null, lte: todayEnd } },
+          select: { userId: true, title: true, dueAt: true },
+          orderBy: { dueAt: 'asc' },
+        });
+      } catch {
+        // Task table may not exist yet — nothing to remind.
+        dueTasks = [];
+      }
+      const tasksByUser: Record<string, typeof dueTasks> = {};
+      for (const t of dueTasks) {
+        if (!tasksByUser[t.userId]) tasksByUser[t.userId] = [];
+        tasksByUser[t.userId].push(t);
+      }
+      const taskUserIds = Object.keys(tasksByUser);
+      if (taskUserIds.length > 0 && process.env.RESEND_API_KEY) {
+        const taskUsers = await prisma.user.findMany({
+          where: { id: { in: taskUserIds }, active: true },
+          select: { id: true, name: true, email: true },
+        });
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
+        const taskResults = await Promise.allSettled(
+          taskUsers
+            .filter((u) => u.email)
+            .map((u) => {
+              const myTasks = tasksByUser[u.id];
+              const rows = myTasks
+                .map((t) => {
+                  const overdue = (t.dueAt ?? '').slice(0, 10) < today;
+                  const due = t.dueAt && t.dueAt.includes('T')
+                    ? new Date(t.dueAt).toLocaleString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true })
+                    : 'Today';
+                  return `<tr><td width="4" style="width:4px;background:${overdue ? '#b45309' : '#1B3C6C'};">&nbsp;</td><td style="padding:11px 16px;border-bottom:1px solid #f1f5f9;"><p style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">${t.title}</p><p style="margin:3px 0 0;font-size:12px;font-weight:700;color:${overdue ? '#b45309' : '#64748b'};">${overdue ? `Overdue${t.dueAt && t.dueAt.includes('T') ? ` · was ${due}` : ''}` : `Due ${due}`}</p></td></tr>`;
+                })
+                .join('');
+              const count = myTasks.length;
+              const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4f8;padding:32px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+  <div style="background:#1B3C6C;padding:26px 24px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);">OntarioReno · Your To-Do</p>
+    <p style="margin:0;font-size:20px;font-weight:800;color:#fff;">${count} task${count !== 1 ? 's' : ''} for today</p>
+  </div>
+  <div style="padding:26px;">
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${u.name}, here's your to-do list for today:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">${rows}</table>
+    <p style="margin:20px 0 0;text-align:center;"><a href="https://ontarioreno.ca/portal/tasks" style="display:inline-block;background:#1B3C6C;color:#fff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:8px;">Open My Tasks</a></p>
+  </div>
+  <div style="padding:18px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">Sent each morning by <strong style="color:#64748b;">OntarioReno</strong></p></div>
+</div></body></html>`;
+              const text = [`Hi ${u.name},`, '', `You have ${count} task${count !== 1 ? 's' : ''} due:`, ...myTasks.map((t) => `- ${t.title}`), '', 'Open: https://ontarioreno.ca/portal/tasks'].join('\n');
+              return resend.emails.send({ from, to: u.email, subject: `Your to-do list — ${count} task${count !== 1 ? 's' : ''} today`, html, text });
+            })
+        );
+        taskEmailsSent = taskResults.filter((r) => r.status === 'fulfilled').length;
+      }
+    } catch (err) {
+      console.error('[morning-brief] task reminders failed:', err);
+    }
+
+    return res.status(200).json({ ok: true, sent, followUpEmailsSent, taskEmailsSent });
   }
 
   // ── Daily business recap cron — emails the business inbox a portal briefing ──

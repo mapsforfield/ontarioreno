@@ -253,6 +253,17 @@ export type Deal = {
   updatedAt: string;
 };
 
+/** A personal to-do item owned by one user. */
+export type Task = {
+  id: string;
+  userId: string;
+  title: string;
+  dueAt?: string | null;
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** The "FROM" box on the commission invoice — your incorporation details. */
 export type BusinessProfile = {
   legalName: string;

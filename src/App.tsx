@@ -92,6 +92,7 @@ import PortalDeals from './portal/pages/PortalDeals';
 import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalClients from './portal/pages/PortalClients';
 import PortalSalesTracker from './portal/pages/PortalSalesTracker';
+import PortalTasks from './portal/pages/PortalTasks';
 import PortalLeaderboard from './portal/pages/PortalLeaderboard';
 import PortalLogin from './portal/pages/PortalLogin';
 import PortalPerformance from './portal/pages/PortalPerformance';
@@ -124,6 +125,7 @@ export default function App() {
               <Route path="deals" element={<PortalDeals />} />
               <Route path="appointments" element={<PortalAppointments />} />
               <Route path="clients" element={<PortalClients />} />
+              <Route path="tasks" element={<PortalTasks />} />
               <Route path="sales-tracker" element={<PortalSalesTracker />} />
               <Route path="financing" element={<PortalFinancing />} />
               <Route path="performance" element={<PortalPerformance />} />

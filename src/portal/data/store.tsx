@@ -30,6 +30,7 @@ import {
   RepDayOff,
   SalesAgreement,
   SaleTrackerRow,
+  Task,
   User,
 } from './types';
 
@@ -68,6 +69,7 @@ type PortalDataState = {
   daysOff: RepDayOff[];
   households: Household[];
   salesAgreements: SalesAgreement[];
+  tasks: Task[];
   users: User[];
   contractors: Contractor[];
   dispatches: ContractorDispatch[];
@@ -124,6 +126,9 @@ type PortalDataContextValue = PortalDataState & {
   getInvoiceConfig: () => Promise<{ businessProfile: BusinessProfile } | null>;
   saveBusinessProfile: (profile: BusinessProfile) => Promise<void>;
   assignInvoiceNumber: (dealId: string) => Promise<number | null>;
+  addTask: (title: string, dueAt?: string | null) => Promise<void>;
+  updateTask: (id: string, updates: { title?: string; dueAt?: string | null; done?: boolean }) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -243,6 +248,7 @@ const emptyState: PortalDataState = {
   daysOff: [],
   households: [],
   salesAgreements: [],
+  tasks: [],
   commissions: [],
   contractors: [],
   deals: [],
@@ -565,7 +571,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Household[]>('/api/appointments?_resource=households'),
       apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
       apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements]) => {
+      apiCall<Task[]>('/api/auth/tasks'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -585,6 +592,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         clients: clients ?? [],
         daysOff: daysOff ?? [],
         households: households ?? [],
+        tasks: tasks ?? [],
         salesAgreements: salesAgreements ?? [],
         trackerRows: trackerRows ?? [],
         defaultCommissionRate: loadDefaultCommissionRate(),
@@ -1289,6 +1297,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           daysOff: current.daysOff,
           households: current.households,
           salesAgreements: current.salesAgreements,
+          tasks: current.tasks,
           contractors: current.contractors,
           deals: [...current.deals, deal],
           dispatches: current.dispatches,
@@ -1559,6 +1568,32 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }));
         }
         return result?.invoiceNumber ?? null;
+      },
+
+      addTask: async (title, dueAt) => {
+        const task = await apiCall<Task>('/api/auth/tasks', {
+          method: 'POST',
+          body: JSON.stringify({ op: 'create', title, dueAt: dueAt ?? null }),
+        });
+        if (task) setState((current) => ({ ...current, tasks: [task, ...current.tasks] }));
+      },
+
+      updateTask: async (id, updates) => {
+        // Optimistic
+        setState((current) => ({
+          ...current,
+          tasks: current.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        }));
+        const task = await apiCall<Task>('/api/auth/tasks', {
+          method: 'POST',
+          body: JSON.stringify({ op: 'update', id, ...updates }),
+        });
+        if (task) setState((current) => ({ ...current, tasks: current.tasks.map((t) => (t.id === id ? task : t)) }));
+      },
+
+      deleteTask: async (id) => {
+        setState((current) => ({ ...current, tasks: current.tasks.filter((t) => t.id !== id) }));
+        await apiCall('/api/auth/tasks', { method: 'POST', body: JSON.stringify({ op: 'delete', id }) });
       },
 
       refetch: () => { loadData(true); },

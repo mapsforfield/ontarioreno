@@ -90,6 +90,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // ── /api/auth/tasks ───────────────────────────────────────────────────────
+  // Personal to-do list. Each user only ever sees/edits their own tasks.
+  if (action === 'tasks') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    const ensureTable = () =>
+      prisma.$executeRawUnsafe(
+        'CREATE TABLE IF NOT EXISTS "Task" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT NOT NULL, "dueAt" TEXT, "done" BOOLEAN NOT NULL DEFAULT false, "reminderSentAt" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+      );
+
+    if (req.method === 'GET') {
+      try {
+        const tasks = await prisma.task.findMany({
+          where: { userId: user.id },
+          orderBy: [{ done: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+        });
+        return res.status(200).json(tasks);
+      } catch {
+        await ensureTable();
+        return res.status(200).json([]);
+      }
+    }
+
+    if (req.method === 'POST') {
+      const body = req.body as Record<string, unknown>;
+      const op = body.op as string;
+      const createTask = () =>
+        prisma.task.create({
+          data: {
+            userId: user.id,
+            title: String(body.title ?? '').slice(0, 300),
+            dueAt: body.dueAt ? String(body.dueAt) : null,
+          },
+        });
+      try {
+        if (op === 'create') return res.status(201).json(await createTask());
+        if (op === 'update' || op === 'delete') {
+          const existing = await prisma.task.findUnique({ where: { id: String(body.id) } });
+          if (!existing || existing.userId !== user.id) return res.status(403).json({ error: 'Forbidden.' });
+          if (op === 'delete') {
+            await prisma.task.delete({ where: { id: existing.id } });
+            return res.status(200).json({ ok: true });
+          }
+          const data: { title?: string; dueAt?: string | null; done?: boolean } = {};
+          if (body.title !== undefined) data.title = String(body.title).slice(0, 300);
+          if (body.dueAt !== undefined) data.dueAt = body.dueAt ? String(body.dueAt) : null;
+          if (body.done !== undefined) data.done = !!body.done;
+          return res.status(200).json(await prisma.task.update({ where: { id: existing.id }, data }));
+        }
+        return res.status(400).json({ error: 'Unknown op.' });
+      } catch {
+        await ensureTable();
+        if (op === 'create') return res.status(201).json(await createTask());
+        return res.status(500).json({ error: 'Task operation failed.' });
+      }
+    }
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
+
   // ── /api/auth/me ─────────────────────────────────────────────────────────────
   if (action === 'me') {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
