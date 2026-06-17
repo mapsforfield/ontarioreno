@@ -769,24 +769,81 @@ export default function PortalAppointments() {
   const completedAppointments = filteredAppointments.filter(
     (appointment) => appointment.status === 'completed'
   );
-  const needsAttentionAppointments = visibleAppointments.filter(
-    (appointment) =>
-      (appointment.status === 'completed' && !appointment.outcomeSubmitted) ||
-      (appointment.nextStep === 'follow_up_required' &&
-        appointment.followUpDate &&
-        appointment.followUpDate <= today) ||
-      (['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
-        appointment.nextStep === 'no_action') ||
-      (appointment.appointmentDate < today && appointment.status !== 'completed') ||
-      appointment.consultationStage === 'follow_up_required' ||
-      (appointment.consultationStage === 'estimate_requested' &&
-        getDaysSince(appointment.updatedAt) > 3) ||
-      (appointment.consultationStage === 'contractor_review' &&
-        getDaysSince(appointment.updatedAt) > 3) ||
-      !appointment.assignedRepId
+  // ── Attention model ──────────────────────────────────────────────────────
+  // Two calm tiers instead of one loud red "Attention":
+  //   • action  — a genuine gap that needs fixing (amber)
+  //   • followup — a scheduled follow-up reminder, dated (sky blue)
+  // A consultation whose outcome is logged is NEVER flagged as missing it.
+  const formatFollowUpDate = (d: string) => {
+    try {
+      return new Date(`${d}T12:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    } catch {
+      return d;
+    }
+  };
+  const getAttentionInfo = (appointment: Appointment) => {
+    const actions: string[] = [];
+    if (appointment.status === 'completed' && !appointment.outcomeSubmitted) {
+      actions.push('Outcome not logged');
+    }
+    if (
+      appointment.appointmentDate < today &&
+      !['completed', 'cancelled'].includes(appointment.status)
+    ) {
+      actions.push('Past due — update status');
+    }
+    if (!appointment.assignedRepId) actions.push('No rep assigned');
+
+    let followUp: { label: string; overdue: boolean } | null = null;
+    const hasFollowUp =
+      appointment.nextStep === 'follow_up_required' ||
+      appointment.consultationStage === 'follow_up_required';
+    if (hasFollowUp) {
+      const date = appointment.followUpDate;
+      if (date) {
+        const overdue = date <= today;
+        followUp = {
+          label: overdue
+            ? `Follow-up due ${formatFollowUpDate(date)}`
+            : `Follow-up ${formatFollowUpDate(date)}`,
+          overdue,
+        };
+      } else {
+        followUp = { label: 'Follow-up needed', overdue: false };
+      }
+    }
+
+    const level: 'none' | 'followup' | 'action' =
+      actions.length > 0 ? 'action' : followUp ? 'followup' : 'none';
+    return { actions, followUp, level };
+  };
+  const attentionDotColor = (level: 'none' | 'followup' | 'action') =>
+    level === 'action' ? 'bg-amber-500' : level === 'followup' ? 'bg-sky-400' : 'bg-emerald-500';
+  const renderAttentionChips = (info: ReturnType<typeof getAttentionInfo>) => (
+    <>
+      {info.actions.map((a) => (
+        <span key={a} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">
+          {a}
+        </span>
+      ))}
+      {info.followUp && (
+        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[0.62rem] font-black text-sky-700">
+          {info.followUp.label}
+        </span>
+      )}
+    </>
   );
-  // Combined list for the desktop "Upcoming & Dispatch Gaps" section
+
+  // Genuine gaps drive the red "Attention" count / mobile tab.
+  const needsAttentionAppointments = visibleAppointments.filter(
+    (appointment) => getAttentionInfo(appointment).level === 'action'
+  );
   const needsAttentionIds = new Set(needsAttentionAppointments.map((a) => a.id));
+  // The dispatch-gaps list also surfaces overdue follow-ups (as calm reminders).
+  const gapAppointments = visibleAppointments.filter((appointment) => {
+    const info = getAttentionInfo(appointment);
+    return info.level === 'action' || !!info.followUp?.overdue;
+  });
   const upcomingCombined = (() => {
     const seen = new Set<string>();
     const combined: typeof needsAttentionAppointments = [];
@@ -794,7 +851,7 @@ export default function PortalAppointments() {
       seen.add(apt.id);
       combined.push(apt);
     }
-    for (const apt of needsAttentionAppointments.slice(0, 8)) {
+    for (const apt of gapAppointments.slice(0, 8)) {
       if (!seen.has(apt.id)) combined.push(apt);
     }
     return combined.sort((a, b) => {
@@ -1017,51 +1074,6 @@ export default function PortalAppointments() {
     (isAdmin || selectedAppointment?.assignedRepId === currentUser.id) &&
     (dispatchReadyStages.includes(form.consultationStage) ||
       form.nextStep === 'contractor_review');
-  const getAttentionReasons = (appointment: Appointment) => {
-    const reasons = [];
-    if (
-      appointment.status === 'completed' &&
-      !appointment.outcomeSubmitted
-    ) {
-      reasons.push('Outcome report needed');
-    }
-    if (
-      appointment.nextStep === 'follow_up_required' &&
-      appointment.followUpDate &&
-      appointment.followUpDate <= today
-    ) {
-      reasons.push('Outcome follow-up due');
-    }
-    if (
-      ['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
-      appointment.nextStep === 'no_action'
-    ) {
-      reasons.push('Hot/warm lead needs next step');
-    }
-    if (
-      appointment.appointmentDate < today &&
-      appointment.status !== 'completed'
-    ) {
-      reasons.push('Past consultation still open');
-    }
-    if (appointment.consultationStage === 'follow_up_required') {
-      reasons.push('Needs follow-up');
-    }
-    if (
-      appointment.consultationStage === 'estimate_requested' &&
-      getDaysSince(appointment.updatedAt) > 3
-    ) {
-      reasons.push('Estimate requested over 3 days ago');
-    }
-    if (
-      appointment.consultationStage === 'contractor_review' &&
-      getDaysSince(appointment.updatedAt) > 3
-    ) {
-      reasons.push('Contractor review over 3 days old');
-    }
-    if (!appointment.assignedRepId) reasons.push('Missing sales rep');
-    return reasons;
-  };
   const groupByRep = (appointments: Appointment[]) => {
     if (!isAdmin) {
       return [
@@ -1697,7 +1709,7 @@ export default function PortalAppointments() {
     const statusClasses = getStatusClasses(appointment.status);
     const stageDot = getStageDotColor(appointment.consultationStage, appointment.status);
     const outcomeBadge = getOutcomeBadge(appointment);
-    const attentionReasons = getAttentionReasons(appointment);
+    const attentionInfo = getAttentionInfo(appointment);
     const canUseRepActions =
       currentUser.role === 'admin' || appointment.assignedRepId === currentUser.id;
     const isRowExpanded = expandedAgendaRows.has(appointment.id);
@@ -1747,9 +1759,9 @@ export default function PortalAppointments() {
               {outcomeBadge.label}
             </span>
           )}
-          {options.attention && attentionReasons.length > 0 && (
-            <span className="hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.62rem] font-black text-amber-800 sm:block">
-              {attentionReasons[0]}
+          {options.attention && attentionInfo.level !== 'none' && (
+            <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+              {renderAttentionChips(attentionInfo)}
             </span>
           )}
           <span className="flex items-center gap-1 text-[0.68rem] font-bold text-slate-400 shrink-0">
@@ -1770,12 +1782,10 @@ export default function PortalAppointments() {
                 Contractor: {getContractorName(appointment.contractorId)}
               </div>
             </div>
-            {/* Attention reasons */}
-            {options.attention && attentionReasons.length > 0 && (
+            {/* Attention chips */}
+            {options.attention && attentionInfo.level !== 'none' && (
               <div className="mb-3 flex flex-wrap gap-1.5">
-                {attentionReasons.map((r) => (
-                  <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">{r}</span>
-                ))}
+                {renderAttentionChips(attentionInfo)}
               </div>
             )}
             {/* Notes */}
@@ -2321,7 +2331,7 @@ export default function PortalAppointments() {
               {needsAttentionAppointments.length > 0 ? (
                 needsAttentionAppointments.map((apt) => {
                   const sc = getStatusClasses(apt.status);
-                  const reasons = getAttentionReasons(apt);
+                  const attentionInfo = getAttentionInfo(apt);
                   const ob = getOutcomeBadge(apt);
                   return (
                     <button
@@ -2350,11 +2360,7 @@ export default function PortalAppointments() {
                                 {ob.label}
                               </span>
                             )}
-                            {reasons.map((r) => (
-                              <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">
-                                {r}
-                              </span>
-                            ))}
+                            {renderAttentionChips(attentionInfo)}
                           </div>
                         </div>
                       </div>
@@ -2695,7 +2701,10 @@ export default function PortalAppointments() {
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> Good
             </span>
             <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-red-500" /> Needs attention
+              <span className="h-2 w-2 rounded-full bg-sky-400" /> Follow-up
+            </span>
+            <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
+              <span className="h-2 w-2 rounded-full bg-amber-500" /> Action needed
             </span>
           </div>
         </div>
@@ -2734,7 +2743,7 @@ export default function PortalAppointments() {
                           {group.appointments.length}
                         </span>
                         {groupHasAttention && (
-                          <span className="ml-1 h-2 w-2 rounded-full bg-red-500" />
+                          <span className="ml-1 h-2 w-2 rounded-full bg-amber-500" />
                         )}
                       </button>
                     )}
@@ -2742,12 +2751,11 @@ export default function PortalAppointments() {
                       <div className={isAdmin ? 'ml-5' : ''}>
                         {group.appointments.map((apt) => {
                           const isRowExpanded = expandedUpcomingRows.has(apt.id);
-                          const isAttention = needsAttentionIds.has(apt.id);
-                          const dotColor = isAttention ? 'bg-red-500' : 'bg-emerald-500';
+                          const attentionInfo = getAttentionInfo(apt);
+                          const dotColor = attentionDotColor(attentionInfo.level);
                           const sc = getStatusClasses(apt.status);
                           const canUseRepActions =
                             currentUser.role === 'admin' || apt.assignedRepId === currentUser.id;
-                          const attentionReasons = getAttentionReasons(apt);
                           return (
                             <div key={apt.id} className="border-b border-slate-100 last:border-b-0">
                               <button
@@ -2778,9 +2786,9 @@ export default function PortalAppointments() {
                                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.62rem] font-black ${sc.badge}`}>
                                   {formatAppointmentStatus(apt.status)}
                                 </span>
-                                {isAttention && (
-                                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[0.62rem] font-black text-red-700">
-                                    Attention
+                                {attentionInfo.level !== 'none' && (
+                                  <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                                    {renderAttentionChips(attentionInfo)}
                                   </span>
                                 )}
                                 <span className="flex items-center gap-1 text-[0.68rem] font-bold text-slate-400">
@@ -2792,13 +2800,9 @@ export default function PortalAppointments() {
                               </button>
                               {isRowExpanded && (
                                 <div className="px-2 pb-3 pt-1">
-                                  {attentionReasons.length > 0 && (
+                                  {attentionInfo.level !== 'none' && (
                                     <div className="mb-2.5 flex flex-wrap gap-1.5">
-                                      {attentionReasons.map((r) => (
-                                        <span key={r} className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-black text-amber-800">
-                                          {r}
-                                        </span>
-                                      ))}
+                                      {renderAttentionChips(attentionInfo)}
                                     </div>
                                   )}
                                   <div className="mb-3 grid gap-3 lg:grid-cols-2">
