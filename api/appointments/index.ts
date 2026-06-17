@@ -582,40 +582,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const results: Array<{ id: string; latitude: number | null; longitude: number | null }> = [];
+      const startTime = Date.now();
+      const TIME_BUDGET = 8500; // leave headroom under the function timeout
+      const geocodeOne = async (q: string) => {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'OntarioReno-Portal/1.0 (info@ontarioreno.ca)' },
+        });
+        const json = (await resp.json()) as Array<{ lat: string; lon: string }>;
+        const hit = json[0];
+        return hit ? { lat: parseFloat(hit.lat), lon: parseFloat(hit.lon) } : null;
+      };
+
       for (const row of rows) {
         // Already cached → return as-is
         if (row.latitude != null && row.longitude != null) {
           results.push({ id: row.id, latitude: row.latitude, longitude: row.longitude });
           continue;
         }
-        const query = [row.address, row.city, row.postalCode, 'Ontario, Canada']
-          .map((p) => (p ?? '').trim())
-          .filter(Boolean)
-          .join(', ');
-        if (!query) {
+        // Out of time — leave for the next pass (client retries).
+        if (Date.now() - startTime > TIME_BUDGET) {
           results.push({ id: row.id, latitude: null, longitude: null });
           continue;
         }
-        try {
-          const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-          const resp = await fetch(url, {
-            headers: { 'User-Agent': 'OntarioReno-Portal/1.0 (info@ontarioreno.ca)' },
-          });
-          const json = (await resp.json()) as Array<{ lat: string; lon: string }>;
-          const hit = json[0];
-          if (hit) {
-            const lat = parseFloat(hit.lat);
-            const lon = parseFloat(hit.lon);
-            await prisma.appointment.update({ where: { id: row.id }, data: { latitude: lat, longitude: lon } });
-            results.push({ id: row.id, latitude: lat, longitude: lon });
-          } else {
-            results.push({ id: row.id, latitude: null, longitude: null });
+        const addr = (row.address ?? '').trim();
+        const city = (row.city ?? '').trim();
+        // Try the precise address first, then fall back to city-level so a
+        // messy/partial address still lands the pin somewhere sensible.
+        const queries = [
+          [addr, city, 'Ontario, Canada'].filter(Boolean).join(', '),
+          city ? `${city}, Ontario, Canada` : '',
+        ].filter((q, i, arr) => q && q !== 'Ontario, Canada' && arr.indexOf(q) === i);
+
+        let found: { lat: number; lon: number } | null = null;
+        for (const q of queries) {
+          if (Date.now() - startTime > TIME_BUDGET) break;
+          try {
+            found = await geocodeOne(q);
+          } catch {
+            found = null;
           }
-        } catch {
+          await new Promise((r) => setTimeout(r, 1000)); // Nominatim ≤ 1 req/sec
+          if (found) break;
+        }
+        if (found) {
+          await prisma.appointment.update({ where: { id: row.id }, data: { latitude: found.lat, longitude: found.lon } });
+          results.push({ id: row.id, latitude: found.lat, longitude: found.lon });
+        } else {
           results.push({ id: row.id, latitude: null, longitude: null });
         }
-        // Respect Nominatim's 1 request/second usage policy
-        await new Promise((r) => setTimeout(r, 1100));
       }
       return res.status(200).json({ results });
     }

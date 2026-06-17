@@ -79,6 +79,10 @@ export default function AppointmentsMap({ appointments, getRepName }: Props) {
     () => appointments.filter((a) => a.latitude != null && a.longitude != null),
     [appointments]
   );
+  const unmapped = useMemo(
+    () => appointments.filter((a) => a.latitude == null || a.longitude == null),
+    [appointments]
+  );
   const ordered = useMemo(() => orderRoute(geocoded), [geocoded]);
   const points = useMemo(
     () => ordered.map((a) => [a.latitude!, a.longitude!] as [number, number]),
@@ -149,6 +153,27 @@ export default function AppointmentsMap({ appointments, getRepName }: Props) {
                 </div>
               </div>
             ))
+          )}
+          {/* Consultations we couldn't place on the map yet */}
+          {unmapped.length > 0 && (
+            <div className="mt-2 border-t border-slate-100 pt-2">
+              <p className="px-2 pb-1 text-[0.6rem] font-black uppercase tracking-[0.12em] text-slate-400">
+                Locating… / no map address ({unmapped.length})
+              </p>
+              {unmapped.map((a) => (
+                <div key={a.id} className="flex items-start gap-2.5 rounded-[0.5rem] px-2 py-2 opacity-70">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500">
+                    <MapPin className="h-3 w-3" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-700">{a.customerName || 'Consultation'}</p>
+                    <p className="truncate text-xs font-semibold text-slate-400">
+                      {fmt12(a.appointmentTime)} · {[a.address, a.city].filter(Boolean).join(', ') || 'No address'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
         {googleMapsUrl && (

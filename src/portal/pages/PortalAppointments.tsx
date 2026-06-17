@@ -882,16 +882,28 @@ export default function PortalAppointments() {
   );
 
   // When the map view is open, geocode any of the day's consultations that
-  // have an address but no cached coordinates yet (cached server-side after).
+  // have an address but no cached coordinates yet. Chains across renders so a
+  // partial pass (server time budget) completes; each id is tried a few times
+  // then left alone, so unresolvable addresses don't loop.
+  const geocodeAttemptsRef = useRef<Map<string, number>>(new Map());
   useEffect(() => {
     const mapActive = calendarView === 'map' || (mobileConsultTab === 'calendar' && mobileCalMode === 'map');
     if (!mapActive) return;
     const needGeocoding = currentDayAppointments
-      .filter((a) => (a.address?.trim() || a.city?.trim()) && (a.latitude == null || a.longitude == null))
+      .filter(
+        (a) =>
+          (a.address?.trim() || a.city?.trim()) &&
+          a.latitude == null &&
+          (geocodeAttemptsRef.current.get(a.id) ?? 0) < 3
+      )
       .map((a) => a.id);
-    if (needGeocoding.length > 0) geocodeAppointments(needGeocoding);
+    if (needGeocoding.length === 0) return;
+    needGeocoding.forEach((id) =>
+      geocodeAttemptsRef.current.set(id, (geocodeAttemptsRef.current.get(id) ?? 0) + 1)
+    );
+    geocodeAppointments(needGeocoding);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarView, mobileConsultTab, mobileCalMode, toDateKey(cursorDate), currentDayAppointments.length]);
+  }, [calendarView, mobileConsultTab, mobileCalMode, toDateKey(cursorDate), currentDayAppointments]);
 
   // ── Trash bin ──
   useEffect(() => {
