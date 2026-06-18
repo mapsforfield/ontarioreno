@@ -110,19 +110,19 @@ export default function PortalTasks() {
 
       {/* Add task */}
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
             placeholder="Add a task — e.g. Call Audley about the quote"
-            className="flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+            className="min-w-0 flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
           />
           <input
             type="datetime-local"
             value={due}
             onChange={(e) => setDue(e.target.value)}
-            className="rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 outline-none focus:border-[#1B3C6C]"
+            className="w-full shrink-0 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 outline-none focus:border-[#1B3C6C] sm:w-52"
           />
           <button
             type="button"
