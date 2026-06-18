@@ -3756,6 +3756,18 @@ export default function PortalAppointments() {
                   </select>
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                  Contractor branding
+                  <select value={form.contractorId} onChange={(event) => updateForm('contractorId', event.target.value)}>
+                    <option value="">No contractor (generic)</option>
+                    {contractorOptions.map((contractor) => (
+                      <option key={contractor.id} value={contractor.id}>{contractor.companyName}</option>
+                    ))}
+                  </select>
+                  <span className="text-xs font-semibold text-slate-400">
+                    If you invite the client, their confirmation email uses this contractor’s name &amp; logo.
+                  </span>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   {form.appointmentType === 'custom_event' ? 'Event Description' : 'Notes'}
                   <textarea rows={3} value={form.internalNotes} onChange={(event) => updateForm('internalNotes', event.target.value)} placeholder={form.appointmentType === 'custom_event' ? 'Describe what this event is about…' : ''} />
                 </label>

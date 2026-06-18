@@ -3,6 +3,8 @@ import {
   buildCustomerHtml,
   buildRepAssignmentHtml,
   buildContractorDispatchHtml,
+  isEventAppointment,
+  APPOINTMENT_TYPE_LABELS,
 } from './emailTemplates';
 import { getCustomerFacingConsultantPhone } from './customerContactRouting';
 
@@ -78,15 +80,16 @@ function customerFooter(contractor?: Contractor, rep?: User) {
   return lines.length ? `\n\n${lines.join('\n')}` : '';
 }
 
-function customerBodyIntro(type: ConsultationEmailType) {
+function customerBodyIntro(type: ConsultationEmailType, isEvent = false) {
+  const noun = isEvent ? 'appointment' : 'renovation consultation';
   if (type === 'reschedule_notice') {
-    return 'Your renovation consultation has been rescheduled.';
+    return `Your ${noun} has been rescheduled.`;
   }
   if (type === 'cancellation_notice') {
-    return 'Your renovation consultation has been cancelled.';
+    return `Your ${noun} has been cancelled.`;
   }
 
-  return 'Your renovation consultation has been booked.';
+  return `Your ${noun} has been booked.`;
 }
 
 function buildCustomerEmail(
@@ -95,22 +98,31 @@ function buildCustomerEmail(
 ): ConsultationEmailPreview {
   const contractorName = contractorPublicName(input.contractor);
   const logoUrl = input.contractor?.logoUrl?.trim() || ''; // used in metadata and HTML template
+  const isEvent = isEventAppointment(input.appointment.appointmentType);
+  const eventTitle =
+    input.appointment.title?.trim() ||
+    input.appointment.customerName?.trim() ||
+    APPOINTMENT_TYPE_LABELS[input.appointment.appointmentType] ||
+    'Appointment';
+  const noun = isEvent ? 'Appointment' : 'Consultation';
   const subjectAction =
     type === 'booking_confirmation'
-      ? 'Consultation Confirmed'
+      ? `${noun} Confirmed`
       : type === 'reschedule_notice'
-        ? 'Consultation Rescheduled'
-        : 'Consultation Cancelled';
+        ? `${noun} Rescheduled`
+        : `${noun} Cancelled`;
   const body = [
     // Logo is included in the HTML template only — never in plain text,
     // as a data URL would make the plain-text body massive.
-    `Hi ${input.appointment.customerName || 'there'},`,
+    `Hi ${(isEvent ? '' : input.appointment.customerName) || 'there'},`,
     '',
-    customerBodyIntro(type),
+    customerBodyIntro(type, isEvent),
     '',
     `Contractor: ${contractorName}`,
-    `Consultation: ${formatDateTime(input.appointment)}`,
-    `Project type: ${input.appointment.projectType || 'Renovation consultation'}`,
+    `${isEvent ? 'When' : 'Consultation'}: ${formatDateTime(input.appointment)}`,
+    isEvent
+      ? `Event: ${eventTitle}`
+      : `Project type: ${input.appointment.projectType || 'Renovation consultation'}`,
     input.rep?.name ? `Assigned representative: ${input.rep.name}` : '',
     input.appointment.customerNotes
       ? `\nCustomer notes:\n${input.appointment.customerNotes}`

@@ -17,6 +17,33 @@ import { getCustomerFacingConsultantPhone } from './customerContactRouting';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Custom-event appointment types. These are internal calendar entries (showroom
+ * visits, supplier meetings, site checks, ad-hoc events) rather than renovation
+ * consultations, so any customer-facing copy must avoid the word "consultation".
+ */
+export const EVENT_APPOINTMENT_TYPES = [
+  'showroom_visit',
+  'supplier_meeting',
+  'site_check',
+  'custom_event',
+];
+
+export function isEventAppointment(type: string | null | undefined): boolean {
+  return type != null && EVENT_APPOINTMENT_TYPES.includes(type);
+}
+
+/** Customer-facing label for each appointment type. */
+export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
+  home_visit: 'Home Visit',
+  phone_consultation: 'Phone Consultation',
+  video_consultation: 'Video Consultation',
+  showroom_visit: 'Showroom Visit',
+  supplier_meeting: 'Supplier Meeting',
+  site_check: 'Site Check',
+  custom_event: 'Appointment',
+};
+
 /** HTML-escape any user-supplied content before insertion. */
 function e(val: string | null | undefined): string {
   if (val == null) return '';
@@ -393,12 +420,10 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
   const rescheduleUrl = `${origin}/portal/consultation/${appointment.id}/reschedule`;
   const cancelUrl = `${origin}/portal/consultation/${appointment.id}/cancel`;
 
-  const apptTypeLabels: Record<string, string> = {
-    home_visit: 'Home Visit',
-    phone_consultation: 'Phone Consultation',
-    video_consultation: 'Video Consultation',
-  };
-  const apptTypeLabel = apptTypeLabels[appointment.appointmentType] ?? 'Consultation';
+  const isEvent = isEventAppointment(appointment.appointmentType);
+  const apptTypeLabel = APPOINTMENT_TYPE_LABELS[appointment.appointmentType] ?? 'Consultation';
+  // For events the title is stored in customerName (there is no separate person).
+  const eventTitle = appointment.title?.trim() || appointment.customerName?.trim() || apptTypeLabel;
 
   // ── Left column: text detail rows ────────────────────────────────────────
   function textRow(label: string, value: string): string {
@@ -413,7 +438,9 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
   const detailTableRows = [
     textRow('Date &amp; Time', e(`${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`)),
     textRow('Service', e(apptTypeLabel)),
-    textRow('Project', e(appointment.projectType || 'Renovation Consultation')),
+    isEvent
+      ? textRow('Event', e(eventTitle))
+      : textRow('Project', e(appointment.projectType || 'Renovation Consultation')),
     rep?.name ? textRow('Provider', e(rep.name)) : '',
     textRow('Contractor', e(contractorName)),
     textRow('Booking ID', e(refId(appointment.id))),
@@ -427,11 +454,21 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
        </div>`
     : '';
 
+  // Events get appointment-neutral copy (no "renovation consultation" wording),
+  // and aren't greeted by the event title (which isn't a person's name).
+  const eventIntro: Record<CustomerEmailType, string> = {
+    booking_confirmation: 'Your appointment has been confirmed. We look forward to seeing you.',
+    reschedule_notice: 'Your appointment has been rescheduled to the date and time shown below.',
+    cancellation_notice: 'Your appointment has been cancelled. Please contact us if you have any questions.',
+  };
+  const greetingName = isEvent ? '' : appointment.customerName?.trim();
+  const introCopy = isEvent ? eventIntro[type] : cfg.intro;
+
   const leftCol = `<td class="col-left" width="58%" valign="top"
   style="padding:32px 28px 32px 32px;background-color:#ffffff;vertical-align:top;">
   <h2 style="margin:0 0 4px;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">${e(cfg.label)}</h2>
-  <p style="margin:0 0 20px;font-size:14px;color:#64748b;font-family:sans-serif;">Hi ${e(appointment.customerName || 'there')},</p>
-  <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;font-family:sans-serif;">${e(cfg.intro)}</p>
+  <p style="margin:0 0 20px;font-size:14px;color:#64748b;font-family:sans-serif;">Hi ${e(greetingName || 'there')},</p>
+  <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;font-family:sans-serif;">${e(introCopy)}</p>
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tbody>${detailTableRows}</tbody>
   </table>
