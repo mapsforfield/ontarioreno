@@ -63,14 +63,22 @@ function numberedIcon(n: number) {
 
 function FitBounds({ points }: { points: Array<[number, number]> }) {
   const map = useMap();
+  // Re-fit whenever the actual coordinates change (e.g. a far stop geocodes in
+  // later) — keyed on the coordinate values, not the array reference.
+  const key = points.map((p) => p.join(',')).join('|');
   useEffect(() => {
     if (points.length === 0) return;
-    if (points.length === 1) {
-      map.setView(points[0], 13);
-    } else {
-      map.fitBounds(points, { padding: [40, 40] });
-    }
-  }, [map, points]);
+    const t = setTimeout(() => {
+      map.invalidateSize();
+      if (points.length === 1) {
+        map.setView(points[0], 13);
+      } else {
+        map.fitBounds(points, { padding: [50, 50] });
+      }
+    }, 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key]);
   return null;
 }
 
