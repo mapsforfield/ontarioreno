@@ -1,6 +1,7 @@
 import {
   ArrowRightLeft,
   CalendarDays,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -4526,6 +4527,20 @@ export default function PortalAppointments() {
               {/* Secondary actions row */}
               {!isCreating && selectedAppointment && (
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Mark as completed — events have no outcome report, so this
+                      is their one-tap way to close out (works on mobile too). */}
+                  {isEventType(form.appointmentType) &&
+                    !['completed', 'no_show'].includes(selectedAppointment.status) && (
+                      <button
+                        type="button"
+                        onClick={() => markConsultationStatus(selectedAppointment, 'completed')}
+                        className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Mark as completed
+                      </button>
+                    )}
+
                   {/* Send Reminder */}
                   <div className="flex flex-col gap-1">
                     <button

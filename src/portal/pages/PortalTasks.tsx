@@ -1,4 +1,4 @@
-import { CalendarClock, Check, ListTodo, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Check, ListTodo, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
@@ -27,6 +27,9 @@ export default function PortalTasks() {
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDue, setEditDue] = useState('');
 
   const myTasks = useMemo(
     () => tasks.filter((t) => t.userId === currentUser?.id),
@@ -51,8 +54,69 @@ export default function PortalTasks() {
     setAdding(false);
   };
 
+  const startEdit = (task: Task) => {
+    setEditingId(task.id);
+    setEditTitle(task.title);
+    // datetime-local needs YYYY-MM-DDTHH:mm; tolerate date-only stored values.
+    setEditDue(task.dueAt ? task.dueAt.slice(0, 16) : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditDue('');
+  };
+
+  const saveEdit = async (task: Task) => {
+    const trimmed = editTitle.trim();
+    if (!trimmed) return;
+    await updateTask(task.id, { title: trimmed, dueAt: editDue || null });
+    cancelEdit();
+  };
+
   const renderTask = (task: Task) => {
     const dueInfo = formatDue(task.dueAt);
+    if (editingId === task.id) {
+      return (
+        <div
+          key={task.id}
+          className="flex flex-col gap-2 rounded-[0.5rem] border border-[#1B3C6C] bg-white px-3 py-3 sm:flex-row sm:items-center"
+        >
+          <input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(task); if (e.key === 'Escape') cancelEdit(); }}
+            autoFocus
+            className="min-w-0 flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+          />
+          <input
+            type="datetime-local"
+            value={editDue}
+            onChange={(e) => setEditDue(e.target.value)}
+            className="w-full shrink-0 rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 outline-none focus:border-[#1B3C6C] sm:w-52"
+          />
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => saveEdit(task)}
+              disabled={!editTitle.trim()}
+              className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:opacity-50"
+            >
+              <Check className="h-4 w-4" />
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="flex h-9 w-9 items-center justify-center rounded-[0.5rem] border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+              aria-label="Cancel edit"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div
         key={task.id}
@@ -86,6 +150,16 @@ export default function PortalTasks() {
             </p>
           )}
         </div>
+        {!task.done && (
+          <button
+            type="button"
+            onClick={() => startEdit(task)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C]"
+            aria-label="Edit task"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => deleteTask(task.id)}
