@@ -8,6 +8,10 @@ const DEFAULT_BUSINESS_PROFILE = {
   addressLine1: '172 Silver Maple Rd',
   addressLine2: 'Richmond Hill, Ontario L4E 4Y8',
   hstNumber: '779706696RT0001',
+  bankName: 'TD Canada Trust',
+  institutionNumber: '004',
+  transitNumber: '11812',
+  accountNumber: '5064635',
 };
 
 async function readBusinessProfile() {
@@ -118,6 +122,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         addressLine1: String(data.addressLine1 ?? '').slice(0, 200),
         addressLine2: String(data.addressLine2 ?? '').slice(0, 200),
         hstNumber: String(data.hstNumber ?? '').slice(0, 100),
+        bankName: String(data.bankName ?? '').slice(0, 100),
+        institutionNumber: String(data.institutionNumber ?? '').slice(0, 20),
+        transitNumber: String(data.transitNumber ?? '').slice(0, 20),
+        accountNumber: String(data.accountNumber ?? '').slice(0, 40),
       };
       try {
         await prisma.setting.upsert({

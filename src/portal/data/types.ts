@@ -270,6 +270,10 @@ export type BusinessProfile = {
   addressLine1: string;
   addressLine2: string;
   hstNumber: string;
+  bankName: string;
+  institutionNumber: string;
+  transitNumber: string;
+  accountNumber: string;
 };
 
 export type SaleTrackerFundedStatus = 'YES' | 'PARTIALLY' | 'NO' | '';

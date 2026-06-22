@@ -26,6 +26,10 @@ type InvoiceData = {
   salesPrice: number;
   commissionRate: number; // percent, e.g. 8.5
   amount: number;
+  bankName: string;
+  institutionNumber: string;
+  transitNumber: string;
+  accountNumber: string;
 };
 
 function money(v: number) {
@@ -152,6 +156,48 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.text(money(d.amount), 569, 466, { align: 'right' });
 
+  // ── Payment instructions (lower-left white space, clear of the wave) ──
+  if (d.bankName || d.accountNumber) {
+    const px = 43;
+    const py = 400;
+    const pw = 332;
+    const ph = 118;
+    doc.setFillColor(247, 249, 252);
+    doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(px, py, pw, ph, 6, 6, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
+    doc.text('PAYMENT INSTRUCTIONS', px + 14, py + 20);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(95, 95, 95);
+    const intro = doc.splitTextToSize(
+      'To settle the full balance in a single transaction and avoid standard daily Interac limits, please remit by Direct Deposit / EFT to:',
+      pw - 28,
+    );
+    doc.text(intro, px + 14, py + 34);
+
+    let by = py + 34 + intro.length * 11 + 9;
+    doc.setTextColor(INK[0], INK[1], INK[2]);
+    doc.setFontSize(9.5);
+    const pair = (label: string, value: string, x: number, y: number, gap: number) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, x, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value || '—', x + gap, y);
+    };
+    pair('Bank:', d.bankName, px + 14, by, 34);
+    by += 15;
+    pair('Institution:', d.institutionNumber, px + 14, by, 56);
+    pair('Transit:', d.transitNumber, px + 150, by, 44);
+    by += 15;
+    pair('Account:', d.accountNumber, px + 14, by, 50);
+  }
+
   return doc;
 }
 
@@ -196,6 +242,10 @@ export default function CommissionInvoice({
     salesPrice: deal.estimatedJobValue,
     commissionRate: rate,
     amount: Math.round(deal.estimatedJobValue * (rate / 100) * 100) / 100,
+    bankName: 'TD Canada Trust',
+    institutionNumber: '004',
+    transitNumber: '11812',
+    accountNumber: '5064635',
   });
   const [saveProfileDefault, setSaveProfileDefault] = useState(false);
 
@@ -230,6 +280,14 @@ export default function CommissionInvoice({
               fromAddr1: config.businessProfile.addressLine1,
               fromAddr2: config.businessProfile.addressLine2,
               fromHst: config.businessProfile.hstNumber,
+              ...(config.businessProfile.bankName
+                ? {
+                    bankName: config.businessProfile.bankName,
+                    institutionNumber: config.businessProfile.institutionNumber,
+                    transitNumber: config.businessProfile.transitNumber,
+                    accountNumber: config.businessProfile.accountNumber,
+                  }
+                : {}),
             }
           : {}),
       }));
@@ -267,6 +325,10 @@ export default function CommissionInvoice({
         addressLine1: data.fromAddr1,
         addressLine2: data.fromAddr2,
         hstNumber: data.fromHst,
+        bankName: data.bankName,
+        institutionNumber: data.institutionNumber,
+        transitNumber: data.transitNumber,
+        accountNumber: data.accountNumber,
       });
     }
   };
@@ -289,7 +351,7 @@ export default function CommissionInvoice({
           to,
           cc: 'info@ontarioreno.ca',
           subject: `Commission Invoice #${data.invoiceNumber} — ${data.customerName}`,
-          body: `Hi ${data.toContact || 'there'},\n\nPlease find attached the commission invoice for ${data.customerName}.\n\nInvoice #${data.invoiceNumber}\nAmount: ${money(data.amount)}\n\nThank you,\nMarketPlug`,
+          body: `Hi ${data.toContact || 'there'},\n\nPlease find attached the commission invoice for ${data.customerName}.\n\nInvoice #${data.invoiceNumber}\nAmount: ${money(data.amount)}\n\nTo settle the full balance in a single transaction and avoid standard daily Interac limits, please remit by Direct Deposit / EFT to:\n\nBank: ${data.bankName}\nInstitution Number: ${data.institutionNumber}\nTransit Number: ${data.transitNumber}\nAccount Number: ${data.accountNumber}\n\nThank you,\nMarketPlug`,
           attachments: [{ filename: fileName, content: base64 }],
         }),
       });
@@ -364,6 +426,17 @@ export default function CommissionInvoice({
                 {field('Commission %', 'commissionRate', { type: 'number' })}
                 {field('Amount (CAD)', 'amount', { type: 'number' })}
               </div>
+
+              <p className="mb-2 mt-4 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Payment details (EFT / direct deposit)</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {field('Bank', 'bankName', { full: true })}
+                {field('Institution #', 'institutionNumber')}
+                {field('Transit #', 'transitNumber')}
+                {field('Account #', 'accountNumber', { full: true })}
+              </div>
+              <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">
+                Shown on the invoice so the contractor can pay by direct deposit. Tick “Save these as my default” above to reuse next time.
+              </p>
             </div>
 
             {/* Live preview */}
