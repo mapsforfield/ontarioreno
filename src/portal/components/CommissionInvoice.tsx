@@ -83,29 +83,41 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.setTextColor(INK[0], INK[1], INK[2]);
   doc.setFontSize(11);
   doc.text('TO:', 328, 162);
-  doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
-  doc.setFontSize(12.5);
-  doc.text(d.toContact, 328, 184);
-  // Company name can be long — wrap it within the TO box (right edge 569).
+
+  // Contact and company can both be long — wrap each within the TO box
+  // (text starts at x=328, box right edge 569) and flow everything below
+  // a running y cursor so nothing collides or runs off the page.
   const TO_MAX_W = 225;
-  let companyFontSize = 12.5;
-  let companyLines = doc.splitTextToSize(d.toCompany, TO_MAX_W);
-  if (companyLines.length > 2) {
-    // Shrink so a long name stays at most ~3 lines and never leaves the box.
-    companyFontSize = 10.5;
-    doc.setFontSize(companyFontSize);
-    companyLines = doc.splitTextToSize(d.toCompany, TO_MAX_W);
-  } else {
-    doc.setFontSize(companyFontSize);
-  }
-  const companyLineH = companyFontSize + 2;
-  doc.text(companyLines, 328, 202);
-  // Push the address down below however many company lines were drawn.
-  const addrStartY = 202 + companyLines.length * companyLineH + 6;
-  doc.setTextColor(INK[0], INK[1], INK[2]);
+  // Render a wrapped block, shrinking the font if it would exceed maxLines.
+  const drawWrapped = (
+    text: string,
+    y: number,
+    baseSize: number,
+    color: number[],
+    maxLines: number,
+  ): number => {
+    if (!text) return y;
+    let size = baseSize;
+    doc.setFontSize(size);
+    let lines = doc.splitTextToSize(text, TO_MAX_W);
+    if (lines.length > maxLines) {
+      size = baseSize - 2;
+      doc.setFontSize(size);
+      lines = doc.splitTextToSize(text, TO_MAX_W);
+    }
+    doc.setTextColor(color[0], color[1], color[2]);
+    doc.text(lines, 328, y);
+    return y + lines.length * (size + 2);
+  };
+
+  let toY = 184;
+  toY = drawWrapped(d.toContact, toY, 12.5, BLUE, 2);
+  if (d.toCompany) toY = drawWrapped(d.toCompany, toY + 4, 12.5, BLUE, 2);
+  toY += 6;
   doc.setFontSize(9.5);
-  doc.text(d.toAddr1, 328, addrStartY);
-  doc.text(d.toAddr2, 328, addrStartY + 13);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  if (d.toAddr1) { doc.text(d.toAddr1, 328, toY); toY += 13; }
+  if (d.toAddr2) doc.text(d.toAddr2, 328, toY);
 
   // Description / Amount headers
   doc.setFont('helvetica', 'bold');
