@@ -86,11 +86,26 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
   doc.setFontSize(12.5);
   doc.text(d.toContact, 328, 184);
-  doc.text(d.toCompany, 328, 202);
+  // Company name can be long — wrap it within the TO box (right edge 569).
+  const TO_MAX_W = 225;
+  let companyFontSize = 12.5;
+  let companyLines = doc.splitTextToSize(d.toCompany, TO_MAX_W);
+  if (companyLines.length > 2) {
+    // Shrink so a long name stays at most ~3 lines and never leaves the box.
+    companyFontSize = 10.5;
+    doc.setFontSize(companyFontSize);
+    companyLines = doc.splitTextToSize(d.toCompany, TO_MAX_W);
+  } else {
+    doc.setFontSize(companyFontSize);
+  }
+  const companyLineH = companyFontSize + 2;
+  doc.text(companyLines, 328, 202);
+  // Push the address down below however many company lines were drawn.
+  const addrStartY = 202 + companyLines.length * companyLineH + 6;
   doc.setTextColor(INK[0], INK[1], INK[2]);
   doc.setFontSize(9.5);
-  doc.text(d.toAddr1, 328, 224);
-  doc.text(d.toAddr2, 328, 237);
+  doc.text(d.toAddr1, 328, addrStartY);
+  doc.text(d.toAddr2, 328, addrStartY + 13);
 
   // Description / Amount headers
   doc.setFont('helvetica', 'bold');
