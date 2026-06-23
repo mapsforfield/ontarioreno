@@ -11,10 +11,18 @@
  */
 import { createHash, createHmac } from 'node:crypto';
 
-const ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? '';
-const ACCESS_KEY = process.env.R2_ACCESS_KEY_ID ?? '';
-const SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY ?? '';
-const BUCKET = process.env.R2_BUCKET ?? '';
+// Strip any stray BOM / zero-width / whitespace — env values set via some shells
+// can carry a leading UTF-8 BOM (U+FEFF) that silently corrupts the
+// bucket/host/signature and makes R2 reject the request without CORS headers.
+function cleanEnv(v: string | undefined): string {
+  // U+FEFF (BOM) and U+200B–U+200D / U+2060 zero-width chars.
+  return (v ?? '').replace(/[﻿​‌‍⁠]/g, '').trim();
+}
+
+const ACCOUNT_ID = cleanEnv(process.env.R2_ACCOUNT_ID);
+const ACCESS_KEY = cleanEnv(process.env.R2_ACCESS_KEY_ID);
+const SECRET_KEY = cleanEnv(process.env.R2_SECRET_ACCESS_KEY);
+const BUCKET = cleanEnv(process.env.R2_BUCKET);
 const HOST = `${ACCOUNT_ID}.r2.cloudflarestorage.com`;
 const REGION = 'auto';
 const SERVICE = 's3';
