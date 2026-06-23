@@ -24,6 +24,7 @@ import {
   Activity,
   Appointment,
   BusinessProfile,
+  ClientVideo,
   ConsultationStage,
   Household,
   ProposalHistory,
@@ -129,6 +130,14 @@ type PortalDataContextValue = PortalDataState & {
   addTask: (title: string, dueAt?: string | null) => Promise<void>;
   updateTask: (id: string, updates: { title?: string; dueAt?: string | null; done?: boolean }) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  listClientVideos: (clientId: string) => Promise<ClientVideo[]>;
+  uploadClientVideo: (
+    clientId: string,
+    file: File,
+    label: string,
+    onProgress?: (pct: number) => void,
+  ) => Promise<ClientVideo | null>;
+  deleteClientVideo: (id: string) => Promise<void>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -1594,6 +1603,56 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       deleteTask: async (id) => {
         setState((current) => ({ ...current, tasks: current.tasks.filter((t) => t.id !== id) }));
         await apiCall('/api/auth/tasks', { method: 'POST', body: JSON.stringify({ op: 'delete', id }) });
+      },
+
+      listClientVideos: async (clientId) => {
+        const videos = await apiCall<ClientVideo[]>(`/api/appointments?_resource=client_videos&clientId=${encodeURIComponent(clientId)}`);
+        return videos ?? [];
+      },
+
+      uploadClientVideo: async (clientId, file, label, onProgress) => {
+        // 1) Ask our API for a presigned URL, 2) PUT the file straight to R2
+        // (XHR so we get upload progress), 3) record the metadata row.
+        const presign = await apiCall<{ uploadUrl: string; key: string }>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({
+            _action: 'client_video_presign',
+            clientId,
+            fileName: file.name,
+            contentType: file.type || 'video/mp4',
+            sizeBytes: file.size,
+          }),
+        });
+        if (!presign?.uploadUrl) return null;
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', presign.uploadUrl);
+          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+          };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.send(file);
+        });
+
+        return apiCall<ClientVideo>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({
+            _action: 'client_video_save',
+            clientId,
+            key: presign.key,
+            label,
+            fileName: file.name,
+            contentType: file.type || 'video/mp4',
+            sizeBytes: file.size,
+          }),
+        });
+      },
+
+      deleteClientVideo: async (id) => {
+        await apiCall('/api/appointments', { method: 'POST', body: JSON.stringify({ _action: 'client_video_delete', id }) });
       },
 
       refetch: () => { loadData(true); },

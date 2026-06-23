@@ -276,6 +276,19 @@ export type BusinessProfile = {
   accountNumber: string;
 };
 
+export type ClientVideo = {
+  id: string;
+  clientId: string;
+  label: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByUserId: string | null;
+  createdAt: string;
+  /** Short-lived signed URL for streaming the private video. */
+  url: string;
+};
+
 export type SaleTrackerFundedStatus = 'YES' | 'PARTIALLY' | 'NO' | '';
 
 export type SaleTrackerRow = {

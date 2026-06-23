@@ -17,6 +17,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
+import ClientVideos from '../components/ClientVideos';
 import { showToast } from '../lib/toast';
 import type { Client, Household } from '../data/types';
 
@@ -644,6 +645,8 @@ export default function PortalClients() {
                   <p className="mt-2 text-sm font-bold text-slate-400">No consultations yet</p>
                 </div>
               )}
+
+              {!isCreating && selectedClient && <ClientVideos clientId={selectedClient.id} />}
 
               <section>
                 <p className="mb-3 text-xs font-black uppercase tracking-[0.14em] text-slate-500">

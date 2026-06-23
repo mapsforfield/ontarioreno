@@ -164,6 +164,20 @@ model Client {
   appointments Appointment[]
 }
 
+// ─── Client media (videos stored in Cloudflare R2; only metadata here) ──────────
+
+model ClientVideo {
+  id               String   @id @default(cuid())
+  clientId         String
+  key              String   // object key in the R2 bucket
+  label            String   @default("Before")
+  fileName         String   @default("")
+  contentType      String   @default("video/mp4")
+  sizeBytes        BigInt   @default(0)
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+}
+
 // ─── Appointments ─────────────────────────────────────────────────────────────
 
 model Appointment {
