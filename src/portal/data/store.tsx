@@ -1611,44 +1611,58 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       uploadClientVideo: async (clientId, file, label, onProgress) => {
-        // 1) Ask our API for a presigned URL, 2) PUT the file straight to R2
-        // (XHR so we get upload progress), 3) record the metadata row.
-        const presign = await apiCall<{ uploadUrl: string; key: string }>('/api/appointments', {
+        const contentType = file.type || 'video/mp4';
+        // 1) Ask our API for a presigned URL …
+        const presignRes = await fetch('/api/appointments', {
           method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             _action: 'client_video_presign',
             clientId,
             fileName: file.name,
-            contentType: file.type || 'video/mp4',
+            contentType,
             sizeBytes: file.size,
           }),
         });
-        if (!presign?.uploadUrl) return null;
+        if (!presignRes.ok) {
+          throw new Error(`Couldn't start upload (${presignRes.status}). ${await presignRes.text().catch(() => '')}`.trim());
+        }
+        const presign = (await presignRes.json()) as { uploadUrl: string; key: string };
 
+        // 2) PUT the file straight to R2 (XHR so we get upload progress) …
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('PUT', presign.uploadUrl);
-          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+          xhr.setRequestHeader('Content-Type', contentType);
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
           };
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
-          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload to storage failed (${xhr.status})`)));
+          xhr.onerror = () => reject(new Error('Upload to storage blocked (network/CORS)'));
           xhr.send(file);
         });
 
-        return apiCall<ClientVideo>('/api/appointments', {
+        // 3) record the metadata row.
+        const saveRes = await fetch('/api/appointments', {
           method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             _action: 'client_video_save',
             clientId,
             key: presign.key,
             label,
             fileName: file.name,
-            contentType: file.type || 'video/mp4',
+            contentType,
             sizeBytes: file.size,
           }),
         });
+        if (!saveRes.ok) {
+          throw new Error(`Saving the video record failed (${saveRes.status}). ${await saveRes.text().catch(() => '')}`.trim());
+        }
+        try { changePublisher?.(); } catch { /* realtime best-effort */ }
+        return (await saveRes.json()) as ClientVideo;
       },
 
       deleteClientVideo: async (id) => {

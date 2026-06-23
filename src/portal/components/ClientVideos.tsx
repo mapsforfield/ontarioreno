@@ -62,8 +62,12 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
       } else {
         showToast({ variant: 'error', message: 'Upload failed. Please try again.' });
       }
-    } catch {
-      showToast({ variant: 'error', message: 'Upload failed. Please try again.' });
+    } catch (err) {
+      showToast({
+        variant: 'error',
+        message: 'Upload failed',
+        description: err instanceof Error ? err.message : 'Please try again.',
+      });
     } finally {
       setUploadPct(null);
     }
