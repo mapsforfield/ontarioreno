@@ -30,6 +30,7 @@ type InvoiceData = {
   institutionNumber: string;
   transitNumber: string;
   accountNumber: string;
+  showPayment: boolean;
 };
 
 function money(v: number) {
@@ -157,7 +158,7 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.text(money(d.amount), 569, 466, { align: 'right' });
 
   // ── Payment instructions (lower-left white space, clear of the wave) ──
-  if (d.bankName || d.accountNumber) {
+  if (d.showPayment && (d.bankName || d.accountNumber)) {
     const px = 43;
     const py = 400;
     const pw = 332;
@@ -246,6 +247,7 @@ export default function CommissionInvoice({
     institutionNumber: '004',
     transitNumber: '11812',
     accountNumber: '5064635',
+    showPayment: true,
   });
   const [saveProfileDefault, setSaveProfileDefault] = useState(false);
 
@@ -351,7 +353,28 @@ export default function CommissionInvoice({
           to,
           cc: 'info@ontarioreno.ca',
           subject: `Commission Invoice #${data.invoiceNumber} — ${data.customerName}`,
-          body: `Hi ${data.toContact || 'there'},\n\nPlease find attached the commission invoice for ${data.customerName}.\n\nInvoice #${data.invoiceNumber}\nAmount: ${money(data.amount)}\n\nTo settle the full balance in a single transaction and avoid standard daily Interac limits, please remit by Direct Deposit / EFT to:\n\nBank: ${data.bankName}\nInstitution Number: ${data.institutionNumber}\nTransit Number: ${data.transitNumber}\nAccount Number: ${data.accountNumber}\n\nThank you,\nMarketPlug`,
+          body: [
+            `Hi ${data.toContact || 'there'},`,
+            '',
+            `Please find attached the commission invoice for ${data.customerName}.`,
+            '',
+            `Invoice #${data.invoiceNumber}`,
+            `Amount: ${money(data.amount)}`,
+            ...(data.showPayment
+              ? [
+                  '',
+                  'To settle the full balance in a single transaction and avoid standard daily Interac limits, please remit by Direct Deposit / EFT to:',
+                  '',
+                  `Bank: ${data.bankName}`,
+                  `Institution Number: ${data.institutionNumber}`,
+                  `Transit Number: ${data.transitNumber}`,
+                  `Account Number: ${data.accountNumber}`,
+                ]
+              : []),
+            '',
+            'Thank you,',
+            'MarketPlug',
+          ].join('\n'),
           attachments: [{ filename: fileName, content: base64 }],
         }),
       });
@@ -427,15 +450,28 @@ export default function CommissionInvoice({
                 {field('Amount (CAD)', 'amount', { type: 'number' })}
               </div>
 
-              <p className="mb-2 mt-4 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Payment details (EFT / direct deposit)</p>
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Payment details (EFT / direct deposit)</p>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={data.showPayment}
+                  onClick={() => set('showPayment', !data.showPayment)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${data.showPayment ? 'bg-[#1B3C6C]' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${data.showPayment ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <div className={`grid gap-2.5 sm:grid-cols-2 ${data.showPayment ? '' : 'pointer-events-none opacity-40'}`}>
                 {field('Bank', 'bankName', { full: true })}
                 {field('Institution #', 'institutionNumber')}
                 {field('Transit #', 'transitNumber')}
                 {field('Account #', 'accountNumber', { full: true })}
               </div>
               <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">
-                Shown on the invoice so the contractor can pay by direct deposit. Tick “Save these as my default” above to reuse next time.
+                {data.showPayment
+                  ? 'Shown on the invoice so the contractor can pay by direct deposit. Toggle off to hide it on this invoice.'
+                  : 'Hidden — the payment section won’t appear on this invoice.'}
               </p>
             </div>
 
