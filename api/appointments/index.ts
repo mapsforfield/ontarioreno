@@ -758,9 +758,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sizeBytes = Number(data.sizeBytes ?? 0);
       const fileName = String(data.fileName ?? 'video');
       if (!clientId) return res.status(400).json({ error: 'Missing clientId.' });
-      if (!contentType.startsWith('video/')) return res.status(400).json({ error: 'Only video files are allowed.' });
+      if (!contentType.startsWith('video/') && !contentType.startsWith('image/')) {
+        return res.status(400).json({ error: 'Only image or video files are allowed.' });
+      }
       if (sizeBytes <= 0 || sizeBytes > MAX_VIDEO_BYTES) {
-        return res.status(400).json({ error: `Video must be between 0 and ${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)} MB.` });
+        return res.status(400).json({ error: `File must be between 0 and ${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)} MB.` });
       }
       const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
       const rand = Math.random().toString(36).slice(2, 10);
@@ -778,7 +780,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: randomUUID(),
         clientId,
         key,
-        label: String(data.label ?? 'Before').slice(0, 40),
+        label: String(data.label ?? 'Before').slice(0, 60),
         fileName: String(data.fileName ?? '').slice(0, 200),
         contentType: String(data.contentType ?? 'video/mp4').slice(0, 100),
         sizeBytes: Math.max(0, Math.round(Number(data.sizeBytes ?? 0))),
@@ -823,6 +825,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       try { await deleteObject(video.key); } catch { /* bytes may already be gone */ }
       await prisma.$executeRawUnsafe('DELETE FROM "ClientVideo" WHERE id = $1', id);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Client media: email a shareable 7-day link to someone ──
+    if (data._action === 'client_media_send') {
+      const id = String(data.id ?? '');
+      const to = String(data.to ?? '').trim();
+      const note = String(data.note ?? '').slice(0, 1000);
+      if (!id) return res.status(400).json({ error: 'Missing id.' });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Invalid recipient email.' });
+      const apiKey = process.env.RESEND_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: 'Email service is not configured.' });
+      const rows = (await prisma.$queryRawUnsafe(
+        'SELECT key, label, "fileName", "contentType" FROM "ClientVideo" WHERE id = $1',
+        id,
+      )) as { key: string; label: string; fileName: string; contentType: string }[];
+      const media = rows[0];
+      if (!media) return res.status(404).json({ error: 'Not found.' });
+      const kind = media.contentType.startsWith('image/') ? 'photo' : 'video';
+      const link = presignGetUrl(media.key, 7 * 24 * 3600); // 7-day shareable link
+      const subject = `OntarioReno — ${media.label} ${kind}`;
+      const senderName = user.name || 'OntarioReno';
+      const text = [
+        'Hi,',
+        '',
+        note.trim() ? note.trim() : `Please find the ${media.label.toLowerCase()} ${kind} below.`,
+        '',
+        `View / download (${media.label} ${kind}):`,
+        link,
+        '',
+        'This link is valid for 7 days.',
+        '',
+        `Sent by ${senderName} via OntarioReno`,
+      ].join('\n');
+      try {
+        const resend = new Resend(apiKey);
+        const { error } = await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>',
+          to,
+          replyTo: user.email || undefined,
+          subject,
+          text,
+        });
+        if (error) return res.status(502).json({ error: error.message ?? 'Failed to send.' });
+      } catch {
+        return res.status(500).json({ error: 'Failed to send the email.' });
+      }
       return res.status(200).json({ ok: true });
     }
 
