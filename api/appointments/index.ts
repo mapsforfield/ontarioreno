@@ -4,6 +4,7 @@ import { requireAuth } from '../../lib/auth.js';
 import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
+import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
 const CREATE_CLIENT_VIDEO_TABLE =
@@ -15,11 +16,13 @@ const CREATE_CLIENT_VIDEO_TABLE =
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024; // 250 MB per clip
 
-// Convert a ClientVideo row into a JSON-safe object with a fresh view URL.
-function serializeVideo(v: {
+type VideoRow = {
   id: string; clientId: string; key: string; label: string; fileName: string;
-  contentType: string; sizeBytes: bigint; uploadedByUserId: string | null; createdAt: Date;
-}) {
+  contentType: string; sizeBytes: bigint | number; uploadedByUserId: string | null; createdAt: Date;
+};
+
+// Convert a ClientVideo row into a JSON-safe object with a fresh view URL.
+function serializeVideo(v: VideoRow) {
   return {
     id: v.id,
     clientId: v.clientId,
@@ -584,11 +587,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!clientId) return res.status(400).json({ error: 'Missing clientId.' });
       if (!isR2Configured()) return res.status(200).json([]);
       try {
-        const videos = await prisma.clientVideo.findMany({
-          where: { clientId },
-          orderBy: { createdAt: 'desc' },
-        });
-        return res.status(200).json(videos.map(serializeVideo));
+        const rows = (await prisma.$queryRawUnsafe(
+          'SELECT id, "clientId", key, label, "fileName", "contentType", "sizeBytes", "uploadedByUserId", "createdAt" FROM "ClientVideo" WHERE "clientId" = $1 ORDER BY "createdAt" DESC',
+          clientId,
+        )) as VideoRow[];
+        return res.status(200).json(rows.map(serializeVideo));
       } catch {
         await prisma.$executeRawUnsafe(CREATE_CLIENT_VIDEO_TABLE);
         return res.status(200).json([]);
@@ -772,35 +775,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const key = String(data.key ?? '');
       if (!clientId || !key) return res.status(400).json({ error: 'Missing clientId or key.' });
       const row = {
+        id: randomUUID(),
         clientId,
         key,
         label: String(data.label ?? 'Before').slice(0, 40),
         fileName: String(data.fileName ?? '').slice(0, 200),
         contentType: String(data.contentType ?? 'video/mp4').slice(0, 100),
-        sizeBytes: BigInt(Math.max(0, Math.round(Number(data.sizeBytes ?? 0)))),
+        sizeBytes: Math.max(0, Math.round(Number(data.sizeBytes ?? 0))),
         uploadedByUserId: user.id,
       };
+      const insert = () =>
+        prisma.$executeRawUnsafe(
+          'INSERT INTO "ClientVideo" (id, "clientId", key, label, "fileName", "contentType", "sizeBytes", "uploadedByUserId", "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8, CURRENT_TIMESTAMP)',
+          row.id, row.clientId, row.key, row.label, row.fileName, row.contentType, row.sizeBytes, row.uploadedByUserId,
+        );
       try {
-        const created = await prisma.clientVideo.create({ data: row });
-        return res.status(201).json(serializeVideo(created));
+        await insert();
       } catch {
         await prisma.$executeRawUnsafe(CREATE_CLIENT_VIDEO_TABLE);
-        const created = await prisma.clientVideo.create({ data: row });
-        return res.status(201).json(serializeVideo(created));
+        await insert();
       }
+      return res.status(201).json({
+        id: row.id,
+        clientId: row.clientId,
+        label: row.label,
+        fileName: row.fileName,
+        contentType: row.contentType,
+        sizeBytes: row.sizeBytes,
+        uploadedByUserId: row.uploadedByUserId,
+        createdAt: new Date().toISOString(),
+        url: presignGetUrl(row.key),
+      });
     }
 
     // ── Client video: delete (admin or the uploader) ──
     if (data._action === 'client_video_delete') {
       const id = String(data.id ?? '');
       if (!id) return res.status(400).json({ error: 'Missing id.' });
-      const video = await prisma.clientVideo.findUnique({ where: { id } });
+      const rows = (await prisma.$queryRawUnsafe(
+        'SELECT id, key, "uploadedByUserId" FROM "ClientVideo" WHERE id = $1',
+        id,
+      )) as { id: string; key: string; uploadedByUserId: string | null }[];
+      const video = rows[0];
       if (!video) return res.status(404).json({ error: 'Not found.' });
       if (user.role !== 'admin' && video.uploadedByUserId !== user.id) {
         return res.status(403).json({ error: 'You can only delete videos you uploaded.' });
       }
       try { await deleteObject(video.key); } catch { /* bytes may already be gone */ }
-      await prisma.clientVideo.delete({ where: { id } });
+      await prisma.$executeRawUnsafe('DELETE FROM "ClientVideo" WHERE id = $1', id);
       return res.status(200).json({ ok: true });
     }
 
