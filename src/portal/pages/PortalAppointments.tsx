@@ -978,7 +978,7 @@ export default function PortalAppointments() {
       appointmentTime: form.appointmentTime,
       appointmentType: form.appointmentType,
       assignedRepId: form.assignedRepId,
-      city: form.city,
+      city: isEventType(form.appointmentType) ? '' : form.city,
       consultationStage: form.consultationStage,
       closeProbability: Number(form.closeProbability) || 0,
       contractorId: form.contractorId || null,
@@ -995,7 +995,7 @@ export default function PortalAppointments() {
       followUpDate: form.followUpDate,
       homeownerInterestLevel: form.homeownerInterestLevel || null,
       internalNotes: form.internalNotes,
-      location: [form.address, form.city].filter(Boolean).join(', '),
+      location: isEventType(form.appointmentType) ? form.address : [form.address, form.city].filter(Boolean).join(', '),
       notes: form.internalNotes,
       phone: form.phone,
       projectType: form.projectType,
@@ -1186,7 +1186,7 @@ export default function PortalAppointments() {
       appointmentType: form.appointmentType,
       assignedRepId: form.assignedRepId || currentUser.id,
       contractorId: form.contractorId || null,
-      city: form.city.trim(),
+      city: isEventType(form.appointmentType) ? '' : form.city.trim(),
       postalCode: form.postalCode.trim(),
       consultationStage: form.consultationStage,
       closeProbability: Number(form.closeProbability) || 0,
@@ -1204,7 +1204,9 @@ export default function PortalAppointments() {
       followUpDate: form.followUpDate,
       homeownerInterestLevel: form.homeownerInterestLevel || null,
       internalNotes: form.internalNotes.trim(),
-      location: [form.address.trim(), form.city.trim()].filter(Boolean).join(', '),
+      location: isEventType(form.appointmentType)
+        ? form.address.trim()
+        : [form.address.trim(), form.city.trim()].filter(Boolean).join(', '),
       notes: form.internalNotes.trim(),
       nextStep: form.nextStep,
       objections: form.objections.trim(),
@@ -3509,7 +3511,9 @@ export default function PortalAppointments() {
                       Address
                     </p>
                     <p className="mt-1 text-sm font-black text-slate-950">
-                      {[form.address, form.city].filter(Boolean).join(', ') ||
+                      {(isEventType(form.appointmentType)
+                        ? form.address
+                        : [form.address, form.city].filter(Boolean).join(', ')) ||
                         'Address not set'}
                     </p>
                   </div>

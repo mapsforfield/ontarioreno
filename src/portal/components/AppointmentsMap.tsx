@@ -10,6 +10,14 @@ type Props = {
   getRepName: (id: string) => string;
 };
 
+// For custom events the address field is the full freeform location, so we
+// don't append the (often stale) city.
+const EVENT_TYPES = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
+function locationText(a: Appointment): string {
+  if (EVENT_TYPES.includes(a.appointmentType)) return a.address || a.city || '';
+  return [a.address, a.city].filter(Boolean).join(', ');
+}
+
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -124,7 +132,7 @@ export default function AppointmentsMap({ appointments, getRepName }: Props) {
                   <br />
                   {fmt12(a.appointmentTime)} · {getRepName(a.assignedRepId)}
                   <br />
-                  <span style={{ color: '#64748b' }}>{[a.address, a.city].filter(Boolean).join(', ')}</span>
+                  <span style={{ color: '#64748b' }}>{locationText(a)}</span>
                 </div>
               </Popup>
             </Marker>
@@ -156,7 +164,7 @@ export default function AppointmentsMap({ appointments, getRepName }: Props) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-slate-900">{a.customerName || 'Consultation'}</p>
                   <p className="truncate text-xs font-semibold text-slate-500">
-                    {fmt12(a.appointmentTime)} · {[a.address, a.city].filter(Boolean).join(', ')}
+                    {fmt12(a.appointmentTime)} · {locationText(a)}
                   </p>
                 </div>
               </div>
@@ -176,7 +184,7 @@ export default function AppointmentsMap({ appointments, getRepName }: Props) {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-slate-700">{a.customerName || 'Consultation'}</p>
                     <p className="truncate text-xs font-semibold text-slate-400">
-                      {fmt12(a.appointmentTime)} · {[a.address, a.city].filter(Boolean).join(', ') || 'No address'}
+                      {fmt12(a.appointmentTime)} · {locationText(a) || 'No address'}
                     </p>
                   </div>
                 </div>
