@@ -37,6 +37,7 @@ import {
   Appointment,
   AppointmentStatus,
   AppointmentType,
+  Client,
   ContractorDispatch,
   ContractorDispatchStatus,
   ConsultationStage,
@@ -642,6 +643,8 @@ export default function PortalAppointments() {
   // Client search/autofill for new consultation form
   const [clientSearch, setClientSearch] = useState('');
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  // Inline name/phone autocomplete on the consultation form (Setmore-style).
+  const [suggestField, setSuggestField] = useState<'name' | 'phone' | null>(null);
   // Which agenda card's "•••" dropdown is open (keyed by appointment.id)
   const [openAgendaMenu, setOpenAgendaMenu] = useState<string | null>(null);
   // Which appointment is currently sending a reminder (keyed by id)
@@ -953,6 +956,39 @@ export default function PortalAppointments() {
   };
   const getRepName = (repId: string) =>
     repId ? users.find((user) => user.id === repId)?.name ?? repId : 'Unassigned Rep';
+
+  // ── Inline client autocomplete + duplicate detection (consultation form) ──
+  const normalizePhone = (p: string) => p.replace(/\D/g, '');
+  const applyClientToForm = (c: Client) => {
+    updateForm('customerName', c.name);
+    updateForm('phone', c.phone ?? '');
+    updateForm('email', c.email ?? '');
+    updateForm('address', c.address ?? '');
+    updateForm('city', c.city ?? '');
+    updateForm('postalCode', c.postalCode ?? '');
+    if (c.projectTypes?.[0]) updateForm('projectType', c.projectTypes[0]);
+    setSuggestField(null);
+  };
+  const clientMatches = (query: string): Client[] => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const digits = normalizePhone(query);
+    return clients
+      .filter((c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q) ||
+        (digits.length >= 3 && normalizePhone(c.phone ?? '').includes(digits)))
+      .slice(0, 6);
+  };
+  // A strong duplicate signal: same (non-trivial) phone, or exact name match.
+  const duplicateClient = (() => {
+    if (!isCreating || isEventType(form.appointmentType)) return undefined;
+    const phoneDigits = normalizePhone(form.phone);
+    const name = form.customerName.trim().toLowerCase();
+    return clients.find((c) =>
+      (phoneDigits.length >= 7 && normalizePhone(c.phone ?? '') === phoneDigits) ||
+      (name.length >= 2 && c.name.trim().toLowerCase() === name));
+  })();
   const getAppointmentProjectType = (appointment: Appointment) =>
     appointment.projectType || getDeal(appointment.dealId)?.projectType || '';
   const getContractorName = (contractorId: string | null) =>
@@ -3785,73 +3821,72 @@ export default function PortalAppointments() {
               </>)}
               {/* Consultation-specific fields */}
               {!isEventType(form.appointmentType) && (<>
-                {/* ── Client autofill search (new consultations only) ── */}
-                {isCreating && (
-                  <div className="sm:col-span-2 relative">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                      Pull from existing client
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search by name, email, or phone…"
-                        value={clientSearch}
-                        onChange={(e) => { setClientSearch(e.target.value); setClientSearchOpen(true); }}
-                        onFocus={() => setClientSearchOpen(true)}
-                        className="w-full rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1B3C6C] focus:outline-none focus:ring-0"
-                      />
-                    </div>
-                    {clientSearchOpen && clientSearch.trim().length > 0 && (() => {
-                      const q = clientSearch.toLowerCase();
-                      const matches = clients.filter((c) =>
-                        c.name.toLowerCase().includes(q) ||
-                        (c.email ?? '').toLowerCase().includes(q) ||
-                        (c.phone ?? '').toLowerCase().includes(q)
-                      ).slice(0, 6);
-                      if (matches.length === 0) return (
-                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white p-3 shadow-lg">
-                          <p className="text-sm font-semibold text-slate-400">No clients found</p>
-                        </div>
-                      );
-                      return (
-                        <div className="absolute z-10 mt-1 w-full rounded-[0.5rem] border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
-                          {matches.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onMouseDown={() => {
-                                updateForm('customerName', c.name);
-                                updateForm('phone', c.phone ?? '');
-                                updateForm('email', c.email ?? '');
-                                updateForm('address', c.address ?? '');
-                                updateForm('city', c.city ?? '');
-                                updateForm('postalCode', c.postalCode ?? '');
-                                if (c.projectTypes?.[0]) updateForm('projectType', c.projectTypes[0]);
-                                setClientSearch('');
-                                setClientSearchOpen(false);
-                              }}
-                              className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]"
-                            >
-                              <span className="text-sm font-black text-slate-900">{c.name}</span>
-                              <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                {/* Duplicate-client warning */}
+                {isCreating && duplicateClient && (
+                  <div className="sm:col-span-2 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="text-sm font-bold text-amber-800">Possible existing client</p>
+                    <p className="mt-0.5 text-sm font-semibold text-amber-700">
+                      {[duplicateClient.name, duplicateClient.phone, duplicateClient.city].filter(Boolean).join(' · ')} is already in your database.
+                    </p>
+                    <button
+                      type="button"
+                      onMouseDown={() => applyClientToForm(duplicateClient)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-[0.5rem] bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700"
+                    >
+                      Use this client
+                    </button>
                   </div>
                 )}
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className="relative grid gap-1.5 text-sm font-bold text-slate-700">
                   Customer Name
                   <input
                     value={form.customerName}
-                    onChange={(event) => updateForm('customerName', event.target.value)}
-                   
+                    autoComplete="off"
+                    placeholder={isCreating ? 'Start typing to find existing clients…' : ''}
+                    onChange={(event) => { updateForm('customerName', event.target.value); setSuggestField('name'); }}
+                    onFocus={() => setSuggestField('name')}
+                    onBlur={() => setTimeout(() => setSuggestField((f) => (f === 'name' ? null : f)), 150)}
                   />
+                  {isCreating && suggestField === 'name' && (() => {
+                    const matches = clientMatches(form.customerName);
+                    if (matches.length === 0) return null;
+                    return (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 divide-y divide-slate-100 rounded-[0.5rem] border border-slate-200 bg-white shadow-lg">
+                        {matches.map((c) => (
+                          <button key={c.id} type="button" onMouseDown={() => applyClientToForm(c)}
+                            className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]">
+                            <span className="text-sm font-black text-slate-900">{c.name}</span>
+                            <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className="relative grid gap-1.5 text-sm font-bold text-slate-700">
                   Phone
-                  <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} />
+                  <input
+                    value={form.phone}
+                    autoComplete="off"
+                    onChange={(event) => { updateForm('phone', event.target.value); setSuggestField('phone'); }}
+                    onFocus={() => setSuggestField('phone')}
+                    onBlur={() => setTimeout(() => setSuggestField((f) => (f === 'phone' ? null : f)), 150)}
+                  />
+                  {isCreating && suggestField === 'phone' && (() => {
+                    const matches = clientMatches(form.phone);
+                    if (matches.length === 0) return null;
+                    return (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 divide-y divide-slate-100 rounded-[0.5rem] border border-slate-200 bg-white shadow-lg">
+                        {matches.map((c) => (
+                          <button key={c.id} type="button" onMouseDown={() => applyClientToForm(c)}
+                            className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-[#f6faff]">
+                            <span className="text-sm font-black text-slate-900">{c.name}</span>
+                            <span className="text-xs font-semibold text-slate-400">{[c.email, c.phone, c.city].filter(Boolean).join(' · ')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Email
