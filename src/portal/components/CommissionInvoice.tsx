@@ -17,12 +17,21 @@ const LINE_BLUE: [number, number, number] = [150, 175, 215];
 type Adjustment = {
   id: string;
   description: string;
+  relatedJob: string; // the original job/deal this adjustment relates to
   kind: 'credit' | 'charge';
   mode: 'percent' | 'amount';
   base: number; // used in percent mode (e.g. the removed scope $)
   rate: number; // used in percent mode (e.g. the commission %)
   amount: number; // used in amount mode
 };
+
+/** The itemised label for an adjustment line (description, job ref, calc). */
+function adjLabel(a: Adjustment): string {
+  const desc = a.description.trim() || 'Adjustment';
+  const job = (a.relatedJob ?? '').trim() ? ` — re: ${(a.relatedJob ?? '').trim()}` : '';
+  const calc = a.mode === 'percent' && a.base > 0 ? ` ($${fmtNum(a.base)} × ${a.rate}%)` : '';
+  return `${desc}${job}${calc}`;
+}
 
 type InvoiceData = {
   invoiceNumber: string;
@@ -181,11 +190,7 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   const adjTotal = adjustments.reduce((s, a) => s + adjValue(a), 0);
   doc.setFontSize(10.5);
   for (const a of adjustments) {
-    const label =
-      a.mode === 'percent' && a.base > 0
-        ? `${a.description.trim() || 'Adjustment'} ($${fmtNum(a.base)} × ${a.rate}%)`
-        : a.description.trim() || 'Adjustment';
-    const lines = doc.splitTextToSize(label, 380) as string[];
+    const lines = doc.splitTextToSize(adjLabel(a), 380) as string[];
     doc.text(lines, 43, dy);
     doc.text(signedMoney(adjValue(a)), 569, dy, { align: 'right' });
     dy += lines.length * 13 + 3;
@@ -281,7 +286,18 @@ export default function CommissionInvoice({
   contractor: Contractor | undefined;
   onClose: () => void;
 }) {
-  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber } = usePortalData();
+  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber, deals } = usePortalData();
+
+  // This contractor's other jobs — offered as quick-pick when crediting against
+  // a previous deal.
+  const contractorJobs = useMemo(
+    () =>
+      deals
+        .filter((d) => contractor && d.assignedContractorId === contractor.id && d.id !== deal.id)
+        .map((d) => [d.homeownerName, d.projectType].filter(Boolean).join(' — '))
+        .filter(Boolean),
+    [deals, contractor, deal.id],
+  );
 
   const [letterhead, setLetterhead] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -323,6 +339,7 @@ export default function CommissionInvoice({
         {
           id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
           description: '',
+          relatedJob: '',
           kind: 'credit',
           mode: 'percent',
           base: 0,
@@ -449,7 +466,7 @@ export default function CommissionInvoice({
                   `Commission subtotal: ${money(data.amount)}`,
                   ...data.adjustments
                     .filter((a) => adjValue(a) !== 0 || a.description.trim())
-                    .map((a) => `${a.description.trim() || 'Adjustment'}${a.mode === 'percent' && a.base > 0 ? ` ($${fmtNum(a.base)} × ${a.rate}%)` : ''}: ${signedMoney(adjValue(a))}`),
+                    .map((a) => `${adjLabel(a)}: ${signedMoney(adjValue(a))}`),
                   `Total payable: ${money(netTotal)}`,
                 ]
               : [`Amount: ${money(data.amount)}`]),
@@ -569,6 +586,18 @@ export default function CommissionInvoice({
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      <input
+                        value={a.relatedJob}
+                        onChange={(e) => updateAdjustment(a.id, { relatedJob: e.target.value })}
+                        list={contractorJobs.length ? `adj-jobs-${a.id}` : undefined}
+                        placeholder="Related job (optional) — e.g. Smith — Basement Reno"
+                        className="mt-2 w-full rounded-[0.4rem] border border-slate-200 px-2.5 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+                      />
+                      {contractorJobs.length > 0 && (
+                        <datalist id={`adj-jobs-${a.id}`}>
+                          {contractorJobs.map((j) => <option key={j} value={j} />)}
+                        </datalist>
+                      )}
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <select
                           value={a.kind}
