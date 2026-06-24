@@ -657,15 +657,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // One-time cleanup: custom events inherited the client's city via autofill,
-    // which polluted the address everywhere ("…Brampton, ON, Hamilton"). Clear it
-    // and the stale geocode so pins re-resolve from the clean address. Becomes a
-    // cheap no-op once there's nothing left to fix.
+    // which polluted the address and dragged map pins to the wrong city. Clear
+    // the city AND the stale geocode on ALL events so each pin re-resolves from
+    // its clean address. Persisted via a Setting flag so it runs exactly once
+    // (a per-instance flag avoids re-checking on every warm request).
     if (!eventCityBackfillDone) {
       eventCityBackfillDone = true;
       try {
-        await prisma.$executeRawUnsafe(
-          `UPDATE "Appointment" SET city = '', latitude = NULL, longitude = NULL WHERE "appointmentType" IN ('showroom_visit','supplier_meeting','site_check','custom_event') AND city <> ''`,
-        );
+        const flag = await prisma.setting.findUnique({ where: { key: 'event_geo_reset_v2' } }).catch(() => null);
+        if (!flag) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "Appointment" SET city = '', latitude = NULL, longitude = NULL WHERE "appointmentType" IN ('showroom_visit','supplier_meeting','site_check','custom_event')`,
+          );
+          await prisma.setting.upsert({
+            where: { key: 'event_geo_reset_v2' },
+            update: { value: 'done' },
+            create: { key: 'event_geo_reset_v2', value: 'done' },
+          });
+        }
       } catch { eventCityBackfillDone = false; }
     }
 
