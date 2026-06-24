@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { Download, Loader2, Send, X } from 'lucide-react';
+import { Download, Loader2, Plus, Send, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
@@ -11,6 +11,18 @@ const PAGE_H = 792;
 const BLUE: [number, number, number] = [42, 77, 160];
 const INK: [number, number, number] = [25, 25, 25];
 const LINE_BLUE: [number, number, number] = [150, 175, 215];
+
+// A documented credit (−) or extra charge (+) on the invoice. Either a flat
+// amount, or a percentage of a "scope" base (auto-computes & self-documents).
+type Adjustment = {
+  id: string;
+  description: string;
+  kind: 'credit' | 'charge';
+  mode: 'percent' | 'amount';
+  base: number; // used in percent mode (e.g. the removed scope $)
+  rate: number; // used in percent mode (e.g. the commission %)
+  amount: number; // used in amount mode
+};
 
 type InvoiceData = {
   invoiceNumber: string;
@@ -31,10 +43,26 @@ type InvoiceData = {
   transitNumber: string;
   accountNumber: string;
   showPayment: boolean;
+  adjustments: Adjustment[];
 };
 
 function money(v: number) {
   return `CAD $${v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtNum(v: number) {
+  return v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Signed dollar amount of an adjustment (negative for credits). */
+function adjValue(a: Adjustment): number {
+  const raw = a.mode === 'percent' ? (a.base * a.rate) / 100 : a.amount;
+  const mag = Math.round(Math.abs(raw) * 100) / 100;
+  return a.kind === 'credit' ? -mag : mag;
+}
+
+function signedMoney(v: number) {
+  return `${v < 0 ? '-' : ''}CAD $${fmtNum(Math.abs(v))}`;
 }
 
 async function loadLetterhead(): Promise<string | null> {
@@ -134,33 +162,65 @@ function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.setLineWidth(1);
   doc.line(43, 309, 569, 309);
 
-  // Description rows
+  // Description rows (flowing cursor so any adjustments fit beneath the main line)
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text(d.customerName, 43, 328);
-  doc.text(`Sales price: $${d.salesPrice.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 43, 343);
-  doc.text(`Commission ${d.commissionRate}%`, 43, 358);
-  doc.text(money(d.amount), 569, 328, { align: 'right' });
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  let dy = 330;
+  doc.text(d.customerName, 43, dy);
+  doc.text(money(d.amount), 569, dy, { align: 'right' });
+  dy += 15;
+  doc.setFontSize(9.5);
+  doc.setTextColor(95, 95, 95);
+  doc.text(`Sales price: $${fmtNum(d.salesPrice)} (incl. HST) · Commission ${d.commissionRate}%`, 43, dy);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  dy += 20;
+
+  // Adjustments / credits
+  const adjustments = (d.adjustments ?? []).filter((a) => adjValue(a) !== 0 || a.description.trim());
+  const adjTotal = adjustments.reduce((s, a) => s + adjValue(a), 0);
+  doc.setFontSize(10.5);
+  for (const a of adjustments) {
+    const label =
+      a.mode === 'percent' && a.base > 0
+        ? `${a.description.trim() || 'Adjustment'} ($${fmtNum(a.base)} × ${a.rate}%)`
+        : a.description.trim() || 'Adjustment';
+    const lines = doc.splitTextToSize(label, 380) as string[];
+    doc.text(lines, 43, dy);
+    doc.text(signedMoney(adjValue(a)), 569, dy, { align: 'right' });
+    dy += lines.length * 13 + 3;
+  }
 
   // Totals
+  const totalsTop = Math.max(dy + 8, 392);
   doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
-  doc.line(43, 395, 569, 395);
-  doc.setFont('helvetica', 'bold');
+  doc.setLineWidth(1);
+  doc.line(43, totalsTop, 569, totalsTop);
+  let ty = totalsTop + 22;
   doc.setFontSize(12);
-  doc.text('Sub Total', 400, 428);
-  doc.setFont('helvetica', 'normal');
-  doc.text(money(d.amount), 569, 428, { align: 'right' });
-  doc.setDrawColor(LINE_BLUE[0], LINE_BLUE[1], LINE_BLUE[2]);
-  doc.line(400, 438, 569, 438);
+  if (adjustments.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sub Total', 400, ty);
+    doc.setFont('helvetica', 'normal');
+    doc.text(money(d.amount), 569, ty, { align: 'right' });
+    ty += 18;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Adjustments', 400, ty);
+    doc.setFont('helvetica', 'normal');
+    doc.text(signedMoney(adjTotal), 569, ty, { align: 'right' });
+    ty += 10;
+  }
+  doc.line(400, ty, 569, ty);
+  ty += 20;
   doc.setFont('helvetica', 'bold');
-  doc.text('Total (CAD)', 400, 466);
+  doc.text('Total (CAD)', 400, ty);
   doc.setFont('helvetica', 'normal');
-  doc.text(money(d.amount), 569, 466, { align: 'right' });
+  doc.text(money(d.amount + adjTotal), 569, ty, { align: 'right' });
 
   // ── Payment instructions (lower-left white space, clear of the wave) ──
   if (d.showPayment && (d.bankName || d.accountNumber)) {
     const px = 43;
-    const py = 400;
+    const py = totalsTop + 14;
     const pw = 332;
     const ph = 118;
     doc.setFillColor(247, 249, 252);
@@ -248,11 +308,36 @@ export default function CommissionInvoice({
     transitNumber: '11812',
     accountNumber: '5064635',
     showPayment: true,
+    adjustments: [],
   });
   const [saveProfileDefault, setSaveProfileDefault] = useState(false);
 
   const set = <K extends keyof InvoiceData>(key: K, value: InvoiceData[K]) =>
     setData((cur) => ({ ...cur, [key]: value }));
+
+  const addAdjustment = () =>
+    setData((cur) => ({
+      ...cur,
+      adjustments: [
+        ...cur.adjustments,
+        {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+          description: '',
+          kind: 'credit',
+          mode: 'percent',
+          base: 0,
+          rate: cur.commissionRate,
+          amount: 0,
+        },
+      ],
+    }));
+  const updateAdjustment = (id: string, patch: Partial<Adjustment>) =>
+    setData((cur) => ({ ...cur, adjustments: cur.adjustments.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
+  const removeAdjustment = (id: string) =>
+    setData((cur) => ({ ...cur, adjustments: cur.adjustments.filter((a) => a.id !== id) }));
+
+  const adjustmentsTotal = data.adjustments.reduce((s, a) => s + adjValue(a), 0);
+  const netTotal = data.amount + adjustmentsTotal;
 
   // Recompute amount when price or rate changes
   useEffect(() => {
@@ -359,7 +444,15 @@ export default function CommissionInvoice({
             `Please find attached the commission invoice for ${data.customerName}.`,
             '',
             `Invoice #${data.invoiceNumber}`,
-            `Amount: ${money(data.amount)}`,
+            ...(data.adjustments.filter((a) => adjValue(a) !== 0 || a.description.trim()).length > 0
+              ? [
+                  `Commission subtotal: ${money(data.amount)}`,
+                  ...data.adjustments
+                    .filter((a) => adjValue(a) !== 0 || a.description.trim())
+                    .map((a) => `${a.description.trim() || 'Adjustment'}${a.mode === 'percent' && a.base > 0 ? ` ($${fmtNum(a.base)} × ${a.rate}%)` : ''}: ${signedMoney(adjValue(a))}`),
+                  `Total payable: ${money(netTotal)}`,
+                ]
+              : [`Amount: ${money(data.amount)}`]),
             ...(data.showPayment
               ? [
                   '',
@@ -379,7 +472,7 @@ export default function CommissionInvoice({
         }),
       });
       if (!res.ok) throw new Error('send failed');
-      showToast({ variant: 'success', message: 'Invoice sent', description: `${data.toCompany} · ${money(data.amount)}` });
+      showToast({ variant: 'success', message: 'Invoice sent', description: `${data.toCompany} · ${money(netTotal)}` });
       onClose();
     } catch {
       showToast({ variant: 'error', message: 'Could not send the invoice. Try again.' });
@@ -449,6 +542,74 @@ export default function CommissionInvoice({
                 {field('Commission %', 'commissionRate', { type: 'number' })}
                 {field('Amount (CAD)', 'amount', { type: 'number' })}
               </div>
+
+              {/* ── Adjustments & credits ── */}
+              <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Adjustments &amp; credits</p>
+                <button type="button" onClick={addAdjustment} className="inline-flex items-center gap-1 text-xs font-bold text-[#1B3C6C] hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+              </div>
+              {data.adjustments.length === 0 ? (
+                <p className="text-[0.7rem] font-semibold text-slate-400">
+                  Optional. Add a credit (e.g. a portion of a job that didn’t proceed) or an extra charge — it’s itemised on the invoice and adjusts the total.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {data.adjustments.map((a) => (
+                    <div key={a.id} className="rounded-[0.5rem] border border-slate-200 bg-slate-50/60 p-2.5">
+                      <div className="flex items-start gap-2">
+                        <input
+                          value={a.description}
+                          onChange={(e) => updateAdjustment(a.id, { description: e.target.value })}
+                          placeholder="Reason — e.g. Landscaping scope not completed"
+                          className="min-w-0 flex-1 rounded-[0.4rem] border border-slate-200 px-2.5 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+                        />
+                        <button type="button" onClick={() => removeAdjustment(a.id)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-red-50 hover:text-red-500" aria-label="Remove">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <select
+                          value={a.kind}
+                          onChange={(e) => updateAdjustment(a.id, { kind: e.target.value as Adjustment['kind'] })}
+                          className="rounded-[0.4rem] border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#1B3C6C]"
+                        >
+                          <option value="credit">Credit (−)</option>
+                          <option value="charge">Charge (+)</option>
+                        </select>
+                        <select
+                          value={a.mode}
+                          onChange={(e) => updateAdjustment(a.id, { mode: e.target.value as Adjustment['mode'] })}
+                          className="rounded-[0.4rem] border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#1B3C6C]"
+                        >
+                          <option value="percent">% of scope amount</option>
+                          <option value="amount">Flat amount</option>
+                        </select>
+                      </div>
+                      {a.mode === 'percent' ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input type="number" value={a.base || ''} onChange={(e) => updateAdjustment(a.id, { base: Number(e.target.value) })} placeholder="Scope $" className="w-0 flex-1 rounded-[0.4rem] border border-slate-200 px-2 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]" />
+                          <span className="text-xs font-black text-slate-400">×</span>
+                          <input type="number" value={a.rate || ''} onChange={(e) => updateAdjustment(a.id, { rate: Number(e.target.value) })} placeholder="%" className="w-16 rounded-[0.4rem] border border-slate-200 px-2 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]" />
+                          <span className="text-xs font-black text-slate-400">=</span>
+                          <span className={`shrink-0 text-sm font-black ${adjValue(a) < 0 ? 'text-red-600' : 'text-slate-900'}`}>{signedMoney(adjValue(a))}</span>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input type="number" value={a.amount || ''} onChange={(e) => updateAdjustment(a.id, { amount: Number(e.target.value) })} placeholder="Amount $" className="w-0 flex-1 rounded-[0.4rem] border border-slate-200 px-2 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]" />
+                          <span className="text-xs font-black text-slate-400">=</span>
+                          <span className={`shrink-0 text-sm font-black ${adjValue(a) < 0 ? 'text-red-600' : 'text-slate-900'}`}>{signedMoney(adjValue(a))}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between rounded-[0.5rem] bg-[#f6faff] px-3 py-2">
+                    <span className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">Net total</span>
+                    <span className="text-sm font-black text-[#1B3C6C]">{money(netTotal)}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-2 mt-4 flex items-center justify-between gap-2">
                 <p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Payment details (EFT / direct deposit)</p>
