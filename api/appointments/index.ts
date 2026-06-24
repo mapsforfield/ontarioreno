@@ -16,6 +16,9 @@ const CREATE_CLIENT_VIDEO_TABLE =
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024; // 250 MB per clip
 
+// Runs the one-time event-city cleanup at most once per warm instance.
+let eventCityBackfillDone = false;
+
 type VideoRow = {
   id: string; clientId: string; key: string; label: string; fileName: string;
   contentType: string; sizeBytes: bigint | number; uploadedByUserId: string | null; createdAt: Date;
@@ -651,6 +654,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return res.status(200).json(trashed);
       }
+    }
+
+    // One-time cleanup: custom events inherited the client's city via autofill,
+    // which polluted the address everywhere ("…Brampton, ON, Hamilton"). Clear it
+    // and the stale geocode so pins re-resolve from the clean address. Becomes a
+    // cheap no-op once there's nothing left to fix.
+    if (!eventCityBackfillDone) {
+      eventCityBackfillDone = true;
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Appointment" SET city = '', latitude = NULL, longitude = NULL WHERE "appointmentType" IN ('showroom_visit','supplier_meeting','site_check','custom_event') AND city <> ''`,
+        );
+      } catch { eventCityBackfillDone = false; }
     }
 
     let appointments;

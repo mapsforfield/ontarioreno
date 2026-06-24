@@ -2247,7 +2247,9 @@ export default function PortalAppointments() {
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
-                            {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                            {isEventType(apt.appointmentType)
+                              ? (apt.address?.trim() || 'Location TBD')
+                              : `${getAppointmentProjectType(apt) || 'Project TBD'} · ${apt.city || 'City TBD'}`}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
@@ -2324,7 +2326,9 @@ export default function PortalAppointments() {
                                     </p>
                                   </div>
                                   <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
-                                    {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                                    {isEventType(apt.appointmentType)
+                              ? (apt.address?.trim() || 'Location TBD')
+                              : `${getAppointmentProjectType(apt) || 'Project TBD'} · ${apt.city || 'City TBD'}`}
                                   </p>
                                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                                     <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
@@ -2626,7 +2630,9 @@ export default function PortalAppointments() {
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
-                            {getAppointmentProjectType(apt) || 'Project TBD'} · {apt.city || 'City TBD'}
+                            {isEventType(apt.appointmentType)
+                              ? (apt.address?.trim() || 'Location TBD')
+                              : `${getAppointmentProjectType(apt) || 'Project TBD'} · ${apt.city || 'City TBD'}`}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className={`rounded-full px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide ${sc.badge}`}>
