@@ -700,7 +700,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         rows = await prisma.appointment.findMany({
           where: { id: { in: ids } },
-          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true },
+          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true, appointmentType: true },
         });
       } catch {
         await prisma.$executeRawUnsafe(
@@ -708,9 +708,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         );
         rows = await prisma.appointment.findMany({
           where: { id: { in: ids } },
-          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true },
+          select: { id: true, address: true, city: true, postalCode: true, latitude: true, longitude: true, appointmentType: true },
         });
       }
+      const GEO_EVENT_TYPES = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
 
       const results: Array<{ id: string; latitude: number | null; longitude: number | null }> = [];
       const startTime = Date.now();
@@ -737,12 +738,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           continue;
         }
         const addr = (row.address ?? '').trim();
-        const city = (row.city ?? '').trim();
-        // Try the precise address first, then fall back to city-level so a
-        // messy/partial address still lands the pin somewhere sensible.
+        // Events' address is a full freeform location (e.g. a showroom in another
+        // city) — geocode by address only so a stale client city can't drag the
+        // pin. Consultations may use a city-level fallback for messy addresses.
+        const isEvent = GEO_EVENT_TYPES.includes(row.appointmentType);
+        const city = isEvent ? '' : (row.city ?? '').trim();
         const queries = [
           [addr, city, 'Ontario, Canada'].filter(Boolean).join(', '),
-          city ? `${city}, Ontario, Canada` : '',
+          !isEvent && city ? `${city}, Ontario, Canada` : '',
         ].filter((q, i, arr) => q && q !== 'Ontario, Canada' && arr.indexOf(q) === i);
 
         let found: { lat: number; lon: number } | null = null;

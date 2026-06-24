@@ -14,7 +14,9 @@ type Props = {
 // don't append the (often stale) city.
 const EVENT_TYPES = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
 function locationText(a: Appointment): string {
-  if (EVENT_TYPES.includes(a.appointmentType)) return a.address || a.city || '';
+  // Events: the address field is the full freeform location — never fall back to
+  // the (often stale, client-inherited) city.
+  if (EVENT_TYPES.includes(a.appointmentType)) return (a.address || '').trim();
   return [a.address, a.city].filter(Boolean).join(', ');
 }
 
