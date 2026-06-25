@@ -35,6 +35,7 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
   const [label, setLabel] = useState<string>('Before');
   const [customLabel, setCustomLabel] = useState('');
   const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [batch, setBatch] = useState<{ current: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Send-by-email modal state
@@ -83,36 +84,49 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
   const effectiveLabel = isCustom ? customLabel.trim() : label;
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file) return;
-    const isMedia = file.type.startsWith('video/') || file.type.startsWith('image/');
-    if (!isMedia) {
-      showToast({ variant: 'error', message: 'Please choose a photo or video file.' });
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      showToast({ variant: 'error', message: 'File is too large (max 250 MB).', description: 'Try a shorter clip or lower resolution.' });
-      return;
-    }
+    if (picked.length === 0) return;
     if (isCustom && !effectiveLabel) {
       showToast({ variant: 'error', message: 'Enter a custom tag first.' });
       return;
     }
-    setUploadPct(0);
-    try {
-      const saved = await uploadClientVideo(clientId, file, effectiveLabel || 'Before', (pct) => setUploadPct(pct));
-      if (saved) {
-        setMedia((cur) => [saved, ...cur]);
-        showToast({ variant: 'success', message: 'Uploaded', description: `${effectiveLabel || 'Before'} · ${formatSize(file.size)}` });
-        if (isCustom) setCustomLabel('');
-      } else {
-        showToast({ variant: 'error', message: 'Upload failed. Please try again.' });
+
+    // Keep only valid media within the size cap; note anything skipped.
+    const valid = picked.filter((f) => (f.type.startsWith('video/') || f.type.startsWith('image/')) && f.size <= MAX_BYTES);
+    const skipped = picked.length - valid.length;
+    if (valid.length === 0) {
+      showToast({ variant: 'error', message: 'No uploadable files.', description: 'Use photos/videos under 250 MB.' });
+      return;
+    }
+
+    const tag = effectiveLabel || 'Before';
+    let ok = 0;
+    let failed = 0;
+    setBatch({ current: 0, total: valid.length });
+    for (let i = 0; i < valid.length; i++) {
+      const file = valid[i];
+      setBatch({ current: i + 1, total: valid.length });
+      setUploadPct(0);
+      try {
+        const saved = await uploadClientVideo(clientId, file, tag, (pct) => setUploadPct(pct));
+        if (saved) { setMedia((cur) => [saved, ...cur]); ok++; } else { failed++; }
+      } catch {
+        failed++;
       }
-    } catch (err) {
-      showToast({ variant: 'error', message: 'Upload failed', description: err instanceof Error ? err.message : 'Please try again.' });
-    } finally {
-      setUploadPct(null);
+    }
+    setUploadPct(null);
+    setBatch(null);
+    if (isCustom) setCustomLabel('');
+
+    if (ok > 0) {
+      showToast({
+        variant: failed || skipped ? 'default' : 'success',
+        message: `Uploaded ${ok} ${ok === 1 ? 'item' : 'items'}`,
+        description: [tag, failed ? `${failed} failed` : '', skipped ? `${skipped} skipped` : ''].filter(Boolean).join(' · '),
+      });
+    } else {
+      showToast({ variant: 'error', message: 'Upload failed. Please try again.' });
     }
   };
 
@@ -181,9 +195,9 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158] disabled:opacity-50"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {uploading ? 'Uploading…' : 'Upload media'}
+            {uploading ? (batch && batch.total > 1 ? `Uploading ${batch.current}/${batch.total}…` : 'Uploading…') : 'Upload media'}
           </button>
-          <input ref={fileRef} type="file" accept="video/*,image/*" className="sr-only" onChange={handleFile} />
+          <input ref={fileRef} type="file" accept="video/*,image/*" multiple className="sr-only" onChange={handleFile} />
         </div>
 
         {uploading && (
@@ -191,7 +205,9 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
               <div className="h-full rounded-full bg-[#1B3C6C] transition-all" style={{ width: `${uploadPct}%` }} />
             </div>
-            <p className="mt-1.5 text-xs font-semibold text-slate-400">{uploadPct}% uploaded — keep this panel open until it finishes.</p>
+            <p className="mt-1.5 text-xs font-semibold text-slate-400">
+              {batch && batch.total > 1 ? `File ${batch.current} of ${batch.total} · ` : ''}{uploadPct}% uploaded — keep this panel open until it finishes.
+            </p>
           </div>
         )}
       </div>
