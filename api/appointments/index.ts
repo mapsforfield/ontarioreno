@@ -856,6 +856,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── Client media: edit the tag/label (admin or the uploader) ──
+    if (data._action === 'client_video_update') {
+      const id = String(data.id ?? '');
+      const label = String(data.label ?? '').slice(0, 60).trim();
+      if (!id || !label) return res.status(400).json({ error: 'Missing id or label.' });
+      const rows = (await prisma.$queryRawUnsafe(
+        'SELECT "uploadedByUserId" FROM "ClientVideo" WHERE id = $1',
+        id,
+      )) as { uploadedByUserId: string | null }[];
+      const existing = rows[0];
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      if (user.role !== 'admin' && existing.uploadedByUserId !== user.id) {
+        return res.status(403).json({ error: 'You can only edit videos you uploaded.' });
+      }
+      await prisma.$executeRawUnsafe('UPDATE "ClientVideo" SET label = $1 WHERE id = $2', label, id);
+      return res.status(200).json({ ok: true, label });
+    }
+
     // ── Client media: email a shareable 7-day link to someone ──
     if (data._action === 'client_media_send') {
       const id = String(data.id ?? '');

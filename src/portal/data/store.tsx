@@ -138,6 +138,7 @@ type PortalDataContextValue = PortalDataState & {
     onProgress?: (pct: number) => void,
   ) => Promise<ClientVideo | null>;
   deleteClientVideo: (id: string) => Promise<void>;
+  updateClientMedia: (id: string, label: string) => Promise<void>;
   sendClientMedia: (id: string, to: string, note: string) => Promise<{ ok: boolean; error?: string }>;
   refetch: () => void;
   assignContractorToDeal: (
@@ -1668,6 +1669,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       deleteClientVideo: async (id) => {
         await apiCall('/api/appointments', { method: 'POST', body: JSON.stringify({ _action: 'client_video_delete', id }) });
+      },
+
+      updateClientMedia: async (id, label) => {
+        await apiCall('/api/appointments', { method: 'POST', body: JSON.stringify({ _action: 'client_video_update', id, label }) });
       },
 
       sendClientMedia: async (id, to, note) => {

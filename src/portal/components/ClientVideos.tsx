@@ -1,4 +1,4 @@
-import { ImageIcon, Loader2, Mail, Send, Tag, Trash2, Upload, X } from 'lucide-react';
+import { Check, ImageIcon, Loader2, Mail, Pencil, Send, Tag, Trash2, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
@@ -26,7 +26,7 @@ function labelBadge(label: string): string {
 const isImage = (m: ClientVideo) => m.contentType.startsWith('image/');
 
 export default function ClientVideos({ clientId }: { clientId: string }) {
-  const { listClientVideos, uploadClientVideo, deleteClientVideo, sendClientMedia, contractors } = usePortalData();
+  const { listClientVideos, uploadClientVideo, deleteClientVideo, updateClientMedia, sendClientMedia, contractors } = usePortalData();
   const { currentUser } = usePortalAuth();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -42,6 +42,29 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
   const [sendTo, setSendTo] = useState('');
   const [sendNote, setSendNote] = useState('');
   const [sendBusy, setSendBusy] = useState(false);
+
+  // Inline tag editing
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<string>('Before');
+  const [editCustom, setEditCustom] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+
+  const startEditTag = (m: ClientVideo) => {
+    setEditId(m.id);
+    const preset = (PRESET_LABELS as readonly string[]).includes(m.label);
+    setEditMode(preset ? m.label : 'Custom');
+    setEditCustom(preset ? '' : m.label);
+  };
+  const saveTag = async (m: ClientVideo) => {
+    const newLabel = editMode === 'Custom' ? editCustom.trim() : editMode;
+    if (!newLabel) return;
+    setEditBusy(true);
+    await updateClientMedia(m.id, newLabel);
+    setEditBusy(false);
+    setMedia((cur) => cur.map((v) => (v.id === m.id ? { ...v, label: newLabel } : v)));
+    setEditId(null);
+    showToast({ variant: 'success', message: 'Tag updated', description: newLabel });
+  };
 
   const contractorsWithEmail = useMemo(
     () => contractors.filter((c) => (c.email ?? '').trim()),
@@ -192,37 +215,86 @@ export default function ClientVideos({ clientId }: { clientId: string }) {
               ) : (
                 <video src={m.url} controls preload="metadata" className="aspect-video w-full bg-slate-900" />
               )}
-              <div className="flex items-center justify-between gap-2 px-3 py-2">
-                <div className="min-w-0">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-black ${labelBadge(m.label)}`}>
-                    {m.label}
-                  </span>
-                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={m.fileName}>
-                    {formatSize(m.sizeBytes)} · {new Date(m.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => openSend(m)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C]"
-                    aria-label="Send by email"
-                    title="Send by email"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                  </button>
-                  {(isAdmin || m.uploadedByUserId === currentUser?.id) && (
+              {editId === m.id ? (
+                <div className="flex flex-col gap-2 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={editMode}
+                      onChange={(e) => setEditMode(e.target.value)}
+                      className="rounded-[0.4rem] border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#1B3C6C]"
+                    >
+                      {PRESET_LABELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                      <option value="Custom">Custom…</option>
+                    </select>
+                    {editMode === 'Custom' && (
+                      <input
+                        value={editCustom}
+                        onChange={(e) => setEditCustom(e.target.value)}
+                        placeholder="Custom tag"
+                        autoFocus
+                        className="min-w-0 flex-1 rounded-[0.4rem] border border-slate-200 px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#1B3C6C]"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleDelete(m)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition hover:bg-red-50 hover:text-red-500"
-                      aria-label="Delete"
+                      onClick={() => saveTag(m)}
+                      disabled={editBusy || (editMode === 'Custom' && !editCustom.trim())}
+                      className="inline-flex items-center gap-1.5 rounded-[0.4rem] bg-[#1B3C6C] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#153158] disabled:opacity-50"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {editBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Save
                     </button>
-                  )}
+                    <button type="button" onClick={() => setEditId(null)} className="rounded-[0.4rem] border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-black ${labelBadge(m.label)}`}>
+                      {m.label}
+                    </span>
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={m.fileName}>
+                      {formatSize(m.sizeBytes)} · {new Date(m.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {(isAdmin || m.uploadedByUserId === currentUser?.id) && (
+                      <button
+                        type="button"
+                        onClick={() => startEditTag(m)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C]"
+                        aria-label="Edit tag"
+                        title="Edit tag"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => openSend(m)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C]"
+                      aria-label="Send by email"
+                      title="Send by email"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                    {(isAdmin || m.uploadedByUserId === currentUser?.id) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
