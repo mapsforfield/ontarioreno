@@ -300,6 +300,63 @@ export default function PortalDeals() {
   const [dragOverColumn, setDragOverColumn] = useState<DealStatus | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; deal: Deal } | null>(null);
 
+  // ── Horizontal scroll: synced top scrollbar + click-and-drag panning ──
+  const boardRef = useRef<HTMLDivElement>(null);
+  const boardInnerRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const [boardScrollW, setBoardScrollW] = useState(0);
+  const panRef = useRef<{ x: number; left: number } | null>(null);
+  const syncingRef = useRef(false);
+
+  useEffect(() => {
+    const board = boardRef.current;
+    const inner = boardInnerRef.current;
+    if (!board || !inner) return;
+    const measure = () => setBoardScrollW(board.scrollWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    ro.observe(board);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!panRef.current || !boardRef.current) return;
+      boardRef.current.scrollLeft = panRef.current.left - (e.pageX - panRef.current.x);
+    };
+    const onUp = () => {
+      panRef.current = null;
+      boardRef.current?.classList.remove('cursor-grabbing', 'select-none');
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
+
+  const onBoardMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    // Don't hijack card drags, buttons, links, or form controls.
+    if ((e.target as HTMLElement).closest('[draggable="true"], button, a, input, textarea, select, video, [role="button"]')) return;
+    const board = boardRef.current;
+    if (!board) return;
+    panRef.current = { x: e.pageX, left: board.scrollLeft };
+    board.classList.add('cursor-grabbing', 'select-none');
+  };
+  const syncFromTop = () => {
+    if (syncingRef.current || !boardRef.current || !topScrollRef.current) return;
+    syncingRef.current = true;
+    boardRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    requestAnimationFrame(() => { syncingRef.current = false; });
+  };
+  const syncFromBoard = () => {
+    if (syncingRef.current || !boardRef.current || !topScrollRef.current) return;
+    syncingRef.current = true;
+    topScrollRef.current.scrollLeft = boardRef.current.scrollLeft;
+    requestAnimationFrame(() => { syncingRef.current = false; });
+  };
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const hasActiveFilters =
     normalizedQuery !== '' ||
@@ -1182,8 +1239,24 @@ OntarioReno Broker Portal`;
         })()}
       </section>
 
-      <section className="w-full overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]">
-        <div className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
+      {/* Top horizontal scrollbar — mirrors the board so you don't have to scroll
+          to the bottom to reach the right-hand columns. */}
+      <div
+        ref={topScrollRef}
+        onScroll={syncFromTop}
+        className="hidden w-full overflow-x-auto overscroll-x-contain md:block"
+        aria-hidden="true"
+      >
+        <div style={{ width: boardScrollW, height: 1 }} />
+      </div>
+
+      <section
+        ref={boardRef}
+        onScroll={syncFromBoard}
+        onMouseDown={onBoardMouseDown}
+        className="w-full cursor-grab overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]"
+      >
+        <div ref={boardInnerRef} className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
           {columnsToRender.map((column) => {
             const isWonColumn = column.status === 'won';
             const allColumnDeals = filteredDeals.filter(
