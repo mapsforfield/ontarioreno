@@ -1,26 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 
 type Picked = { address: string; city: string; postalCode: string };
+type Suggestion = { placeId: string; description: string };
 
-type NominatimItem = {
-  display_name: string;
-  address?: {
-    house_number?: string;
-    road?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    hamlet?: string;
-    postcode?: string;
-  };
-};
+function newToken(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+}
 
 /**
- * Address field with Canada-wide autocomplete (OpenStreetMap/Nominatim, free).
- * Debounced; on select it fills address + (optionally) city + postal code via
- * onSelect. The parent owns the text value, so it degrades to a plain input if
- * suggestions don't load.
+ * Address field with Google Places autocomplete (accurate addresses, postal
+ * codes and cities). The API key stays server-side — this only talks to our
+ * own /api proxy. Degrades to a plain input if suggestions don't load.
  */
 export default function AddressAutocomplete({
   value,
@@ -35,39 +25,52 @@ export default function AddressAutocomplete({
   placeholder?: string;
   fillCityPostal?: boolean;
 }) {
-  const [results, setResults] = useState<NominatimItem[]>([]);
+  const [results, setResults] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const skipNext = useRef(false);
+  // One session token per "type + pick" cycle keeps it billed as a single,
+  // cheaper autocomplete session.
+  const tokenRef = useRef<string>(newToken());
 
   useEffect(() => {
     if (skipNext.current) { skipNext.current = false; return; }
     const q = value.trim();
-    if (q.length < 4) { setResults([]); return; }
+    if (q.length < 3) { setResults([]); return; }
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=ca&limit=5&q=${encodeURIComponent(q)}`;
-        const res = await fetch(url, { headers: { Accept: 'application/json' } });
-        const json = await res.json();
-        setResults(Array.isArray(json) ? json : []);
+        const res = await fetch(
+          `/api/appointments?_resource=places_autocomplete&input=${encodeURIComponent(q)}&token=${tokenRef.current}`,
+          { credentials: 'include' },
+        );
+        const json = (await res.json()) as { suggestions?: Suggestion[] };
+        setResults(json.suggestions ?? []);
       } catch {
         setResults([]);
       }
-    }, 450);
+    }, 250);
     return () => window.clearTimeout(timer.current);
   }, [value]);
 
-  const choose = (item: NominatimItem) => {
-    const a = item.address ?? {};
-    const street = [a.house_number, a.road].filter(Boolean).join(' ');
-    const city = a.city || a.town || a.village || a.municipality || a.hamlet || '';
-    const postalCode = a.postcode || '';
+  const choose = async (item: Suggestion) => {
     skipNext.current = true;
-    const address = street || item.display_name.split(',')[0];
-    onSelect({ address, city: fillCityPostal ? city : '', postalCode: fillCityPostal ? postalCode : '' });
+    onChange(item.description); // immediate feedback
     setResults([]);
     setOpen(false);
+    try {
+      const res = await fetch(
+        `/api/appointments?_resource=places_details&placeId=${encodeURIComponent(item.placeId)}&token=${tokenRef.current}`,
+        { credentials: 'include' },
+      );
+      const p = (await res.json()) as Picked;
+      if (p && p.address) {
+        onSelect({ address: p.address, city: fillCityPostal ? p.city : '', postalCode: fillCityPostal ? p.postalCode : '' });
+      }
+    } catch {
+      /* keep the description text we already set */
+    }
+    tokenRef.current = newToken(); // next lookup is a fresh session
   };
 
   return (
@@ -82,14 +85,14 @@ export default function AddressAutocomplete({
       />
       {open && results.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-[0.5rem] border border-slate-200 bg-white shadow-lg">
-          {results.map((r, i) => (
+          {results.map((r) => (
             <button
-              key={`${r.display_name}-${i}`}
+              key={r.placeId}
               type="button"
               onMouseDown={() => choose(r)}
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-[#f6faff]"
             >
-              {r.display_name}
+              {r.description}
             </button>
           ))}
         </div>

@@ -584,6 +584,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ── Google Places: address autocomplete (key stays server-side) ──
+    if (req.query['_resource'] === 'places_autocomplete') {
+      const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+      const input = String(req.query['input'] ?? '').trim();
+      const token = String(req.query['token'] ?? '');
+      if (!apiKey || input.length < 3) return res.status(200).json({ suggestions: [] });
+      try {
+        const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
+          body: JSON.stringify({ input, includedRegionCodes: ['ca'], ...(token ? { sessionToken: token } : {}) }),
+        });
+        const j = (await r.json()) as { suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }> };
+        const suggestions = (j.suggestions ?? [])
+          .map((s) => ({ placeId: s.placePrediction?.placeId ?? '', description: s.placePrediction?.text?.text ?? '' }))
+          .filter((s) => s.placeId && s.description);
+        return res.status(200).json({ suggestions });
+      } catch {
+        return res.status(200).json({ suggestions: [] });
+      }
+    }
+
+    // ── Google Places: resolve a picked place into address parts ──
+    if (req.query['_resource'] === 'places_details') {
+      const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+      const placeId = String(req.query['placeId'] ?? '');
+      const token = String(req.query['token'] ?? '');
+      if (!apiKey || !placeId) return res.status(400).json({ error: 'Missing placeId.' });
+      try {
+        const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}${token ? `?sessionToken=${encodeURIComponent(token)}` : ''}`;
+        const r = await fetch(url, {
+          headers: { 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'addressComponents,formattedAddress' },
+        });
+        const j = (await r.json()) as {
+          formattedAddress?: string;
+          addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+        };
+        const comps = j.addressComponents ?? [];
+        const get = (type: string) => comps.find((c) => (c.types ?? []).includes(type));
+        const streetNum = get('street_number')?.longText ?? '';
+        const route = get('route')?.longText ?? get('route')?.shortText ?? '';
+        const city = (get('locality') ?? get('postal_town') ?? get('sublocality') ?? get('administrative_area_level_2'))?.longText ?? '';
+        const postalCode = get('postal_code')?.longText ?? '';
+        const address = [streetNum, route].filter(Boolean).join(' ') || (j.formattedAddress?.split(',')[0] ?? '');
+        return res.status(200).json({ address, city, postalCode });
+      } catch {
+        return res.status(500).json({ error: 'Lookup failed.' });
+      }
+    }
+
     // ── Client videos (metadata + fresh signed view URLs) ──
     if (req.query['_resource'] === 'client_videos') {
       const clientId = String(req.query['clientId'] ?? '');
