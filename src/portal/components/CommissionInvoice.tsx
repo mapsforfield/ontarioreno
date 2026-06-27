@@ -33,7 +33,7 @@ function adjLabel(a: Adjustment): string {
   return `${desc}${job}${calc}`;
 }
 
-type InvoiceData = {
+export type InvoiceData = {
   invoiceNumber: string;
   fromLegalName: string;
   fromAddr1: string;
@@ -74,7 +74,7 @@ function signedMoney(v: number) {
   return `${v < 0 ? '-' : ''}CAD $${fmtNum(Math.abs(v))}`;
 }
 
-async function loadLetterhead(): Promise<string | null> {
+export async function loadLetterhead(): Promise<string | null> {
   try {
     const res = await fetch('/invoice-letterhead.png');
     if (!res.ok) return null;
@@ -90,7 +90,7 @@ async function loadLetterhead(): Promise<string | null> {
   }
 }
 
-function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
+export function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   if (letterhead) doc.addImage(letterhead, 'PNG', 0, 0, PAGE_W, PAGE_H);
 
@@ -437,6 +437,7 @@ export default function CommissionInvoice({
         adjustmentsTotal,
         netAmount: netTotal,
         sentTo,
+        snapshot: JSON.stringify(data),
       });
     } catch {
       recordedRef.current = false; // allow a later attempt

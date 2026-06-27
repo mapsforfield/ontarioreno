@@ -293,6 +293,8 @@ export type CommissionInvoiceRecord = {
   sentTo: string;
   sentByUserId: string | null;
   createdAt: string;
+  /** Full JSON snapshot of the invoice data, used to re-render the exact PDF. */
+  snapshot?: string | null;
 };
 
 export type ClientVideo = {

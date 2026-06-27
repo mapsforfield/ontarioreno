@@ -11,7 +11,8 @@ const CREATE_INVOICE_LEDGER =
   '"salesPrice" DOUBLE PRECISION NOT NULL DEFAULT 0, "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0, ' +
   '"baseAmount" DOUBLE PRECISION NOT NULL DEFAULT 0, "adjustmentsTotal" DOUBLE PRECISION NOT NULL DEFAULT 0, ' +
   '"netAmount" DOUBLE PRECISION NOT NULL DEFAULT 0, "sentTo" TEXT NOT NULL DEFAULT \'\', ' +
-  '"sentByUserId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
+  '"snapshot" TEXT, "sentByUserId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
+const ALTER_INVOICE_SNAPSHOT = 'ALTER TABLE "CommissionInvoiceRecord" ADD COLUMN IF NOT EXISTS "snapshot" TEXT';
 
 // Default "FROM" box for the commission invoice — editable & stored in Setting.
 const DEFAULT_BUSINESS_PROFILE = {
@@ -155,18 +156,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         adjustmentsTotal: Number(data.adjustmentsTotal) || 0,
         netAmount: Number(data.netAmount) || 0,
         sentTo: String(data.sentTo ?? '').slice(0, 200),
+        snapshot: data.snapshot ? String(data.snapshot).slice(0, 100000) : null,
         sentByUserId: user.id,
       };
       const insert = () =>
         prisma.$executeRawUnsafe(
-          'INSERT INTO "CommissionInvoiceRecord" (id, "invoiceNumber", "dealId", "contractorId", "customerName", "contractorName", "salesPrice", "commissionRate", "baseAmount", "adjustmentsTotal", "netAmount", "sentTo", "sentByUserId", "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, CURRENT_TIMESTAMP)',
+          'INSERT INTO "CommissionInvoiceRecord" (id, "invoiceNumber", "dealId", "contractorId", "customerName", "contractorName", "salesPrice", "commissionRate", "baseAmount", "adjustmentsTotal", "netAmount", "sentTo", "snapshot", "sentByUserId", "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, CURRENT_TIMESTAMP)',
           row.id, row.invoiceNumber, row.dealId, row.contractorId, row.customerName, row.contractorName,
-          row.salesPrice, row.commissionRate, row.baseAmount, row.adjustmentsTotal, row.netAmount, row.sentTo, row.sentByUserId,
+          row.salesPrice, row.commissionRate, row.baseAmount, row.adjustmentsTotal, row.netAmount, row.sentTo, row.snapshot, row.sentByUserId,
         );
       try {
         await insert();
       } catch {
         await prisma.$executeRawUnsafe(CREATE_INVOICE_LEDGER);
+        await prisma.$executeRawUnsafe(ALTER_INVOICE_SNAPSHOT);
         await insert();
       }
       return res.status(201).json({ ...row, createdAt: new Date().toISOString() });

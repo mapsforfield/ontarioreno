@@ -5,13 +5,16 @@ import {
   HandCoins,
   TrendingUp,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { usePortalAuth } from '../auth';
 import {
   formatCurrency,
   formatDealStatus,
 } from '../data/selectors';
 import { usePortalData } from '../data/store';
+import { showToast } from '../lib/toast';
+import type { InvoiceData } from '../components/CommissionInvoice';
+const InvoiceViewer = lazy(() => import('../components/InvoiceViewer'));
 import { CommissionInvoiceRecord, CommissionPayoutStatus, Deal, DealStatus } from '../data/types';
 
 const projectedStatuses = [
@@ -88,6 +91,19 @@ export default function PortalCommissions() {
   const [rateSaved, setRateSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
+  const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
+
+  const openInvoice = (inv: CommissionInvoiceRecord) => {
+    if (!inv.snapshot) {
+      showToast({ variant: 'default', message: 'No saved copy', description: 'This invoice predates re-view — open its deal to regenerate it.' });
+      return;
+    }
+    try {
+      setViewingInvoice(JSON.parse(inv.snapshot) as InvoiceData);
+    } catch {
+      showToast({ variant: 'error', message: 'Could not open this invoice.' });
+    }
+  };
 
   useEffect(() => {
     if (isAdmin) listInvoices().then(setInvoices).catch(() => {});
@@ -384,7 +400,7 @@ export default function PortalCommissions() {
           <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-3">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">Invoice History ({invoices.length})</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-500">Commission invoices you’ve sent, most recent first.</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-500">Commission invoices you’ve sent, most recent first. Click a row to re-open it.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -400,7 +416,11 @@ export default function PortalCommissions() {
                 </thead>
                 <tbody>
                   {invoices.map((inv) => (
-                    <tr key={inv.id} className="border-b border-slate-50">
+                    <tr
+                      key={inv.id}
+                      onClick={() => openInvoice(inv)}
+                      className="cursor-pointer border-b border-slate-50 transition hover:bg-[#f6faff]"
+                    >
                       <td className="px-4 py-2 font-black text-slate-900">#{inv.invoiceNumber ?? '—'}</td>
                       <td className="px-4 py-2 font-semibold text-slate-700">{inv.customerName || '—'}</td>
                       <td className="px-4 py-2 font-semibold text-slate-700">{inv.contractorName || '—'}</td>
@@ -420,6 +440,12 @@ export default function PortalCommissions() {
               </table>
             </div>
           </section>
+        )}
+
+        {viewingInvoice && (
+          <Suspense fallback={null}>
+            <InvoiceViewer data={viewingInvoice} onClose={() => setViewingInvoice(null)} />
+          </Suspense>
         )}
       </div>
     );
