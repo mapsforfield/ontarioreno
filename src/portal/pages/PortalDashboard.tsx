@@ -143,6 +143,47 @@ export default function PortalDashboard() {
   const getRepName = (repId: string) =>
     repId ? users.find((user) => user.id === repId)?.name ?? repId : 'Unassigned Rep';
 
+  // ── Unified "Today / needs attention" list (tasks, consults, follow-ups, stale deals) ──
+  const fmtTime12 = (t?: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    if (isNaN(h)) return t;
+    const p = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return m ? `${h12}:${String(m).padStart(2, '0')} ${p}` : `${h12} ${p}`;
+  };
+  type AgendaItem = { id: string; kind: 'task' | 'consult' | 'followup' | 'stale'; title: string; subtitle: string; href: string; state?: Record<string, unknown>; urgent: boolean; sort: string };
+  const agendaItems: AgendaItem[] = (() => {
+    const items: AgendaItem[] = [];
+    myOpenTasks.forEach((t) => {
+      const due = t.dueAt ? t.dueAt.slice(0, 10) : '';
+      if (due && due <= today) {
+        items.push({ id: `task-${t.id}`, kind: 'task', title: t.title, subtitle: due < today ? 'Task · overdue' : 'Task · due today', href: '/portal/tasks', urgent: due < today, sort: t.dueAt ?? '' });
+      }
+    });
+    todayAppointments.forEach((a) => {
+      items.push({ id: `consult-${a.id}`, kind: 'consult', title: a.customerName || a.title || 'Consultation', subtitle: [fmtTime12(a.appointmentTime), a.city || a.address].filter(Boolean).join(' · ') || 'Consultation today', href: '/portal/appointments', state: { openAppointmentId: a.id }, urgent: false, sort: a.appointmentTime ?? '00:00' });
+    });
+    visibleAppointments.forEach((a) => {
+      if (a.appointmentDate === today) return; // already shown above
+      if (a.followUpDate && a.followUpDate <= today && a.status !== 'cancelled' && !(a.status === 'completed' && a.outcomeSubmitted)) {
+        items.push({ id: `fu-${a.id}`, kind: 'followup', title: a.customerName || a.title || 'Follow-up', subtitle: a.followUpDate < today ? 'Follow-up · overdue' : 'Follow-up · today', href: '/portal/appointments', state: { openAppointmentId: a.id }, urgent: a.followUpDate < today, sort: a.followUpDate });
+      }
+    });
+    visibleDeals
+      .filter((d) => !d.isHistorical && !['won', 'lost'].includes(d.status) && getDaysSince(d.updatedAt) > 14)
+      .sort((x, y) => getDaysSince(y.updatedAt) - getDaysSince(x.updatedAt))
+      .slice(0, 3)
+      .forEach((d) => items.push({ id: `stale-${d.id}`, kind: 'stale', title: d.homeownerName || 'Deal', subtitle: `${getDaysSince(d.updatedAt)}d untouched · ${d.status.replace(/_/g, ' ')}`, href: '/portal/deals', state: { openDealId: d.id }, urgent: false, sort: 'zzz' }));
+    return items.sort((a, b) => (a.urgent === b.urgent ? a.sort.localeCompare(b.sort) : a.urgent ? -1 : 1)).slice(0, 8);
+  })();
+  const agendaDot: Record<AgendaItem['kind'], string> = {
+    task: 'bg-amber-400',
+    consult: 'bg-[#1B3C6C]',
+    followup: 'bg-sky-400',
+    stale: 'bg-orange-400',
+  };
+
   const summaryCards = [
     {
       label: 'Active Contractors',
@@ -210,6 +251,38 @@ export default function PortalDashboard() {
             Schedule Consultation
           </Link>
         </div>
+      </section>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#32639b]">Today · Needs attention</p>
+          {agendaItems.length > 0 && (
+            <span className="rounded-full bg-[#e8f1fb] px-2.5 py-0.5 text-xs font-black text-[#1B3C6C]">{agendaItems.length}</span>
+          )}
+        </div>
+        {agendaItems.length === 0 ? (
+          <p className="mt-3 text-sm font-semibold text-slate-400">You’re all caught up — nothing due today. 🎉</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {agendaItems.map((it) => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => navigate(it.href, it.state ? { state: it.state } : undefined)}
+                className="flex w-full items-center gap-3 rounded-[0.5rem] border border-slate-100 bg-[#fbfdff] px-3 py-2.5 text-left transition hover:bg-[#f6faff]"
+              >
+                <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${agendaDot[it.kind]}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-black text-slate-900">{it.title}</span>
+                  <span className="block truncate text-xs font-semibold text-slate-400">{it.subtitle}</span>
+                </span>
+                {it.urgent && (
+                  <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[0.6rem] font-black text-red-600">URGENT</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
