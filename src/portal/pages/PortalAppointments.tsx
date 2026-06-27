@@ -39,6 +39,7 @@ import {
   AppointmentStatus,
   AppointmentType,
   Client,
+  Deal,
   ContractorDispatch,
   ContractorDispatchStatus,
   ConsultationStage,
@@ -600,6 +601,7 @@ export default function PortalAppointments() {
     logActivity,
     updateContractorDispatch,
     updateAppointment,
+    updateDeal,
     addDaysOff,
     removeDayOff,
     users,
@@ -1447,6 +1449,26 @@ export default function PortalAppointments() {
       },
       currentUser
     );
+
+    // Auto-sync the LINKED deal from this outcome so the rep doesn't re-enter
+    // the same figures. Conservative: value/financing always; deal status only
+    // for the terminal won/lost outcomes (never moves a deal backwards).
+    if (selectedAppointment.dealId) {
+      const dealUpdates: Partial<Deal> = {};
+      if (estimatedProjectValue > 0) dealUpdates.estimatedJobValue = estimatedProjectValue;
+      if (financingNeeded !== null) dealUpdates.financingRequired = financingNeeded;
+      if (form.nextStep === 'won') dealUpdates.status = 'won';
+      else if (form.nextStep === 'lost') dealUpdates.status = 'lost';
+      if (Object.keys(dealUpdates).length > 0) {
+        updateDeal(selectedAppointment.dealId, dealUpdates, currentUser);
+        showToast({
+          variant: 'success',
+          message: 'Linked deal updated',
+          description: 'Value, financing and outcome synced from this consultation.',
+        });
+      }
+    }
+
     setForm((current) => ({
       ...current,
       consultationStage:
