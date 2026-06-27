@@ -286,7 +286,7 @@ export default function CommissionInvoice({
   contractor: Contractor | undefined;
   onClose: () => void;
 }) {
-  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber, recordInvoice, deals } = usePortalData();
+  const { getInvoiceConfig, saveBusinessProfile, getNextInvoiceNumber, recordInvoice, deals } = usePortalData();
 
   // This contractor's other jobs — offered as quick-pick when crediting against
   // a previous deal.
@@ -306,7 +306,7 @@ export default function CommissionInvoice({
 
   const rate = Math.round((contractor?.commissionRate ?? 0.085) * 10000) / 100;
   const [data, setData] = useState<InvoiceData>({
-    invoiceNumber: deal.invoiceNumber ? String(deal.invoiceNumber) : '…',
+    invoiceNumber: '…',
     fromLegalName: '9664327 CANADA INC.',
     fromAddr1: '172 Silver Maple Rd',
     fromAddr2: 'Richmond Hill, Ontario L4E 4Y8',
@@ -371,13 +371,13 @@ export default function CommissionInvoice({
       const [lh, config, num] = await Promise.all([
         loadLetterhead(),
         getInvoiceConfig(),
-        deal.invoiceNumber ? Promise.resolve(deal.invoiceNumber) : assignInvoiceNumber(deal.id),
+        getNextInvoiceNumber(),
       ]);
       if (cancelled) return;
       setLetterhead(lh);
       setData((cur) => ({
         ...cur,
-        invoiceNumber: String(num ?? deal.invoiceNumber ?? ''),
+        invoiceNumber: String(num ?? ''),
         ...(config?.businessProfile
           ? {
               fromLegalName: config.businessProfile.legalName,

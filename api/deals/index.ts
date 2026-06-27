@@ -51,6 +51,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ businessProfile });
     }
 
+    // ── Next commission invoice number (admin) — advances per issuance ──
+    if (req.query['_resource'] === 'next_invoice_number') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      let ledgerMax = 0;
+      try {
+        const r = (await prisma.$queryRawUnsafe(
+          'SELECT MAX("invoiceNumber")::int AS max FROM "CommissionInvoiceRecord"',
+        )) as Array<{ max: number | null }>;
+        ledgerMax = r?.[0]?.max ?? 0;
+      } catch { /* ledger table may not exist yet */ }
+      const dealAgg = await prisma.deal.aggregate({ _max: { invoiceNumber: true } }).catch(() => ({ _max: { invoiceNumber: null } }));
+      const dealMax = dealAgg._max.invoiceNumber ?? 0;
+      return res.status(200).json({ next: Math.max(ledgerMax, dealMax, 4043) + 1 });
+    }
+
     // ── Commission invoice ledger (admin only) ──
     if (req.query['_resource'] === 'invoices') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
@@ -173,6 +188,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await insert();
       }
       return res.status(201).json({ ...row, createdAt: new Date().toISOString() });
+    }
+
+    // ── Delete a ledger entry (admin) ──
+    if (data._action === 'delete_invoice') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const id = String(data.id ?? '');
+      if (!id) return res.status(400).json({ error: 'Missing id.' });
+      try {
+        await prisma.$executeRawUnsafe('DELETE FROM "CommissionInvoiceRecord" WHERE id = $1', id);
+      } catch { /* nothing to delete */ }
+      return res.status(200).json({ ok: true });
     }
 
     // ── Save the commission-invoice business profile (admin only) ──

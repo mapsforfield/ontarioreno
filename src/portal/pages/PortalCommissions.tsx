@@ -3,6 +3,7 @@ import {
   Banknote,
   CircleDollarSign,
   HandCoins,
+  Trash2,
   TrendingUp,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -83,6 +84,7 @@ export default function PortalCommissions() {
     defaultCommissionRate,
     getDealsForRep,
     listInvoices,
+    deleteInvoice,
     setDefaultCommissionRate,
     updateCommission,
     users,
@@ -92,6 +94,12 @@ export default function PortalCommissions() {
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
+
+  const handleDeleteInvoice = async (inv: CommissionInvoiceRecord) => {
+    if (!window.confirm(`Remove invoice #${inv.invoiceNumber ?? ''} (${inv.customerName}) from the history?`)) return;
+    setInvoices((cur) => cur.filter((i) => i.id !== inv.id));
+    await deleteInvoice(inv.id);
+  };
 
   const openInvoice = (inv: CommissionInvoiceRecord) => {
     if (!inv.snapshot) {
@@ -412,6 +420,7 @@ export default function PortalCommissions() {
                     <th className="px-4 py-2 text-right">Net</th>
                     <th className="hidden px-4 py-2 sm:table-cell">Sent to</th>
                     <th className="px-4 py-2">Date</th>
+                    <th className="px-4 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -433,6 +442,17 @@ export default function PortalCommissions() {
                       <td className="hidden px-4 py-2 font-semibold text-slate-500 sm:table-cell">{inv.sentTo || '—'}</td>
                       <td className="px-4 py-2 font-semibold text-slate-500">
                         {new Date(inv.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(inv); }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                          aria-label="Delete invoice record"
+                          title="Remove from history"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}

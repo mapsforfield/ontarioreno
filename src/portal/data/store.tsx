@@ -129,6 +129,8 @@ type PortalDataContextValue = PortalDataState & {
   saveBusinessProfile: (profile: BusinessProfile) => Promise<void>;
   recordInvoice: (payload: Partial<CommissionInvoiceRecord>) => Promise<void>;
   listInvoices: () => Promise<CommissionInvoiceRecord[]>;
+  deleteInvoice: (id: string) => Promise<void>;
+  getNextInvoiceNumber: () => Promise<number | null>;
   assignInvoiceNumber: (dealId: string) => Promise<number | null>;
   addTask: (title: string, dueAt?: string | null) => Promise<void>;
   updateTask: (id: string, updates: { title?: string; dueAt?: string | null; done?: boolean }) => Promise<void>;
@@ -1580,6 +1582,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       listInvoices: async () => {
         const rows = await apiCall<CommissionInvoiceRecord[]>('/api/deals?_resource=invoices');
         return rows ?? [];
+      },
+
+      deleteInvoice: async (id) => {
+        await apiCall('/api/deals', { method: 'POST', body: JSON.stringify({ _action: 'delete_invoice', id }) });
+      },
+
+      getNextInvoiceNumber: async () => {
+        const r = await apiCall<{ next: number }>('/api/deals?_resource=next_invoice_number');
+        return r?.next ?? null;
       },
 
       assignInvoiceNumber: async (dealId) => {
