@@ -406,17 +406,11 @@ export default function PortalLayout() {
 
       <main
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-        className="min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:px-8 lg:pb-10 lg:pt-8"
+        className="min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:px-8 lg:pb-10 lg:pt-8 xl:px-10 2xl:px-12"
       >
-        {/* One consistent content frame for every page so navigation never jumps.
-            The deals board is the one exception — it's a kanban that genuinely
-            needs the full width, so it breaks out to edge-to-edge. */}
-        <div
-          className={cn(
-            'mx-auto w-full',
-            location.pathname.startsWith('/portal/deals') ? 'max-w-none' : 'max-w-[1400px]'
-          )}
-        >
+        {/* Full-width content with comfortable gutters — consistent across every
+            page so navigation never jumps. */}
+        <div className="w-full">
           <div className="mb-6 hidden items-center justify-between lg:flex">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
