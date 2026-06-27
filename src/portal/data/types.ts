@@ -276,6 +276,23 @@ export type BusinessProfile = {
   accountNumber: string;
 };
 
+export type CommissionInvoiceRecord = {
+  id: string;
+  invoiceNumber: number | null;
+  dealId: string | null;
+  contractorId: string | null;
+  customerName: string;
+  contractorName: string;
+  salesPrice: number;
+  commissionRate: number;
+  baseAmount: number;
+  adjustmentsTotal: number;
+  netAmount: number;
+  sentTo: string;
+  sentByUserId: string | null;
+  createdAt: string;
+};
+
 export type ClientVideo = {
   id: string;
   clientId: string;

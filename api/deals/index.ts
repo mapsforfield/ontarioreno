@@ -1,6 +1,17 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { randomUUID } from 'node:crypto';
+
+// Self-healing ledger of commission invoices that were generated / sent.
+const CREATE_INVOICE_LEDGER =
+  'CREATE TABLE IF NOT EXISTS "CommissionInvoiceRecord" (' +
+  '"id" TEXT PRIMARY KEY, "invoiceNumber" INTEGER, "dealId" TEXT, "contractorId" TEXT, ' +
+  '"customerName" TEXT NOT NULL DEFAULT \'\', "contractorName" TEXT NOT NULL DEFAULT \'\', ' +
+  '"salesPrice" DOUBLE PRECISION NOT NULL DEFAULT 0, "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0, ' +
+  '"baseAmount" DOUBLE PRECISION NOT NULL DEFAULT 0, "adjustmentsTotal" DOUBLE PRECISION NOT NULL DEFAULT 0, ' +
+  '"netAmount" DOUBLE PRECISION NOT NULL DEFAULT 0, "sentTo" TEXT NOT NULL DEFAULT \'\', ' +
+  '"sentByUserId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
 
 // Default "FROM" box for the commission invoice — editable & stored in Setting.
 const DEFAULT_BUSINESS_PROFILE = {
@@ -37,6 +48,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       const businessProfile = await readBusinessProfile();
       return res.status(200).json({ businessProfile });
+    }
+
+    // ── Commission invoice ledger (admin only) ──
+    if (req.query['_resource'] === 'invoices') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      try {
+        const rows = await prisma.$queryRawUnsafe(
+          'SELECT * FROM "CommissionInvoiceRecord" ORDER BY "createdAt" DESC LIMIT 500',
+        );
+        return res.status(200).json(rows);
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_INVOICE_LEDGER);
+        return res.status(200).json([]);
+      }
     }
 
     // ── Sales Agreements ──
@@ -113,6 +138,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const data = req.body;
+
+    // ── Record a generated/sent commission invoice in the ledger (admin) ──
+    if (data._action === 'record_invoice') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const row = {
+        id: randomUUID(),
+        invoiceNumber: Number.isFinite(Number(data.invoiceNumber)) ? Math.round(Number(data.invoiceNumber)) : null,
+        dealId: data.dealId ? String(data.dealId) : null,
+        contractorId: data.contractorId ? String(data.contractorId) : null,
+        customerName: String(data.customerName ?? '').slice(0, 200),
+        contractorName: String(data.contractorName ?? '').slice(0, 200),
+        salesPrice: Number(data.salesPrice) || 0,
+        commissionRate: Number(data.commissionRate) || 0,
+        baseAmount: Number(data.baseAmount) || 0,
+        adjustmentsTotal: Number(data.adjustmentsTotal) || 0,
+        netAmount: Number(data.netAmount) || 0,
+        sentTo: String(data.sentTo ?? '').slice(0, 200),
+        sentByUserId: user.id,
+      };
+      const insert = () =>
+        prisma.$executeRawUnsafe(
+          'INSERT INTO "CommissionInvoiceRecord" (id, "invoiceNumber", "dealId", "contractorId", "customerName", "contractorName", "salesPrice", "commissionRate", "baseAmount", "adjustmentsTotal", "netAmount", "sentTo", "sentByUserId", "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, CURRENT_TIMESTAMP)',
+          row.id, row.invoiceNumber, row.dealId, row.contractorId, row.customerName, row.contractorName,
+          row.salesPrice, row.commissionRate, row.baseAmount, row.adjustmentsTotal, row.netAmount, row.sentTo, row.sentByUserId,
+        );
+      try {
+        await insert();
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_INVOICE_LEDGER);
+        await insert();
+      }
+      return res.status(201).json({ ...row, createdAt: new Date().toISOString() });
+    }
 
     // ── Save the commission-invoice business profile (admin only) ──
     if (data._action === 'save_business_profile') {

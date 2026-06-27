@@ -25,6 +25,7 @@ import {
   Appointment,
   BusinessProfile,
   ClientVideo,
+  CommissionInvoiceRecord,
   ConsultationStage,
   Household,
   ProposalHistory,
@@ -126,6 +127,8 @@ type PortalDataContextValue = PortalDataState & {
   fetchTrashedDeals: () => Promise<Deal[]>;
   getInvoiceConfig: () => Promise<{ businessProfile: BusinessProfile } | null>;
   saveBusinessProfile: (profile: BusinessProfile) => Promise<void>;
+  recordInvoice: (payload: Partial<CommissionInvoiceRecord>) => Promise<void>;
+  listInvoices: () => Promise<CommissionInvoiceRecord[]>;
   assignInvoiceNumber: (dealId: string) => Promise<number | null>;
   addTask: (title: string, dueAt?: string | null) => Promise<void>;
   updateTask: (id: string, updates: { title?: string; dueAt?: string | null; done?: boolean }) => Promise<void>;
@@ -1565,6 +1568,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           body: JSON.stringify({ _action: 'save_business_profile', ...profile }),
         });
+      },
+
+      recordInvoice: async (payload) => {
+        await apiCall('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'record_invoice', ...payload }),
+        });
+      },
+
+      listInvoices: async () => {
+        const rows = await apiCall<CommissionInvoiceRecord[]>('/api/deals?_resource=invoices');
+        return rows ?? [];
       },
 
       assignInvoiceNumber: async (dealId) => {

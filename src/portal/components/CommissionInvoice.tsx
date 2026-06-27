@@ -286,7 +286,7 @@ export default function CommissionInvoice({
   contractor: Contractor | undefined;
   onClose: () => void;
 }) {
-  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber, deals } = usePortalData();
+  const { getInvoiceConfig, saveBusinessProfile, assignInvoiceNumber, recordInvoice, deals } = usePortalData();
 
   // This contractor's other jobs — offered as quick-pick when crediting against
   // a previous deal.
@@ -489,6 +489,22 @@ export default function CommissionInvoice({
         }),
       });
       if (!res.ok) throw new Error('send failed');
+      // Record it in the ledger (best-effort — never block the send).
+      try {
+        await recordInvoice({
+          invoiceNumber: Number(data.invoiceNumber) || null,
+          dealId: deal.id,
+          contractorId: contractor?.id ?? null,
+          customerName: data.customerName,
+          contractorName: data.toCompany,
+          salesPrice: data.salesPrice,
+          commissionRate: data.commissionRate,
+          baseAmount: data.amount,
+          adjustmentsTotal,
+          netAmount: netTotal,
+          sentTo: to,
+        });
+      } catch { /* ledger is best-effort */ }
       showToast({ variant: 'success', message: 'Invoice sent', description: `${data.toCompany} · ${money(netTotal)}` });
       onClose();
     } catch {
