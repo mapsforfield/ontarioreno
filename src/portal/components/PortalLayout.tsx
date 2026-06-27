@@ -153,19 +153,6 @@ export default function PortalLayout() {
   const isMoreRouteActive = mobileMoreItems.some((item) =>
     location.pathname.startsWith(item.href)
   );
-  const wideWorkspaceRoutes = [
-    '/portal/admin',
-    '/portal/appointments',
-    '/portal/commissions',
-    '/portal/contractors',
-    '/portal/deals',
-    '/portal/financing',
-    '/portal/performance',
-    '/portal/sales-tracker',
-  ];
-  const isWideWorkspace = wideWorkspaceRoutes.some((route) =>
-    location.pathname.startsWith(route)
-  );
 
   const handleLogout = () => {
     logout();
@@ -419,17 +406,11 @@ export default function PortalLayout() {
 
       <main
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-        className={cn(
-          'min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:pb-10 lg:pt-8',
-          isWideWorkspace ? 'lg:px-6 xl:px-8 2xl:px-10' : 'lg:px-8'
-        )}
+        className="min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:px-8 lg:pb-10 lg:pt-8"
       >
-        <div
-          className={cn(
-            'mx-auto w-full',
-            isWideWorkspace ? 'max-w-none' : 'max-w-6xl'
-          )}
-        >
+        {/* One consistent content frame for every page so navigation never jumps.
+            Wide layouts (the deals board) scroll horizontally inside this frame. */}
+        <div className="mx-auto w-full max-w-[1400px]">
           <div className="mb-6 hidden items-center justify-between lg:flex">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
