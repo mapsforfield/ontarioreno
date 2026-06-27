@@ -85,17 +85,14 @@ import { PortalDataProvider } from './portal/data/store';
 import PortalLayout from './portal/components/PortalLayout';
 import PortalAdmin from './portal/pages/PortalAdmin';
 import PortalAppointments from './portal/pages/PortalAppointments';
-import PortalCommissions from './portal/pages/PortalCommissions';
+import PortalAnalytics from './portal/pages/PortalAnalytics';
 import PortalContractors from './portal/pages/PortalContractors';
 import PortalDashboard from './portal/pages/PortalDashboard';
 import PortalDeals from './portal/pages/PortalDeals';
 import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalClients from './portal/pages/PortalClients';
-import PortalSalesTracker from './portal/pages/PortalSalesTracker';
 import PortalTasks from './portal/pages/PortalTasks';
-import PortalLeaderboard from './portal/pages/PortalLeaderboard';
 import PortalLogin from './portal/pages/PortalLogin';
-import PortalPerformance from './portal/pages/PortalPerformance';
 import ConsultationReschedule from './portal/pages/ConsultationReschedule';
 import ConsultationCancel from './portal/pages/ConsultationCancel';
 
@@ -126,11 +123,13 @@ export default function App() {
               <Route path="appointments" element={<PortalAppointments />} />
               <Route path="clients" element={<PortalClients />} />
               <Route path="tasks" element={<PortalTasks />} />
-              <Route path="sales-tracker" element={<PortalSalesTracker />} />
               <Route path="financing" element={<PortalFinancing />} />
-              <Route path="performance" element={<PortalPerformance />} />
-              <Route path="leaderboard" element={<PortalLeaderboard />} />
-              <Route path="commissions" element={<PortalCommissions />} />
+              {/* Analytics hub — all four render the tabbed PortalAnalytics so
+                  existing deep links keep working. */}
+              <Route path="sales-tracker" element={<PortalAnalytics />} />
+              <Route path="performance" element={<PortalAnalytics />} />
+              <Route path="leaderboard" element={<PortalAnalytics />} />
+              <Route path="commissions" element={<PortalAnalytics />} />
               <Route element={<PortalGuard adminOnly />}>
                 <Route path="admin" element={<PortalAdmin />} />
               </Route>

@@ -46,11 +46,8 @@ const navItems = [
   },
   { label: 'Clients', href: '/portal/clients', icon: UserRound },
   { label: 'Tasks', href: '/portal/tasks', icon: ListTodo },
-  { label: 'My Sales', href: '/portal/sales-tracker', icon: TableProperties },
   { label: 'Financing', href: '/portal/financing', icon: CreditCard },
   { label: 'Performance', href: '/portal/performance', icon: LineChart },
-  { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy },
-  { label: 'Commissions', href: '/portal/commissions', icon: HandCoins },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
 ];
 
