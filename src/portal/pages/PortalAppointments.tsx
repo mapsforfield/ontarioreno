@@ -21,6 +21,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 
 import TrashPanel from '../components/TrashPanel';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import { showToast } from '../lib/toast';
 
 const AppointmentsMap = lazy(() => import('../components/AppointmentsMap'));
@@ -3754,7 +3755,13 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address / Location
-                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="e.g. 123 Main St, showroom address, client's home…" />
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(v) => updateForm('address', v)}
+                    onSelect={({ address }) => updateForm('address', address)}
+                    fillCityPostal={false}
+                    placeholder="e.g. 123 Main St, showroom address, client's home…"
+                  />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Client Phone
@@ -3902,7 +3909,15 @@ export default function PortalAppointments() {
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address
-                  <input value={form.address} onChange={(event) => updateForm('address', event.target.value)} />
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(v) => updateForm('address', v)}
+                    onSelect={({ address, city, postalCode }) => {
+                      updateForm('address', address);
+                      if (city) updateForm('city', city);
+                      if (postalCode) updateForm('postalCode', postalCode);
+                    }}
+                  />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Project Type

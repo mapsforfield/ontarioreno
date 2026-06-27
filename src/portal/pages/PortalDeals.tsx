@@ -24,6 +24,8 @@ import {
   DealStatus,
 } from '../data/types';
 
+import AddressAutocomplete from '../components/AddressAutocomplete';
+
 const CommissionInvoice = lazy(() => import('../components/CommissionInvoice'));
 
 const columns: Array<{ label: string; status: DealStatus }> = [
@@ -1690,9 +1692,14 @@ OntarioReno Broker Portal`;
                 </label>
                 <label className="col-span-full grid gap-1.5 text-sm font-bold text-slate-700">
                   Address
-                  <input
+                  <AddressAutocomplete
                     value={form.address}
-                    onChange={(event) => updateForm('address', event.target.value)}
+                    onChange={(v) => updateForm('address', v)}
+                    onSelect={({ address, city, postalCode }) => {
+                      updateForm('address', address);
+                      if (city) updateForm('city', city);
+                      if (postalCode) updateForm('postalCode', postalCode);
+                    }}
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">

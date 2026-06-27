@@ -19,6 +19,7 @@ import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
 import ClientVideos from '../components/ClientVideos';
 import ClientAgreements from '../components/ClientAgreements';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import { showToast } from '../lib/toast';
 import type { Client, Household } from '../data/types';
 
@@ -709,7 +710,16 @@ export default function PortalClients() {
                   </label>
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     Address
-                    <input value={form.address} onChange={(e) => updateForm('address', e.target.value)} placeholder="123 Main St" />
+                    <AddressAutocomplete
+                      value={form.address}
+                      onChange={(v) => updateForm('address', v)}
+                      onSelect={({ address, city, postalCode }) => {
+                        updateForm('address', address);
+                        if (city) updateForm('city', city);
+                        if (postalCode) updateForm('postalCode', postalCode);
+                      }}
+                      placeholder="123 Main St"
+                    />
                   </label>
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     City
