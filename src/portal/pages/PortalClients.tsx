@@ -162,6 +162,19 @@ export default function PortalClients() {
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
   const clientAppointments = selectedClientId ? getAppointmentsForClient(selectedClientId) : [];
 
+  // Possible duplicate while adding a client: same (non-trivial) phone or exact name.
+  const normalizePhone = (p: string) => p.replace(/\D/g, '');
+  const duplicateClient = isCreating
+    ? clients.find((c) => {
+        const phone = normalizePhone(form.phone);
+        const name = form.name.trim().toLowerCase();
+        return (
+          (phone.length >= 7 && normalizePhone(c.phone ?? '') === phone) ||
+          (name.length >= 2 && c.name.trim().toLowerCase() === name)
+        );
+      })
+    : undefined;
+
   const selectedHousehold: Household | null =
     selectedHouseholdId ? (households.find((h) => h.id === selectedHouseholdId) ?? null) : null;
 
@@ -656,6 +669,21 @@ export default function PortalClients() {
                   {isCreating ? 'Client Details' : 'Edit Profile'}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
+                  {isCreating && duplicateClient && (
+                    <div className="sm:col-span-2 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="text-sm font-bold text-amber-800">Possible duplicate client</p>
+                      <p className="mt-0.5 text-sm font-semibold text-amber-700">
+                        {[duplicateClient.name, duplicateClient.phone, duplicateClient.city].filter(Boolean).join(' · ')} is already in your database.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(duplicateClient)}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-[0.5rem] bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700"
+                      >
+                        Open existing client
+                      </button>
+                    </div>
+                  )}
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                     Full Name *
                     <input value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="Jane Smith" />
