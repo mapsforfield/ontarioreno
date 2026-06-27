@@ -302,6 +302,30 @@ export default function PortalDeals() {
   const [dragOverColumn, setDragOverColumn] = useState<DealStatus | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; deal: Deal } | null>(null);
 
+  // ── Bulk "Select mode" (admin) — quarantined so normal click/drag is untouched ──
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) =>
+    setSelectedDealIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  const exitSelectMode = () => { setSelectMode(false); setSelectedDealIds(new Set()); };
+  const bulkReassign = (repId: string) => {
+    if (!repId) return;
+    const n = selectedDealIds.size;
+    selectedDealIds.forEach((id) => updateDeal(id, { assignedRepId: repId }, currentUser ?? undefined));
+    showToast({ variant: 'success', message: `Reassigned ${n} deal${n !== 1 ? 's' : ''}` });
+    exitSelectMode();
+  };
+  const bulkSetStatus = (status: DealStatus) => {
+    const n = selectedDealIds.size;
+    selectedDealIds.forEach((id) => updateDeal(id, { status, nextFollowUpDate: '' }, currentUser ?? undefined));
+    showToast({ variant: 'success', message: `Moved ${n} deal${n !== 1 ? 's' : ''} to ${status.replace(/_/g, ' ')}` });
+    exitSelectMode();
+  };
+
   // ── Horizontal scroll: synced top scrollbar + click-and-drag panning ──
   const boardRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
@@ -995,6 +1019,21 @@ OntarioReno Broker Portal`;
         </div>
         {currentUser && (
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 rounded-[0.5rem] border px-3.5 py-3 text-sm font-bold shadow-sm transition',
+                  selectMode
+                    ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white hover:bg-[#153158]'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                )}
+                title="Select multiple deals for bulk actions"
+              >
+                {selectMode ? 'Done' : 'Select'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setTrashOpen(true); loadTrash(); }}
@@ -1372,8 +1411,9 @@ OntarioReno Broker Portal`;
                           key={deal.id}
                           role="button"
                           tabIndex={0}
-                          draggable
+                          draggable={!selectMode}
                           onDragStart={(event) => {
+                            if (selectMode) { event.preventDefault(); return; }
                             event.dataTransfer.setData('text/deal-id', deal.id);
                             event.dataTransfer.effectAllowed = 'move';
                             setDraggingDealId(deal.id);
@@ -1383,6 +1423,7 @@ OntarioReno Broker Portal`;
                             setDragOverColumn(null);
                           }}
                           onContextMenu={(event) => {
+                            if (selectMode) return;
                             event.preventDefault();
                             event.stopPropagation();
                             setContextMenu({
@@ -1391,21 +1432,24 @@ OntarioReno Broker Portal`;
                               deal,
                             });
                           }}
-                          onClick={() => openDeal(deal)}
+                          onClick={() => (selectMode ? toggleSelect(deal.id) : openDeal(deal))}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
-                              openDeal(deal);
+                              if (selectMode) toggleSelect(deal.id); else openDeal(deal);
                             }
                           }}
                           className={cn(
-                            'w-full cursor-grab rounded-[0.5rem] border p-3 text-left transition hover:bg-white active:cursor-grabbing',
+                            'w-full rounded-[0.5rem] border p-3 text-left transition',
+                            selectMode ? 'cursor-pointer' : 'cursor-grab hover:bg-white active:cursor-grabbing',
                             draggingDealId === deal.id && 'opacity-40',
-                            rot?.level === 'danger'
-                              ? 'border-red-200 bg-red-50 hover:border-red-300'
-                              : rot?.level === 'warn'
-                                ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
-                                : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd]'
+                            selectMode && selectedDealIds.has(deal.id)
+                              ? 'border-[#1B3C6C] bg-[#e8f1fb] ring-2 ring-[#1B3C6C]'
+                              : rot?.level === 'danger'
+                                ? 'border-red-200 bg-red-50 hover:border-red-300'
+                                : rot?.level === 'warn'
+                                  ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
+                                  : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd]'
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -1546,6 +1590,46 @@ OntarioReno Broker Portal`;
           })}
         </div>
       </section>
+
+      {/* ── Bulk-action bar (Select mode) ── */}
+      {selectMode && (
+        <div className="fixed inset-x-0 bottom-0 z-[110] border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-10px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 sm:gap-3">
+            <span className="text-sm font-black text-slate-900">
+              {selectedDealIds.size} selected
+            </span>
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) bulkReassign(e.target.value); }}
+              disabled={selectedDealIds.size === 0}
+              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+            >
+              <option value="">Reassign rep…</option>
+              {users.filter((u) => u.role === 'rep').map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) bulkSetStatus(e.target.value as DealStatus); }}
+              disabled={selectedDealIds.size === 0}
+              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+            >
+              <option value="">Set status…</option>
+              {columns.map((c) => (
+                <option key={c.status} value={c.status}>{c.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={exitSelectMode}
+              className="ml-auto rounded-[0.5rem] border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Right-click context menu: quick status move ── */}
       {contextMenu && (
