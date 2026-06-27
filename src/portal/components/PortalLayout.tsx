@@ -13,6 +13,7 @@ import {
   ListTodo,
   LogOut,
   MoreHorizontal,
+  Search,
   ShieldCheck,
   TableProperties,
   Trophy,
@@ -30,6 +31,7 @@ import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
 import AdminActivityCenter from './AdminActivityCenter';
+import GlobalSearch from './GlobalSearch';
 import Toaster from './Toaster';
 
 const navItems = [
@@ -55,6 +57,24 @@ const navItems = [
 export default function PortalLayout() {
   const { currentUser, isAdmin, logout, updateCurrentUser } = usePortalAuth();
   const { changeUserPassword, updateUser, getVisibleAppointmentsForUser } = usePortalData();
+
+  // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      } else if (e.key === '/' && !typing) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Needs-attention count for badge on Consultations nav item
   const today = new Date().toISOString().slice(0, 10);
@@ -245,6 +265,14 @@ export default function PortalLayout() {
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-[#1B3C6C]"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <AdminActivityCenter variant="mobile" />
             <label className="relative flex h-10 w-10 cursor-pointer shrink-0 overflow-visible rounded-full">
               <span className="flex h-10 w-10 overflow-hidden rounded-full bg-[#f4c35a] text-[#071525]">
@@ -318,6 +346,15 @@ export default function PortalLayout() {
                 Sales command center
               </h1>
             </div>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="mt-4 flex w-full items-center gap-2 rounded-[0.5rem] border border-white/10 bg-white/[0.06] px-3.5 py-2.5 text-sm font-semibold text-blue-100/70 transition hover:bg-white/[0.1]"
+            >
+              <Search className="h-4 w-4" />
+              <span className="flex-1 text-left">Search…</span>
+              <span className="rounded border border-white/15 px-1.5 py-0.5 text-[0.6rem] font-bold text-blue-100/60">⌘K</span>
+            </button>
           </div>
 
           <nav className="mt-7 space-y-1.5">
@@ -621,6 +658,7 @@ export default function PortalLayout() {
         </div>
       )}
 
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <Toaster />
     </div>
   );

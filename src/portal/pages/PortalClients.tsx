@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
 import ClientVideos from '../components/ClientVideos';
@@ -126,6 +126,17 @@ export default function PortalClients() {
   useEffect(() => {
     fetchTrashedClients().then(setTrashedClients).catch(() => {});
   }, [fetchTrashedClients]);
+
+  // Open a client directly (e.g. from global search).
+  const location = useLocation();
+  useEffect(() => {
+    const id = (location.state as { openClientId?: string } | null)?.openClientId;
+    if (!id) return;
+    const client = clients.find((c) => c.id === id);
+    if (client) openEdit(client);
+    window.history.replaceState({}, '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, clients.length]);
   const openTrash = async () => {
     setTrashOpen(true);
     setTrashLoading(true);
