@@ -121,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Self-healing: the deletedAt column may not exist yet (schema can't be
       // pushed from local env). Add it, then retry. Idempotent.
       await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER'
+        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER, ADD COLUMN IF NOT EXISTS "clientId" TEXT'
       );
       deals = await prisma.deal.findMany({
         where: activeWhere,
@@ -281,25 +281,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const adminTotalEst = Math.round(jobValue * totalRate);
 
-    const deal = await prisma.deal.create({
-      data: {
-        homeownerName: data.homeownerName,
-        phone: data.phone ?? '',
-        email: data.email ?? '',
-        address: data.address ?? '',
-        city: data.city ?? '',
-        postalCode: data.postalCode ?? '',
-        projectType: data.projectType,
-        estimatedJobValue: jobValue,
-        financingRequired: data.financingRequired ?? false,
-        assignedRepId: data.assignedRepId ?? user.id,
-        assignedContractorId: data.assignedContractorId ?? null,
-        status: data.status ?? 'new_lead',
-        notes: data.notes ?? '',
-        nextFollowUpDate: data.nextFollowUpDate ?? '',
-      },
-      include: { activity: true, proposals: true, dispatches: true },
-    });
+    const dealData = {
+      clientId: data.clientId ?? null,
+      homeownerName: data.homeownerName,
+      phone: data.phone ?? '',
+      email: data.email ?? '',
+      address: data.address ?? '',
+      city: data.city ?? '',
+      postalCode: data.postalCode ?? '',
+      projectType: data.projectType,
+      estimatedJobValue: jobValue,
+      financingRequired: data.financingRequired ?? false,
+      assignedRepId: data.assignedRepId ?? user.id,
+      assignedContractorId: data.assignedContractorId ?? null,
+      status: data.status ?? 'new_lead',
+      notes: data.notes ?? '',
+      nextFollowUpDate: data.nextFollowUpDate ?? '',
+    };
+    let deal;
+    try {
+      deal = await prisma.deal.create({ data: dealData, include: { activity: true, proposals: true, dispatches: true } });
+    } catch {
+      // Self-healing: the clientId column may not exist yet on older databases.
+      await prisma.$executeRawUnsafe('ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "clientId" TEXT');
+      deal = await prisma.deal.create({ data: dealData, include: { activity: true, proposals: true, dispatches: true } });
+    }
 
     // Create the commission record atomically with the deal
     const commission = await prisma.commission.upsert({

@@ -82,6 +82,8 @@ model Contractor {
 
 model Deal {
   id                   String   @id @default(cuid())
+  /// Optional link to the originating Client record (source of truth for contact).
+  clientId             String?
   homeownerName        String
   phone                String
   email                String

@@ -2957,6 +2957,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           const dealPostalCode = appointment.postalCode?.trim() || linkedClient?.postalCode?.trim() || '';
           const deal: Deal = {
             activity: [],
+            clientId: appointment.clientId ?? linkedClient?.id ?? null,
             address: dealAddress,
             assignedContractorId:
               appointment.recommendedContractorId ?? appointment.contractorId,
@@ -3023,6 +3024,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
           method: 'POST',
           body: JSON.stringify({
+            clientId: tempDeal.clientId ?? null,
             homeownerName: tempDeal.homeownerName,
             phone: tempDeal.phone,
             email: tempDeal.email,

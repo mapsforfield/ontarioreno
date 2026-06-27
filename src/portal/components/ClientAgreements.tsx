@@ -14,6 +14,7 @@ export default function ClientAgreements({ clientId }: { clientId: string }) {
   // deal that shares the client's email/phone (covers "Convert to Deal").
   const dealIds = useMemo(() => {
     const ids = new Set<string>();
+    deals.forEach((d) => { if (d.clientId === clientId) ids.add(d.id); }); // exact link
     getAppointmentsForClient(clientId).forEach((a) => { if (a.dealId) ids.add(a.dealId); });
     const email = client?.email?.trim().toLowerCase();
     const phone = client?.phone?.trim();

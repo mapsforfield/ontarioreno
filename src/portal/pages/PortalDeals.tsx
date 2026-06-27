@@ -481,6 +481,9 @@ export default function PortalDeals() {
   const [clientSearch, setClientSearch] = useState('');
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   const handledNavState = useRef<string | null>(null);
+  // Tracks the client an in-progress "Convert to Deal" came from, so the new
+  // deal links back to that client record.
+  const prefillClientIdRef = useRef<string | null>(null);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
   const selectedDealAppointments = selectedDeal
     ? getAppointmentsForDeal(selectedDeal.id)
@@ -598,6 +601,7 @@ export default function PortalDeals() {
     const prefill = state?.prefillClient;
     if (prefill && handledNavState.current !== `prefill-${prefill.id}`) {
       handledNavState.current = `prefill-${prefill.id}`;
+      prefillClientIdRef.current = prefill.id;
       setSelectedDealId(null);
       setIsAddingDeal(true);
       setForm({
@@ -623,6 +627,7 @@ export default function PortalDeals() {
   }, [location.state]);
 
   const openAddDeal = () => {
+    prefillClientIdRef.current = null;
     setSelectedDealId(null);
     setIsAddingDeal(true);
     setForm(emptyDealForm);
@@ -673,6 +678,7 @@ export default function PortalDeals() {
     if (!currentUser || !form.homeownerName.trim()) return;
 
     const dealPayload = {
+      clientId: prefillClientIdRef.current ?? undefined,
       address: form.address.trim(),
       city: form.city.trim(),
       email: form.email.trim(),
@@ -1600,6 +1606,19 @@ OntarioReno Broker Portal`;
                     ? 'Add Deal'
                     : selectedDeal?.homeownerName ?? 'Deal'}
                 </h2>
+                {!isAddingDeal && selectedDeal?.clientId && (() => {
+                  const linkedClient = clients.find((c) => c.id === selectedDeal.clientId);
+                  if (!linkedClient) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/portal/clients', { state: { openClientId: linkedClient.id } })}
+                      className="mt-1.5 text-xs font-bold text-[#1B3C6C] hover:underline"
+                    >
+                      → View client profile
+                    </button>
+                  );
+                })()}
               </div>
               <button
                 type="button"

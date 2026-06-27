@@ -230,6 +230,8 @@ export type Activity = {
 
 export type Deal = {
   id: string;
+  /** Link to the originating client record (source of truth for contact info). */
+  clientId?: string | null;
   homeownerName: string;
   phone: string;
   email: string;
