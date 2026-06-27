@@ -418,8 +418,36 @@ export default function CommissionInvoice({
     [data.customerName]
   );
 
-  const handleDownload = () => {
+  // Record the invoice in the ledger once per open (whether sent or downloaded),
+  // so hitting Download repeatedly doesn't create duplicate entries.
+  const recordedRef = useRef(false);
+  const logInvoiceOnce = async (sentTo: string) => {
+    if (recordedRef.current) return;
+    recordedRef.current = true;
+    try {
+      await recordInvoice({
+        invoiceNumber: Number(data.invoiceNumber) || null,
+        dealId: deal.id,
+        contractorId: contractor?.id ?? null,
+        customerName: data.customerName,
+        contractorName: data.toCompany,
+        salesPrice: data.salesPrice,
+        commissionRate: data.commissionRate,
+        baseAmount: data.amount,
+        adjustmentsTotal,
+        netAmount: netTotal,
+        sentTo,
+      });
+    } catch {
+      recordedRef.current = false; // allow a later attempt
+    }
+  };
+
+  const handleDownload = async () => {
     buildPdf(letterhead, data).save(fileName);
+    await persistProfileIfNeeded();
+    await logInvoiceOnce('Downloaded');
+    showToast({ variant: 'success', message: 'Invoice downloaded', description: 'Logged to Invoice History.' });
   };
 
   const persistProfileIfNeeded = async () => {
@@ -489,22 +517,7 @@ export default function CommissionInvoice({
         }),
       });
       if (!res.ok) throw new Error('send failed');
-      // Record it in the ledger (best-effort — never block the send).
-      try {
-        await recordInvoice({
-          invoiceNumber: Number(data.invoiceNumber) || null,
-          dealId: deal.id,
-          contractorId: contractor?.id ?? null,
-          customerName: data.customerName,
-          contractorName: data.toCompany,
-          salesPrice: data.salesPrice,
-          commissionRate: data.commissionRate,
-          baseAmount: data.amount,
-          adjustmentsTotal,
-          netAmount: netTotal,
-          sentTo: to,
-        });
-      } catch { /* ledger is best-effort */ }
+      await logInvoiceOnce(to); // record in the ledger (best-effort)
       showToast({ variant: 'success', message: 'Invoice sent', description: `${data.toCompany} · ${money(netTotal)}` });
       onClose();
     } catch {
