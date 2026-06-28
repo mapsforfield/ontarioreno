@@ -69,6 +69,7 @@ const TERMINAL = ['booked', 'qualified', 'won', 'lost', 'dead', 'duplicate'];
 
 const normPhone = (v: unknown) => String(v ?? '').replace(/\D/g, '');
 const normEmail = (v: unknown) => String(v ?? '').trim().toLowerCase();
+const clean = (v: unknown) => String(v ?? '').trim();
 
 const leadInclude = { interactions: { orderBy: { occurredAt: 'desc' } as const } };
 
@@ -94,6 +95,117 @@ function statusForOutcome(outcome: string): string | null {
     default:
       return null;
   }
+}
+
+function sourceRank(source: unknown) {
+  const s = clean(source).toLowerCase();
+  if (['website_intake', 'website', 'intake', 'parsed'].includes(s)) return 3;
+  if (s === 'meta') return 2;
+  if (s === 'import') return 1;
+  return 0;
+}
+
+function isWebsiteSource(source: unknown) {
+  return sourceRank(source) >= 3;
+}
+
+function statusForImportStatus(value: unknown): { status: string; note: string } {
+  const s = clean(value).toLowerCase().replace(/[\s-]+/g, '_');
+  switch (s) {
+    case '':
+    case 'new':
+      return { status: 'new', note: '' };
+    case 'not_interested':
+    case 'notinterested':
+      return { status: 'lost', note: 'Import status: not_interested' };
+    case 'duplicate':
+      return { status: 'duplicate', note: 'Import status: duplicate' };
+    case 'booked':
+      return { status: 'booked', note: 'Import status: booked' };
+    case 'callback':
+    case 'callback_scheduled':
+      return { status: 'new', note: 'Import status: callback' };
+    default:
+      return { status: 'new', note: `Import status: ${clean(value)}` };
+  }
+}
+
+function parseFinancingInterest(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  const f = clean(value).toLowerCase();
+  if (['yes', 'true', 'y', '1', 'interested', 'needed'].includes(f)) return true;
+  if (['no', 'false', 'n', '0', 'not interested', 'none'].includes(f)) return false;
+  return null;
+}
+
+function formatExtraAnswers(extra: unknown) {
+  if (!extra || typeof extra !== 'object' || Array.isArray(extra)) return '';
+  const entries = Object.entries(extra as Record<string, unknown>)
+    .map(([key, value]) => [clean(key), clean(value)])
+    .filter(([key, value]) => key && value);
+  if (entries.length === 0) return '';
+  return ['Website intake answers', ...entries.map(([key, value]) => `${key}: ${value}`)].join('\n');
+}
+
+function mergeNotes(...parts: Array<string | null | undefined>) {
+  const out: string[] = [];
+  for (const part of parts) {
+    const text = clean(part);
+    if (text && !out.some((existing) => existing.includes(text) || text.includes(existing))) out.push(text);
+  }
+  return out.join('\n\n');
+}
+
+function importLeadData(row: Record<string, unknown>) {
+  const importSource = clean(row.importSource);
+  const explicitSource = clean(row.source);
+  const source = explicitSource || (importSource === 'website_intake' ? 'website_intake' : importSource === 'meta' ? 'meta' : 'import');
+  const statusInfo = statusForImportStatus(row.importStatus);
+  const extraNotes = formatExtraAnswers(row.extraAnswers);
+  const notes = mergeNotes(clean(row.notes), statusInfo.note, extraNotes);
+  return {
+    name: clean(row.name),
+    phone: clean(row.phone),
+    email: clean(row.email),
+    city: clean(row.city),
+    address: clean(row.address),
+    postalCode: clean(row.postalCode),
+    projectType: clean(row.projectType),
+    budget: clean(row.budget),
+    financingInterest: parseFinancingInterest(row.financingInterest),
+    source,
+    sourceDetail: clean(row.sourceDetail),
+    externalId: row.externalId ? clean(row.externalId) : null,
+    submittedAt: row.submittedAt ? new Date(String(row.submittedAt)) : new Date(),
+    status: statusInfo.status,
+    notes,
+  };
+}
+
+function hasValue(value: unknown) {
+  return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
+function mergeLeadPatch(existing: Record<string, unknown>, incoming: ReturnType<typeof importLeadData>) {
+  const incomingRicher = isWebsiteSource(incoming.source) || sourceRank(incoming.source) > sourceRank(existing.source);
+  const patch: Record<string, unknown> = {};
+  for (const field of ['name', 'phone', 'email', 'city', 'address', 'postalCode', 'projectType', 'budget', 'sourceDetail'] as const) {
+    if (hasValue(incoming[field]) && (!hasValue(existing[field]) || incomingRicher)) patch[field] = incoming[field];
+  }
+  if (incoming.financingInterest !== null && (existing.financingInterest == null || incomingRicher)) {
+    patch.financingInterest = incoming.financingInterest;
+  }
+  if (hasValue(incoming.source) && (!hasValue(existing.source) || incomingRicher)) patch.source = incoming.source;
+  if (incoming.externalId && !hasValue(existing.externalId)) patch.externalId = incoming.externalId;
+  if (incoming.notes) {
+    const nextNotes = mergeNotes(clean(existing.notes), incoming.notes);
+    if (nextNotes !== clean(existing.notes)) patch.notes = nextNotes;
+  }
+  const existingStatus = clean(existing.status);
+  if (!['booked', 'won'].includes(existingStatus) && incoming.status && incoming.status !== existingStatus) {
+    patch.status = incoming.status;
+  }
+  return { patch, incomingRicher };
 }
 
 // ─── ?intake=1 — token-gated, UNAUTHENTICATED ─────────────────────────────────
@@ -295,63 +407,58 @@ async function handleCollection(
       if (rows.length === 0) return res.status(400).json({ error: 'No rows provided.' });
 
       return await withTables(async () => {
-        const existing = await prisma.lead.findMany({
-          select: { phone: true, email: true, externalId: true },
-        });
-        const seenPhones = new Set(existing.map((l) => normPhone(l.phone)).filter(Boolean));
-        const seenEmails = new Set(existing.map((l) => normEmail(l.email)).filter(Boolean));
-        const seenExternal = new Set(existing.map((l) => l.externalId).filter(Boolean) as string[]);
-
-        const toCreate: Array<Record<string, unknown>> = [];
+        let created = 0;
+        let updated = 0;
+        let merged = 0;
         let duplicates = 0;
-        for (const row of rows) {
-          const name = String(row.name ?? '').trim();
-          if (!name) continue; // unnamed rows fall into "skipped"
-          const phone = normPhone(row.phone);
-          const email = normEmail(row.email);
-          const externalId = row.externalId ? String(row.externalId) : null;
-          const isDup =
-            (externalId && seenExternal.has(externalId)) ||
-            (phone && seenPhones.has(phone)) ||
-            (email && seenEmails.has(email));
-          if (isDup) { duplicates++; continue; }
-          if (phone) seenPhones.add(phone);
-          if (email) seenEmails.add(email);
-          if (externalId) seenExternal.add(externalId);
+        let skipped = 0;
+        const seenBatchKeys = new Set<string>();
 
-          let financingInterest: boolean | null = null;
-          if (typeof row.financingInterest === 'boolean') financingInterest = row.financingInterest;
-          else if (typeof row.financingInterest === 'string') {
-            const f = row.financingInterest.trim().toLowerCase();
-            if (['yes', 'true', 'y', '1'].includes(f)) financingInterest = true;
-            else if (['no', 'false', 'n', '0'].includes(f)) financingInterest = false;
+        for (const row of rows) {
+          const incoming = importLeadData(row);
+          if (!incoming.name && !incoming.phone && !incoming.email) { skipped++; continue; }
+
+          const phone = normPhone(incoming.phone);
+          const email = normEmail(incoming.email);
+          const batchKey = incoming.externalId || phone || email;
+          if (batchKey && seenBatchKeys.has(batchKey)) {
+            duplicates++;
+            continue;
+          }
+          if (batchKey) seenBatchKeys.add(batchKey);
+
+          const existing = await prisma.lead.findFirst({
+            where: {
+              OR: [
+                ...(incoming.externalId ? [{ externalId: incoming.externalId }] : []),
+                ...(phone ? [{ phone: { contains: phone.slice(-10) } }] : []),
+                ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+              ],
+            },
+          });
+
+          if (existing) {
+            const { patch, incomingRicher } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming);
+            if (Object.keys(patch).length > 0) {
+              await prisma.lead.update({ where: { id: existing.id }, data: patch });
+              updated++;
+              if (incomingRicher) merged++;
+            } else {
+              duplicates++;
+            }
+            continue;
           }
 
-          toCreate.push({
-            name,
-            phone: String(row.phone ?? '').trim(),
-            email: String(row.email ?? '').trim(),
-            city: String(row.city ?? '').trim(),
-            address: String(row.address ?? '').trim(),
-            postalCode: String(row.postalCode ?? '').trim(),
-            projectType: String(row.projectType ?? '').trim(),
-            budget: String(row.budget ?? '').trim(),
-            financingInterest,
-            source: String(row.source ?? 'import'),
-            sourceDetail: String(row.sourceDetail ?? '').trim(),
-            externalId,
-            submittedAt: row.submittedAt ? new Date(String(row.submittedAt)) : new Date(),
-            notes: String(row.notes ?? '').trim(),
-            assignedRepId: null,
+          await prisma.lead.create({
+            data: {
+              ...incoming,
+              name: incoming.name || incoming.email || incoming.phone || 'Imported lead',
+              assignedRepId: null,
+            },
           });
+          created++;
         }
-
-        let created = 0;
-        if (toCreate.length > 0) {
-          const result = await prisma.lead.createMany({ data: toCreate as never, skipDuplicates: true });
-          created = result.count;
-        }
-        return res.status(201).json({ created, duplicates, skipped: rows.length - created - duplicates });
+        return res.status(201).json({ created, updated, merged, duplicates, skipped });
       });
     }
 

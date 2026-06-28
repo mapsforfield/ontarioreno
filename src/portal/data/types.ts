@@ -443,6 +443,10 @@ export type LeadImportRow = {
   sourceDetail?: string;
   submittedAt?: string;
   notes?: string;
+  externalId?: string;
+  importSource?: 'auto' | 'meta' | 'website_intake';
+  importStatus?: string;
+  extraAnswers?: Record<string, string>;
 };
 
 export type CommissionPayoutStatus = 'pending' | 'partial' | 'paid';

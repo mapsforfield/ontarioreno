@@ -541,10 +541,49 @@ function CustomerCard({
 // ─── Import modal (admin) ─────────────────────────────────────────────────────
 const IMPORT_COLUMNS = [
   'name', 'phone', 'email', 'city', 'address', 'postalCode',
-  'projectType', 'budget', 'financingInterest', 'source', 'submittedAt', 'notes',
+  'projectType', 'budget', 'financingInterest', 'source', 'submittedAt', 'importStatus', 'notes',
 ];
 
-function parseCsv(text: string): LeadImportRow[] {
+type ImportSourceChoice = 'auto' | 'meta' | 'website_intake';
+
+const FIELD_ALIASES: Record<keyof Omit<LeadImportRow, 'extraAnswers' | 'importSource'>, string[]> = {
+  name: ['name', 'fullname', 'customername', 'contactname', 'leadname', 'firstname', 'firstandlastname'],
+  phone: ['phone', 'phonenumber', 'mobile', 'mobilephone', 'contactphone', 'telephone', 'tel'],
+  email: ['email', 'emailaddress', 'contactemail'],
+  city: ['city', 'town', 'municipality'],
+  address: ['address', 'streetaddress', 'projectaddress', 'homeaddress', 'propertyaddress'],
+  postalCode: ['postalcode', 'postcode', 'zip', 'zipcode'],
+  projectType: ['projecttype', 'project', 'servicetype', 'service', 'renovationtype', 'typeofproject'],
+  budget: ['budget', 'projectbudget', 'estimatedbudget', 'budgetrange'],
+  financingInterest: ['financinginterest', 'financing', 'needfinancing', 'financingneeded', 'interestedinfinancing'],
+  source: ['source', 'leadsource'],
+  sourceDetail: ['sourcedetail', 'campaign', 'campaignname', 'formname', 'adname'],
+  submittedAt: ['submittedat', 'submitted', 'createdat', 'timestamp', 'date', 'submissiondate'],
+  notes: ['notes', 'note', 'comments', 'message', 'details'],
+  externalId: ['externalid', 'metaleadid', 'leadid', 'id'],
+  importStatus: ['importstatus', 'status', 'leadstatus', 'disposition'],
+};
+
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function canonicalField(header: string): keyof Omit<LeadImportRow, 'extraAnswers' | 'importSource'> | null {
+  const normalized = normalizeHeader(header);
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+    if (aliases.includes(normalized)) return field as keyof Omit<LeadImportRow, 'extraAnswers' | 'importSource'>;
+  }
+  return null;
+}
+
+function parseBooleanLike(value: string): boolean | null {
+  const v = value.trim().toLowerCase();
+  if (['yes', 'true', 'y', '1', 'interested', 'needed'].includes(v)) return true;
+  if (['no', 'false', 'n', '0', 'not interested', 'none'].includes(v)) return false;
+  return null;
+}
+
+function parseCsv(text: string, importSource: ImportSourceChoice): LeadImportRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length === 0) return [];
   const delim = lines[0].includes('\t') ? '\t' : ',';
@@ -564,22 +603,37 @@ function parseCsv(text: string): LeadImportRow[] {
     out.push(cur);
     return out.map((s) => s.trim());
   };
-  const header = splitLine(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z]/g, ''));
-  const known = IMPORT_COLUMNS.map((c) => c.toLowerCase());
-  const hasHeader = header.some((h) => known.includes(h));
+  const rawHeader = splitLine(lines[0]);
+  const header = rawHeader.map(canonicalField);
+  const hasHeader = header.some(Boolean);
   const colMap = hasHeader
-    ? header.map((h) => IMPORT_COLUMNS[known.indexOf(h)] ?? null)
-    : IMPORT_COLUMNS;
+    ? header
+    : (IMPORT_COLUMNS as Array<keyof Omit<LeadImportRow, 'extraAnswers' | 'importSource'>>);
   const dataLines = hasHeader ? lines.slice(1) : lines;
   const rows: LeadImportRow[] = [];
   for (const line of dataLines) {
     const cells = splitLine(line);
-    const row: Record<string, string> = {};
+    const row: Partial<LeadImportRow> = { importSource };
+    const extraAnswers: Record<string, string> = {};
     cells.forEach((val, i) => {
       const key = colMap[i];
-      if (key) row[key] = val;
+      if (key) {
+        if (key === 'financingInterest') row[key] = parseBooleanLike(val);
+        else row[key] = val;
+      } else if (hasHeader && val) {
+        const label = rawHeader[i] || `Column ${i + 1}`;
+        extraAnswers[label] = val;
+      }
     });
-    if (row.name) rows.push(row as unknown as LeadImportRow);
+    if (!row.source && importSource === 'auto' && Object.keys(extraAnswers).length > 0) {
+      row.source = 'website_intake';
+    } else if (!row.source && importSource !== 'auto') {
+      row.source = importSource === 'website_intake' ? 'website_intake' : 'meta';
+    }
+    if (Object.keys(extraAnswers).length > 0) row.extraAnswers = extraAnswers;
+    const fallbackName = [extraAnswers['First Name'], extraAnswers['Last Name']].filter(Boolean).join(' ');
+    if (!row.name && fallbackName) row.name = fallbackName;
+    if (row.name || row.phone || row.email) rows.push(row as LeadImportRow);
   }
   return rows;
 }
@@ -587,8 +641,9 @@ function parseCsv(text: string): LeadImportRow[] {
 function ImportModal({ onClose }: { onClose: () => void }) {
   const { importLeads } = usePortalData();
   const [text, setText] = useState('');
+  const [importSource, setImportSource] = useState<ImportSourceChoice>('auto');
   const [busy, setBusy] = useState(false);
-  const rows = useMemo(() => parseCsv(text), [text]);
+  const rows = useMemo(() => parseCsv(text, importSource), [text, importSource]);
 
   const handleImport = async () => {
     if (rows.length === 0) return;
@@ -597,8 +652,8 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     setBusy(false);
     if (result) {
       showToast({
-        message: `${result.created} imported`,
-        description: `${result.duplicates} duplicate(s) skipped, ${result.skipped} other skipped`,
+        message: `${result.created} created, ${result.updated} updated`,
+        description: `${result.merged} richer merge(s), ${result.duplicates} duplicate(s), ${result.skipped} skipped`,
         variant: 'success',
         duration: 8000,
       });
@@ -616,16 +671,31 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"><X className="h-4 w-4" /></button>
         </div>
         <div className="p-5">
-          <p className="text-sm text-slate-600">
-            Paste CSV or tab-separated rows. Include a header row with any of:{' '}
-            <code className="rounded bg-slate-100 px-1 text-xs">{IMPORT_COLUMNS.join(', ')}</code>.
-            Leads land unassigned for triage. Duplicates (by phone/email) are skipped.
-          </p>
+          <div className="grid gap-3 sm:grid-cols-[14rem_minmax(0,1fr)]">
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Source
+              <select value={importSource} onChange={(e) => setImportSource(e.target.value as ImportSourceChoice)} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-slate-700">
+                <option value="auto">Auto detect</option>
+                <option value="meta">Meta lead sheet</option>
+                <option value="website_intake">Website intake sheet</option>
+              </select>
+            </label>
+            <div className="text-sm text-slate-600">
+              <p>
+                Paste CSV or tab-separated rows from Meta or website intake sheets. Headers can use common names like
+                <span className="font-semibold"> full name, phone number, email address, project, budget, financing, status</span>.
+              </p>
+              <p className="mt-1">
+                Optional <code className="rounded bg-slate-100 px-1 text-xs">importStatus</code>: new, not_interested, duplicate, booked, callback.
+                Website-only answers are preserved in notes.
+              </p>
+            </div>
+          </div>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={10}
-            placeholder={`name,phone,email,city,projectType,budget\nJane Doe,416-555-1212,jane@example.com,Hamilton,Basement,$40k-60k`}
+            placeholder={`full name,phone number,email address,city,project,budget,importStatus,preferred contact time\nJane Doe,416-555-1212,jane@example.com,Hamilton,Basement,$40k-60k,new,Evenings`}
             className="mt-3 w-full rounded-[0.7rem] border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
           />
           <div className="mt-4 flex items-center justify-between">
