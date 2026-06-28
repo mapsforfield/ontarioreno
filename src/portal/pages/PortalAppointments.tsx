@@ -698,12 +698,18 @@ export default function PortalAppointments() {
   // Auto-open a consultation when arriving from the dashboard
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    const state = location.state as { openAppointmentId?: string; prefillClient?: import('../data/types').Client } | null;
+    const state = location.state as { openAppointmentId?: string; panelTab?: string; prefillClient?: import('../data/types').Client } | null;
     const id = state?.openAppointmentId;
     if (id && handledNavState.current !== id) {
       handledNavState.current = id;
       const apt = visibleAppointments.find((a) => a.id === id);
-      if (apt) openAppointment(apt);
+      if (apt) {
+        openAppointment(apt); // resets to the Prep tab…
+        const tab = state?.panelTab;
+        if (tab && ['prep', 'details', 'outcome', 'dispatch', 'emails'].includes(tab) && !isEventType(apt.appointmentType)) {
+          setPanelTab(tab as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'); // …then jump to the relevant one
+        }
+      }
     }
     // Pre-fill new consultation form from a client profile
     const prefill = state?.prefillClient;

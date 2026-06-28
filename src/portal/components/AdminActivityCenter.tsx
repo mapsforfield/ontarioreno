@@ -182,7 +182,15 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
     setOpen(false);
     // Deep-link straight to the exact record the activity refers to.
     if (a.entityType === 'appointment' || a.actionType.startsWith('consultation')) {
-      navigate('/portal/appointments', { state: { openAppointmentId: a.entityId } });
+      // Land on the tab the activity is about (outcome, dispatch, emails, …).
+      const panelTab = a.actionType.includes('outcome')
+        ? 'outcome'
+        : a.actionType.includes('dispatch') || a.actionType.includes('proposal')
+          ? 'dispatch'
+          : a.actionType === 'email_sent'
+            ? 'emails'
+            : 'prep';
+      navigate('/portal/appointments', { state: { openAppointmentId: a.entityId, panelTab } });
     } else if (a.entityType === 'deal' || a.dealId) {
       navigate('/portal/deals', { state: { openDealId: a.dealId || a.entityId } });
     } else if (a.entityType === 'contractor') {
