@@ -180,10 +180,13 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
 
   const goToActivity = (a: Activity) => {
     setOpen(false);
+    // Deep-link straight to the exact record the activity refers to.
     if (a.entityType === 'appointment' || a.actionType.startsWith('consultation')) {
-      navigate('/portal/appointments');
-    } else if (a.dealId || a.entityType === 'deal') {
-      navigate('/portal/deals');
+      navigate('/portal/appointments', { state: { openAppointmentId: a.entityId } });
+    } else if (a.entityType === 'deal' || a.dealId) {
+      navigate('/portal/deals', { state: { openDealId: a.dealId || a.entityId } });
+    } else if (a.entityType === 'contractor') {
+      navigate('/portal/contractors');
     }
   };
 
