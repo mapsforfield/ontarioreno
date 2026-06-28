@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
 import { prisma } from '../../lib/prisma.js';
+import { withSchema } from '../../lib/schema.js';
 import {
   signToken,
   setAuthCookie,
@@ -101,16 +102,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
 
     if (req.method === 'GET') {
-      try {
-        const tasks = await prisma.task.findMany({
+      const tasks = await withSchema(() =>
+        prisma.task.findMany({
           where: { userId: user.id },
           orderBy: [{ done: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
-        });
-        return res.status(200).json(tasks);
-      } catch {
-        await ensureTable();
-        return res.status(200).json([]);
-      }
+        })
+      );
+      return res.status(200).json(tasks);
     }
 
     if (req.method === 'POST') {
@@ -196,10 +194,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store');
-      const activities = await prisma.activity.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+      const activities = await withSchema(() =>
+        prisma.activity.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })
+      );
       return res.status(200).json(activities);
     }
 

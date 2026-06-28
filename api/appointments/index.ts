@@ -4,6 +4,7 @@ import { requireAuth } from '../../lib/auth.js';
 import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
+import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -58,12 +59,28 @@ async function sendPush(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ── Schema reconcile cron (no user auth — verified by CRON_SECRET) ──
+  // A daily safety net that re-applies the generated schema DDL, in case a
+  // deploy-time apply was skipped (e.g. a DB blip during build).
+  if (req.method === 'GET' && req.query['_cron'] === 'ensure-schema') {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+    await ensureSchema();
+    return res.status(200).json({ ok: true });
+  }
+
   // ── Daily morning briefing cron (no user auth — verified by CRON_SECRET) ──
   if (req.method === 'GET' && req.query['_cron'] === 'morning-brief') {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
+
+    // Daily schema reconcile (folded into an existing cron so we don't exceed the
+    // Hobby plan's cron limit). Belt-and-suspenders behind the deploy-time apply.
+    await ensureSchema();
 
     const today = new Date().toISOString().slice(0, 10);
     const appointments = await prisma.appointment.findMany({
@@ -568,20 +585,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     // ── Client list ──
     if (req.query['_resource'] === 'clients') {
-      try {
-        const clients = await prisma.client.findMany({
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-        });
-        return res.status(200).json(clients);
-      } catch {
-        await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)');
-        const clients = await prisma.client.findMany({
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-        });
-        return res.status(200).json(clients);
-      }
+      const clients = await withSchema(() =>
+        prisma.client.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } })
+      );
+      return res.status(200).json(clients);
     }
 
     // ── Google Places: address autocomplete (key stays server-side) ──
@@ -671,16 +678,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Days off list ──
     if (req.query['_resource'] === 'days_off') {
-      const daysOff = await prisma.repDayOff.findMany({ orderBy: { date: 'asc' } });
+      const daysOff = await withSchema(() => prisma.repDayOff.findMany({ orderBy: { date: 'asc' } }));
       return res.status(200).json(daysOff);
     }
 
     // ── Household list ──
     if (req.query['_resource'] === 'households') {
-      const households = await prisma.household.findMany({
+      const households = await withSchema(() => prisma.household.findMany({
         include: { members: { select: { id: true } } },
         orderBy: { name: 'asc' },
-      });
+      }));
       return res.status(200).json(
         households.map(({ members, ...h }) => ({ ...h, memberIds: members.map((m) => m.id) }))
       );
@@ -688,22 +695,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Trash bin — soft-deleted consultations ──
     if (req.query['_resource'] === 'trash') {
-      try {
-        const trashed = await prisma.appointment.findMany({
-          where: { deletedAt: { not: null } },
-          orderBy: { deletedAt: 'desc' },
-        });
-        return res.status(200).json(trashed);
-      } catch {
-        await prisma.$executeRawUnsafe(
-          'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "leadId" TEXT'
-        );
-        const trashed = await prisma.appointment.findMany({
-          where: { deletedAt: { not: null } },
-          orderBy: { deletedAt: 'desc' },
-        });
-        return res.status(200).json(trashed);
-      }
+      const trashed = await withSchema(() =>
+        prisma.appointment.findMany({ where: { deletedAt: { not: null } }, orderBy: { deletedAt: 'desc' } })
+      );
+      return res.status(200).json(trashed);
     }
 
     // One-time cleanup: custom events inherited the client's city via autofill,
@@ -728,22 +723,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { eventCityBackfillDone = false; }
     }
 
-    let appointments;
-    try {
-      appointments = await prisma.appointment.findMany({
-        where: { deletedAt: null },
-        orderBy: { appointmentDate: 'desc' },
-      });
-    } catch {
-      // Self-healing: deletedAt / latitude / longitude columns may not exist yet.
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "leadId" TEXT'
-      );
-      appointments = await prisma.appointment.findMany({
-        where: { deletedAt: null },
-        orderBy: { appointmentDate: 'desc' },
-      });
-    }
+    const appointments = await withSchema(() =>
+      prisma.appointment.findMany({ where: { deletedAt: null }, orderBy: { appointmentDate: 'desc' } })
+    );
     return res.status(200).json(appointments);
   }
 

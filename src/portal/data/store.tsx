@@ -88,6 +88,8 @@ type PortalDataState = {
   proposals: ProposalHistory[];
   trackerRows: SaleTrackerRow[];
   defaultCommissionRate: number;
+  /** True when a core dataset failed to load (a real error, not "empty"). */
+  loadError: boolean;
 };
 
 type ContractorDispatchDraft = Omit<
@@ -308,6 +310,7 @@ const emptyState: PortalDataState = {
   trackerRows: [],
   users: [],
   defaultCommissionRate: loadDefaultCommissionRate(),
+  loadError: false,
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
@@ -668,6 +671,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         salesAgreements: salesAgreements ?? [],
         trackerRows: trackerRows ?? [],
         defaultCommissionRate: loadDefaultCommissionRate(),
+        // A null result means the fetch actually failed (apiCall returns [] only
+        // on success). If any core dataset failed, flag it so the UI can warn
+        // instead of silently rendering empty screens.
+        loadError: [users, contractors, rawDeals, appointments, commissions].some((r) => r === null),
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1397,6 +1404,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           trackerRows: current.trackerRows,
           users: current.users,
           defaultCommissionRate: current.defaultCommissionRate,
+          loadError: current.loadError,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {

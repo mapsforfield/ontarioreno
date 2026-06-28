@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { withSchema } from '../../lib/schema.js';
 
 /** commissionRate is confidential — only admins ever receive it. */
 function stripRate<T extends { commissionRate?: number }>(
@@ -18,22 +19,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   if (req.method === 'GET') {
-    let contractors;
-    try {
-      contractors = await prisma.contractor.findMany({
-        orderBy: { companyName: 'asc' },
-      });
-    } catch {
-      // Self-healing migration: the commissionRate column may not exist yet
-      // (schema can't be pushed from local env — DB credentials live only in
-      // the Neon integration). Idempotent, runs at most once.
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Contractor" ADD COLUMN IF NOT EXISTS "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 0.085, ADD COLUMN IF NOT EXISTS "address" TEXT, ADD COLUMN IF NOT EXISTS "city" TEXT, ADD COLUMN IF NOT EXISTS "province" TEXT, ADD COLUMN IF NOT EXISTS "postalCode" TEXT'
-      );
-      contractors = await prisma.contractor.findMany({
-        orderBy: { companyName: 'asc' },
-      });
-    }
+    const contractors = await withSchema(() =>
+      prisma.contractor.findMany({ orderBy: { companyName: 'asc' } })
+    );
     return res.status(200).json(contractors.map((c) => stripRate(c, user.role)));
   }
 

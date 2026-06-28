@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { withSchema } from '../../lib/schema.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -17,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!commission) return res.status(404).json({ error: 'Not found.' });
       return res.status(200).json(commission);
     }
-    const commissions = await prisma.commission.findMany();
+    const commissions = await withSchema(() => prisma.commission.findMany());
     return res.status(200).json(commissions);
   }
 

@@ -1,6 +1,7 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { withSchema } from '../../lib/schema.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing ledger of commission invoices that were generated / sent.
@@ -83,20 +84,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Sales Agreements ──
     if (req.query['_resource'] === 'agreements') {
       const where = user.role === 'admin' ? {} : { deal: { assignedRepId: user.id } };
-      const agreements = await prisma.salesAgreement.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-      });
+      const agreements = await withSchema(() =>
+        prisma.salesAgreement.findMany({ where, orderBy: { createdAt: 'desc' } })
+      );
       return res.status(200).json(agreements);
     }
 
     // ── Sales Tracker rows ──
     if (req.query['_resource'] === 'tracker') {
       const where = user.role === 'admin' ? {} : { repId: user.id };
-      const rows = await prisma.saleTracker.findMany({
-        where,
-        orderBy: [{ repId: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-      });
+      const rows = await withSchema(() =>
+        prisma.saleTracker.findMany({
+          where,
+          orderBy: [{ repId: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+        })
+      );
       return res.status(200).json(rows);
     }
 
@@ -106,49 +108,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deletedAt: { not: null },
         ...(user.role === 'admin' ? {} : { assignedRepId: user.id }),
       };
-      try {
-        const trashed = await prisma.deal.findMany({
-          where,
-          orderBy: { deletedAt: 'desc' },
-        });
-        return res.status(200).json(trashed);
-      } catch {
-        await prisma.$executeRawUnsafe(
-          'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER'
-        );
-        const trashed = await prisma.deal.findMany({ where, orderBy: { deletedAt: 'desc' } });
-        return res.status(200).json(trashed);
-      }
+      const trashed = await withSchema(() =>
+        prisma.deal.findMany({ where, orderBy: { deletedAt: 'desc' } })
+      );
+      return res.status(200).json(trashed);
     }
 
-    const activeWhere = { deletedAt: null };
-    let deals;
-    try {
-      deals = await prisma.deal.findMany({
-        where: activeWhere,
+    const deals = await withSchema(() =>
+      prisma.deal.findMany({
+        where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
         include: {
           activity: { orderBy: { createdAt: 'desc' } },
           proposals: { orderBy: { sentAt: 'desc' } },
           dispatches: { orderBy: { createdAt: 'desc' } },
         },
-      });
-    } catch {
-      // Self-healing: the deletedAt column may not exist yet (schema can't be
-      // pushed from local env). Add it, then retry. Idempotent.
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "invoiceNumber" INTEGER, ADD COLUMN IF NOT EXISTS "clientId" TEXT'
-      );
-      deals = await prisma.deal.findMany({
-        where: activeWhere,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          activity: { orderBy: { createdAt: 'desc' } },
-          proposals: { orderBy: { sentAt: 'desc' } },
-          dispatches: { orderBy: { createdAt: 'desc' } },
-        },
-      });
-    }
+      })
+    );
     return res.status(200).json(deals);
   }
 

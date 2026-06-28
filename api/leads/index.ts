@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
+import { ensureSchema } from '../../lib/schema.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -51,6 +52,9 @@ async function ensureLeadTables() {
   for (const sql of LEAD_INDEXES) {
     try { await prisma.$executeRawUnsafe(sql); } catch { /* index race — ignore */ }
   }
+  // Also run the central reconcile so any future Lead/Interaction column added to
+  // schema.prisma is healed here too (not just the original columns above).
+  try { await ensureSchema(); } catch { /* best-effort */ }
   tablesEnsured = true;
 }
 

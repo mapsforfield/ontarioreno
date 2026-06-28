@@ -10,6 +10,7 @@ import {
   Gauge,
   HandCoins,
   LineChart,
+  AlertTriangle,
   ListTodo,
   LogOut,
   MoreHorizontal,
@@ -55,7 +56,7 @@ const navItems = [
 
 export default function PortalLayout() {
   const { currentUser, isAdmin, logout, updateCurrentUser } = usePortalAuth();
-  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser } = usePortalData();
+  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser, loadError, refetch } = usePortalData();
 
   // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
   const [searchOpen, setSearchOpen] = useState(false);
@@ -413,6 +414,23 @@ export default function PortalLayout() {
         {/* Full-width content with comfortable gutters — consistent across every
             page so navigation never jumps. */}
         <div className="w-full">
+          {loadError && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[0.6rem] border border-red-300 bg-red-50 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                <p className="text-sm font-bold text-red-800">
+                  Some data couldn&rsquo;t be loaded. Your records are safe — this is a temporary loading problem, not data loss.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="rounded-[0.5rem] bg-red-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-red-700"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <div className="mb-6 hidden items-center justify-between lg:flex">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">

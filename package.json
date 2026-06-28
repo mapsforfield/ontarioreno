@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "node build-prisma.mjs && vite build",
+    "schema:gen": "node scripts/generate-schema-ddl.mjs",
+    "schema:check": "node scripts/generate-schema-ddl.mjs --check",
+    "build": "node scripts/generate-schema-ddl.mjs --check && node scripts/apply-schema.mjs && node build-prisma.mjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
