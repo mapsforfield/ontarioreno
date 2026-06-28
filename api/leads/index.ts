@@ -203,7 +203,12 @@ function timeValue(value: unknown) {
   return Number.isNaN(time) ? null : time;
 }
 
-function mergeLeadPatch(existing: Record<string, unknown>, incoming: ReturnType<typeof importLeadData>) {
+function mergeLeadPatch(
+  existing: Record<string, unknown>,
+  incoming: ReturnType<typeof importLeadData>,
+  statusExplicit: boolean,
+  hasIncomingDate: boolean,
+) {
   const incomingRicher = isWebsiteSource(incoming.source) || sourceRank(incoming.source) > sourceRank(existing.source);
   const patch: Record<string, unknown> = {};
   for (const field of ['name', 'phone', 'email', 'city', 'address', 'postalCode', 'projectType', 'budget', 'sourceDetail'] as const) {
@@ -216,17 +221,28 @@ function mergeLeadPatch(existing: Record<string, unknown>, incoming: ReturnType<
   if (incoming.externalId && !hasValue(existing.externalId)) patch.externalId = incoming.externalId;
   const existingSubmittedAt = timeValue(existing.submittedAt);
   const incomingSubmittedAt = timeValue(incoming.submittedAt);
-  if (incomingSubmittedAt != null && (existingSubmittedAt == null || incomingSubmittedAt > existingSubmittedAt)) {
+  // Only advance submittedAt when the incoming row actually carried a real date.
+  // A dateless re-import defaults submittedAt to "now"; bumping on that would
+  // float an old lead to the top of the queue.
+  if (hasIncomingDate && incomingSubmittedAt != null && (existingSubmittedAt == null || incomingSubmittedAt > existingSubmittedAt)) {
     patch.submittedAt = incoming.submittedAt;
   }
   if (incoming.notes) {
     const nextNotes = mergeNotes(clean(existing.notes), incoming.notes);
     if (nextNotes !== clean(existing.notes)) patch.notes = nextNotes;
   }
+  // Never reset a dispositioned lead back to 'new' on re-import. Booked/won are
+  // fully locked; any other non-'new' status only changes when the sheet carries
+  // an explicit (importStatus-based) disposition. A still-'new' lead can be
+  // promoted by any incoming status.
   const existingStatus = clean(existing.status);
-  if (!['booked', 'won'].includes(existingStatus) && incoming.status && incoming.status !== existingStatus) {
-    patch.status = incoming.status;
-  }
+  const incomingStatus = incoming.status;
+  const canSetStatus =
+    Boolean(incomingStatus) &&
+    incomingStatus !== existingStatus &&
+    !['booked', 'won'].includes(existingStatus) &&
+    (existingStatus === 'new' || (statusExplicit && incomingStatus !== 'new'));
+  if (canSetStatus) patch.status = incomingStatus;
   return { patch, incomingRicher };
 }
 
@@ -440,30 +456,45 @@ async function handleCollection(
 
         for (let index = 0; index < rows.length; index++) {
           const row = rows[index];
+          let rowKey: string | null = null;
           try {
             const incoming = importLeadData(row);
             if (!incoming.name && !incoming.phone && !incoming.email) { skipped++; continue; }
 
             const phone = normPhone(incoming.phone);
+            // Only dedupe on a full (>=10 digit) phone; short/partial numbers are
+            // too collision-prone to merge on.
+            const phoneLast10 = phone.length >= 10 ? phone.slice(-10) : null;
             const email = normEmail(incoming.email);
-            const batchKey = incoming.externalId || phone || email;
-            if (batchKey && seenBatchKeys.has(batchKey)) {
+            rowKey = incoming.externalId || phoneLast10 || email || null;
+            if (rowKey && seenBatchKeys.has(rowKey)) {
               duplicates++;
               continue;
             }
-            if (batchKey) seenBatchKeys.add(batchKey);
+            if (rowKey) seenBatchKeys.add(rowKey);
 
-            const matchers = [
+            // externalId + email match via Prisma; phone matches via normalized
+            // last-10-digit equality so any stored format (+1 / dashes / parens) merges.
+            const prismaMatchers = [
               ...(incoming.externalId ? [{ externalId: incoming.externalId }] : []),
-              ...(phone ? [{ phone: { contains: phone.slice(-10) } }] : []),
               ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
             ];
-            const existing = matchers.length > 0
-              ? await prisma.lead.findFirst({ where: { OR: matchers } })
+            let existing = prismaMatchers.length > 0
+              ? await prisma.lead.findFirst({ where: { OR: prismaMatchers } })
               : null;
+            if (!existing && phoneLast10) {
+              const phoneMatches = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+                `SELECT "id" FROM "Lead" WHERE right(regexp_replace("phone", '[^0-9]', '', 'g'), 10) = $1 LIMIT 1`,
+                phoneLast10,
+              );
+              if (phoneMatches[0]) existing = await prisma.lead.findUnique({ where: { id: phoneMatches[0].id } });
+            }
 
             if (existing) {
-              const { patch, incomingRicher } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming);
+              const statusExplicit = clean(row.importStatus) !== '';
+              const incomingDateRaw = clean(row.submittedAt);
+              const hasIncomingDate = incomingDateRaw !== '' && !Number.isNaN(new Date(incomingDateRaw).getTime());
+              const { patch, incomingRicher } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming, statusExplicit, hasIncomingDate);
               if (Object.keys(patch).length > 0) {
                 await prisma.lead.update({ where: { id: existing.id }, data: patch });
                 updated++;
@@ -488,9 +519,7 @@ async function handleCollection(
             const failure = { row: index + 2, name: clean(row.name), reason };
             failures.push(failure);
             console.error('[leads/import] row failed', failure, err);
-            if (row.externalId) seenBatchKeys.delete(clean(row.externalId));
-            else if (row.phone) seenBatchKeys.delete(normPhone(row.phone));
-            else if (row.email) seenBatchKeys.delete(normEmail(row.email));
+            if (rowKey) seenBatchKeys.delete(rowKey);
           }
         }
         return res.status(201).json({
