@@ -294,7 +294,7 @@ export default function PortalDeals() {
   const [contractorFilter, setContractorFilter] = useState('all');
   const [valueFilter, setValueFilter] = useState<ValueFilter>('all');
   const [staleOnly, setStaleOnly] = useState(false);
-  const [wonRange, setWonRange] = useState<WonRange>('all');
+  const [wonRange, setWonRange] = useState<WonRange>('quarter');
   const [showOlderWon, setShowOlderWon] = useState(false);
 
   // ── Drag-and-drop + context menu ──────────────────────────────
