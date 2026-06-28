@@ -926,13 +926,20 @@ function TriageView() {
 }
 
 // ─── Queue rail ───────────────────────────────────────────────────────────────
-function queueTag(lead: Lead, now: number) {
-  const due = lead.callbackAt && new Date(lead.callbackAt).getTime() <= now;
-  if (due) return { label: 'callback', className: 'bg-amber-100 text-amber-800' };
-  if (lead.attemptCount === 0 && lead.status === 'new') {
-    return { label: 'new', className: 'bg-emerald-100 text-emerald-800' };
+function queueTag(lead: Lead, now: number): { label: string; className: string; accent: string } {
+  const cbTime = lead.callbackAt ? new Date(lead.callbackAt).getTime() : null;
+  // A scheduled callback (the customer asked for a specific time) outranks a plain
+  // no-answer follow-up — give it a distinct amber tag + left accent, due or not.
+  if (cbTime != null && cbTime <= now) {
+    return { label: 'Callback due', className: 'bg-amber-500 text-white', accent: 'border-l-amber-500' };
   }
-  return { label: 'follow-up', className: 'bg-slate-100 text-slate-600' };
+  if (cbTime != null || lead.status === 'callback_scheduled') {
+    return { label: 'Callback', className: 'bg-amber-100 text-amber-800 ring-1 ring-amber-300', accent: 'border-l-amber-400' };
+  }
+  if (lead.attemptCount === 0 && lead.status === 'new') {
+    return { label: 'new', className: 'bg-emerald-100 text-emerald-800', accent: 'border-l-emerald-400' };
+  }
+  return { label: 'follow-up', className: 'bg-slate-100 text-slate-600', accent: 'border-l-transparent' };
 }
 
 function QueueRail({
@@ -990,7 +997,8 @@ function QueueRail({
                 key={l.id}
                 onClick={() => onSelect(l.id)}
                 className={cn(
-                  'flex w-full flex-col items-start gap-1 border-b border-slate-50 px-4 py-3 text-left transition',
+                  'flex w-full flex-col items-start gap-1 border-b border-b-slate-100 border-l-4 px-4 py-3 text-left transition',
+                  tag.accent,
                   selected ? 'bg-[#e8f1fb]' : 'hover:bg-slate-50'
                 )}
               >
