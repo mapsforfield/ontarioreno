@@ -14,6 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const schemaPath = join(root, 'prisma', 'schema.prisma');
 const outPath = join(root, 'lib', 'schema-ddl.generated.js');
+const dtsPath = join(root, 'lib', 'schema-ddl.generated.d.ts');
 
 const SCALARS = {
   String: 'TEXT',
@@ -137,17 +138,20 @@ const banner =
   '// AUTO-GENERATED from prisma/schema.prisma by scripts/generate-schema-ddl.mjs.\n' +
   '// Do NOT edit by hand. Regenerate with: npm run schema:gen\n';
 const out = `${banner}export const SCHEMA_STATEMENTS = ${JSON.stringify(statements, null, 2)};\n`;
+// Type declaration so TypeScript (incl. Vercel's function compiler) knows the
+// generated .js exports a string[] — avoids an implicit-any error on import.
+const dts = `${banner}export const SCHEMA_STATEMENTS: string[];\n`;
 
-// In --check mode, fail if the committed file is stale (CI / pre-deploy guard).
+// In --check mode, fail if either committed file is stale (CI / pre-deploy guard).
 if (process.argv.includes('--check')) {
-  let current = '';
-  try { current = readFileSync(outPath, 'utf8'); } catch { /* missing */ }
-  if (current !== out) {
-    console.error('[generate-schema-ddl] STALE: lib/schema-ddl.generated.js is out of date. Run: npm run schema:gen');
+  const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
+  if (read(outPath) !== out || read(dtsPath) !== dts) {
+    console.error('[generate-schema-ddl] STALE: generated schema files are out of date. Run: npm run schema:gen');
     process.exit(1);
   }
   console.log(`[generate-schema-ddl] up to date (${statements.length} statements, ${tables.length} tables)`);
 } else {
   writeFileSync(outPath, out);
+  writeFileSync(dtsPath, dts);
   console.log(`[generate-schema-ddl] wrote ${statements.length} statements for ${tables.length} tables`);
 }
