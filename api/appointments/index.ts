@@ -696,7 +696,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(trashed);
       } catch {
         await prisma.$executeRawUnsafe(
-          'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+          'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "leadId" TEXT'
         );
         const trashed = await prisma.appointment.findMany({
           where: { deletedAt: { not: null } },
@@ -737,7 +737,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       // Self-healing: deletedAt / latitude / longitude columns may not exist yet.
       await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION'
+        'ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS "leadId" TEXT'
       );
       appointments = await prisma.appointment.findMany({
         where: { deletedAt: null },
