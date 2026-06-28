@@ -449,6 +449,16 @@ export type LeadImportRow = {
   extraAnswers?: Record<string, string>;
 };
 
+export type LeadImportResult = {
+  created: number;
+  updated: number;
+  merged: number;
+  duplicates: number;
+  skipped: number;
+  failed: number;
+  failures: Array<{ row: number; name?: string; reason: string }>;
+};
+
 export type CommissionPayoutStatus = 'pending' | 'partial' | 'paid';
 
 export type Commission = {

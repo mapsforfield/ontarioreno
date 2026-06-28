@@ -32,6 +32,7 @@ import {
   CallOutcome,
   InteractionChannel,
   Lead,
+  LeadImportResult,
   LeadImportRow,
   ProposalHistory,
   RepDayOff,
@@ -203,10 +204,11 @@ type PortalDataContextValue = PortalDataState & {
   deleteHousehold: (householdId: string) => Promise<void>;
   getAppointmentsForClient: (clientId: string) => Appointment[];
   // ── Leads / Sales Workspace ──
-  importLeads: (rows: LeadImportRow[]) => Promise<{ created: number; updated: number; merged: number; duplicates: number; skipped: number } | null>;
+  importLeads: (rows: LeadImportRow[]) => Promise<LeadImportResult | null>;
   addLead: (draft: Partial<Lead> & { name: string }) => Promise<Lead | null>;
   updateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
   assignLeads: (ids: string[], repId: string | null) => Promise<void>;
+  deleteLeads: (ids: string[]) => Promise<number>;
   logInteraction: (
     leadId: string,
     draft: {
@@ -3189,7 +3191,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       // ── Leads / Sales Workspace ─────────────────────────────────────────────
       importLeads: async (rows) => {
-        const result = await apiCall<{ created: number; updated: number; merged: number; duplicates: number; skipped: number }>(
+        const result = await apiCall<LeadImportResult>(
           '/api/leads',
           { method: 'POST', body: JSON.stringify({ _action: 'import_leads', rows }) }
         );
@@ -3241,6 +3243,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           body: JSON.stringify({ _action: 'assign', ids, repId }),
         });
+      },
+
+      deleteLeads: async (ids) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.filter((l) => !ids.includes(l.id)),
+        }));
+        const result = await apiCall<{ ok: boolean; deleted: number }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_leads', ids }),
+        });
+        if (!result) {
+          loadData(true);
+          return 0;
+        }
+        return result.deleted;
       },
 
       logInteraction: async (leadId, draft) => {

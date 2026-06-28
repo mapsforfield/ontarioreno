@@ -16,6 +16,7 @@ import {
   SkipForward,
   Sparkles,
   TimerReset,
+  Trash2,
   Upload,
   UserPlus,
   Users,
@@ -30,6 +31,7 @@ import type {
   Client,
   Interaction,
   Lead,
+  LeadImportResult,
   LeadImportRow,
 } from '../data/types';
 
@@ -606,8 +608,13 @@ function parseCsv(text: string, importSource: ImportSourceChoice): LeadImportRow
   const rawHeader = splitLine(lines[0]);
   const header = rawHeader.map(canonicalField);
   const hasHeader = header.some(Boolean);
+  const explicitImportStatusIndex = rawHeader.findIndex((h) => normalizeHeader(h) === 'importstatus');
   const colMap = hasHeader
-    ? header
+    ? header.map((field, index) =>
+        field === 'importStatus' && explicitImportStatusIndex >= 0 && index !== explicitImportStatusIndex
+          ? null
+          : field
+      )
     : (IMPORT_COLUMNS as Array<keyof Omit<LeadImportRow, 'extraAnswers' | 'importSource'>>);
   const dataLines = hasHeader ? lines.slice(1) : lines;
   const rows: LeadImportRow[] = [];
@@ -643,6 +650,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState('');
   const [importSource, setImportSource] = useState<ImportSourceChoice>('auto');
   const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<LeadImportResult | null>(null);
   const rows = useMemo(() => parseCsv(text, importSource), [text, importSource]);
 
   const handleImport = async () => {
@@ -651,13 +659,14 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     const result = await importLeads(rows);
     setBusy(false);
     if (result) {
+      setLastResult(result);
       showToast({
-        message: `${result.created} created, ${result.updated} updated`,
+        message: `${result.created} created, ${result.updated} updated${result.failed ? `, ${result.failed} failed` : ''}`,
         description: `${result.merged} richer merge(s), ${result.duplicates} duplicate(s), ${result.skipped} skipped`,
-        variant: 'success',
+        variant: result.failed ? 'default' : 'success',
         duration: 8000,
       });
-      onClose();
+      if (result.failed === 0) onClose();
     } else {
       showToast({ message: 'Import failed', variant: 'error' });
     }
@@ -683,21 +692,39 @@ function ImportModal({ onClose }: { onClose: () => void }) {
             <div className="text-sm text-slate-600">
               <p>
                 Paste CSV or tab-separated rows from Meta or website intake sheets. Headers can use common names like
-                <span className="font-semibold"> full name, phone number, email address, project, budget, financing, status</span>.
+                <span className="font-semibold"> full name, phone number, email address, project, budget, financing, importStatus</span>.
               </p>
               <p className="mt-1">
-                Optional <code className="rounded bg-slate-100 px-1 text-xs">importStatus</code>: new, not_interested, duplicate, booked, callback.
-                Website-only answers are preserved in notes.
+                <code className="rounded bg-slate-100 px-1 text-xs">importStatus</code> is the source of truth: new, callback, booked, duplicate, not_interested.
+                Cell colors are ignored; website-only answers are preserved in notes.
               </p>
             </div>
           </div>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setLastResult(null);
+            }}
             rows={10}
             placeholder={`full name,phone number,email address,city,project,budget,importStatus,preferred contact time\nJane Doe,416-555-1212,jane@example.com,Hamilton,Basement,$40k-60k,new,Evenings`}
             className="mt-3 w-full rounded-[0.7rem] border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
           />
+          {lastResult && lastResult.failed > 0 && (
+            <div className="mt-3 rounded-[0.7rem] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <div className="font-bold">{lastResult.failed} row(s) failed and were skipped. The rest of the import continued.</div>
+              <ul className="mt-1 space-y-1">
+                {lastResult.failures.slice(0, 8).map((failure) => (
+                  <li key={`${failure.row}-${failure.reason}`}>
+                    Row {failure.row}{failure.name ? ` (${failure.name})` : ''}: {failure.reason}
+                  </li>
+                ))}
+              </ul>
+              {lastResult.failures.length > 8 && (
+                <div className="mt-1 font-semibold">Showing 8 of {lastResult.failures.length} failed rows.</div>
+              )}
+            </div>
+          )}
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm font-bold text-slate-500">{rows.length} lead(s) detected</span>
             <div className="flex gap-2">
@@ -715,7 +742,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
 // ─── Admin triage ─────────────────────────────────────────────────────────────
 function TriageView() {
-  const { getUnassignedLeads, assignLeads, users } = usePortalData();
+  const { getUnassignedLeads, assignLeads, deleteLeads, users } = usePortalData();
   const unassigned = getUnassignedLeads();
   const reps = useMemo(() => users.filter((u) => u.active), [users]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -743,6 +770,22 @@ function TriageView() {
     setRepId('');
   };
 
+  const handleDeleteSelected = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    const confirmed = window.confirm(
+      `Permanently delete ${ids.length} selected unassigned lead(s)? This clears them for reupload and cannot be undone.`
+    );
+    if (!confirmed) return;
+    const deleted = await deleteLeads(ids);
+    showToast({
+      message: `${deleted || ids.length} lead(s) deleted`,
+      description: 'You can reupload the corrected sheet now.',
+      variant: 'success',
+    });
+    setSelected(new Set());
+  };
+
   return (
     <div className="rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
@@ -766,6 +809,9 @@ function TriageView() {
           </select>
           <button onClick={handleAssign} disabled={!repId} className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
             <UserPlus className="h-4 w-4" /> Assign
+          </button>
+          <button onClick={handleDeleteSelected} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50">
+            <Trash2 className="h-4 w-4" /> Delete selected
           </button>
         </div>
       )}

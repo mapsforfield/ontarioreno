@@ -138,6 +138,18 @@ function parseFinancingInterest(value: unknown): boolean | null {
   return null;
 }
 
+function parseImportDate(value: unknown): Date {
+  const raw = clean(value);
+  if (!raw) return new Date();
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function importErrorReason(err: unknown): string {
+  if (err instanceof Error) return err.message.split('\n')[0] || err.name;
+  return clean(err) || 'Unknown import error';
+}
+
 function formatExtraAnswers(extra: unknown) {
   if (!extra || typeof extra !== 'object' || Array.isArray(extra)) return '';
   const entries = Object.entries(extra as Record<string, unknown>)
@@ -176,7 +188,7 @@ function importLeadData(row: Record<string, unknown>) {
     source,
     sourceDetail: clean(row.sourceDetail),
     externalId: row.externalId ? clean(row.externalId) : null,
-    submittedAt: row.submittedAt ? new Date(String(row.submittedAt)) : new Date(),
+    submittedAt: parseImportDate(row.submittedAt),
     status: statusInfo.status,
     notes,
   };
@@ -412,53 +424,74 @@ async function handleCollection(
         let merged = 0;
         let duplicates = 0;
         let skipped = 0;
+        let failed = 0;
+        const failures: Array<{ row: number; name?: string; reason: string }> = [];
         const seenBatchKeys = new Set<string>();
 
-        for (const row of rows) {
-          const incoming = importLeadData(row);
-          if (!incoming.name && !incoming.phone && !incoming.email) { skipped++; continue; }
+        for (let index = 0; index < rows.length; index++) {
+          const row = rows[index];
+          try {
+            const incoming = importLeadData(row);
+            if (!incoming.name && !incoming.phone && !incoming.email) { skipped++; continue; }
 
-          const phone = normPhone(incoming.phone);
-          const email = normEmail(incoming.email);
-          const batchKey = incoming.externalId || phone || email;
-          if (batchKey && seenBatchKeys.has(batchKey)) {
-            duplicates++;
-            continue;
-          }
-          if (batchKey) seenBatchKeys.add(batchKey);
-
-          const existing = await prisma.lead.findFirst({
-            where: {
-              OR: [
-                ...(incoming.externalId ? [{ externalId: incoming.externalId }] : []),
-                ...(phone ? [{ phone: { contains: phone.slice(-10) } }] : []),
-                ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
-              ],
-            },
-          });
-
-          if (existing) {
-            const { patch, incomingRicher } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming);
-            if (Object.keys(patch).length > 0) {
-              await prisma.lead.update({ where: { id: existing.id }, data: patch });
-              updated++;
-              if (incomingRicher) merged++;
-            } else {
+            const phone = normPhone(incoming.phone);
+            const email = normEmail(incoming.email);
+            const batchKey = incoming.externalId || phone || email;
+            if (batchKey && seenBatchKeys.has(batchKey)) {
               duplicates++;
+              continue;
             }
-            continue;
-          }
+            if (batchKey) seenBatchKeys.add(batchKey);
 
-          await prisma.lead.create({
-            data: {
-              ...incoming,
-              name: incoming.name || incoming.email || incoming.phone || 'Imported lead',
-              assignedRepId: null,
-            },
-          });
-          created++;
+            const matchers = [
+              ...(incoming.externalId ? [{ externalId: incoming.externalId }] : []),
+              ...(phone ? [{ phone: { contains: phone.slice(-10) } }] : []),
+              ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+            ];
+            const existing = matchers.length > 0
+              ? await prisma.lead.findFirst({ where: { OR: matchers } })
+              : null;
+
+            if (existing) {
+              const { patch, incomingRicher } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming);
+              if (Object.keys(patch).length > 0) {
+                await prisma.lead.update({ where: { id: existing.id }, data: patch });
+                updated++;
+                if (incomingRicher) merged++;
+              } else {
+                duplicates++;
+              }
+              continue;
+            }
+
+            await prisma.lead.create({
+              data: {
+                ...incoming,
+                name: incoming.name || incoming.email || incoming.phone || 'Imported lead',
+                assignedRepId: null,
+              },
+            });
+            created++;
+          } catch (err) {
+            failed++;
+            const reason = importErrorReason(err);
+            const failure = { row: index + 2, name: clean(row.name), reason };
+            failures.push(failure);
+            console.error('[leads/import] row failed', failure, err);
+            if (row.externalId) seenBatchKeys.delete(clean(row.externalId));
+            else if (row.phone) seenBatchKeys.delete(normPhone(row.phone));
+            else if (row.email) seenBatchKeys.delete(normEmail(row.email));
+          }
         }
-        return res.status(201).json({ created, updated, merged, duplicates, skipped });
+        return res.status(201).json({
+          created,
+          updated,
+          merged,
+          duplicates,
+          skipped,
+          failed,
+          failures,
+        });
       });
     }
 
@@ -475,6 +508,25 @@ async function handleCollection(
         prisma.lead.updateMany({ where: { id: { in: ids } }, data: { assignedRepId: repId } })
       );
       return res.status(200).json({ ok: true, ids, repId });
+    }
+
+    if (action === 'delete_leads') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const ids = Array.isArray(data.ids) ? data.ids.map((value) => clean(value)).filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'No lead ids provided.' });
+
+      return await withTables(async () => {
+        const leads = await prisma.lead.findMany({
+          where: { id: { in: ids }, assignedRepId: null },
+          select: { id: true },
+        });
+        const leadIds = leads.map((lead) => lead.id);
+        if (leadIds.length === 0) return res.status(200).json({ ok: true, deleted: 0 });
+
+        await prisma.interaction.deleteMany({ where: { leadId: { in: leadIds } } });
+        const result = await prisma.lead.deleteMany({ where: { id: { in: leadIds } } });
+        return res.status(200).json({ ok: true, deleted: result.count });
+      });
     }
 
     if (action === 'log_interaction') {
