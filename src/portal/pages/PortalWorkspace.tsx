@@ -14,6 +14,7 @@ import {
   Phone,
   PhoneCall,
   SkipForward,
+  Sparkles,
   TimerReset,
   Upload,
   UserPlus,
@@ -35,20 +36,29 @@ import type {
 // ─── Outcome buttons ──────────────────────────────────────────────────────────
 type Tone = 'neutral' | 'good' | 'bad' | 'warn';
 type OutcomeAction = { value: CallOutcome; label: string; shortLabel?: string; tone: Tone };
-const PRIMARY_OUTCOMES: OutcomeAction[] = [
+const NO_CONTACT_OUTCOMES: OutcomeAction[] = [
   { value: 'no_answer', label: 'No answer', tone: 'neutral' },
   { value: 'voicemail', label: 'Left voicemail', tone: 'neutral' },
+];
+const TALKED_OUTCOMES: OutcomeAction[] = [
   { value: 'callback_scheduled', label: 'Schedule callback', shortLabel: 'Callback', tone: 'warn' },
   { value: 'not_interested', label: 'Not interested', tone: 'bad' },
+];
+const BAD_LEAD_OUTCOMES: OutcomeAction[] = [
   { value: 'wrong_number', label: 'Wrong number', tone: 'bad' },
+  { value: 'not_qualified', label: 'Not qualified', tone: 'bad' },
+  { value: 'duplicate', label: 'Duplicate', tone: 'bad' },
 ];
 const SECONDARY_OUTCOMES: OutcomeAction[] = [
   { value: 'needs_follow_up', label: 'Needs follow-up', tone: 'warn' },
-  { value: 'not_qualified', label: 'Not qualified', tone: 'bad' },
-  { value: 'duplicate', label: 'Duplicate', tone: 'bad' },
   { value: 'already_booked', label: 'Already booked', tone: 'good' },
 ];
-const OUTCOMES = [...PRIMARY_OUTCOMES, ...SECONDARY_OUTCOMES];
+const OUTCOMES = [
+  ...NO_CONTACT_OUTCOMES,
+  ...TALKED_OUTCOMES,
+  ...BAD_LEAD_OUTCOMES,
+  ...SECONDARY_OUTCOMES,
+];
 
 const toneClasses: Record<Tone, string> = {
   neutral: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
@@ -88,6 +98,43 @@ function fmtDateTime(iso: string | null | undefined): string {
     minute: '2-digit',
     hour12: true,
   });
+}
+
+function startOfLocalDate(offsetDays: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function dateInputValue(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function leadUrgency(lead: Lead) {
+  const now = Date.now();
+  if (lead.callbackAt) {
+    const callback = new Date(lead.callbackAt).getTime();
+    if (!Number.isNaN(callback) && callback <= now) return 'Callback due now';
+  }
+  if (lead.attemptCount === 0) return `Fresh lead - submitted ${timeAgo(lead.submittedAt)}`;
+  if (lead.lastContactedAt) return `Attempt ${lead.attemptCount + 1} - last touch ${timeAgo(lead.lastContactedAt)}`;
+  return `Attempt ${lead.attemptCount + 1}`;
+}
+
+function callReason(lead: Lead) {
+  const signals = [
+    lead.projectType,
+    lead.city,
+    lead.budget ? `${lead.budget} budget` : '',
+    lead.financingInterest ? 'financing interest' : '',
+  ].filter(Boolean);
+  if (signals.length > 0) return signals.join(' - ');
+  if (lead.sourceDetail) return lead.sourceDetail;
+  return 'Needs qualification';
 }
 
 function leadToClient(lead: Lead): Client {
@@ -209,6 +256,13 @@ function CustomerCard({
       ? fmtDateTime(lead.callbackAt)
       : '';
   const lastTouch = lead.lastContactedAt ? timeAgo(lead.lastContactedAt) : '';
+  const reason = callReason(lead);
+  const urgency = leadUrgency(lead);
+  const quickCallback = (days: number, time: string) => {
+    setCbDate(dateInputValue(startOfLocalDate(days)));
+    setCbTime(time);
+    setShowCallback(true);
+  };
 
   const handleOutcome = async (outcome: CallOutcome) => {
     if (outcome === 'callback_scheduled') {
@@ -263,6 +317,16 @@ function CustomerCard({
       </div>
     ) : null;
 
+  const outcomeButton = (o: OutcomeAction, className = '') => (
+    <button
+      key={o.value}
+      onClick={() => handleOutcome(o.value)}
+      className={cn('min-h-11 rounded-[0.65rem] border px-3 py-2 text-sm font-black transition', toneClasses[o.tone], className)}
+    >
+      {o.shortLabel ?? o.label}
+    </button>
+  );
+
   return (
     <div className="overflow-hidden rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-3">
@@ -295,47 +359,55 @@ function CustomerCard({
       </div>
 
       <div className="p-5">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Current customer</p>
-          <h2 className="mt-1 text-3xl font-black tracking-[-0.02em] text-slate-950 sm:text-4xl">
-            {lead.name}
-          </h2>
-          <p className="mt-1 text-base font-semibold text-slate-600">
-            {[lead.city, lead.projectType].filter(Boolean).join(' - ') || 'No project details'}
-          </p>
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-          <div className="min-w-0 rounded-[0.8rem] border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-400">Phone</p>
-            <p className="mt-0.5 truncate text-2xl font-black text-slate-950">{lead.phone || 'No phone number'}</p>
+        <div className="rounded-[0.9rem] border border-[#d8e5f4] bg-[#f7fbff] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-[#32639b]">
+                <Sparkles className="h-3.5 w-3.5" /> Current call
+              </p>
+              <h2 className="mt-2 text-4xl font-black tracking-[-0.02em] text-slate-950 sm:text-5xl">
+                {lead.name}
+              </h2>
+              <p className="mt-2 text-lg font-bold text-slate-700">{reason}</p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#1B3C6C] ring-1 ring-[#c9dbef]">
+              {urgency}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 md:justify-end">
+
+          <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">Phone</p>
+              <p className="mt-0.5 truncate text-3xl font-black text-slate-950">{lead.phone || 'No phone number'}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 md:justify-end">
             {lead.phone && (
               <button onClick={copyPhone} className="inline-flex items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
                 {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
             )}
-            <button onClick={handleBook} className="inline-flex items-center gap-2 rounded-[0.7rem] bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
-              <CalendarPlus className="h-4 w-4" /> Book appointment
-            </button>
+            </div>
           </div>
-        </div>
 
-        <div className="mt-4">
+          <div className="mt-4">
           {tel ? (
-            <a href={tel} className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] bg-[#1B3C6C] px-5 py-4 text-lg font-black text-white shadow-sm transition hover:bg-[#153158]">
+            <a href={tel} className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] bg-[#1B3C6C] px-5 py-5 text-xl font-black text-white shadow-sm transition hover:bg-[#153158]">
               <PhoneCall className="h-6 w-6" /> Call now
             </a>
           ) : (
-            <span className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] border border-slate-200 px-5 py-4 text-lg font-black text-slate-400">
+            <span className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] border border-slate-200 px-5 py-5 text-xl font-black text-slate-400">
               <Phone className="h-5 w-5" /> No phone number
             </span>
           )}
+          </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <details className="mt-4 rounded-[0.8rem] border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-black text-slate-600 marker:text-slate-400">
+            Lead details
+          </summary>
+          <div className="grid grid-cols-2 gap-4 border-t border-slate-100 px-4 py-4 sm:grid-cols-4">
           {detail('Email', lead.email)}
           {detail('Budget', lead.budget)}
           {detail(
@@ -354,7 +426,8 @@ function CustomerCard({
               </p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {lead.notes && (
           <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -363,11 +436,11 @@ function CustomerCard({
           </div>
         )}
 
-        <div className="mt-5 rounded-[0.85rem] border border-slate-200 bg-slate-50 p-4">
+        <div className="mt-5 rounded-[0.85rem] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-slate-400">After the call</p>
-              <p className="text-sm font-semibold text-slate-600">Choose an outcome to log and move to the next lead.</p>
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">What happened?</p>
+              <p className="text-sm font-semibold text-slate-600">Disposition</p>
             </div>
             <button onClick={() => setShowNote((v) => !v)} className="inline-flex items-center gap-2 rounded-[0.6rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
               <MessageSquarePlus className="h-4 w-4" /> Add note
@@ -382,16 +455,28 @@ function CustomerCard({
             className="mt-3 w-full rounded-[0.7rem] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
           />
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            {PRIMARY_OUTCOMES.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => handleOutcome(o.value)}
-                className={cn('min-h-11 rounded-[0.65rem] border px-3 py-2 text-sm font-black transition', toneClasses[o.tone])}
-              >
-                {o.shortLabel ?? o.label}
-              </button>
-            ))}
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            <div className="rounded-[0.75rem] border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">No contact</p>
+              <div className="mt-2 grid gap-2">
+                {NO_CONTACT_OUTCOMES.map((o) => outcomeButton(o, 'bg-white'))}
+              </div>
+            </div>
+            <div className="rounded-[0.75rem] border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs font-black uppercase tracking-wide text-emerald-700">Talked</p>
+              <div className="mt-2 grid gap-2">
+                <button onClick={handleBook} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[0.65rem] bg-emerald-600 px-3 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
+                  <CalendarPlus className="h-4 w-4" /> Book appointment
+                </button>
+                {TALKED_OUTCOMES.map((o) => outcomeButton(o, o.value === 'not_interested' ? 'bg-white' : ''))}
+              </div>
+            </div>
+            <div className="rounded-[0.75rem] border border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-black uppercase tracking-wide text-red-700">Bad lead</p>
+              <div className="mt-2 grid gap-2">
+                {BAD_LEAD_OUTCOMES.map((o) => outcomeButton(o))}
+              </div>
+            </div>
           </div>
 
           <button
@@ -416,6 +501,14 @@ function CustomerCard({
 
           {showCallback && (
             <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[0.7rem] border border-amber-200 bg-amber-50 p-3">
+              <div className="basis-full">
+                <p className="text-xs font-black uppercase tracking-wide text-amber-900">Callback time</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => quickCallback(0, '16:00')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-100">Later today</button>
+                  <button type="button" onClick={() => quickCallback(1, '10:00')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-100">Tomorrow AM</button>
+                  <button type="button" onClick={() => quickCallback(7, '10:00')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-100">Next week</button>
+                </div>
+              </div>
               <label className="text-xs font-bold text-amber-900">
                 Date
                 <input type="date" value={cbDate} onChange={(e) => setCbDate(e.target.value)} className="mt-1 block rounded-lg border border-amber-300 px-2 py-1.5 text-sm" />
@@ -741,7 +834,7 @@ function ContextPanel({ lead }: { lead: Lead }) {
   const latest = lead.interactions?.[0];
   return (
     <div className="space-y-3">
-      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-[0.9rem] border border-slate-200 bg-white/80 p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-[#1B3C6C]" />
           <p className="text-xs font-black uppercase tracking-wide text-slate-400">Context</p>
@@ -754,22 +847,29 @@ function ContextPanel({ lead }: { lead: Lead }) {
             </p>
           </div>
           <div>
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Source</p>
-            <p className="font-semibold text-slate-700">{[lead.source, lead.sourceDetail].filter(Boolean).join(' - ') || 'Unknown'}</p>
+            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Contact</p>
+            <p className="font-semibold text-slate-700">{lead.email || 'No email'}</p>
+            <p className="text-slate-500">{[lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ') || 'No address'}</p>
           </div>
           {lead.notes && (
-            <div>
-              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Lead note</p>
-              <p className="text-slate-600 whitespace-pre-wrap">{lead.notes}</p>
-            </div>
+            <details>
+              <summary className="cursor-pointer text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Lead note</summary>
+              <p className="mt-1 text-slate-600 whitespace-pre-wrap">{lead.notes}</p>
+            </details>
           )}
+          <details>
+            <summary className="cursor-pointer text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Source</summary>
+            <p className="mt-1 font-semibold text-slate-700">{[lead.source, lead.sourceDetail].filter(Boolean).join(' - ') || 'Unknown'}</p>
+          </details>
         </div>
       </div>
 
-      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-400">Timeline</p>
-        <LeadTimeline lead={lead} />
-      </div>
+      <details className="rounded-[0.9rem] border border-slate-200 bg-white/80 shadow-sm">
+        <summary className="cursor-pointer px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-400 marker:text-slate-400">Timeline</summary>
+        <div className="border-t border-slate-100 p-4">
+          <LeadTimeline lead={lead} />
+        </div>
+      </details>
     </div>
   );
 }
@@ -816,7 +916,7 @@ export default function PortalWorkspace() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">Sales Workspace</p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Call queue</h1>
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Call flow</h1>
         </div>
         {isAdmin && (
           <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1 shadow-sm">
