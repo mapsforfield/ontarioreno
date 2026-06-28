@@ -7,11 +7,14 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  FileText,
   MapPin,
+  MoreHorizontal,
   MessageSquarePlus,
   Phone,
   PhoneCall,
   SkipForward,
+  TimerReset,
   Upload,
   UserPlus,
   Users,
@@ -31,17 +34,21 @@ import type {
 
 // ─── Outcome buttons ──────────────────────────────────────────────────────────
 type Tone = 'neutral' | 'good' | 'bad' | 'warn';
-const OUTCOMES: Array<{ value: CallOutcome; label: string; tone: Tone }> = [
+type OutcomeAction = { value: CallOutcome; label: string; shortLabel?: string; tone: Tone };
+const PRIMARY_OUTCOMES: OutcomeAction[] = [
   { value: 'no_answer', label: 'No answer', tone: 'neutral' },
   { value: 'voicemail', label: 'Left voicemail', tone: 'neutral' },
-  { value: 'needs_follow_up', label: 'Needs follow-up', tone: 'warn' },
-  { value: 'callback_scheduled', label: 'Schedule callback', tone: 'warn' },
+  { value: 'callback_scheduled', label: 'Schedule callback', shortLabel: 'Callback', tone: 'warn' },
   { value: 'not_interested', label: 'Not interested', tone: 'bad' },
-  { value: 'not_qualified', label: 'Not qualified', tone: 'bad' },
   { value: 'wrong_number', label: 'Wrong number', tone: 'bad' },
+];
+const SECONDARY_OUTCOMES: OutcomeAction[] = [
+  { value: 'needs_follow_up', label: 'Needs follow-up', tone: 'warn' },
+  { value: 'not_qualified', label: 'Not qualified', tone: 'bad' },
   { value: 'duplicate', label: 'Duplicate', tone: 'bad' },
   { value: 'already_booked', label: 'Already booked', tone: 'good' },
 ];
+const OUTCOMES = [...PRIMARY_OUTCOMES, ...SECONDARY_OUTCOMES];
 
 const toneClasses: Record<Tone, string> = {
   neutral: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
@@ -182,20 +189,26 @@ function CustomerCard({
   const [showCallback, setShowCallback] = useState(false);
   const [cbDate, setCbDate] = useState('');
   const [cbTime, setCbTime] = useState('10:00');
+  const [showMoreOutcomes, setShowMoreOutcomes] = useState(false);
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState('');
 
-  // Reset per-lead UI when the lead changes.
   useEffect(() => {
     setCallNote('');
     setShowCallback(false);
     setCbDate('');
     setCbTime('10:00');
+    setShowMoreOutcomes(false);
     setShowNote(false);
     setNoteText('');
   }, [lead.id]);
 
   const tel = telHref(lead.phone);
+  const callbackDue =
+    lead.callbackAt && new Date(lead.callbackAt).getTime() <= Date.now()
+      ? fmtDateTime(lead.callbackAt)
+      : '';
+  const lastTouch = lead.lastContactedAt ? timeAgo(lead.lastContactedAt) : '';
 
   const handleOutcome = async (outcome: CallOutcome) => {
     if (outcome === 'callback_scheduled') {
@@ -242,156 +255,196 @@ function CustomerCard({
     }
   };
 
-  const detail = (label: string, value: string) =>
+  const detail = (label: string, value: string, className = '') =>
     value ? (
-      <div>
+      <div className={className}>
         <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">{label}</p>
         <p className="text-sm font-semibold text-slate-800 break-words">{value}</p>
       </div>
     ) : null;
 
   return (
-    <div className="rounded-[0.9rem] border border-slate-200 bg-white p-5 shadow-sm">
-      {/* Header: name + queue position */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate text-2xl font-black tracking-[-0.02em] text-slate-950">
-              {lead.name}
-            </h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
+    <div className="overflow-hidden rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">
+              {index + 1} of {total}
+            </span>
+            <span className="rounded-full bg-[#e8f1fb] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">
               {statusLabel[lead.status] ?? lead.status}
             </span>
+            {callbackDue && (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
+                Callback due {callbackDue}
+              </span>
+            )}
           </div>
-          <p className="mt-0.5 text-sm font-semibold text-slate-500">
-            {[lead.city, lead.projectType].filter(Boolean).join(' · ') || 'No project details'}
+          <div className="flex shrink-0 items-center gap-1">
+            <button onClick={onPrev} disabled={index <= 0} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40" aria-label="Previous lead">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button onClick={onNext} disabled={index >= total - 1} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40" aria-label="Next lead">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button onClick={onSkip} className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
+              <SkipForward className="h-4 w-4" /> Skip
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Current customer</p>
+          <h2 className="mt-1 text-3xl font-black tracking-[-0.02em] text-slate-950 sm:text-4xl">
+            {lead.name}
+          </h2>
+          <p className="mt-1 text-base font-semibold text-slate-600">
+            {[lead.city, lead.projectType].filter(Boolean).join(' - ') || 'No project details'}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button onClick={onPrev} disabled={index <= 0} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40" aria-label="Previous lead">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="px-1 text-xs font-bold text-slate-500">{index + 1}/{total}</span>
-          <button onClick={onNext} disabled={index >= total - 1} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40" aria-label="Next lead">
-            <ChevronRight className="h-4 w-4" />
-          </button>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="min-w-0 rounded-[0.8rem] border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-400">Phone</p>
+            <p className="mt-0.5 truncate text-2xl font-black text-slate-950">{lead.phone || 'No phone number'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            {lead.phone && (
+              <button onClick={copyPhone} className="inline-flex items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            )}
+            <button onClick={handleBook} className="inline-flex items-center gap-2 rounded-[0.7rem] bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+              <CalendarPlus className="h-4 w-4" /> Book appointment
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Call bar */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {tel ? (
-          <a href={tel} className="inline-flex items-center gap-2 rounded-[0.7rem] bg-[#1B3C6C] px-5 py-3 text-base font-bold text-white shadow-sm transition hover:bg-[#153158]">
-            <PhoneCall className="h-5 w-5" /> Call {lead.phone}
-          </a>
-        ) : (
-          <span className="inline-flex items-center gap-2 rounded-[0.7rem] border border-slate-200 px-5 py-3 text-base font-bold text-slate-400">
-            <Phone className="h-5 w-5" /> No phone number
-          </span>
-        )}
-        {lead.phone && (
-          <button onClick={copyPhone} className="inline-flex items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        )}
-        <button onClick={onSkip} className="ml-auto inline-flex items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
-          <SkipForward className="h-4 w-4" /> Skip
-        </button>
-      </div>
+        <div className="mt-4">
+          {tel ? (
+            <a href={tel} className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] bg-[#1B3C6C] px-5 py-4 text-lg font-black text-white shadow-sm transition hover:bg-[#153158]">
+              <PhoneCall className="h-6 w-6" /> Call now
+            </a>
+          ) : (
+            <span className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] border border-slate-200 px-5 py-4 text-lg font-black text-slate-400">
+              <Phone className="h-5 w-5" /> No phone number
+            </span>
+          )}
+        </div>
 
-      {/* Detail grid */}
-      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3">
-        {detail('Email', lead.email)}
-        {detail('Budget', lead.budget)}
-        {detail(
-          'Financing',
-          lead.financingInterest == null ? '' : lead.financingInterest ? 'Interested' : 'No'
-        )}
-        {detail('Source', [lead.source, lead.sourceDetail].filter(Boolean).join(' · '))}
-        {detail('Submitted', fmtDateTime(lead.submittedAt))}
-        {detail('Attempts', String(lead.attemptCount))}
-        {lead.address && (
-          <div className="col-span-2 sm:col-span-3">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Address</p>
-            <p className="flex items-center gap-1 text-sm font-semibold text-slate-800">
-              <MapPin className="h-3.5 w-3.5 text-slate-400" />
-              {[lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ')}
-            </p>
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {detail('Email', lead.email)}
+          {detail('Budget', lead.budget)}
+          {detail(
+            'Financing',
+            lead.financingInterest == null ? '' : lead.financingInterest ? 'Interested' : 'No'
+          )}
+          {detail('Attempts', `${lead.attemptCount}${lastTouch ? ` - last ${lastTouch}` : ''}`)}
+          {detail('Source', [lead.source, lead.sourceDetail].filter(Boolean).join(' - '), 'sm:col-span-2')}
+          {detail('Submitted', fmtDateTime(lead.submittedAt))}
+          {lead.address && (
+            <div className="col-span-2 sm:col-span-4">
+              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Address</p>
+              <p className="flex items-center gap-1 text-sm font-semibold text-slate-800">
+                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                {[lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ')}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {lead.notes && (
+          <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Lead notes</p>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">{lead.notes}</p>
           </div>
         )}
-      </div>
 
-      {lead.notes && (
-        <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Notes</p>
-          <p className="text-sm text-slate-700 whitespace-pre-wrap">{lead.notes}</p>
-        </div>
-      )}
+        <div className="mt-5 rounded-[0.85rem] border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">After the call</p>
+              <p className="text-sm font-semibold text-slate-600">Choose an outcome to log and move to the next lead.</p>
+            </div>
+            <button onClick={() => setShowNote((v) => !v)} className="inline-flex items-center gap-2 rounded-[0.6rem] border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+              <MessageSquarePlus className="h-4 w-4" /> Add note
+            </button>
+          </div>
 
-      {/* Call note */}
-      <textarea
-        value={callNote}
-        onChange={(e) => setCallNote(e.target.value)}
-        placeholder="Quick note about this call (optional)…"
-        rows={2}
-        className="mt-4 w-full rounded-[0.7rem] border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
-      />
+          <textarea
+            value={callNote}
+            onChange={(e) => setCallNote(e.target.value)}
+            placeholder="Quick call note (optional)"
+            rows={2}
+            className="mt-3 w-full rounded-[0.7rem] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
+          />
 
-      {/* Outcome buttons */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {OUTCOMES.map((o) => (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {PRIMARY_OUTCOMES.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => handleOutcome(o.value)}
+                className={cn('min-h-11 rounded-[0.65rem] border px-3 py-2 text-sm font-black transition', toneClasses[o.tone])}
+              >
+                {o.shortLabel ?? o.label}
+              </button>
+            ))}
+          </div>
+
           <button
-            key={o.value}
-            onClick={() => handleOutcome(o.value)}
-            className={cn('rounded-[0.6rem] border px-3 py-2 text-sm font-bold transition', toneClasses[o.tone])}
+            onClick={() => setShowMoreOutcomes((v) => !v)}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-[0.6rem] px-2 py-1.5 text-sm font-bold text-slate-500 transition hover:bg-white hover:text-slate-700"
           >
-            {o.label}
+            <MoreHorizontal className="h-4 w-4" /> More outcomes
           </button>
-        ))}
-      </div>
+          {showMoreOutcomes && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SECONDARY_OUTCOMES.map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => handleOutcome(o.value)}
+                  className={cn('rounded-[0.6rem] border px-3 py-2 text-sm font-bold transition', toneClasses[o.tone])}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {/* Callback scheduler */}
-      {showCallback && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[0.7rem] border border-amber-200 bg-amber-50 p-3">
-          <label className="text-xs font-bold text-amber-900">
-            Date
-            <input type="date" value={cbDate} onChange={(e) => setCbDate(e.target.value)} className="mt-1 block rounded-lg border border-amber-300 px-2 py-1.5 text-sm" />
-          </label>
-          <label className="text-xs font-bold text-amber-900">
-            Time
-            <input type="time" value={cbTime} onChange={(e) => setCbTime(e.target.value)} className="mt-1 block rounded-lg border border-amber-300 px-2 py-1.5 text-sm" />
-          </label>
-          <button onClick={handleSaveCallback} disabled={!cbDate} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
-            <Clock className="h-4 w-4" /> Set callback
-          </button>
-          <button onClick={() => setShowCallback(false)} className="rounded-lg px-2 py-2 text-sm font-bold text-amber-800">Cancel</button>
+          {showCallback && (
+            <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[0.7rem] border border-amber-200 bg-amber-50 p-3">
+              <label className="text-xs font-bold text-amber-900">
+                Date
+                <input type="date" value={cbDate} onChange={(e) => setCbDate(e.target.value)} className="mt-1 block rounded-lg border border-amber-300 px-2 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-bold text-amber-900">
+                Time
+                <input type="time" value={cbTime} onChange={(e) => setCbTime(e.target.value)} className="mt-1 block rounded-lg border border-amber-300 px-2 py-1.5 text-sm" />
+              </label>
+              <button onClick={handleSaveCallback} disabled={!cbDate} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
+                <Clock className="h-4 w-4" /> Set callback
+              </button>
+              <button onClick={() => setShowCallback(false)} className="rounded-lg px-2 py-2 text-sm font-bold text-amber-800">Cancel</button>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Primary actions */}
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-        <button onClick={handleBook} className="inline-flex items-center gap-2 rounded-[0.7rem] bg-emerald-600 px-5 py-3 text-base font-bold text-white shadow-sm transition hover:bg-emerald-700">
-          <CalendarPlus className="h-5 w-5" /> Book appointment
-        </button>
-        <button onClick={() => setShowNote((v) => !v)} className="inline-flex items-center gap-2 rounded-[0.7rem] border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-          <MessageSquarePlus className="h-4 w-4" /> Add note
-        </button>
-      </div>
-
-      {showNote && (
-        <div className="mt-3 flex flex-col gap-2 rounded-[0.7rem] border border-slate-200 bg-slate-50 p-3">
-          <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={2} placeholder="Add a note to this lead's timeline…" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100" />
-          <div className="flex gap-2">
-            <button onClick={handleSaveNote} disabled={!noteText.trim()} className="rounded-lg bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Save note</button>
-            <button onClick={() => setShowNote(false)} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600">Cancel</button>
+        {showNote && (
+          <div className="mt-3 flex flex-col gap-2 rounded-[0.7rem] border border-slate-200 bg-slate-50 p-3">
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={2} placeholder="Add a note to this lead's timeline" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100" />
+            <div className="flex gap-2">
+              <button onClick={handleSaveNote} disabled={!noteText.trim()} className="rounded-lg bg-[#1B3C6C] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Save note</button>
+              <button onClick={() => setShowNote(false)} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600">Cancel</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
-
 // ─── Import modal (admin) ─────────────────────────────────────────────────────
 const IMPORT_COLUMNS = [
   'name', 'phone', 'email', 'city', 'address', 'postalCode',
@@ -593,6 +646,15 @@ function TriageView() {
 }
 
 // ─── Queue rail ───────────────────────────────────────────────────────────────
+function queueTag(lead: Lead, now: number) {
+  const due = lead.callbackAt && new Date(lead.callbackAt).getTime() <= now;
+  if (due) return { label: 'callback', className: 'bg-amber-100 text-amber-800' };
+  if (lead.attemptCount === 0 && lead.status === 'new') {
+    return { label: 'new', className: 'bg-emerald-100 text-emerald-800' };
+  }
+  return { label: 'follow-up', className: 'bg-slate-100 text-slate-600' };
+}
+
 function QueueRail({
   queue,
   selectedId,
@@ -606,51 +668,66 @@ function QueueRail({
   const counts = useMemo(() => {
     let callbacks = 0;
     let fresh = 0;
+    let followUp = 0;
     for (const l of queue) {
       if (l.callbackAt && new Date(l.callbackAt).getTime() <= now) callbacks++;
       else if (l.attemptCount === 0 && l.status === 'new') fresh++;
+      else followUp++;
     }
-    return { callbacks, fresh };
+    return { callbacks, fresh, followUp };
   }, [queue, now]);
 
   return (
     <div className="rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Call queue</p>
-        <p className="text-sm font-bold text-slate-700">
-          {queue.length} lead(s)
-          {counts.callbacks > 0 && <span className="text-amber-600"> · {counts.callbacks} callback(s) due</span>}
-          {counts.fresh > 0 && <span className="text-emerald-600"> · {counts.fresh} new</span>}
-        </p>
+      <div className="border-b border-slate-100 px-4 py-4">
+        <p className="text-xs font-black uppercase tracking-wide text-slate-400">Next up</p>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-amber-50 px-2 py-2">
+            <p className="text-lg font-black text-amber-800">{counts.callbacks}</p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-wide text-amber-700">Due</p>
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-2 py-2">
+            <p className="text-lg font-black text-emerald-800">{counts.fresh}</p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-wide text-emerald-700">New</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 px-2 py-2">
+            <p className="text-lg font-black text-slate-700">{counts.followUp}</p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Older</p>
+          </div>
+        </div>
       </div>
-      <div className="max-h-[70vh] overflow-y-auto">
+      <div className="max-h-[72vh] overflow-y-auto">
         {queue.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm font-semibold text-slate-400">Queue is empty 🎉</p>
+          <p className="px-4 py-8 text-center text-sm font-semibold text-slate-400">Queue is empty.</p>
         ) : (
-          queue.map((l) => {
-            const due = l.callbackAt && new Date(l.callbackAt).getTime() <= now;
+          queue.map((l, idx) => {
+            const tag = queueTag(l, now);
+            const selected = l.id === selectedId;
             return (
               <button
                 key={l.id}
                 onClick={() => onSelect(l.id)}
                 className={cn(
-                  'flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-3 text-left transition',
-                  l.id === selectedId ? 'bg-[#e8f1fb]' : 'hover:bg-slate-50'
+                  'flex w-full flex-col items-start gap-1 border-b border-slate-50 px-4 py-3 text-left transition',
+                  selected ? 'bg-[#e8f1fb]' : 'hover:bg-slate-50'
                 )}
               >
                 <span className="flex w-full items-center justify-between gap-2">
-                  <span className="truncate text-sm font-bold text-slate-800">{l.name}</span>
-                  {due && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700">callback</span>}
-                  {!due && l.attemptCount === 0 && l.status === 'new' && (
-                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-700">new</span>
-                  )}
+                  <span className="min-w-0 truncate text-sm font-black text-slate-800">
+                    {selected ? 'Now: ' : `${idx + 1}. `}{l.name}
+                  </span>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-black', tag.className)}>
+                    {tag.label}
+                  </span>
                 </span>
-                <span className="truncate text-xs text-slate-500">
-                  {[l.city, l.projectType].filter(Boolean).join(' · ') || 'No details'}
+                <span className="truncate text-xs font-semibold text-slate-500">
+                  {[l.city, l.projectType].filter(Boolean).join(' - ') || 'No details'}
                 </span>
-                {l.lastContactedAt && (
-                  <span className="text-[0.65rem] font-semibold text-slate-400">last: {timeAgo(l.lastContactedAt)}</span>
-                )}
+                <span className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.65rem] font-semibold text-slate-400">
+                  {l.callbackAt && <span><TimerReset className="mr-0.5 inline h-3 w-3" />{fmtDateTime(l.callbackAt)}</span>}
+                  {l.lastContactedAt && <span>last {timeAgo(l.lastContactedAt)}</span>}
+                  {l.attemptCount > 0 && <span>{l.attemptCount} attempt(s)</span>}
+                </span>
               </button>
             );
           })
@@ -660,6 +737,42 @@ function QueueRail({
   );
 }
 
+function ContextPanel({ lead }: { lead: Lead }) {
+  const latest = lead.interactions?.[0];
+  return (
+    <div className="space-y-3">
+      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-[#1B3C6C]" />
+          <p className="text-xs font-black uppercase tracking-wide text-slate-400">Context</p>
+        </div>
+        <div className="mt-3 space-y-3 text-sm">
+          <div>
+            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Latest touch</p>
+            <p className="font-semibold text-slate-700">
+              {latest ? `${fmtDateTime(latest.occurredAt)} - ${latest.outcome ? outcomeLabel[latest.outcome] ?? latest.outcome : latest.channel}` : 'No interactions yet'}
+            </p>
+          </div>
+          <div>
+            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Source</p>
+            <p className="font-semibold text-slate-700">{[lead.source, lead.sourceDetail].filter(Boolean).join(' - ') || 'Unknown'}</p>
+          </div>
+          {lead.notes && (
+            <div>
+              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Lead note</p>
+              <p className="text-slate-600 whitespace-pre-wrap">{lead.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-400">Timeline</p>
+        <LeadTimeline lead={lead} />
+      </div>
+    </div>
+  );
+}
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
@@ -716,7 +829,7 @@ export default function PortalWorkspace() {
       {isAdmin && tab === 'triage' ? (
         <TriageView />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)_18rem]">
+        <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
           <QueueRail queue={queue} selectedId={selectedId} onSelect={setSelectedId} />
           {selectedWithTimeline ? (
             <>
@@ -728,13 +841,10 @@ export default function PortalWorkspace() {
                 onNext={goNext}
                 onSkip={goNext}
               />
-              <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Timeline</p>
-                <LeadTimeline lead={selectedWithTimeline} />
-              </div>
+              <ContextPanel lead={selectedWithTimeline} />
             </>
           ) : (
-            <div className="lg:col-span-2 flex items-center justify-center rounded-[0.9rem] border border-dashed border-slate-300 bg-white p-12">
+            <div className="xl:col-span-2 flex items-center justify-center rounded-[0.9rem] border border-dashed border-slate-300 bg-white p-12">
               <p className="text-center text-sm font-semibold text-slate-400">
                 Your queue is empty.
                 {isAdmin ? ' Import and assign leads from Triage.' : ' New leads will appear here once assigned.'}
