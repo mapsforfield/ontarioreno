@@ -198,6 +198,11 @@ function hasValue(value: unknown) {
   return value !== null && value !== undefined && String(value).trim() !== '';
 }
 
+function timeValue(value: unknown) {
+  const time = new Date(String(value ?? '')).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
 function mergeLeadPatch(existing: Record<string, unknown>, incoming: ReturnType<typeof importLeadData>) {
   const incomingRicher = isWebsiteSource(incoming.source) || sourceRank(incoming.source) > sourceRank(existing.source);
   const patch: Record<string, unknown> = {};
@@ -209,6 +214,11 @@ function mergeLeadPatch(existing: Record<string, unknown>, incoming: ReturnType<
   }
   if (hasValue(incoming.source) && (!hasValue(existing.source) || incomingRicher)) patch.source = incoming.source;
   if (incoming.externalId && !hasValue(existing.externalId)) patch.externalId = incoming.externalId;
+  const existingSubmittedAt = timeValue(existing.submittedAt);
+  const incomingSubmittedAt = timeValue(incoming.submittedAt);
+  if (incomingSubmittedAt != null && (existingSubmittedAt == null || incomingSubmittedAt > existingSubmittedAt)) {
+    patch.submittedAt = incoming.submittedAt;
+  }
   if (incoming.notes) {
     const nextNotes = mergeNotes(clean(existing.notes), incoming.notes);
     if (nextNotes !== clean(existing.notes)) patch.notes = nextNotes;

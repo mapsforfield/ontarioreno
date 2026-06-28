@@ -472,44 +472,22 @@ function normalizeSearchValue(value: string) {
 }
 
 // ─── Lead queue scoring (client-side in Phase 1; pure + deterministic) ────────
-// A lead is only "in the queue" if it's actionable right now. Callback-scheduled
-// leads wait silently until their time arrives.
-function isQueueEligible(lead: Lead, now: number): boolean {
+// Source is only metadata. Meta + website intake leads share one callable queue.
+function isQueueEligible(lead: Lead): boolean {
   if (lead.deletedAt) return false;
   if (TERMINAL_LEAD_STATUSES.includes(lead.status)) return false;
-  if (
-    lead.status === 'callback_scheduled' &&
-    lead.callbackAt &&
-    new Date(lead.callbackAt).getTime() > now
-  ) {
-    return false; // scheduled for the future — not due yet
-  }
   return true;
 }
 
-// Returns [bucket, tiebreak]; lower sorts first. Buckets:
-//   0 callbacks now due  ·  1 brand-new (never attempted)  ·  2 attempted/follow-up
-function leadQueueRank(lead: Lead, now: number): [number, number] {
-  const callback = lead.callbackAt ? new Date(lead.callbackAt).getTime() : null;
-  if (callback != null && callback <= now) return [0, callback]; // most overdue first
-  if (lead.attemptCount === 0 && lead.status === 'new') {
-    return [1, -new Date(lead.submittedAt).getTime()]; // freshest first (speed-to-lead)
-  }
-  const last = lead.lastContactedAt
-    ? new Date(lead.lastContactedAt).getTime()
-    : new Date(lead.submittedAt).getTime();
-  return [2, last]; // longest-waiting first
+function submittedAtRank(lead: Lead) {
+  const submittedAt = new Date(lead.submittedAt).getTime();
+  return Number.isNaN(submittedAt) ? 0 : submittedAt;
 }
 
 function sortLeadQueue(leads: Lead[]): Lead[] {
-  const now = Date.now();
   return leads
-    .filter((lead) => isQueueEligible(lead, now))
-    .sort((a, b) => {
-      const [ra, sa] = leadQueueRank(a, now);
-      const [rb, sb] = leadQueueRank(b, now);
-      return ra - rb || sa - sb;
-    });
+    .filter(isQueueEligible)
+    .sort((a, b) => submittedAtRank(b) - submittedAtRank(a));
 }
 
 function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
