@@ -18,6 +18,7 @@ import {
   TimerReset,
   Trash2,
   Upload,
+  UserCheck,
   UserPlus,
   Users,
   X,
@@ -174,6 +175,55 @@ const outcomeLabel: Record<string, string> = Object.fromEntries(
   OUTCOMES.map((o) => [o.value, o.label])
 );
 
+// ─── Existing-client detection ────────────────────────────────────────────────
+// Cross-references a queue lead against the Clients list by phone (last 10
+// digits), email, or name. A match usually means the person was dealt with /
+// booked before and slipped past the import — flag it so it can be marked.
+type ClientMatchField = 'phone' | 'email' | 'name';
+type ClientMatch = { clientId: string; clientName: string; fields: ClientMatchField[] };
+type ClientIndex = {
+  byPhone: Map<string, Client>;
+  byEmail: Map<string, Client>;
+  byName: Map<string, Client>;
+};
+
+const phoneKey = (v: string | null | undefined) => {
+  const d = String(v ?? '').replace(/\D/g, '');
+  return d.length >= 10 ? d.slice(-10) : '';
+};
+const emailKey = (v: string | null | undefined) => String(v ?? '').trim().toLowerCase();
+const nameKey = (v: string | null | undefined) =>
+  String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+function buildClientIndex(clients: Client[]): ClientIndex {
+  const byPhone = new Map<string, Client>();
+  const byEmail = new Map<string, Client>();
+  const byName = new Map<string, Client>();
+  for (const c of clients) {
+    if (c.deletedAt) continue;
+    const p = phoneKey(c.phone);
+    if (p && !byPhone.has(p)) byPhone.set(p, c);
+    const e = emailKey(c.email);
+    if (e && !byEmail.has(e)) byEmail.set(e, c);
+    const n = nameKey(c.name);
+    if (n && !byName.has(n)) byName.set(n, c);
+  }
+  return { byPhone, byEmail, byName };
+}
+
+function matchLeadToClient(lead: Lead, index: ClientIndex): ClientMatch | null {
+  const fields: ClientMatchField[] = [];
+  let client: Client | undefined;
+  const p = phoneKey(lead.phone);
+  if (p && index.byPhone.has(p)) { client = index.byPhone.get(p); fields.push('phone'); }
+  const e = emailKey(lead.email);
+  if (e && index.byEmail.has(e)) { client = client ?? index.byEmail.get(e); fields.push('email'); }
+  const n = nameKey(lead.name);
+  if (n && index.byName.has(n)) { client = client ?? index.byName.get(n); fields.push('name'); }
+  if (!client) return null;
+  return { clientId: client.id, clientName: client.name, fields };
+}
+
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 function LeadTimeline({ lead }: { lead: Lead }) {
   const entries = useMemo(() => {
@@ -219,6 +269,7 @@ function CustomerCard({
   lead,
   index,
   total,
+  clientMatch,
   onPrev,
   onNext,
   onSkip,
@@ -226,6 +277,7 @@ function CustomerCard({
   lead: Lead;
   index: number;
   total: number;
+  clientMatch: ClientMatch | null;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -361,6 +413,25 @@ function CustomerCard({
       </div>
 
       <div className="p-5">
+        {clientMatch && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[0.8rem] border border-amber-300 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <UserCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+              <div>
+                <p className="text-sm font-black text-amber-900">Already in your Clients list</p>
+                <p className="text-xs font-semibold text-amber-800">
+                  Matched on {clientMatch.fields.join(' & ')} — they may have been booked before. If so, mark this lead &ldquo;Already booked&rdquo; or &ldquo;Duplicate&rdquo;.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/portal/clients', { state: { openClientId: clientMatch.clientId } })}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100"
+            >
+              View client
+            </button>
+          </div>
+        )}
         <div className="rounded-[0.9rem] border border-[#d8e5f4] bg-[#f7fbff] p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -868,10 +939,12 @@ function QueueRail({
   queue,
   selectedId,
   onSelect,
+  matches,
 }: {
   queue: Lead[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  matches: Map<string, ClientMatch>;
 }) {
   const now = Date.now();
   const counts = useMemo(() => {
@@ -932,7 +1005,15 @@ function QueueRail({
                 <span className="truncate text-xs font-semibold text-slate-500">
                   {[l.city, l.projectType].filter(Boolean).join(' - ') || 'No details'}
                 </span>
-                <span className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.65rem] font-semibold text-slate-400">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] font-semibold text-slate-400">
+                  {matches.has(l.id) && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800"
+                      title={`Already in Clients (matched on ${matches.get(l.id)!.fields.join(', ')})`}
+                    >
+                      <UserCheck className="h-3 w-3" /> in clients
+                    </span>
+                  )}
                   {l.callbackAt && <span><TimerReset className="mr-0.5 inline h-3 w-3" />{fmtDateTime(l.callbackAt)}</span>}
                   {l.lastContactedAt && <span>last {timeAgo(l.lastContactedAt)}</span>}
                   {l.attemptCount > 0 && <span>{l.attemptCount} attempt(s)</span>}
@@ -992,14 +1073,36 @@ function ContextPanel({ lead }: { lead: Lead }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
-  const { getLeadQueue, getInteractionsForLead } = usePortalData();
+  const { getLeadQueue, getInteractionsForLead, clients } = usePortalData();
   const [tab, setTab] = useState<'queue' | 'triage'>('queue');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [onlyMatches, setOnlyMatches] = useState(false);
 
   const queue = currentUser ? getLeadQueue(currentUser) : [];
-  const queueKey = queue.map((l) => l.id).join(',');
+  const queueKeyAll = queue.map((l) => l.id).join(',');
 
-  // Keep the selection valid as the queue changes (lead leaves, etc.).
+  // Flag queue leads that already exist in the Clients list (phone/email/name).
+  const clientIndex = useMemo(() => buildClientIndex(clients), [clients]);
+  const matchByLeadId = useMemo(() => {
+    const m = new Map<string, ClientMatch>();
+    for (const l of queue) {
+      const match = matchLeadToClient(l, clientIndex);
+      if (match) m.set(l.id, match);
+    }
+    return m;
+  }, [queueKeyAll, clientIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  const matchCount = matchByLeadId.size;
+
+  // Optionally narrow the queue to just the existing-client matches.
+  const displayedQueue = onlyMatches ? queue.filter((l) => matchByLeadId.has(l.id)) : queue;
+  const queueKey = displayedQueue.map((l) => l.id).join(',');
+
+  // Drop the filter automatically once every match has been worked through.
+  useEffect(() => {
+    if (onlyMatches && matchCount === 0) setOnlyMatches(false);
+  }, [onlyMatches, matchCount]);
+
+  // Keep the selection valid as the (filtered) queue changes.
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   useEffect(() => {
@@ -1011,20 +1114,20 @@ export default function PortalWorkspace() {
     }
   }, [queueKey]);
 
-  const index = queue.findIndex((l) => l.id === selectedId);
-  const selectedLead = index >= 0 ? queue[index] : null;
+  const index = displayedQueue.findIndex((l) => l.id === selectedId);
+  const selectedLead = index >= 0 ? displayedQueue[index] : null;
   // Pull the freshest interactions onto the selected lead for the timeline.
   const selectedWithTimeline = selectedLead
     ? { ...selectedLead, interactions: getInteractionsForLead(selectedLead.id) }
     : null;
 
   const goNext = () => {
-    if (queue.length === 0) return;
-    const next = Math.min(index + 1, queue.length - 1);
-    setSelectedId(queue[next]?.id ?? null);
+    if (displayedQueue.length === 0) return;
+    const next = Math.min(index + 1, displayedQueue.length - 1);
+    setSelectedId(displayedQueue[next]?.id ?? null);
   };
   const goPrev = () => {
-    if (index > 0) setSelectedId(queue[index - 1].id);
+    if (index > 0) setSelectedId(displayedQueue[index - 1].id);
   };
 
   return (
@@ -1034,25 +1137,48 @@ export default function PortalWorkspace() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">Sales Workspace</p>
           <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Call flow</h1>
         </div>
-        {isAdmin && (
-          <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1 shadow-sm">
-            <button onClick={() => setTab('queue')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'queue' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Call queue</button>
-            <button onClick={() => setTab('triage')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'triage' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Triage &amp; import</button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {tab === 'queue' && (
+            <button
+              onClick={() => setOnlyMatches((v) => !v)}
+              disabled={matchCount === 0}
+              title="Highlight leads already in your Clients list (matched by phone, email, or name) — likely booked before."
+              className={cn(
+                'inline-flex items-center gap-2 rounded-[0.7rem] border px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60',
+                onlyMatches
+                  ? 'border-amber-300 bg-amber-100 text-amber-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              )}
+            >
+              <UserCheck className="h-4 w-4" />
+              {matchCount === 0
+                ? 'No existing clients'
+                : onlyMatches
+                  ? `Showing ${matchCount} in clients`
+                  : `Existing clients (${matchCount})`}
+            </button>
+          )}
+          {isAdmin && (
+            <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1 shadow-sm">
+              <button onClick={() => setTab('queue')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'queue' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Call queue</button>
+              <button onClick={() => setTab('triage')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'triage' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Triage &amp; import</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {isAdmin && tab === 'triage' ? (
         <TriageView />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
-          <QueueRail queue={queue} selectedId={selectedId} onSelect={setSelectedId} />
+          <QueueRail queue={displayedQueue} selectedId={selectedId} onSelect={setSelectedId} matches={matchByLeadId} />
           {selectedWithTimeline ? (
             <>
               <CustomerCard
                 lead={selectedWithTimeline}
                 index={index}
-                total={queue.length}
+                total={displayedQueue.length}
+                clientMatch={matchByLeadId.get(selectedWithTimeline.id) ?? null}
                 onPrev={goPrev}
                 onNext={goNext}
                 onSkip={goNext}
