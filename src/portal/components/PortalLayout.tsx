@@ -37,7 +37,7 @@ import Toaster from './Toaster';
 
 const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
-  { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall },
+  { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, adminOnly: true },
   { label: 'Contractors', href: '/portal/contractors', icon: Building2 },
   { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness },
   {
