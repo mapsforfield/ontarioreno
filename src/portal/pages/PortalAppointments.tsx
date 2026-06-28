@@ -14,6 +14,7 @@ import {
   Send,
   Trash2,
   UserRound,
+  UserX,
   X,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -338,7 +339,7 @@ function sourceLabel(source: Appointment['source']) {
 
 // Stage-based dot color — used on calendar pills and month dots
 function getStageDotColor(stage: ConsultationStage, status?: AppointmentStatus): string {
-  if (status === 'no_show') return 'bg-red-400';
+  if (status === 'no_show') return 'bg-black';
   if (status === 'cancelled') return 'bg-slate-300';
   if (stage === 'won') return 'bg-emerald-500';
   if (stage === 'lost') return 'bg-red-500';
@@ -363,7 +364,7 @@ function getMobileDotColor(status: AppointmentStatus, stage?: ConsultationStage)
   if (status === 'completed') return 'bg-emerald-500';
   if (status === 'confirmed') return 'bg-sky-500';
   if (status === 'rescheduled') return 'bg-amber-500';
-  if (status === 'no_show') return 'bg-orange-500';
+  if (status === 'no_show') return 'bg-black';
   if (status === 'cancelled') return 'bg-slate-400';
   return 'bg-[#1B3C6C]';
 }
@@ -396,9 +397,9 @@ function getStatusClasses(status: AppointmentStatus) {
   }
   if (status === 'no_show') {
     return {
-      badge: 'bg-orange-100 text-orange-800',
-      card: 'border-orange-200 bg-orange-50/70 hover:border-orange-300',
-      dot: 'bg-orange-500',
+      badge: 'bg-black text-white',
+      card: 'border-slate-800 bg-slate-100 hover:border-black',
+      dot: 'bg-black',
     };
   }
   if (status === 'cancelled') {
@@ -418,7 +419,7 @@ function getStatusClasses(status: AppointmentStatus) {
 /** Returns a solid Tailwind bg class + whether text on it should be light or dark */
 function getStagePillBg(stage: ConsultationStage, status?: AppointmentStatus, aptType?: AppointmentType): { bg: string; lightText: boolean } {
   if (aptType && isEventType(aptType)) return getEventTypePillBg(aptType);
-  if (status === 'no_show')   return { bg: 'bg-red-400',      lightText: true };
+  if (status === 'no_show')   return { bg: 'bg-black',        lightText: true };
   if (status === 'cancelled') return { bg: 'bg-slate-300',    lightText: false };
   if (stage === 'won')        return { bg: 'bg-emerald-500',  lightText: true };
   if (stage === 'lost')       return { bg: 'bg-red-500',      lightText: true };
@@ -441,7 +442,7 @@ const CALENDAR_LEGEND: Array<{ bg: string; label: string }> = [
   { bg: 'bg-teal-500', label: 'Completed' },
   { bg: 'bg-emerald-500', label: 'Won' },
   { bg: 'bg-red-500', label: 'Lost' },
-  { bg: 'bg-red-400', label: 'No-show' },
+  { bg: 'bg-black', label: 'No-show' },
   { bg: 'bg-slate-300', label: 'Cancelled' },
   { bg: 'bg-orange-500', label: 'Showroom Visit' },
   { bg: 'bg-purple-600', label: 'Supplier Meeting' },
@@ -3659,6 +3660,25 @@ export default function PortalAppointments() {
                   <span className="w-fit rounded-full bg-[#e8f1fb] px-3 py-1 text-xs font-black text-[#1B3C6C]">
                     {form.status ? formatAppointmentStatus(form.status) : 'Schedule TBD'}
                   </span>
+                  {selectedAppointment && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next: AppointmentStatus = form.status === 'no_show' ? 'scheduled' : 'no_show';
+                        updateForm('status', next);
+                        updateAppointment(selectedAppointment.id, { status: next }, currentUser);
+                      }}
+                      title={form.status === 'no_show' ? 'Undo the no-show mark' : 'Client was not home — mark this consultation a no-show'}
+                      className={`inline-flex w-fit items-center gap-2 rounded-[0.5rem] px-3 py-2 text-xs font-black transition ${
+                        form.status === 'no_show'
+                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                          : 'bg-black text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <UserX className="h-3.5 w-3.5" />
+                      {form.status === 'no_show' ? 'Undo No-Show' : 'Mark No-Show'}
+                    </button>
+                  )}
                   {selectedAppointment && getOutcomeBadge(selectedAppointment) && (
                     <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${getOutcomeBadge(selectedAppointment)?.className}`}>
                       {getOutcomeBadge(selectedAppointment)?.label}
