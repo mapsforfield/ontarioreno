@@ -13,6 +13,7 @@ import {
   ListTodo,
   LogOut,
   MoreHorizontal,
+  PhoneCall,
   Search,
   ShieldCheck,
   TableProperties,
@@ -36,6 +37,7 @@ import Toaster from './Toaster';
 
 const navItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
+  { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall },
   { label: 'Contractors', href: '/portal/contractors', icon: Building2 },
   { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness },
   {

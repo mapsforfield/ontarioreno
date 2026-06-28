@@ -36,6 +36,8 @@ model User {
   daysOff              RepDayOff[]
   salesAgreements      SalesAgreement[]
   tasks                Task[]
+  leads                Lead[]
+  interactions         Interaction[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -225,6 +227,8 @@ model Appointment {
   /// stored so we never re-geocode the same address).
   latitude                 Float?
   longitude                Float?
+  /// Set when the consultation was booked from a Lead in the Sales Workspace.
+  leadId                   String?
   externalCalendarId       String?
   externalEventId          String?
   syncedAt                 String?
@@ -390,6 +394,83 @@ model Setting {
   key       String   @id
   value     String   @default("")
   updatedAt DateTime @updatedAt
+}
+
+// ─── Leads (pre-pipeline — the Google-Sheet replacement) ─────────────────────
+// A Lead is a cheap, side-effect-free record (no commission/tracker spawned).
+// It promotes INTO the existing Client/Deal/Appointment flow via the link
+// fields below — it never duplicates those records, it points at them.
+
+model Lead {
+  id                String    @id @default(cuid())
+  // Contact + qualification (from Meta / Sheet import / manual entry)
+  name              String
+  phone             String    @default("")
+  email             String    @default("")
+  city              String    @default("")
+  address           String    @default("")
+  postalCode        String    @default("")
+  projectType       String    @default("")
+  /// Free-text — Meta sends ranges like "$25k–50k", so this stays a String.
+  budget            String    @default("")
+  /// null = unknown
+  financingInterest Boolean?
+  // Provenance
+  source            String    @default("manual") // 'meta' | 'import' | 'manual'
+  sourceDetail      String    @default("")        // campaign / form name
+  externalId        String?   @unique             // Meta leadgen id — dedupe key
+  submittedAt       DateTime  @default(now())     // when the lead originated
+  // Workflow
+  /// 'new'|'attempting'|'callback_scheduled'|'booked'|'qualified'|'won'|'lost'|'dead'|'duplicate'
+  status            String    @default("new")
+  assignedRepId     String?                        // null = unassigned pool
+  callbackAt        DateTime?                       // drives the queue
+  lastContactedAt   DateTime?
+  attemptCount      Int       @default(0)
+  notes             String    @default("")
+  // Promotion links — Lead points at canonical records, never duplicates them
+  clientId          String?
+  dealId            String?
+  appointmentId     String?
+  // Soft-delete (trash parity with Deal/Client/Appointment)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  assignedRep  User?         @relation(fields: [assignedRepId], references: [id])
+  interactions Interaction[]
+
+  @@index([assignedRepId, status])
+  @@index([status])
+  @@index([callbackAt])
+  @@index([deletedAt])
+}
+
+// ─── Interactions (multi-channel touch log — call is one channel) ────────────
+// Generalized from the start so SMS/email/WhatsApp/notes/AI-summaries slot in
+// without a migration. Phase 1 writes 'call', 'note', and 'system' rows.
+
+model Interaction {
+  id              String   @id @default(cuid())
+  leadId          String
+  userId          String?                          // actor; null for inbound/system
+  /// 'call'|'sms'|'email'|'whatsapp'|'note'|'system'|'ai_summary'
+  channel         String   @default("call")
+  /// 'outbound'|'inbound'|'internal'
+  direction       String   @default("outbound")
+  outcome         String?                           // call-outcome enum; null for notes
+  subject         String?                           // email subject, etc.
+  body            String   @default("")             // note text / message / AI summary
+  durationSeconds Int?                              // calls (null until Quo reports)
+  occurredAt      DateTime @default(now())          // when it happened (may be backdated)
+  metadata        Json?                             // channel extras (Quo call id, msg id)
+  createdAt       DateTime @default(now())
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([leadId, occurredAt])
+  @@index([channel])
 }
 
 // ─── Tasks (personal to-do list per user) ────────────────────────────────────

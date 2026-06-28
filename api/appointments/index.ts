@@ -1148,8 +1148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(updated);
     }
 
-    const appointment = await prisma.appointment.create({
-      data: {
+    const appointmentData = {
         dealId: data.dealId || null,
         customerName: data.customerName,
         phone: data.phone ?? '',
@@ -1183,9 +1182,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         outcomeNotes: data.outcomeNotes ?? '',
         objections: data.objections ?? '',
         followUpDate: data.followUpDate ?? '',
+        leadId: data.leadId || null,
         createdByUserId: user.id,
-      },
-    });
+    };
+    let appointment;
+    try {
+      appointment = await prisma.appointment.create({ data: appointmentData });
+    } catch {
+      // Self-healing: the leadId column may not exist yet on older databases.
+      await prisma.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "leadId" TEXT');
+      appointment = await prisma.appointment.create({ data: appointmentData });
+    }
     // ── Auto-upsert client profile ──
     // Match by email if provided, otherwise create a new profile.
     // Link the appointment back to the client.
@@ -1242,6 +1249,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     } catch {
       // Client auto-linking is non-critical
+    }
+
+    // ── Lead promotion: if this consultation was booked from a Lead, link them
+    // and flip the lead to 'booked'. Done server-side so the link is reliable
+    // even though the client creates appointments optimistically. ──
+    if (appointmentData.leadId) {
+      try {
+        const linked = await prisma.appointment.findUnique({
+          where: { id: appointment.id },
+          select: { clientId: true },
+        });
+        await prisma.lead.update({
+          where: { id: appointmentData.leadId },
+          data: {
+            appointmentId: appointment.id,
+            status: 'booked',
+            ...(linked?.clientId ? { clientId: linked.clientId } : {}),
+          },
+        });
+        await prisma.interaction.create({
+          data: {
+            leadId: appointmentData.leadId,
+            userId: user.id,
+            channel: 'system',
+            direction: 'internal',
+            body: `Appointment booked for ${appointment.appointmentDate} at ${appointment.appointmentTime || 'time TBD'}`,
+          },
+        });
+      } catch {
+        // Lead linking is non-critical to creating the appointment.
+      }
     }
 
     // Best-effort push + email to assigned rep

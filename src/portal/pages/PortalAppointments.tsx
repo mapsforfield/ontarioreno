@@ -662,6 +662,9 @@ export default function PortalAppointments() {
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
   const handledNavState = useRef<string | null>(null);
+  // Set when the create drawer was opened from a Lead (Sales Workspace) so we
+  // can link the new appointment back to that lead server-side.
+  const prefillLeadIdRef = useRef<string | null>(null);
   const [expandedUpcomingRows, setExpandedUpcomingRows] = useState<Set<string>>(new Set());
   const [collapsedRepGroups, setCollapsedRepGroups] = useState<Set<string>>(new Set());
   const [dispatchForm, setDispatchForm] = useState<DispatchFormState>({
@@ -698,7 +701,7 @@ export default function PortalAppointments() {
   // Auto-open a consultation when arriving from the dashboard
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    const state = location.state as { openAppointmentId?: string; panelTab?: string; prefillClient?: import('../data/types').Client } | null;
+    const state = location.state as { openAppointmentId?: string; panelTab?: string; prefillClient?: import('../data/types').Client; fromLeadId?: string } | null;
     const id = state?.openAppointmentId;
     if (id && handledNavState.current !== id) {
       handledNavState.current = id;
@@ -715,6 +718,7 @@ export default function PortalAppointments() {
     const prefill = state?.prefillClient;
     if (prefill && handledNavState.current !== `prefill-${prefill.id}`) {
       handledNavState.current = `prefill-${prefill.id}`;
+      prefillLeadIdRef.current = state?.fromLeadId ?? null;
       setIsCreating(true);
       setSelectedAppointmentId(null);
       setForm({
@@ -1218,6 +1222,7 @@ export default function PortalAppointments() {
     setEmailActionMessage('');
     setConflictWarning(null);
     conflictOverrideRef.current = false;
+    prefillLeadIdRef.current = null;
   };
 
   const saveAppointment = () => {
@@ -1283,7 +1288,8 @@ export default function PortalAppointments() {
     conflictOverrideRef.current = false;
 
     if (isCreating) {
-      addAppointment(payload, currentUser);
+      // Attach the originating lead only on create, so the server can link them.
+      addAppointment({ ...payload, leadId: prefillLeadIdRef.current }, currentUser);
     } else if (selectedAppointment) {
       updateAppointment(selectedAppointment.id, payload, currentUser);
       // Real consultations nudge for an outcome report when marked complete;

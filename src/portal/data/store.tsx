@@ -28,12 +28,18 @@ import {
   CommissionInvoiceRecord,
   ConsultationStage,
   Household,
+  Interaction,
+  CallOutcome,
+  InteractionChannel,
+  Lead,
+  LeadImportRow,
   ProposalHistory,
   RepDayOff,
   SalesAgreement,
   SaleTrackerRow,
   Task,
   User,
+  TERMINAL_LEAD_STATUSES,
 } from './types';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
@@ -68,6 +74,7 @@ type PortalDataState = {
   activities: Activity[];
   appointments: Appointment[];
   clients: Client[];
+  leads: Lead[];
   daysOff: RepDayOff[];
   households: Household[];
   salesAgreements: SalesAgreement[];
@@ -195,6 +202,31 @@ type PortalDataContextValue = PortalDataState & {
   updateHousehold: (householdId: string, updates: { name?: string; notes?: string; addMemberId?: string; removeMemberId?: string }) => Promise<Household | null>;
   deleteHousehold: (householdId: string) => Promise<void>;
   getAppointmentsForClient: (clientId: string) => Appointment[];
+  // ── Leads / Sales Workspace ──
+  importLeads: (rows: LeadImportRow[]) => Promise<{ created: number; duplicates: number; skipped: number } | null>;
+  addLead: (draft: Partial<Lead> & { name: string }) => Promise<Lead | null>;
+  updateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
+  assignLeads: (ids: string[], repId: string | null) => Promise<void>;
+  logInteraction: (
+    leadId: string,
+    draft: {
+      channel: InteractionChannel;
+      outcome?: CallOutcome | null;
+      body?: string;
+      subject?: string | null;
+      durationSeconds?: number | null;
+      direction?: string;
+      callbackAt?: string;
+    }
+  ) => Promise<void>;
+  scheduleCallback: (leadId: string, callbackAt: string, note?: string) => Promise<void>;
+  deleteLead: (leadId: string) => Promise<void>;
+  restoreLead: (leadId: string) => Promise<void>;
+  purgeLead: (leadId: string) => Promise<void>;
+  fetchTrashedLeads: () => Promise<Lead[]>;
+  getLeadQueue: (user: User) => Lead[];
+  getUnassignedLeads: () => Lead[];
+  getInteractionsForLead: (leadId: string) => Interaction[];
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   deleteTrackerRow: (id: string) => Promise<void>;
@@ -261,6 +293,7 @@ const emptyState: PortalDataState = {
   activities: [],
   appointments: [],
   clients: [],
+  leads: [],
   daysOff: [],
   households: [],
   salesAgreements: [],
@@ -436,6 +469,47 @@ function normalizeSearchValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+// ─── Lead queue scoring (client-side in Phase 1; pure + deterministic) ────────
+// A lead is only "in the queue" if it's actionable right now. Callback-scheduled
+// leads wait silently until their time arrives.
+function isQueueEligible(lead: Lead, now: number): boolean {
+  if (lead.deletedAt) return false;
+  if (TERMINAL_LEAD_STATUSES.includes(lead.status)) return false;
+  if (
+    lead.status === 'callback_scheduled' &&
+    lead.callbackAt &&
+    new Date(lead.callbackAt).getTime() > now
+  ) {
+    return false; // scheduled for the future — not due yet
+  }
+  return true;
+}
+
+// Returns [bucket, tiebreak]; lower sorts first. Buckets:
+//   0 callbacks now due  ·  1 brand-new (never attempted)  ·  2 attempted/follow-up
+function leadQueueRank(lead: Lead, now: number): [number, number] {
+  const callback = lead.callbackAt ? new Date(lead.callbackAt).getTime() : null;
+  if (callback != null && callback <= now) return [0, callback]; // most overdue first
+  if (lead.attemptCount === 0 && lead.status === 'new') {
+    return [1, -new Date(lead.submittedAt).getTime()]; // freshest first (speed-to-lead)
+  }
+  const last = lead.lastContactedAt
+    ? new Date(lead.lastContactedAt).getTime()
+    : new Date(lead.submittedAt).getTime();
+  return [2, last]; // longest-waiting first
+}
+
+function sortLeadQueue(leads: Lead[]): Lead[] {
+  const now = Date.now();
+  return leads
+    .filter((lead) => isQueueEligible(lead, now))
+    .sort((a, b) => {
+      const [ra, sa] = leadQueueRank(a, now);
+      const [rb, sb] = leadQueueRank(b, now);
+      return ra - rb || sa - sb;
+    });
+}
+
 function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
   const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
   const adminTotalEstimatedCommission = Math.round(
@@ -588,7 +662,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
       apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
       apiCall<Task[]>('/api/auth/tasks'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks]) => {
+      apiCall<Lead[]>('/api/leads'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -606,6 +681,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         dispatches,
         proposals,
         clients: clients ?? [],
+        leads: (leads ?? []).map((l) => ({ ...l, interactions: l.interactions ?? [] })),
         daysOff: daysOff ?? [],
         households: households ?? [],
         tasks: tasks ?? [],
@@ -755,6 +831,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         : state.appointments.filter(
             (appointment) => appointment.assignedRepId === user.id
           );
+
+    const getLeadQueue = (user: User) => {
+      const mine =
+        user.role === 'admin'
+          ? state.leads.filter((lead) => lead.assignedRepId)
+          : state.leads.filter((lead) => lead.assignedRepId === user.id);
+      return sortLeadQueue(mine);
+    };
+
+    const getUnassignedLeads = () =>
+      state.leads.filter(
+        (lead) =>
+          !lead.assignedRepId &&
+          !lead.deletedAt &&
+          !TERMINAL_LEAD_STATUSES.includes(lead.status)
+      );
+
+    const getInteractionsForLead = (leadId: string) =>
+      state.leads.find((lead) => lead.id === leadId)?.interactions ?? [];
 
     const getActivitiesForUser = (user: User) => {
       if (user.role === 'admin') return state.activities;
@@ -1310,6 +1405,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           commissions: [...current.commissions, createCommissionForDeal(deal, current.defaultCommissionRate)],
           appointments: current.appointments,
           clients: current.clients,
+          leads: current.leads,
           daysOff: current.daysOff,
           households: current.households,
           salesAgreements: current.salesAgreements,
@@ -2199,7 +2295,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         });
 
-        apiCall(`/api/commissions/${commissionId}`, {
+        apiCall(`/api/commissions?id=${commissionId}`, {
           method: 'PATCH',
           body: JSON.stringify(updates),
         });
@@ -3090,6 +3186,125 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           });
         });
       },
+
+      // ── Leads / Sales Workspace ─────────────────────────────────────────────
+      importLeads: async (rows) => {
+        const result = await apiCall<{ created: number; duplicates: number; skipped: number }>(
+          '/api/leads',
+          { method: 'POST', body: JSON.stringify({ _action: 'import_leads', rows }) }
+        );
+        if (result) loadData(true);
+        return result;
+      },
+
+      addLead: async (draft) => {
+        const lead = await apiCall<Lead>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        });
+        if (lead) {
+          setState((current) => ({
+            ...current,
+            leads: [{ ...lead, interactions: lead.interactions ?? [] }, ...current.leads],
+          }));
+        }
+        return lead;
+      },
+
+      updateLead: async (leadId, updates) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) => (l.id === leadId ? { ...l, ...updates } : l)),
+        }));
+        const saved = await apiCall<Lead>(`/api/leads?id=${leadId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
+        if (saved) {
+          setState((current) => ({
+            ...current,
+            leads: current.leads.map((l) =>
+              l.id === leadId ? { ...saved, interactions: saved.interactions ?? l.interactions } : l
+            ),
+          }));
+        }
+      },
+
+      assignLeads: async (ids, repId) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) =>
+            ids.includes(l.id) ? { ...l, assignedRepId: repId } : l
+          ),
+        }));
+        await apiCall('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'assign', ids, repId }),
+        });
+      },
+
+      logInteraction: async (leadId, draft) => {
+        const res = await apiCall<{ interaction: Interaction; lead: Lead }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'log_interaction', leadId, ...draft }),
+        });
+        if (res?.lead) {
+          setState((current) => ({
+            ...current,
+            leads: current.leads.map((l) =>
+              l.id === leadId
+                ? { ...res.lead, interactions: res.lead.interactions ?? l.interactions }
+                : l
+            ),
+          }));
+        }
+      },
+
+      scheduleCallback: async (leadId, callbackAt, note) => {
+        const res = await apiCall<{ lead: Lead }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'schedule_callback', leadId, callbackAt, note }),
+        });
+        if (res?.lead) {
+          setState((current) => ({
+            ...current,
+            leads: current.leads.map((l) =>
+              l.id === leadId
+                ? { ...res.lead, interactions: res.lead.interactions ?? l.interactions }
+                : l
+            ),
+          }));
+        }
+      },
+
+      deleteLead: async (leadId) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.filter((l) => l.id !== leadId),
+        }));
+        await apiCall(`/api/leads?id=${leadId}`, { method: 'DELETE' });
+      },
+
+      restoreLead: async (leadId) => {
+        await apiCall(`/api/leads?id=${leadId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'restore_lead' }),
+        });
+        loadData(true);
+      },
+
+      purgeLead: async (leadId) => {
+        await apiCall(`/api/leads?id=${leadId}&purge=1`, { method: 'DELETE' });
+      },
+
+      fetchTrashedLeads: async () => {
+        const trashed = await apiCall<Lead[]>('/api/leads?_resource=trash');
+        return (trashed ?? []).map((l) => ({ ...l, interactions: l.interactions ?? [] }));
+      },
+
+      getLeadQueue,
+      getUnassignedLeads,
+      getInteractionsForLead,
 
       // ── Selectors / calculators (pure, no API) ──────────────────────────────
       calculateAdminPaidRepCommission,

@@ -152,6 +152,8 @@ export type Appointment = {
   objections: string;
   followUpDate: string;
   clientId?: string | null;
+  /** Set when the consultation was booked from a Lead in the Sales Workspace. */
+  leadId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   deletedAt?: string | null;
@@ -330,6 +332,117 @@ export type SaleTrackerRow = {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+};
+
+// ─── Leads + Interactions (Sales Workspace) ──────────────────────────────────
+
+export type LeadStatus =
+  | 'new'
+  | 'attempting'
+  | 'callback_scheduled'
+  | 'booked'
+  | 'qualified'
+  | 'won'
+  | 'lost'
+  | 'dead'
+  | 'duplicate';
+
+/** Statuses that drop a lead out of the call queue entirely. */
+export const TERMINAL_LEAD_STATUSES: LeadStatus[] = [
+  'booked',
+  'qualified',
+  'won',
+  'lost',
+  'dead',
+  'duplicate',
+];
+
+export type LeadSource = 'meta' | 'import' | 'manual';
+
+export type CallOutcome =
+  | 'no_answer'
+  | 'voicemail'
+  | 'callback_scheduled'
+  | 'not_interested'
+  | 'wrong_number'
+  | 'duplicate'
+  | 'not_qualified'
+  | 'already_booked'
+  | 'needs_follow_up'
+  | 'booked';
+
+export type InteractionChannel =
+  | 'call'
+  | 'sms'
+  | 'email'
+  | 'whatsapp'
+  | 'note'
+  | 'system'
+  | 'ai_summary';
+
+export type InteractionDirection = 'outbound' | 'inbound' | 'internal';
+
+export type Interaction = {
+  id: string;
+  leadId: string;
+  userId: string | null;
+  channel: InteractionChannel;
+  direction: InteractionDirection;
+  outcome: CallOutcome | null;
+  subject: string | null;
+  body: string;
+  durationSeconds: number | null;
+  occurredAt: string;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type Lead = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  city: string;
+  address: string;
+  postalCode: string;
+  projectType: string;
+  budget: string;
+  financingInterest: boolean | null;
+  source: LeadSource | string;
+  sourceDetail: string;
+  externalId?: string | null;
+  submittedAt: string;
+  status: LeadStatus;
+  assignedRepId: string | null;
+  callbackAt: string | null;
+  lastContactedAt: string | null;
+  attemptCount: number;
+  notes: string;
+  clientId?: string | null;
+  dealId?: string | null;
+  appointmentId?: string | null;
+  deletedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Embedded by the API on list/queue fetches. */
+  interactions: Interaction[];
+};
+
+/** One row of a pasted/uploaded lead import (admin). */
+export type LeadImportRow = {
+  name: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  address?: string;
+  postalCode?: string;
+  projectType?: string;
+  budget?: string;
+  financingInterest?: boolean | null;
+  source?: string;
+  sourceDetail?: string;
+  submittedAt?: string;
+  notes?: string;
 };
 
 export type CommissionPayoutStatus = 'pending' | 'partial' | 'paid';
