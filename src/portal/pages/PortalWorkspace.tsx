@@ -1346,11 +1346,158 @@ function RepPerformancePanel() {
   );
 }
 
+// ─── Bad leads (disqualified — still reviewable + reopenable) ─────────────────
+const BAD_STATUSES = ['lost', 'dead', 'duplicate'];
+const BAD_OUTCOMES = new Set(['not_interested', 'not_qualified', 'wrong_number', 'duplicate']);
+
+function badReason(lead: Lead): string {
+  const hit = (lead.interactions ?? []).find(
+    (i) => i.channel === 'call' && i.outcome && BAD_OUTCOMES.has(i.outcome)
+  );
+  if (hit?.outcome) return outcomeLabel[hit.outcome] ?? hit.outcome;
+  if (lead.status === 'dead') return 'Wrong number';
+  if (lead.status === 'duplicate') return 'Duplicate';
+  return 'Not qualified';
+}
+
+function BadLeadsView() {
+  const { leads, users, updateLead, logInteraction, getInteractionsForLead } = usePortalData();
+  const [filter, setFilter] = useState<'all' | 'lost' | 'dead' | 'duplicate'>('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const repName = (id: string | null) => (id ? users.find((u) => u.id === id)?.name ?? '—' : 'Unassigned');
+
+  const allBad = useMemo(
+    () => leads.filter((l) => !l.deletedAt && BAD_STATUSES.includes(l.status)),
+    [leads]
+  );
+  const counts = {
+    all: allBad.length,
+    lost: allBad.filter((l) => l.status === 'lost').length,
+    dead: allBad.filter((l) => l.status === 'dead').length,
+    duplicate: allBad.filter((l) => l.status === 'duplicate').length,
+  };
+  const list = useMemo(
+    () =>
+      allBad
+        .filter((l) => filter === 'all' || l.status === filter)
+        .sort((a, b) => new Date(b.lastContactedAt ?? b.updatedAt).getTime() - new Date(a.lastContactedAt ?? a.updatedAt).getTime()),
+    [allBad, filter]
+  );
+
+  const selected = list.find((l) => l.id === selectedId) ?? null;
+  const selectedFull = selected ? { ...selected, interactions: getInteractionsForLead(selected.id) } : null;
+
+  const handleReopen = (lead: Lead) => {
+    updateLead(lead.id, { status: 'new' });
+    logInteraction(lead.id, { channel: 'system', body: `Reopened from "${badReason(lead)}" — returned to the call queue` });
+    showToast({ message: `${lead.name} reopened`, description: 'Back in the call queue.', variant: 'success' });
+    setSelectedId(null);
+  };
+
+  const chips: Array<{ key: typeof filter; label: string; n: number }> = [
+    { key: 'all', label: 'All', n: counts.all },
+    { key: 'lost', label: 'Not interested / qualified', n: counts.lost },
+    { key: 'dead', label: 'Wrong number', n: counts.dead },
+    { key: 'duplicate', label: 'Duplicate', n: counts.duplicate },
+  ];
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {chips.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setFilter(c.key)}
+            className={cn('rounded-full border px-3 py-1.5 text-xs font-bold transition', filter === c.key ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')}
+          >
+            {c.label} ({c.n})
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
+        {/* List */}
+        <div className="rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
+          <div className="max-h-[70vh] overflow-y-auto">
+            {list.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm font-semibold text-slate-400">No bad leads here.</p>
+            ) : (
+              list.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => setSelectedId(l.id)}
+                  className={cn('flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-3 text-left transition', l.id === selectedId ? 'bg-[#e8f1fb]' : 'hover:bg-slate-50')}
+                >
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="truncate text-sm font-black text-slate-800">{l.name}</span>
+                    <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[0.6rem] font-bold text-red-700">{badReason(l)}</span>
+                  </span>
+                  <span className="truncate text-xs text-slate-500">{[l.city, l.projectType].filter(Boolean).join(' - ') || 'No details'}</span>
+                  <span className="text-[0.65rem] font-semibold text-slate-400">{repName(l.assignedRepId)} · {l.lastContactedAt ? timeAgo(l.lastContactedAt) : fmtDateTime(l.updatedAt)}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Detail */}
+        {selectedFull ? (
+          <div className="rounded-[0.9rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-2xl font-black tracking-[-0.02em] text-slate-950">{selectedFull.name}</h2>
+                  <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-700">{badReason(selectedFull)}</span>
+                </div>
+                <p className="mt-0.5 text-sm font-semibold text-slate-500">{[selectedFull.city, selectedFull.projectType].filter(Boolean).join(' · ') || 'No project details'}</p>
+              </div>
+              <button onClick={() => handleReopen(selectedFull)} className="inline-flex items-center gap-2 rounded-[0.7rem] bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700">
+                <TimerReset className="h-4 w-4" /> Reopen lead
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Phone</p>
+                {telHref(selectedFull.phone) ? (
+                  <a href={telHref(selectedFull.phone)!} className="text-sm font-bold text-[#1B3C6C] hover:underline">{selectedFull.phone}</a>
+                ) : <p className="text-sm font-semibold text-slate-400">—</p>}
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Email</p>
+                <p className="truncate text-sm font-semibold text-slate-800">{selectedFull.email || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Rep</p>
+                <p className="text-sm font-semibold text-slate-800">{repName(selectedFull.assignedRepId)}</p>
+              </div>
+            </div>
+
+            {selectedFull.notes && (
+              <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Lead notes</p>
+                <p className="whitespace-pre-wrap text-sm text-slate-700">{selectedFull.notes}</p>
+              </div>
+            )}
+
+            <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Timeline &amp; rep notes</p>
+            <LeadTimeline lead={selectedFull} />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center rounded-[0.9rem] border border-dashed border-slate-300 bg-white p-12">
+            <p className="text-center text-sm font-semibold text-slate-400">Select a lead to review its notes and timeline.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
   const { getLeadQueue, getInteractionsForLead, clients, leads } = usePortalData();
-  const [tab, setTab] = useState<'queue' | 'triage' | 'performance'>('queue');
+  const [tab, setTab] = useState<'queue' | 'triage' | 'performance' | 'bad'>('queue');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [onlyMatches, setOnlyMatches] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
@@ -1521,12 +1668,15 @@ export default function PortalWorkspace() {
               <button onClick={() => setTab('triage')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'triage' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Triage &amp; import</button>
             )}
             <button onClick={() => setTab('performance')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'performance' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Performance</button>
+            <button onClick={() => setTab('bad')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'bad' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Bad leads</button>
           </div>
         </div>
       </div>
 
       {tab === 'performance' ? (
         <RepPerformancePanel />
+      ) : tab === 'bad' ? (
+        <BadLeadsView />
       ) : isAdmin && tab === 'triage' ? (
         <TriageView />
       ) : (
