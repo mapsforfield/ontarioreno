@@ -1184,11 +1184,173 @@ function AvailabilityPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Rep performance (computed client-side from leads + interactions) ─────────
+type RepStats = {
+  assigned: number; untouched: number; bookedPile: number; callbackPile: number; lostDead: number;
+  calls: number; reached: number; callbacksSet: number; booked: number;
+};
+
+const NO_CONTACT_OUTCOMES_SET = new Set(['no_answer', 'voicemail']);
+
+function inWindow(iso: string | null | undefined, startMs: number | null): boolean {
+  if (startMs == null) return true;
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return !Number.isNaN(t) && t >= startMs;
+}
+
+function computeRepStats(leads: Lead[], userId: string, startMs: number | null): RepStats {
+  const s: RepStats = {
+    assigned: 0, untouched: 0, bookedPile: 0, callbackPile: 0, lostDead: 0,
+    calls: 0, reached: 0, callbacksSet: 0, booked: 0,
+  };
+  for (const l of leads) {
+    if (l.assignedRepId === userId) {
+      s.assigned++;
+      if (l.attemptCount === 0) s.untouched++;
+      if (['booked', 'qualified', 'won'].includes(l.status)) s.bookedPile++;
+      else if (l.status === 'callback_scheduled') s.callbackPile++;
+      else if (['lost', 'dead', 'duplicate'].includes(l.status)) s.lostDead++;
+    }
+    for (const i of l.interactions ?? []) {
+      if (i.userId !== userId || !inWindow(i.occurredAt, startMs)) continue;
+      if (i.channel === 'call') {
+        s.calls++;
+        if (i.outcome && !NO_CONTACT_OUTCOMES_SET.has(i.outcome)) s.reached++;
+      } else if (i.channel === 'system') {
+        if (/Callback scheduled/i.test(i.body)) s.callbacksSet++;
+        else if (/Appointment booked/i.test(i.body)) s.booked++;
+      }
+    }
+  }
+  return s;
+}
+
+const PERF_WINDOWS: Array<{ key: 'today' | 'week' | 'all'; label: string }> = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'Last 7 days' },
+  { key: 'all', label: 'All time' },
+];
+
+function pct(n: number, d: number): number {
+  return d > 0 ? Math.round((n / d) * 100) : 0;
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div className="rounded-[0.7rem] border border-slate-200 bg-white p-4">
+      <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-black text-slate-900">{value}</p>
+      {sub && <p className="text-xs font-semibold text-slate-500">{sub}</p>}
+    </div>
+  );
+}
+
+function RepPerformancePanel() {
+  const { currentUser, isAdmin } = usePortalAuth();
+  const { leads, users } = usePortalData();
+  const [win, setWin] = useState<'today' | 'week' | 'all'>('today');
+  const startMs = win === 'all' ? null : win === 'today' ? startOfLocalDate(0).getTime() : startOfLocalDate(-6).getTime();
+
+  const windowPicker = (
+    <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1">
+      {PERF_WINDOWS.map((w) => (
+        <button
+          key={w.key}
+          onClick={() => setWin(w.key)}
+          className={cn('rounded-[0.5rem] px-3 py-1.5 text-xs font-bold transition', win === w.key ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}
+        >
+          {w.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // ── Rep: their own numbers only ──
+  if (!isAdmin) {
+    const s = computeRepStats(leads, currentUser?.id ?? '', startMs);
+    return (
+      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-black tracking-[-0.01em]">Your performance</h2>
+          {windowPicker}
+        </div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Activity ({PERF_WINDOWS.find((w) => w.key === win)?.label.toLowerCase()})</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Calls" value={s.calls} />
+          <StatCard label="Reached" value={s.reached} sub={`${pct(s.reached, s.calls)}% contact`} />
+          <StatCard label="Callbacks set" value={s.callbacksSet} />
+          <StatCard label="Booked" value={s.booked} />
+        </div>
+        <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Your pile (current)</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Assigned" value={s.assigned} />
+          <StatCard label="Untouched" value={s.untouched} />
+          <StatCard label="Booked" value={s.bookedPile} sub={`${pct(s.bookedPile, s.assigned)}% conversion`} />
+          <StatCard label="Not interested / dead" value={s.lostDead} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Admin: leaderboard across reps ──
+  const reps = users.filter((u) => u.role === 'rep');
+  const rows = reps
+    .map((rep) => ({ rep, s: computeRepStats(leads, rep.id, startMs) }))
+    .sort((a, b) => b.s.booked - a.s.booked || b.s.calls - a.s.calls);
+
+  return (
+    <div className="rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div>
+          <h2 className="text-lg font-black tracking-[-0.01em]">Rep performance</h2>
+          <p className="text-xs font-semibold text-slate-500">Activity columns reflect the selected window; pile columns are current.</p>
+        </div>
+        {windowPicker}
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-5 py-10 text-center text-sm font-semibold text-slate-400">No reps yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-4 py-3">Rep</th>
+                <th className="px-4 py-3">Assigned</th>
+                <th className="px-4 py-3">Untouched</th>
+                <th className="px-4 py-3">Calls</th>
+                <th className="px-4 py-3">Reached</th>
+                <th className="px-4 py-3">Callbacks</th>
+                <th className="px-4 py-3">Booked</th>
+                <th className="px-4 py-3">Conv.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ rep, s }) => (
+                <tr key={rep.id} className="border-b border-slate-50 hover:bg-slate-50/60">
+                  <td className="px-4 py-3 font-bold text-slate-800">{rep.name}</td>
+                  <td className="px-4 py-3 text-slate-700">{s.assigned}</td>
+                  <td className={cn('px-4 py-3', s.untouched > 0 ? 'font-bold text-amber-700' : 'text-slate-500')}>{s.untouched}</td>
+                  <td className="px-4 py-3 text-slate-700">{s.calls}</td>
+                  <td className="px-4 py-3 text-slate-700">{s.reached}<span className="text-slate-400"> ({pct(s.reached, s.calls)}%)</span></td>
+                  <td className="px-4 py-3 text-slate-700">{s.callbacksSet}</td>
+                  <td className="px-4 py-3 font-black text-emerald-700">{s.booked}</td>
+                  <td className="px-4 py-3 text-slate-700">{pct(s.bookedPile, s.assigned)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
   const { getLeadQueue, getInteractionsForLead, clients, leads } = usePortalData();
-  const [tab, setTab] = useState<'queue' | 'triage'>('queue');
+  const [tab, setTab] = useState<'queue' | 'triage' | 'performance'>('queue');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [onlyMatches, setOnlyMatches] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
@@ -1353,16 +1515,19 @@ export default function PortalWorkspace() {
                   : `Existing clients (${matchCount})`}
             </button>
           )}
-          {isAdmin && (
-            <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1 shadow-sm">
-              <button onClick={() => setTab('queue')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'queue' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Call queue</button>
+          <div className="flex rounded-[0.7rem] border border-slate-200 bg-white p-1 shadow-sm">
+            <button onClick={() => setTab('queue')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'queue' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Call queue</button>
+            {isAdmin && (
               <button onClick={() => setTab('triage')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'triage' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Triage &amp; import</button>
-            </div>
-          )}
+            )}
+            <button onClick={() => setTab('performance')} className={cn('rounded-[0.5rem] px-4 py-2 text-sm font-bold transition', tab === 'performance' ? 'bg-[#1B3C6C] text-white' : 'text-slate-600 hover:bg-slate-50')}>Performance</button>
+          </div>
         </div>
       </div>
 
-      {isAdmin && tab === 'triage' ? (
+      {tab === 'performance' ? (
+        <RepPerformancePanel />
+      ) : isAdmin && tab === 'triage' ? (
         <TriageView />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
