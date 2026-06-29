@@ -119,6 +119,7 @@ export default function App() {
             <Route path="/portal" element={<PortalLayout />}>
               <Route index element={<PortalDashboard />} />
               <Route path="dashboard" element={<PortalDashboard />} />
+              <Route path="workspace" element={<PortalWorkspace />} />
               <Route path="contractors" element={<PortalContractors />} />
               <Route path="deals" element={<PortalDeals />} />
               <Route path="appointments" element={<PortalAppointments />} />
@@ -132,7 +133,6 @@ export default function App() {
               <Route path="leaderboard" element={<PortalAnalytics />} />
               <Route path="commissions" element={<PortalAnalytics />} />
               <Route element={<PortalGuard adminOnly />}>
-                <Route path="workspace" element={<PortalWorkspace />} />
                 <Route path="admin" element={<PortalAdmin />} />
               </Route>
             </Route>

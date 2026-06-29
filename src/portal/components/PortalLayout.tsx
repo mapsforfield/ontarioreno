@@ -28,35 +28,49 @@ import {
   registerPushNotifications,
   unregisterPushNotifications,
 } from '../lib/pushNotifications';
+import type { LucideIcon } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
+import { repCanAccess, featureForPath, type RepFeatureKey } from '../data/repFeatures';
 import AdminActivityCenter from './AdminActivityCenter';
 import GlobalSearch from './GlobalSearch';
 import Toaster from './Toaster';
 
-const navItems = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  mobileLabel?: string;
+  adminOnly?: boolean;
+  feature?: RepFeatureKey;
+};
+
+// Order matters: Call Queue sits near the end so it doesn't crowd the core
+// sections for reps (especially in the mobile "More" menu). Admin is always last.
+const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
-  { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, adminOnly: true },
-  { label: 'Contractors', href: '/portal/contractors', icon: Building2 },
-  { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness },
+  { label: 'Contractors', href: '/portal/contractors', icon: Building2, feature: 'contractors' },
+  { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness, feature: 'deals' },
   {
     label: 'Consultations',
     mobileLabel: 'Consults',
     href: '/portal/appointments',
     icon: CalendarDays,
+    feature: 'consultations',
   },
-  { label: 'Clients', href: '/portal/clients', icon: UserRound },
-  { label: 'Tasks', href: '/portal/tasks', icon: ListTodo },
-  { label: 'Financing', href: '/portal/financing', icon: CreditCard },
-  { label: 'Performance', href: '/portal/performance', icon: LineChart },
+  { label: 'Clients', href: '/portal/clients', icon: UserRound, feature: 'clients' },
+  { label: 'Tasks', href: '/portal/tasks', icon: ListTodo, feature: 'tasks' },
+  { label: 'Financing', href: '/portal/financing', icon: CreditCard, feature: 'financing' },
+  { label: 'Performance', href: '/portal/performance', icon: LineChart, feature: 'analytics' },
+  { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, feature: 'workspace' },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function PortalLayout() {
   const { currentUser, isAdmin, logout, updateCurrentUser } = usePortalAuth();
-  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser, loadError, refetch } = usePortalData();
+  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser, loadError, refetch, repAccess } = usePortalData();
 
   // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
   const [searchOpen, setSearchOpen] = useState(false);
@@ -140,7 +154,21 @@ export default function PortalLayout() {
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const location = useLocation();
   const navigate = useNavigate();
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.adminOnly) return isAdmin;
+    if (isAdmin) return true;
+    return item.feature ? repCanAccess(repAccess, item.feature) : true;
+  });
+
+  // Deep-link enforcement: a rep who types/bookmarks a URL for a section they're
+  // no longer allowed into is bounced to the dashboard.
+  useEffect(() => {
+    if (!currentUser || isAdmin) return;
+    const feature = featureForPath(location.pathname);
+    if (feature && !repCanAccess(repAccess, feature)) {
+      navigate('/portal/dashboard', { replace: true });
+    }
+  }, [currentUser, isAdmin, location.pathname, repAccess, navigate]);
   const mobilePrimaryHrefs = [
     '/portal/dashboard',
     '/portal/deals',

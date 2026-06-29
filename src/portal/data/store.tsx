@@ -90,6 +90,8 @@ type PortalDataState = {
   defaultCommissionRate: number;
   /** True when a core dataset failed to load (a real error, not "empty"). */
   loadError: boolean;
+  /** Admin-managed map of which portal sections reps may access ({} = all open). */
+  repAccess: Record<string, boolean>;
 };
 
 type ContractorDispatchDraft = Omit<
@@ -231,6 +233,7 @@ type PortalDataContextValue = PortalDataState & {
   getLeadQueue: (user: User) => Lead[];
   getUnassignedLeads: () => Lead[];
   getInteractionsForLead: (leadId: string) => Interaction[];
+  setRepAccess: (access: Record<string, boolean>) => Promise<void>;
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   deleteTrackerRow: (id: string) => Promise<void>;
@@ -311,6 +314,7 @@ const emptyState: PortalDataState = {
   users: [],
   defaultCommissionRate: loadDefaultCommissionRate(),
   loadError: false,
+  repAccess: {},
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
@@ -663,7 +667,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
       apiCall<Task[]>('/api/auth/tasks'),
       apiCall<Lead[]>('/api/leads'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads]) => {
+      apiCall<Record<string, boolean>>('/api/auth/rep-access'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -692,6 +697,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         // on success). If any core dataset failed, flag it so the UI can warn
         // instead of silently rendering empty screens.
         loadError: [users, contractors, rawDeals, appointments, commissions].some((r) => r === null),
+        repAccess: repAccess ?? {},
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1422,6 +1428,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           users: current.users,
           defaultCommissionRate: current.defaultCommissionRate,
           loadError: current.loadError,
+          repAccess: current.repAccess,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
@@ -3326,6 +3333,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       getLeadQueue,
       getUnassignedLeads,
       getInteractionsForLead,
+
+      setRepAccess: async (access) => {
+        setState((current) => ({ ...current, repAccess: access }));
+        await apiCall('/api/auth/rep-access', {
+          method: 'POST',
+          body: JSON.stringify(access),
+        });
+      },
 
       // ── Selectors / calculators (pure, no API) ──────────────────────────────
       calculateAdminPaidRepCommission,

@@ -91,6 +91,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // ── /api/auth/rep-access ──────────────────────────────────────────────────
+  // Admin-managed map of which portal sections reps may access. Any authed user
+  // can READ it (so the nav/guards know what to show); only admins can WRITE.
+  if (action === 'rep-access') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    if (req.method === 'GET') {
+      const row = await withSchema(() => prisma.setting.findUnique({ where: { key: 'rep_access' } }));
+      let value: Record<string, boolean> = {};
+      try { value = row?.value ? JSON.parse(row.value) : {}; } catch { value = {}; }
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(value);
+    }
+
+    if (req.method === 'POST') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const access: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(body)) access[String(k)] = Boolean(v);
+      await withSchema(() => prisma.setting.upsert({
+        where: { key: 'rep_access' },
+        update: { value: JSON.stringify(access) },
+        create: { key: 'rep_access', value: JSON.stringify(access) },
+      }));
+      return res.status(200).json(access);
+    }
+
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
+
   // ── /api/auth/tasks ───────────────────────────────────────────────────────
   // Personal to-do list. Each user only ever sees/edits their own tasks.
   if (action === 'tasks') {

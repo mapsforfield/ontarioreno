@@ -12,6 +12,7 @@ import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { generateTemporaryPassword, usePortalData } from '../data/store';
 import { ActivityEntityType, User } from '../data/types';
+import { REP_FEATURES, repCanAccess } from '../data/repFeatures';
 
 type RepFormState = {
   active: boolean;
@@ -119,6 +120,8 @@ export default function PortalAdmin() {
     toggleUserActive,
     updateUser,
     users,
+    repAccess,
+    setRepAccess,
   } = usePortalData();
   const [commissionInput, setCommissionInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const [commissionSaved, setCommissionSaved] = useState(false);
@@ -334,6 +337,49 @@ export default function PortalAdmin() {
               </p>
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="border-b border-slate-200 pb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+            Access Control
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+            What reps can access
+          </h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Toggle which portal sections your sales reps can open. Invoice generation
+            and commission-rate visibility always stay admin-only.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {REP_FEATURES.map((feature) => {
+            const on = repCanAccess(repAccess, feature.key);
+            return (
+              <button
+                key={feature.key}
+                type="button"
+                onClick={() => setRepAccess({ ...repAccess, [feature.key]: !on })}
+                className={`flex items-center justify-between gap-3 rounded-[0.6rem] border px-4 py-3 text-left transition ${
+                  on
+                    ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-slate-800">{feature.label}</span>
+                  <span className="block text-xs font-semibold text-slate-500">{feature.description}</span>
+                </span>
+                <span
+                  aria-hidden
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${on ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
