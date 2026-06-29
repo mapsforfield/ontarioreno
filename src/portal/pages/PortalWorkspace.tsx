@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  CalendarDays,
   CalendarPlus,
   Check,
   ChevronLeft,
@@ -28,6 +29,7 @@ import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
 import { cn } from '../../lib/utils';
 import type {
+  Appointment,
   CallOutcome,
   Client,
   Interaction,
@@ -101,6 +103,15 @@ function fmtDateTime(iso: string | null | undefined): string {
     minute: '2-digit',
     hour12: true,
   });
+}
+
+function fmtClock(time: string | null | undefined): string {
+  if (!time) return 'TBD';
+  const [h, m] = String(time).split(':').map(Number);
+  if (Number.isNaN(h)) return String(time);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m || 0).padStart(2, '0')} ${period}`;
 }
 
 function startOfLocalDate(offsetDays: number) {
@@ -1078,6 +1089,101 @@ function ContextPanel({ lead }: { lead: Lead }) {
     </div>
   );
 }
+
+// ─── Availability peek (read-only agenda, next 2 weeks) ───────────────────────
+const AVAIL_DAYS = 14;
+
+function AvailabilityPanel({ onClose }: { onClose: () => void }) {
+  const { appointments, users } = usePortalData();
+  const [repId, setRepId] = useState('');
+  const reps = useMemo(() => users.filter((u) => u.active), [users]);
+  const repName = (id: string) => users.find((u) => u.id === id)?.name ?? 'Unassigned';
+
+  const days = useMemo(() => {
+    const active = appointments.filter(
+      (a) => a.status !== 'cancelled' && (!repId || a.assignedRepId === repId)
+    );
+    const byDate = new Map<string, Appointment[]>();
+    for (const a of active) {
+      const list = byDate.get(a.appointmentDate);
+      if (list) list.push(a);
+      else byDate.set(a.appointmentDate, [a]);
+    }
+    const result: Array<{ key: string; date: Date; appts: Appointment[] }> = [];
+    for (let i = 0; i < AVAIL_DAYS; i++) {
+      const date = startOfLocalDate(i);
+      const key = dateInputValue(date);
+      const appts = (byDate.get(key) ?? []).slice().sort((x, y) =>
+        (x.appointmentTime || '').localeCompare(y.appointmentTime || '')
+      );
+      result.push({ key, date, appts });
+    }
+    return result;
+  }, [appointments, repId]);
+
+  const heading = (date: Date, i: number) => {
+    if (i === 0) return 'Today';
+    if (i === 1) return 'Tomorrow';
+    return date.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/40 backdrop-blur-sm">
+      <button type="button" className="flex-1" onClick={onClose} aria-label="Close availability" />
+      <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#32639b]">Availability</p>
+            <h2 className="mt-0.5 text-xl font-black tracking-[-0.02em]">Next 2 weeks</h2>
+          </div>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="border-b border-slate-100 px-5 py-3">
+          <select
+            value={repId}
+            onChange={(e) => setRepId(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+          >
+            <option value="">All reps</option>
+            {reps.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {days.map((day, i) => (
+            <div key={day.key} className={cn('rounded-[0.7rem] border p-3', i === 0 ? 'border-[#1B3C6C]/30 bg-[#f3f8ff]' : 'border-slate-200 bg-white')}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-black text-slate-800">{heading(day.date, i)}</p>
+                <span className={cn('rounded-full px-2 py-0.5 text-[0.65rem] font-black', day.appts.length === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
+                  {day.appts.length === 0 ? 'Wide open' : `${day.appts.length} booked`}
+                </span>
+              </div>
+              {day.appts.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {day.appts.map((a) => (
+                    <div key={a.id} className="flex items-start gap-2">
+                      <span className="mt-0.5 w-16 shrink-0 text-xs font-black tabular-nums text-[#1B3C6C]">{fmtClock(a.appointmentTime)}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">{a.customerName || a.title || 'Consultation'}</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {[a.city, !repId ? repName(a.assignedRepId) : ''].filter(Boolean).join(' · ') || a.projectType || 'Consultation'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
@@ -1085,6 +1191,7 @@ export default function PortalWorkspace() {
   const [tab, setTab] = useState<'queue' | 'triage'>('queue');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [onlyMatches, setOnlyMatches] = useState(false);
+  const [showAvailability, setShowAvailability] = useState(false);
 
   const queue = currentUser ? getLeadQueue(currentUser) : [];
   const queueKeyAll = queue.map((l) => l.id).join(',');
@@ -1185,6 +1292,16 @@ export default function PortalWorkspace() {
         <div className="flex flex-wrap items-center gap-2">
           {tab === 'queue' && (
             <button
+              onClick={() => setShowAvailability(true)}
+              title="Peek at the consultation calendar for the next 2 weeks without leaving the call"
+              className="inline-flex items-center gap-2 rounded-[0.7rem] border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Availability
+            </button>
+          )}
+          {tab === 'queue' && (
+            <button
               onClick={() => setOnlyMatches((v) => !v)}
               disabled={matchCount === 0}
               title="Highlight leads already in your Clients list (matched by phone, email, or name) — likely booked before."
@@ -1240,6 +1357,8 @@ export default function PortalWorkspace() {
           )}
         </div>
       )}
+
+      {showAvailability && <AvailabilityPanel onClose={() => setShowAvailability(false)} />}
     </div>
   );
 }
