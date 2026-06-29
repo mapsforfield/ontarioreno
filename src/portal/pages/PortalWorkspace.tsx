@@ -1122,6 +1122,43 @@ export default function PortalWorkspace() {
     }
   }, [queueKey]);
 
+  // Callback engine: re-evaluate the queue on a timer so a scheduled callback
+  // rises to the top the moment its time arrives (sortLeadQueue handles the
+  // ordering), and nudge the rep with a toast when one comes due.
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const dueNotifiedRef = useRef<Set<string>>(new Set());
+  const dueSeededRef = useRef(false);
+  useEffect(() => {
+    const now = Date.now();
+    const dueIds = queue
+      .filter((l) => l.callbackAt && new Date(l.callbackAt).getTime() <= now)
+      .map((l) => l.id);
+    if (!dueSeededRef.current) {
+      // Seed silently on first load so we don't toast for callbacks already due.
+      dueSeededRef.current = true;
+      dueNotifiedRef.current = new Set(dueIds);
+      return;
+    }
+    for (const id of dueIds) {
+      if (dueNotifiedRef.current.has(id)) continue;
+      dueNotifiedRef.current.add(id);
+      const lead = queue.find((l) => l.id === id);
+      showToast({
+        message: `Callback due: ${lead?.name ?? 'lead'}`,
+        description: 'Moved to the top of your queue.',
+        duration: 10000,
+      });
+    }
+    // Allow a re-alert if a callback is rescheduled forward and later comes due.
+    for (const id of [...dueNotifiedRef.current]) {
+      if (!dueIds.includes(id)) dueNotifiedRef.current.delete(id);
+    }
+  }, [nowTick, queueKeyAll]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const index = displayedQueue.findIndex((l) => l.id === selectedId);
   const selectedLead = index >= 0 ? displayedQueue[index] : null;
   // Pull the freshest interactions onto the selected lead for the timeline.

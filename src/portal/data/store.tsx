@@ -487,10 +487,27 @@ function submittedAtRank(lead: Lead) {
   return Number.isNaN(submittedAt) ? 0 : submittedAt;
 }
 
+/** A callback's time, but only once it has actually arrived ("due"). */
+function callbackDueTime(lead: Lead, now: number): number | null {
+  if (!lead.callbackAt) return null;
+  const t = new Date(lead.callbackAt).getTime();
+  return Number.isNaN(t) || t > now ? null : t;
+}
+
 function sortLeadQueue(leads: Lead[]): Lead[] {
+  const now = Date.now();
   return leads
     .filter(isQueueEligible)
-    .sort((a, b) => submittedAtRank(b) - submittedAtRank(a));
+    .sort((a, b) => {
+      // Callback engine: a callback whose time has arrived jumps to the top of
+      // the queue (most overdue first). Everything else stays newest-first.
+      const da = callbackDueTime(a, now);
+      const db = callbackDueTime(b, now);
+      if (da != null && db != null) return da - db;
+      if (da != null) return -1;
+      if (db != null) return 1;
+      return submittedAtRank(b) - submittedAtRank(a);
+    });
 }
 
 function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
