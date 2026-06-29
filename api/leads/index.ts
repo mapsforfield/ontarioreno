@@ -250,6 +250,42 @@ function mergeLeadPatch(
   return { patch, incomingRicher };
 }
 
+/** Find an existing lead matching incoming by externalId / email / normalized phone. */
+async function findExistingLead(incoming: ReturnType<typeof importLeadData>) {
+  const phone = normPhone(incoming.phone);
+  const phoneLast10 = phone.length >= 10 ? phone.slice(-10) : null;
+  const email = normEmail(incoming.email);
+  const prismaMatchers = [
+    ...(incoming.externalId ? [{ externalId: incoming.externalId }] : []),
+    ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+  ];
+  let existing = prismaMatchers.length > 0
+    ? await prisma.lead.findFirst({ where: { OR: prismaMatchers } })
+    : null;
+  if (!existing && phoneLast10) {
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT "id" FROM "Lead" WHERE right(regexp_replace("phone", '[^0-9]', '', 'g'), 10) = $1 LIMIT 1`,
+      phoneLast10,
+    );
+    if (rows[0]) existing = await prisma.lead.findUnique({ where: { id: rows[0].id } });
+  }
+  return existing;
+}
+
+/** Ring the realtime "doorbell" so every open portal refetches and the new lead
+ *  appears immediately. Server-side publish (the intake endpoint is unauthenticated
+ *  so it can't use the client's doorbell). Best-effort — realtime is optional. */
+async function ringDoorbell() {
+  const apiKey = process.env.ABLY_API_KEY;
+  if (!apiKey) return;
+  try {
+    const { Rest } = await import('ably');
+    await new Rest(apiKey).channels.get('portal-changes').publish('change', { at: Date.now(), source: 'intake' });
+  } catch (err) {
+    console.error('[leads/intake] doorbell failed:', err);
+  }
+}
+
 // ─── ?intake=1 — token-gated, UNAUTHENTICATED ─────────────────────────────────
 async function handleIntake(req: VercelRequest, res: VercelResponse) {
   const secret = process.env.LEAD_INTAKE_TOKEN;
@@ -275,53 +311,44 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
   }
 
   const data = (req.body ?? {}) as Record<string, unknown>;
-  const name = String(data.name ?? '').trim();
-  if (!name) return res.status(400).json({ error: 'Name is required.' });
-
-  const phone = String(data.phone ?? '').trim();
-  const email = String(data.email ?? '').trim();
-  const externalId = data.externalId ? String(data.externalId) : null;
+  // Parse with the same logic as the bulk importer, so website/Meta rows get the
+  // same field mapping, extra-answers-into-notes, and source handling.
+  const incoming = importLeadData(data);
+  if (!incoming.name && !incoming.phone && !incoming.email) {
+    return res.status(400).json({ error: 'A name, phone, or email is required.' });
+  }
 
   try {
-    return await withTables(async () => {
-      // Dedupe — always 200 so the sender (Meta) does not retry-storm.
-      const dupe = await prisma.lead.findFirst({
-        where: {
-          OR: [
-            ...(externalId ? [{ externalId }] : []),
-            ...(normPhone(phone) ? [{ phone }] : []),
-            ...(normEmail(email) ? [{ email }] : []),
-          ],
-        },
-        select: { id: true },
-      });
-      if (dupe) return res.status(200).json({ ok: true, deduped: true, id: dupe.id });
-
-      const lead = await prisma.lead.create({
+    const result = await withTables(async () => {
+      const existing = await findExistingLead(incoming);
+      if (existing) {
+        // Enrich an existing lead (e.g. richer website data over a sparse Meta lead)
+        // — same merge rules as the importer; never resurrects a dispositioned lead.
+        const statusExplicit = clean(data.importStatus) !== '';
+        const dateRaw = clean(data.submittedAt);
+        const hasIncomingDate = dateRaw !== '' && !Number.isNaN(new Date(dateRaw).getTime());
+        const { patch } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming, statusExplicit, hasIncomingDate);
+        if (Object.keys(patch).length > 0) {
+          await prisma.lead.update({ where: { id: existing.id }, data: patch });
+        }
+        return { id: existing.id, merged: true };
+      }
+      const created = await prisma.lead.create({
         data: {
-          name,
-          phone,
-          email,
-          city: String(data.city ?? '').trim(),
-          address: String(data.address ?? '').trim(),
-          postalCode: String(data.postalCode ?? '').trim(),
-          projectType: String(data.projectType ?? '').trim(),
-          budget: String(data.budget ?? '').trim(),
-          financingInterest:
-            typeof data.financingInterest === 'boolean' ? data.financingInterest : null,
-          source: 'meta',
-          sourceDetail: String(data.sourceDetail ?? '').trim(),
-          externalId,
-          notes: String(data.notes ?? '').trim(),
-          assignedRepId: null,
+          ...incoming,
+          name: incoming.name || incoming.email || incoming.phone || 'Website lead',
+          assignedRepId: null, // always land unassigned → admin triage
         },
         select: { id: true },
       });
-      return res.status(201).json({ ok: true, id: lead.id });
+      return { id: created.id, merged: false };
     });
+    await ringDoorbell();
+    // Merge → 200, create → 201; always ok so the sender never retry-storms.
+    return res.status(result.merged ? 200 : 201).json({ ok: true, ...result });
   } catch (err) {
     console.error('[leads/intake] failed:', err);
-    return res.status(200).json({ ok: false }); // avoid external retry storms
+    return res.status(200).json({ ok: false });
   }
 }
 

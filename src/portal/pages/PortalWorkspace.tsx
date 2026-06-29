@@ -1187,11 +1187,34 @@ function AvailabilityPanel({ onClose }: { onClose: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
-  const { getLeadQueue, getInteractionsForLead, clients } = usePortalData();
+  const { getLeadQueue, getInteractionsForLead, clients, leads } = usePortalData();
   const [tab, setTab] = useState<'queue' | 'triage'>('queue');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [onlyMatches, setOnlyMatches] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
+  const [newArrivals, setNewArrivals] = useState(0);
+
+  // Surface freshly-arrived leads. The intake endpoint rings the realtime
+  // doorbell, so the store refetches and `leads` gains the new rows on its own;
+  // here we detect them and show an "N new leads" alert + a toast.
+  const knownLeadIdsRef = useRef<Set<string>>(new Set());
+  const leadsSeededRef = useRef(false);
+  useEffect(() => {
+    if (!leadsSeededRef.current) {
+      leadsSeededRef.current = true;
+      knownLeadIdsRef.current = new Set(leads.map((l) => l.id));
+      return;
+    }
+    const fresh = leads.filter((l) => !knownLeadIdsRef.current.has(l.id));
+    if (fresh.length === 0) return;
+    for (const l of fresh) knownLeadIdsRef.current.add(l.id);
+    setNewArrivals((n) => n + fresh.length);
+    showToast({
+      message: `${fresh.length} new lead${fresh.length > 1 ? 's' : ''} arrived`,
+      description: 'Now in your call queue / triage.',
+      duration: 8000,
+    });
+  }, [leads]);
 
   const queue = currentUser ? getLeadQueue(currentUser) : [];
   const queueKeyAll = queue.map((l) => l.id).join(',');
@@ -1290,6 +1313,16 @@ export default function PortalWorkspace() {
           <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Call flow</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {newArrivals > 0 && (
+            <button
+              onClick={() => { setNewArrivals(0); if (isAdmin) setTab('triage'); }}
+              title={isAdmin ? 'Review and assign the new leads in Triage' : 'New leads have arrived in your queue'}
+              className="inline-flex items-center gap-2 rounded-[0.7rem] border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+            >
+              <Sparkles className="h-4 w-4" />
+              {newArrivals} new lead{newArrivals > 1 ? 's' : ''}
+            </button>
+          )}
           {tab === 'queue' && (
             <button
               onClick={() => setShowAvailability(true)}
