@@ -609,6 +609,7 @@ export default function PortalAppointments() {
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
+  const [calendarContractorFilter, setCalendarContractorFilter] = useState<string>('all');
 
   // ── Days off panel ──
   const [daysOffPanelOpen, setDaysOffPanelOpen] = useState(false);
@@ -761,11 +762,12 @@ export default function PortalAppointments() {
   const filteredAppointments = visibleAppointments.filter(
     matchesConsultationFilter
   );
-  // Calendar-specific rep filter (admin only)
-  const calendarAppointments =
-    isAdmin && calendarRepFilter !== 'all'
-      ? filteredAppointments.filter((a) => a.assignedRepId === calendarRepFilter)
-      : filteredAppointments;
+  // Calendar-specific filters: rep (admin only) + contractor (everyone).
+  const calendarAppointments = filteredAppointments.filter((a) => {
+    if (isAdmin && calendarRepFilter !== 'all' && a.assignedRepId !== calendarRepFilter) return false;
+    if (calendarContractorFilter !== 'all' && a.contractorId !== calendarContractorFilter) return false;
+    return true;
+  });
   const selectedAppointment = visibleAppointments.find(
     (appointment) => appointment.id === selectedAppointmentId
   );
@@ -3047,6 +3049,19 @@ export default function PortalAppointments() {
                 ))}
               </select>
             )}
+            {/* Contractor filter — everyone */}
+            <select
+              value={calendarContractorFilter}
+              onChange={(e) => setCalendarContractorFilter(e.target.value)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#b8c9dd] focus:outline-none focus:ring-2 focus:ring-[#32639b]/30"
+            >
+              <option value="all">All contractors</option>
+              {[...contractors]
+                .sort((a, b) => a.companyName.localeCompare(b.companyName))
+                .map((contractor) => (
+                  <option key={contractor.id} value={contractor.id}>{contractor.companyName}</option>
+                ))}
+            </select>
             {(['month', 'week', 'day', 'map'] as CalendarView[]).map((view) => (
               <button
                 key={view}
