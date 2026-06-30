@@ -34,6 +34,7 @@ import {
   Lead,
   LeadImportResult,
   LeadImportRow,
+  NoteTemplate,
   ProposalHistory,
   RepDayOff,
   SalesAgreement,
@@ -92,6 +93,8 @@ type PortalDataState = {
   loadError: boolean;
   /** Admin-managed map of which portal sections reps may access ({} = all open). */
   repAccess: Record<string, boolean>;
+  /** Reusable Customer Notes templates for booking consultations. */
+  noteTemplates: NoteTemplate[];
 };
 
 type ContractorDispatchDraft = Omit<
@@ -234,6 +237,7 @@ type PortalDataContextValue = PortalDataState & {
   getUnassignedLeads: () => Lead[];
   getInteractionsForLead: (leadId: string) => Interaction[];
   setRepAccess: (access: Record<string, boolean>) => Promise<void>;
+  setNoteTemplates: (templates: NoteTemplate[]) => Promise<void>;
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   deleteTrackerRow: (id: string) => Promise<void>;
@@ -315,6 +319,7 @@ const emptyState: PortalDataState = {
   defaultCommissionRate: loadDefaultCommissionRate(),
   loadError: false,
   repAccess: {},
+  noteTemplates: [],
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
@@ -668,7 +673,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Task[]>('/api/auth/tasks'),
       apiCall<Lead[]>('/api/leads'),
       apiCall<Record<string, boolean>>('/api/auth/rep-access'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess]) => {
+      apiCall<NoteTemplate[]>('/api/auth/note-templates'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -698,6 +704,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         // instead of silently rendering empty screens.
         loadError: [users, contractors, rawDeals, appointments, commissions].some((r) => r === null),
         repAccess: repAccess ?? {},
+        noteTemplates: noteTemplates ?? [],
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1429,6 +1436,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           defaultCommissionRate: current.defaultCommissionRate,
           loadError: current.loadError,
           repAccess: current.repAccess,
+          noteTemplates: current.noteTemplates,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
@@ -3340,6 +3348,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           body: JSON.stringify(access),
         });
+      },
+
+      setNoteTemplates: async (templates) => {
+        setState((current) => ({ ...current, noteTemplates: templates }));
+        const saved = await apiCall<NoteTemplate[]>('/api/auth/note-templates', {
+          method: 'POST',
+          body: JSON.stringify(templates),
+        });
+        if (saved) setState((current) => ({ ...current, noteTemplates: saved }));
       },
 
       // ── Selectors / calculators (pure, no API) ──────────────────────────────

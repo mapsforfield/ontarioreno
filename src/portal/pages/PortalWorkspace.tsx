@@ -1494,11 +1494,19 @@ function BadLeadsView() {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+const SELECTED_LEAD_KEY = 'or_workspace_selected_lead';
+
 export default function PortalWorkspace() {
   const { currentUser, isAdmin } = usePortalAuth();
   const { getLeadQueue, getInteractionsForLead, clients, leads } = usePortalData();
   const [tab, setTab] = useState<'queue' | 'triage' | 'performance' | 'bad'>('queue');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Restore the last lead you were on so leaving and returning doesn't reset to the top.
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    try { return localStorage.getItem(SELECTED_LEAD_KEY); } catch { return null; }
+  });
+  useEffect(() => {
+    try { if (selectedId) localStorage.setItem(SELECTED_LEAD_KEY, selectedId); } catch { /* ignore */ }
+  }, [selectedId]);
   const [onlyMatches, setOnlyMatches] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
   const [newArrivals, setNewArrivals] = useState(0);

@@ -459,6 +459,9 @@ export type LeadImportResult = {
   failures: Array<{ row: number; name?: string; reason: string }>;
 };
 
+/** A reusable Customer Notes template for booking consultations. */
+export type NoteTemplate = { id: string; label: string; body: string };
+
 export type CommissionPayoutStatus = 'pending' | 'partial' | 'paid';
 
 export type Commission = {

@@ -606,6 +606,7 @@ export default function PortalAppointments() {
     addDaysOff,
     removeDayOff,
     users,
+    noteTemplates,
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
@@ -4057,7 +4058,25 @@ export default function PortalAppointments() {
                   </select>
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-                  Customer Notes
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    Customer Notes
+                    {noteTemplates.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(event) => {
+                          const tpl = noteTemplates.find((t) => t.id === event.target.value);
+                          if (!tpl) return;
+                          updateForm('customerNotes', form.customerNotes.trim() ? `${form.customerNotes.trim()}\n\n${tpl.body}` : tpl.body);
+                        }}
+                        className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-[#1B3C6C]"
+                      >
+                        <option value="">Insert template…</option>
+                        {noteTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </span>
                   <textarea rows={3} value={form.customerNotes} onChange={(event) => updateForm('customerNotes', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-slate-700 sm:col-span-2">

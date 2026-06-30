@@ -6,12 +6,12 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { generateTemporaryPassword, usePortalData } from '../data/store';
-import { ActivityEntityType, User } from '../data/types';
+import { ActivityEntityType, NoteTemplate, User } from '../data/types';
 import { REP_FEATURES, repCanAccess } from '../data/repFeatures';
 
 type RepFormState = {
@@ -122,7 +122,31 @@ export default function PortalAdmin() {
     users,
     repAccess,
     setRepAccess,
+    noteTemplates,
+    setNoteTemplates,
   } = usePortalData();
+  const [tplDraft, setTplDraft] = useState<NoteTemplate[]>([]);
+  const [tplDirty, setTplDirty] = useState(false);
+  const [tplSaved, setTplSaved] = useState(false);
+  useEffect(() => { if (!tplDirty) setTplDraft(noteTemplates); }, [noteTemplates, tplDirty]);
+  const editTpl = (id: string, patch: Partial<NoteTemplate>) => {
+    setTplDirty(true);
+    setTplDraft((cur) => cur.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  };
+  const addTpl = () => {
+    setTplDirty(true);
+    setTplDraft((cur) => [...cur, { id: `tpl-${Date.now()}`, label: '', body: '' }]);
+  };
+  const removeTpl = (id: string) => {
+    setTplDirty(true);
+    setTplDraft((cur) => cur.filter((t) => t.id !== id));
+  };
+  const saveTpls = async () => {
+    await setNoteTemplates(tplDraft.filter((t) => t.label.trim() || t.body.trim()));
+    setTplDirty(false);
+    setTplSaved(true);
+    setTimeout(() => setTplSaved(false), 2000);
+  };
   const [commissionInput, setCommissionInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const [commissionSaved, setCommissionSaved] = useState(false);
   const repManagementRef = useRef<HTMLElement>(null);
@@ -380,6 +404,68 @@ export default function PortalAdmin() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Booking</p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Customer note templates</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Reusable Customer Notes you can insert with one click when booking a consultation.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {tplSaved && <span className="text-sm font-bold text-emerald-600">Saved</span>}
+            <button
+              type="button"
+              onClick={saveTpls}
+              disabled={!tplDirty}
+              className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save templates
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {tplDraft.length === 0 && (
+            <p className="text-sm font-semibold text-slate-400">No templates yet — add one below.</p>
+          )}
+          {tplDraft.map((tpl) => (
+            <div key={tpl.id} className="rounded-[0.5rem] border border-slate-200 p-3">
+              <div className="flex items-center gap-2">
+                <input
+                  value={tpl.label}
+                  onChange={(e) => editTpl(tpl.id, { label: e.target.value })}
+                  placeholder="Template name (e.g. Hamilton Grant)"
+                  className="flex-1 rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeTpl(tpl.id)}
+                  className="flex h-9 w-9 items-center justify-center rounded-[0.5rem] border border-slate-200 text-slate-400 transition hover:border-red-200 hover:text-red-600"
+                  aria-label="Delete template"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea
+                value={tpl.body}
+                onChange={(e) => editTpl(tpl.id, { body: e.target.value })}
+                rows={4}
+                placeholder="The notes that get inserted…"
+                className="mt-2 w-full rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm text-slate-700"
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addTpl}
+            className="inline-flex items-center gap-2 rounded-[0.5rem] border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Plus className="h-4 w-4" /> Add template
+          </button>
         </div>
       </section>
 

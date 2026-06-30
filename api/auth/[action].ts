@@ -122,6 +122,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed.' });
   }
 
+  // ── /api/auth/note-templates ──────────────────────────────────────────────
+  // Reusable Customer Notes templates for booking consultations. Read by any
+  // authed user; only admins can edit. Seeds a Hamilton Grant template by default.
+  if (action === 'note-templates') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    const DEFAULT_TEMPLATES = [
+      {
+        id: 'hamilton-grant',
+        label: 'Hamilton Grant',
+        body:
+          'Pre-qualified through OntarioReno for the Hamilton Secondary Suite Grant (up to $40K).\n\n' +
+          'This visit is to confirm eligibility and provide an accurate scope and estimate.',
+      },
+    ];
+
+    if (req.method === 'GET') {
+      const row = await withSchema(() => prisma.setting.findUnique({ where: { key: 'note_templates' } }));
+      let value: Array<{ id: string; label: string; body: string }> = DEFAULT_TEMPLATES;
+      if (row?.value) {
+        try {
+          const parsed = JSON.parse(row.value);
+          if (Array.isArray(parsed)) value = parsed;
+        } catch { /* keep default */ }
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(value);
+    }
+
+    if (req.method === 'POST') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const raw = req.body;
+      const list = Array.isArray(raw) ? raw : Array.isArray(raw?.templates) ? raw.templates : [];
+      const clean = list
+        .map((t: Record<string, unknown>) => ({
+          id: String(t?.id ?? '').slice(0, 60) || Math.random().toString(36).slice(2, 9),
+          label: String(t?.label ?? '').slice(0, 80),
+          body: String(t?.body ?? '').slice(0, 4000),
+        }))
+        .filter((t: { label: string; body: string }) => t.label.trim() || t.body.trim());
+      await withSchema(() => prisma.setting.upsert({
+        where: { key: 'note_templates' },
+        update: { value: JSON.stringify(clean) },
+        create: { key: 'note_templates', value: JSON.stringify(clean) },
+      }));
+      return res.status(200).json(clean);
+    }
+
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
+
   // ── /api/auth/tasks ───────────────────────────────────────────────────────
   // Personal to-do list. Each user only ever sees/edits their own tasks.
   if (action === 'tasks') {
