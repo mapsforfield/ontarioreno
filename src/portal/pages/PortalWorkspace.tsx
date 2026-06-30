@@ -294,7 +294,7 @@ function CustomerCard({
   onSkip: () => void;
 }) {
   const navigate = useNavigate();
-  const { logInteraction, scheduleCallback, updateLead } = usePortalData();
+  const { logInteraction, scheduleCallback } = usePortalData();
 
   const [callNote, setCallNote] = useState('');
   const [copied, setCopied] = useState(false);
@@ -357,8 +357,9 @@ function CustomerCard({
   };
 
   const handleBook = () => {
-    // Optimistically take it out of the queue; the booking flow confirms server-side.
-    updateLead(lead.id, { status: 'booked' });
+    // Don't mark the lead booked here — that's what made an accidental click (or
+    // a cancelled booking) strand the lead. The lead only leaves the queue when
+    // the appointment is actually created (server-side, which rings the doorbell).
     navigate('/portal/appointments', {
       state: { prefillClient: leadToClient(lead), fromLeadId: lead.id },
     });
@@ -1493,6 +1494,59 @@ function BadLeadsView() {
   );
 }
 
+// ─── Booked panel (recover accidentally-booked leads) ────────────────────────
+function BookedPanel() {
+  const { leads, updateLead, logInteraction } = usePortalData();
+  const booked = useMemo(
+    () =>
+      leads
+        .filter((l) => !l.deletedAt && l.status === 'booked')
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    [leads]
+  );
+
+  const handleReturn = (lead: Lead) => {
+    updateLead(lead.id, { status: 'new' });
+    logInteraction(lead.id, { channel: 'system', body: 'Returned to the call queue from Booked' });
+    showToast({ message: `${lead.name} returned to the call queue`, variant: 'success' });
+  };
+
+  return (
+    <details className="overflow-hidden rounded-[0.9rem] border border-slate-200 bg-white shadow-sm">
+      <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 marker:content-['']">
+        <span className="flex items-center gap-2">
+          <CalendarPlus className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-black uppercase tracking-wide text-slate-500">Booked</span>
+        </span>
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-black text-emerald-700">{booked.length}</span>
+      </summary>
+      <div className="max-h-[55vh] overflow-y-auto border-t border-slate-100">
+        {booked.length === 0 ? (
+          <p className="px-4 py-6 text-center text-xs font-semibold text-slate-400">Nothing booked yet.</p>
+        ) : (
+          booked.map((l) => (
+            <div key={l.id} className="border-b border-slate-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-bold text-slate-800">{l.name}</span>
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-bold', l.appointmentId ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                  {l.appointmentId ? 'Scheduled' : 'Not scheduled'}
+                </span>
+              </div>
+              <p className="truncate text-xs text-slate-500">{[l.city, l.projectType].filter(Boolean).join(' · ') || 'No details'}</p>
+              <button
+                onClick={() => handleReturn(l)}
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                <TimerReset className="h-3.5 w-3.5" /> Return to call flow
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const SELECTED_LEAD_KEY = 'or_workspace_selected_lead';
 
@@ -1691,26 +1745,27 @@ export default function PortalWorkspace() {
         <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
           <QueueRail queue={displayedQueue} selectedId={selectedId} onSelect={setSelectedId} matches={matchByLeadId} />
           {selectedWithTimeline ? (
-            <>
-              <CustomerCard
-                lead={selectedWithTimeline}
-                index={index}
-                total={displayedQueue.length}
-                clientMatch={matchByLeadId.get(selectedWithTimeline.id) ?? null}
-                onPrev={goPrev}
-                onNext={goNext}
-                onSkip={goNext}
-              />
-              <ContextPanel lead={selectedWithTimeline} />
-            </>
+            <CustomerCard
+              lead={selectedWithTimeline}
+              index={index}
+              total={displayedQueue.length}
+              clientMatch={matchByLeadId.get(selectedWithTimeline.id) ?? null}
+              onPrev={goPrev}
+              onNext={goNext}
+              onSkip={goNext}
+            />
           ) : (
-            <div className="xl:col-span-2 flex items-center justify-center rounded-[0.9rem] border border-dashed border-slate-300 bg-white p-12">
+            <div className="flex items-center justify-center rounded-[0.9rem] border border-dashed border-slate-300 bg-white p-12">
               <p className="text-center text-sm font-semibold text-slate-400">
                 Your queue is empty.
                 {isAdmin ? ' Import and assign leads from Triage.' : ' New leads will appear here once assigned.'}
               </p>
             </div>
           )}
+          <div className="space-y-3">
+            {selectedWithTimeline && <ContextPanel lead={selectedWithTimeline} />}
+            <BookedPanel />
+          </div>
         </div>
       )}
 
