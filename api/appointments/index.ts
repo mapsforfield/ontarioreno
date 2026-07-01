@@ -59,31 +59,23 @@ async function sendPush(
 }
 
 // ─── Contractor-scoped, read-only responses ─────────────────────────────────
-// A contractor account only ever receives its own contractor's calendar + clients,
-// and only a safe subset of fields (no internal sales notes, values, financing,
-// objections, deal/lead links, etc.).
+// A contractor account sees the FULL sales calendar so the team looks busy, but
+// deliberately ANONYMIZED: no client contact details (phone/email/address), no
+// contractor attribution (they must not see which jobs belong to whom), and no
+// notes of any kind. Only enough to show that a consultation exists.
+// The scrub happens server-side so these fields never leave the database for a
+// contractor account — there is nothing to recover in dev tools.
 function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string) {
   return {
     id: a.id,
     customerName: a.customerName,
-    phone: a.phone,
-    email: a.email,
-    address: a.address,
-    city: a.city,
-    postalCode: a.postalCode,
     projectType: a.projectType,
     appointmentDate: a.appointmentDate,
     appointmentTime: a.appointmentTime,
     durationMinutes: a.durationMinutes,
     appointmentType: a.appointmentType,
     status: a.status,
-    consultationStage: a.consultationStage,
-    customerNotes: a.customerNotes,
-    contractorId: a.contractorId,
-    assignedRepId: a.assignedRepId,
     repName,
-    latitude: a.latitude,
-    longitude: a.longitude,
   };
 }
 
@@ -91,47 +83,26 @@ function scrubClientForContractor(c: Record<string, unknown>) {
   return {
     id: c.id,
     name: c.name,
-    phone: c.phone,
-    email: c.email,
-    address: c.address,
-    city: c.city,
-    postalCode: c.postalCode,
     projectTypes: c.projectTypes,
   };
 }
 
-async function handleContractorGet(
-  req: VercelRequest,
-  res: VercelResponse,
-  user: { contractorId?: string | null },
-) {
-  const cid = user.contractorId;
-  if (!cid) return res.status(200).json([]);
+async function handleContractorGet(req: VercelRequest, res: VercelResponse) {
+  // Contractor accounts see the FULL calendar + client roster, but anonymized —
+  // no contact details and no contractor attribution (see scrub helpers above).
 
-  // Clients tied to this contractor (via any Galaxy consultation OR deal).
+  // Client roster: every client, names only (no phone/email/address).
   if (req.query['_resource'] === 'clients') {
-    const [appts, deals] = await Promise.all([
-      withSchema(() => prisma.appointment.findMany({ where: { contractorId: cid, deletedAt: null }, select: { clientId: true, email: true } })),
-      withSchema(() => prisma.deal.findMany({ where: { assignedContractorId: cid, deletedAt: null }, select: { clientId: true, email: true } })),
-    ]);
-    const ids = new Set<string>();
-    const emails = new Set<string>();
-    for (const r of [...appts, ...deals]) {
-      if (r.clientId) ids.add(r.clientId);
-      if (r.email) emails.add(r.email.trim().toLowerCase());
-    }
-    const or: object[] = [{ id: { in: [...ids] } }];
-    if (emails.size) or.push({ email: { in: [...emails], mode: 'insensitive' } });
-    const clients = await withSchema(() => prisma.client.findMany({ where: { deletedAt: null, OR: or }, orderBy: { name: 'asc' } }));
+    const clients = await withSchema(() => prisma.client.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } }));
     return res.status(200).json(clients.map((c) => scrubClientForContractor(c as unknown as Record<string, unknown>)));
   }
 
   // Anything else the contractor asks for that isn't the calendar → not available.
   if (req.query['_resource']) return res.status(403).json({ error: 'Not available for contractor accounts.' });
 
-  // Default: this contractor's calendar only.
+  // Default: the whole sales calendar (every rep / every contractor), scrubbed.
   const appts = await withSchema(() => prisma.appointment.findMany({
-    where: { contractorId: cid, deletedAt: null },
+    where: { deletedAt: null },
     orderBy: { appointmentDate: 'desc' },
   }));
   const repIds = [...new Set(appts.map((a) => a.assignedRepId).filter(Boolean))] as string[];
@@ -664,10 +635,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
   if (!user) return;
 
-  // Contractor accounts: read-only, scoped to their own calendar + clients.
+  // Contractor accounts: read-only, full calendar but anonymized (no contact
+  // details, no contractor attribution, no notes).
   if (user.role === 'contractor') {
     if (req.method !== 'GET') return res.status(403).json({ error: 'Not available for contractor accounts.' });
-    return handleContractorGet(req, res, user);
+    return handleContractorGet(req, res);
   }
 
   if (req.method === 'GET') {

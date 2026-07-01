@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Phone, Mail, MapPin, Clock, User, Wrench, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, User, Wrench } from 'lucide-react';
 import { usePortalData } from '../data/store';
-import { usePortalAuth } from '../auth';
 import type { Appointment } from '../data/types';
 
 // Appointments loaded for a contractor carry a server-added `repName`.
+// Contact fields (phone/email/address) and contractor attribution are stripped
+// server-side, so they are simply absent here.
 type CxAppt = Appointment & { repName?: string };
 
 function fmt12(t?: string | null) {
@@ -58,10 +59,6 @@ function statusColor(a: Appointment): { bg: string; light: boolean } {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function telHref(phone?: string | null) {
-  return phone ? `tel:${String(phone).replace(/[^+\d]/g, '')}` : undefined;
-}
-
 function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 py-2.5">
@@ -76,8 +73,6 @@ function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: st
 
 function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => void }) {
   const c = statusColor(appt);
-  const fullAddress = [appt.address, appt.city, appt.postalCode].filter(Boolean).join(', ');
-  const mapsHref = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : undefined;
   const timeLabel = [fmt12(appt.appointmentTime), appt.durationMinutes ? `${appt.durationMinutes} min` : '']
     .filter(Boolean)
     .join(' · ');
@@ -119,29 +114,6 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
             </DetailRow>
           )}
 
-          {fullAddress && (
-            <DetailRow icon={<MapPin className="h-4 w-4" />} label="Address">
-              <span>{fullAddress}</span>
-              {mapsHref && (
-                <a href={mapsHref} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-xs font-bold text-[#1B3C6C] hover:underline">
-                  Open in Maps
-                </a>
-              )}
-            </DetailRow>
-          )}
-
-          {appt.phone && (
-            <DetailRow icon={<Phone className="h-4 w-4" />} label="Phone">
-              <a href={telHref(appt.phone)} className="text-[#1B3C6C] hover:underline">{appt.phone}</a>
-            </DetailRow>
-          )}
-
-          {appt.email && (
-            <DetailRow icon={<Mail className="h-4 w-4" />} label="Email">
-              <a href={`mailto:${appt.email}`} className="text-[#1B3C6C] hover:underline break-all">{appt.email}</a>
-            </DetailRow>
-          )}
-
           {appt.projectType && (
             <DetailRow icon={<Wrench className="h-4 w-4" />} label="Project">
               {appt.projectType}
@@ -153,27 +125,6 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
               {appt.repName}
             </DetailRow>
           )}
-
-          {appt.customerNotes && (
-            <DetailRow icon={<FileText className="h-4 w-4" />} label="Notes">
-              <span className="whitespace-pre-wrap font-medium text-slate-600">{appt.customerNotes}</span>
-            </DetailRow>
-          )}
-        </div>
-
-        <div className="border-t border-slate-100 px-5 py-3">
-          <div className="flex gap-2">
-            {appt.phone && (
-              <a href={telHref(appt.phone)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#1B3C6C] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#16325a]">
-                <Phone className="h-4 w-4" /> Call
-              </a>
-            )}
-            {mapsHref && (
-              <a href={mapsHref} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                <MapPin className="h-4 w-4" /> Directions
-              </a>
-            )}
-          </div>
         </div>
       </div>
     </div>
@@ -181,7 +132,6 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
 }
 
 export default function ContractorCalendar() {
-  const { currentUser } = usePortalAuth();
   const { appointments } = usePortalData();
   const [cursor, setCursor] = useState(() => {
     const today = new Date();
@@ -230,9 +180,7 @@ export default function ContractorCalendar() {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
-            {currentUser?.contractorName || 'Contractor'}
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">Sales team</p>
           <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Consultation calendar</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -266,7 +214,7 @@ export default function ContractorCalendar() {
                         key={a.id}
                         onClick={() => setSelectedId(a.id)}
                         className={`w-full rounded ${c.bg} px-1.5 py-1 text-left transition hover:brightness-110 hover:ring-2 hover:ring-slate-900/10 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]/40`}
-                        title={`${fmt12(a.appointmentTime)} · ${a.customerName} · ${[a.city, a.projectType].filter(Boolean).join(' · ')}${a.repName ? ` · Rep: ${a.repName}` : ''}`}
+                        title={`${fmt12(a.appointmentTime)} · ${a.customerName}${a.projectType ? ` · ${a.projectType}` : ''}${a.repName ? ` · Rep: ${a.repName}` : ''}`}
                       >
                         <p className={`truncate text-[0.6rem] font-bold ${c.light ? 'text-white/80' : 'text-slate-700'}`}>{fmt12(a.appointmentTime)}</p>
                         <p className={`truncate text-[0.68rem] font-black leading-tight ${c.light ? 'text-white' : 'text-slate-900'}`}>{a.customerName || 'Consultation'}</p>
@@ -280,7 +228,7 @@ export default function ContractorCalendar() {
           })}
         </div>
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of consultations assigned to {currentUser?.contractorName || 'your company'}. Tap a consultation to see contact details.</p>
+      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of the sales team's consultation schedule. Tap a consultation for details.</p>
 
       {selected && <AppointmentDetail appt={selected} onClose={() => setSelectedId(null)} />}
     </div>

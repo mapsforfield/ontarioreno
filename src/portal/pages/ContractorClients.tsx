@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { usePortalData } from '../data/store';
-import { usePortalAuth } from '../auth';
 
 export default function ContractorClients() {
-  const { currentUser } = usePortalAuth();
   const { clients } = usePortalData();
   const [query, setQuery] = useState('');
 
@@ -13,7 +11,7 @@ export default function ContractorClients() {
     const base = [...clients].sort((a, b) => a.name.localeCompare(b.name));
     if (!q) return base;
     return base.filter((c) =>
-      [c.name, c.phone, c.email, c.address, c.city, (c.projectTypes ?? []).join(' ')]
+      [c.name, (c.projectTypes ?? []).join(' ')]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
@@ -22,9 +20,7 @@ export default function ContractorClients() {
   return (
     <div>
       <div className="mb-5">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
-          {currentUser?.contractorName || 'Contractor'}
-        </p>
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">Sales team</p>
         <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] text-slate-950">Clients</h1>
       </div>
 
@@ -47,9 +43,6 @@ export default function ContractorClients() {
               <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Address</th>
                   <th className="px-4 py-3">Project</th>
                 </tr>
               </thead>
@@ -57,11 +50,6 @@ export default function ContractorClients() {
                 {list.map((c) => (
                   <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/60">
                     <td className="px-4 py-3 font-bold text-slate-800">{c.name}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {c.phone ? <a href={`tel:${c.phone.replace(/[^+\d]/g, '')}`} className="text-[#1B3C6C] hover:underline">{c.phone}</a> : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{c.email || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{[c.address, c.city].filter(Boolean).join(', ') || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{(c.projectTypes ?? []).join(', ') || '—'}</td>
                   </tr>
                 ))}
@@ -70,7 +58,7 @@ export default function ContractorClients() {
           </div>
         )}
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of clients linked to {currentUser?.contractorName || 'your company'}.</p>
+      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only client roster.</p>
     </div>
   );
 }
