@@ -65,6 +65,12 @@ async function sendPush(
 // notes of any kind. Only enough to show that a consultation exists.
 // The scrub happens server-side so these fields never leave the database for a
 // contractor account — there is nothing to recover in dev tools.
+// Only genuine homeowner consultations are shared with contractor accounts —
+// never internal/operational events (showroom visits, supplier meetings, site
+// checks, custom events). Those can expose specific high-value closing clients
+// that don't belong to the contractor.
+const CONTRACTOR_VISIBLE_TYPES = ['home_visit', 'phone_consultation', 'video_consultation'];
+
 function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string) {
   return {
     id: a.id,
@@ -100,9 +106,10 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse) {
   // Anything else the contractor asks for that isn't the calendar → not available.
   if (req.query['_resource']) return res.status(403).json({ error: 'Not available for contractor accounts.' });
 
-  // Default: the whole sales calendar (every rep / every contractor), scrubbed.
+  // Default: the whole sales calendar (every rep / every contractor), scrubbed —
+  // but consultations ONLY (no custom/operational events).
   const appts = await withSchema(() => prisma.appointment.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, appointmentType: { in: CONTRACTOR_VISIBLE_TYPES } },
     orderBy: { appointmentDate: 'desc' },
   }));
   const repIds = [...new Set(appts.map((a) => a.assignedRepId).filter(Boolean))] as string[];
