@@ -184,9 +184,14 @@ export default function ContractorCalendar() {
   const { currentUser } = usePortalAuth();
   const { appointments } = usePortalData();
   const [cursor, setCursor] = useState(() => {
+    const today = new Date();
     const d = new Date();
     d.setDate(1);
     d.setHours(0, 0, 0, 0);
+    // Early in the month the current-month grid is mostly empty, while the
+    // previous month's grid still trails into the first ~11 days of this month.
+    // Land on the previous month until the 12th so the view isn't blank on arrival.
+    if (today.getDate() < 12) d.setMonth(d.getMonth() - 1);
     return d;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
