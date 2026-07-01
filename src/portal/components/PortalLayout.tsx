@@ -34,6 +34,7 @@ import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
 import { repCanAccess, featureForPath, type RepFeatureKey } from '../data/repFeatures';
+import { torontoToday } from '../lib/time';
 import AdminActivityCenter from './AdminActivityCenter';
 import GlobalSearch from './GlobalSearch';
 import Toaster from './Toaster';
@@ -97,7 +98,7 @@ export default function PortalLayout() {
   }, []);
 
   // Needs-attention count for badge on Consultations nav item
-  const today = new Date().toISOString().slice(0, 10);
+  const today = torontoToday();
   const visibleAppointments = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
   const needsAttentionCount = visibleAppointments.filter(
     (a) =>

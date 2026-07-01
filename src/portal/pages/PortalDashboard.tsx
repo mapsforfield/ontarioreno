@@ -16,6 +16,7 @@ import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
 import { ConsultationStage } from '../data/types';
+import { torontoToday } from '../lib/time';
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -96,7 +97,7 @@ export default function PortalDashboard() {
   const visibleAppointments = currentUser
     ? getVisibleAppointmentsForUser(currentUser)
     : [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = torontoToday();
   const todayAppointments = visibleAppointments.filter(
     (appointment) => appointment.appointmentDate === today
   );

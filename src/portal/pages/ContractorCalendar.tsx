@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, User, Wrench } from 'lucide-react';
 import { usePortalData } from '../data/store';
+import { torontoToday } from '../lib/time';
 import type { Appointment } from '../data/types';
 
 // Appointments loaded for a contractor carry a server-added `repName`.
@@ -134,14 +135,13 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
 export default function ContractorCalendar() {
   const { appointments } = usePortalData();
   const [cursor, setCursor] = useState(() => {
-    const today = new Date();
-    const d = new Date();
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
+    // Based on Ontario's date, not the viewer's device clock.
+    const [y, m, day] = torontoToday().split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
     // Early in the month the current-month grid is mostly empty, while the
     // previous month's grid still trails into the first ~11 days of this month.
     // Land on the previous month until the 12th so the view isn't blank on arrival.
-    if (today.getDate() < 12) d.setMonth(d.getMonth() - 1);
+    if (day < 12) d.setMonth(d.getMonth() - 1);
     return d;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -172,7 +172,7 @@ export default function ContractorCalendar() {
     () => Array.from({ length: 42 }, (_, i) => { const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d; }),
     [gridStart]
   );
-  const todayKey = toKey(new Date());
+  const todayKey = torontoToday();
   const monthLabel = cursor.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
   const shift = (n: number) => setCursor((c) => { const d = new Date(c); d.setMonth(c.getMonth() + n); return d; });
 

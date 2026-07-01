@@ -1,6 +1,7 @@
 import { CalendarDays, CheckCircle2, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { torontoToday } from '../lib/time';
 
 /** Generate half-hour time slots from 8:00 AM to 7:00 PM. */
 function buildTimeSlots(): Array<{ label: string; value: string }> {
@@ -20,9 +21,9 @@ function buildTimeSlots(): Array<{ label: string; value: string }> {
 
 const TIME_SLOTS = buildTimeSlots();
 
-/** ISO date string for today, used as the min attribute on the date picker. */
+/** Today's date (Ontario time), used as the min attribute on the date picker. */
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return torontoToday();
 }
 
 type Status = 'idle' | 'loading' | 'success' | 'error';

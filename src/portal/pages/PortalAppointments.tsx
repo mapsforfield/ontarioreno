@@ -24,6 +24,7 @@ import { usePortalAuth } from '../auth';
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { showToast } from '../lib/toast';
+import { torontoToday, localDateKey } from '../lib/time';
 
 const AppointmentsMap = lazy(() => import('../components/AppointmentsMap'));
 import {
@@ -205,7 +206,7 @@ const dispatchReadyStages: ConsultationStage[] = [
 
 const emptyForm: AppointmentFormState = {
   address: '',
-  appointmentDate: new Date().toISOString().slice(0, 10),
+  appointmentDate: torontoToday(),
   appointmentTime: '10:00',
   appointmentType: 'home_visit',
   assignedRepId: '',
@@ -283,7 +284,9 @@ function getStartOfWeek(date: Date) {
 }
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  // Read back the calendar-grid day in local time (grid cells are built locally);
+  // never via toISOString(), which would shift the key to the UTC day.
+  return localDateKey(date);
 }
 
 function getDaysSince(value: string) {
@@ -772,7 +775,7 @@ export default function PortalAppointments() {
   const selectedAppointment = visibleAppointments.find(
     (appointment) => appointment.id === selectedAppointmentId
   );
-  const today = toDateKey(new Date());
+  const today = torontoToday();
   const todayAppointments = filteredAppointments.filter(
     (appointment) => appointment.appointmentDate === today
   );
@@ -5077,9 +5080,9 @@ export default function PortalAppointments() {
                     { label: 'Today', offset: 0 },
                     { label: 'Tomorrow', offset: 1 },
                   ].map(({ label, offset }) => {
-                    const d = new Date();
+                    const d = new Date(`${torontoToday()}T12:00:00`);
                     d.setDate(d.getDate() + offset);
-                    const iso = d.toISOString().slice(0, 10);
+                    const iso = localDateKey(d);
                     return (
                       <button
                         key={label}
@@ -5144,7 +5147,7 @@ export default function PortalAppointments() {
                     const cursor = new Date(daysOffFromDate + 'T00:00:00');
                     const end = new Date((daysOffToDate || daysOffFromDate) + 'T00:00:00');
                     while (cursor <= end) {
-                      dates.push(cursor.toISOString().slice(0, 10));
+                      dates.push(localDateKey(cursor));
                       cursor.setDate(cursor.getDate() + 1);
                     }
                     await addDaysOff(dates, daysOffNote.trim(), isAdmin ? repId : undefined);
