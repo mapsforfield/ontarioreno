@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { ensureSchema } from '../../lib/schema.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
@@ -716,6 +716,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+  if (denyContractor(user, res)) return;
 
   const id = req.query['id'] as string | undefined;
   if (id) return handleById(req, res, user, id);

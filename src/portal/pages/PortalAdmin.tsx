@@ -124,7 +124,30 @@ export default function PortalAdmin() {
     setRepAccess,
     noteTemplates,
     setNoteTemplates,
+    contractors,
+    addContractorAccount,
   } = usePortalData();
+  const [cxName, setCxName] = useState('');
+  const [cxEmail, setCxEmail] = useState('');
+  const [cxContractorId, setCxContractorId] = useState('');
+  const [cxNotice, setCxNotice] = useState('');
+  const [cxBusy, setCxBusy] = useState(false);
+  const createContractorAccount = async () => {
+    if (!cxName.trim() || !cxEmail.trim() || !cxContractorId) {
+      setCxNotice('Name, email, and a contractor are required.');
+      return;
+    }
+    setCxBusy(true);
+    const result = await addContractorAccount(cxName.trim(), cxEmail.trim(), cxContractorId);
+    setCxBusy(false);
+    if ('error' in result) {
+      setCxNotice(result.error);
+      return;
+    }
+    setCxNotice(`Account created. Temporary password: ${result.tempPassword}`);
+    setCxName(''); setCxEmail(''); setCxContractorId('');
+  };
+  const contractorAccounts = users.filter((u) => u.role === 'contractor');
   const [tplDraft, setTplDraft] = useState<NoteTemplate[]>([]);
   const [tplDirty, setTplDirty] = useState(false);
   const [tplSaved, setTplSaved] = useState(false);
@@ -467,6 +490,47 @@ export default function PortalAdmin() {
             <Plus className="h-4 w-4" /> Add template
           </button>
         </div>
+      </section>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="border-b border-slate-200 pb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Access Control</p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Contractor accounts</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            A read-only login scoped to one contractor — they see only that contractor&rsquo;s
+            consultation calendar and clients, and can change nothing.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <input value={cxName} onChange={(e) => setCxName(e.target.value)} placeholder="Contact name (e.g. PJ)" className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800" />
+          <input value={cxEmail} onChange={(e) => setCxEmail(e.target.value)} placeholder="Login email" type="email" className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800" />
+          <select value={cxContractorId} onChange={(e) => setCxContractorId(e.target.value)} className="rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">
+            <option value="">Select contractor…</option>
+            {[...contractors].sort((a, b) => a.companyName.localeCompare(b.companyName)).map((c) => (
+              <option key={c.id} value={c.id}>{c.companyName}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button onClick={createContractorAccount} disabled={cxBusy} className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:opacity-50">
+            {cxBusy ? 'Creating…' : 'Create contractor account'}
+          </button>
+          {cxNotice && <span className="text-sm font-bold text-slate-700">{cxNotice}</span>}
+        </div>
+        {contractorAccounts.length > 0 && (
+          <div className="mt-4 space-y-1.5">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Existing contractor accounts</p>
+            {contractorAccounts.map((u) => (
+              <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[0.5rem] border border-slate-100 px-3 py-2">
+                <span className="text-sm font-bold text-slate-800">{u.name} <span className="font-semibold text-slate-400">· {u.email}</span></span>
+                <span className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{contractors.find((c) => c.id === u.contractorId)?.companyName ?? 'Unlinked'}</span>
+                  <button onClick={() => toggleUserActive(u.id, currentUser ?? undefined)} className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${u.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{u.active ? 'Active' : 'Disabled'}</button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section ref={repManagementRef} className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">

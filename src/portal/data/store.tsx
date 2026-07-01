@@ -106,6 +106,7 @@ type PortalDataContextValue = PortalDataState & {
   isLoading: boolean;
   setDefaultCommissionRate: (rate: number) => void;
   addUser: (user: Omit<User, 'id' | 'role'>, actor?: User) => Promise<{ tempPassword: string } | { error: string } | null>;
+  addContractorAccount: (name: string, email: string, contractorId: string) => Promise<{ tempPassword: string } | { error: string }>;
   updateUser: (
     userId: string,
     updates: Partial<Omit<User, 'id' | 'role'>>,
@@ -658,6 +659,24 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   // background refreshes (realtime pings, tab focus) don't flash a spinner.
   const loadData = useCallback((silent = false) => {
     if (!silent) setIsLoading(true);
+
+    // Contractor accounts only ever load their own (server-scoped) calendar +
+    // clients. Everything else stays empty — they can't see or reach it.
+    if (currentUser?.role === 'contractor') {
+      return Promise.all([
+        apiCall<Appointment[]>('/api/appointments'),
+        apiCall<Client[]>('/api/appointments?_resource=clients'),
+      ]).then(([appointments, clients]) => {
+        setState({
+          ...emptyState,
+          appointments: (appointments ?? []).map((a) => normalizeAppointment(a, [])),
+          clients: clients ?? [],
+          loadError: appointments === null,
+        });
+        setIsLoading(false);
+      }).catch(() => setIsLoading(false));
+    }
+
     return Promise.all([
       apiCall<User[]>('/api/users'),
       apiCall<Contractor[]>('/api/contractors'),
@@ -708,7 +727,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.role]);
 
   // Debounced background refresh — collapses a burst of pings/focus events
   // into a single refetch a beat later.
@@ -1097,6 +1117,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           users: current.users.map((u) => (u.id === tempId ? saved : u)),
         }));
 
+        return { tempPassword };
+      },
+
+      addContractorAccount: async (name, email, contractorId) => {
+        const tempPassword = generateTemporaryPassword();
+        const res = await fetch('/api/auth/add-rep', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, role: 'contractor', contractorId, avatarInitial: name[0]?.toUpperCase() ?? 'C', password: tempPassword }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { error?: string };
+          return { error: body.error ?? 'Failed to create contractor account.' };
+        }
+        const saved = await res.json() as User;
+        setState((current) => ({ ...current, users: [...current.users, saved] }));
         return { tempPassword };
       },
 

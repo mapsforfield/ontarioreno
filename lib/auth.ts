@@ -69,6 +69,20 @@ export async function requireAuth(req: VercelRequest, res: VercelResponse) {
   return user;
 }
 
+/** Contractor accounts are read-only and scoped to their own contractor. Use this
+ *  to lock them out of endpoints/methods they must never reach. Returns true (and
+ *  sends 403) when the user is a contractor, so callers do `if (denyContractor(...)) return;`. */
+export function denyContractor(
+  user: { role: string } | null,
+  res: VercelResponse
+): boolean {
+  if (user?.role === 'contractor') {
+    res.status(403).json({ error: 'Not available for contractor accounts.' });
+    return true;
+  }
+  return false;
+}
+
 /** Require admin role — sends 403 if not admin. */
 export async function requireAdmin(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);

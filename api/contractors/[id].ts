@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuth, denyContractor } from '../../lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
   if (!user) return;
+  if (denyContractor(user, res)) return;
 
   const { id } = req.query as { id: string };
 

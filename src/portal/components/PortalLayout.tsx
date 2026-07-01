@@ -68,8 +68,14 @@ const navItems: NavItem[] = [
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
 ];
 
+// Contractor accounts get a tiny, read-only nav: just their scoped calendar + clients.
+const contractorNavItems: NavItem[] = [
+  { label: 'Calendar', href: '/portal/cx-calendar', icon: CalendarDays },
+  { label: 'Clients', href: '/portal/cx-clients', icon: UserRound },
+];
+
 export default function PortalLayout() {
-  const { currentUser, isAdmin, logout, updateCurrentUser } = usePortalAuth();
+  const { currentUser, isAdmin, isContractor, logout, updateCurrentUser } = usePortalAuth();
   const { changeUserPassword, updateUser, getVisibleAppointmentsForUser, loadError, refetch, repAccess } = usePortalData();
 
   // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
@@ -154,33 +160,46 @@ export default function PortalLayout() {
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const location = useLocation();
   const navigate = useNavigate();
-  const visibleNavItems = navItems.filter((item) => {
-    if (item.adminOnly) return isAdmin;
-    if (isAdmin) return true;
-    return item.feature ? repCanAccess(repAccess, item.feature) : true;
-  });
+  const visibleNavItems = isContractor
+    ? contractorNavItems
+    : navItems.filter((item) => {
+        if (item.adminOnly) return isAdmin;
+        if (isAdmin) return true;
+        return item.feature ? repCanAccess(repAccess, item.feature) : true;
+      });
 
   // Deep-link enforcement: a rep who types/bookmarks a URL for a section they're
   // no longer allowed into is bounced to the dashboard.
   useEffect(() => {
-    if (!currentUser || isAdmin) return;
+    if (!currentUser || isAdmin || isContractor) return;
     const feature = featureForPath(location.pathname);
     if (feature && !repCanAccess(repAccess, feature)) {
       navigate('/portal/dashboard', { replace: true });
     }
-  }, [currentUser, isAdmin, location.pathname, repAccess, navigate]);
+  }, [currentUser, isAdmin, isContractor, location.pathname, repAccess, navigate]);
+
+  // Contractors can only ever be on their two scoped pages — anything else
+  // (dashboard, deep links, etc.) bounces to their calendar.
+  useEffect(() => {
+    if (!currentUser || !isContractor) return;
+    if (!location.pathname.startsWith('/portal/cx-')) {
+      navigate('/portal/cx-calendar', { replace: true });
+    }
+  }, [currentUser, isContractor, location.pathname, navigate]);
   const mobilePrimaryHrefs = [
     '/portal/dashboard',
     '/portal/deals',
     '/portal/appointments',
     '/portal/contractors',
   ];
-  const mobilePrimaryItems = mobilePrimaryHrefs
-    .map((href) => visibleNavItems.find((item) => item.href === href))
-    .filter((item): item is (typeof visibleNavItems)[number] => Boolean(item));
-  const mobileMoreItems = visibleNavItems.filter(
-    (item) => !mobilePrimaryHrefs.includes(item.href)
-  );
+  const mobilePrimaryItems = isContractor
+    ? visibleNavItems
+    : mobilePrimaryHrefs
+        .map((href) => visibleNavItems.find((item) => item.href === href))
+        .filter((item): item is (typeof visibleNavItems)[number] => Boolean(item));
+  const mobileMoreItems = isContractor
+    ? []
+    : visibleNavItems.filter((item) => !mobilePrimaryHrefs.includes(item.href));
   const isMoreRouteActive = mobileMoreItems.some((item) =>
     location.pathname.startsWith(item.href)
   );

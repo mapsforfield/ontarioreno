@@ -1,4 +1,4 @@
-export type PortalRole = 'admin' | 'rep';
+export type PortalRole = 'admin' | 'rep' | 'contractor';
 
 export type User = {
   id: string;
@@ -9,6 +9,10 @@ export type User = {
   avatarUrl?: string;
   passwordHash?: string;
   active: boolean;
+  /** For contractor accounts — the contractor this login is scoped to. */
+  contractorId?: string | null;
+  /** Display name of the linked contractor (returned by login/me). */
+  contractorName?: string | null;
 };
 
 export type FinancingStatus =

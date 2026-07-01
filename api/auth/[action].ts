@@ -10,6 +10,7 @@ import {
   getCurrentUser,
   requireAuth,
   requireAdmin,
+  denyContractor,
 } from '../../lib/auth.js';
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
@@ -57,9 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!valid) return res.status(401).json({ error: 'Invalid email or password.' });
     const token = signToken({ userId: user.id, role: user.role });
     setAuthCookie(res, token);
+    const contractorName = user.role === 'contractor' && user.contractorId
+      ? (await prisma.contractor.findUnique({ where: { id: user.contractorId }, select: { companyName: true } }).catch(() => null))?.companyName ?? null
+      : null;
     return res.status(200).json({
       ok: true, id: user.id, name: user.name, email: user.email,
       role: user.role, avatarInitial: user.avatarInitial, avatarUrl: user.avatarUrl, active: user.active,
+      contractorId: user.contractorId ?? null, contractorName,
     });
   }
 
@@ -235,9 +240,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated.' });
+    const contractorName = user.role === 'contractor' && user.contractorId
+      ? (await prisma.contractor.findUnique({ where: { id: user.contractorId }, select: { companyName: true } }).catch(() => null))?.companyName ?? null
+      : null;
     return res.status(200).json({
       id: user.id, name: user.name, email: user.email, role: user.role,
       avatarInitial: user.avatarInitial, avatarUrl: user.avatarUrl, active: user.active,
+      contractorId: user.contractorId ?? null, contractorName,
     });
   }
 
@@ -246,21 +255,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const admin = await requireAdmin(req, res);
     if (!admin) return;
-    const { name, email, password, role, avatarInitial, avatarUrl } = req.body as {
+    const { name, email, password, role, avatarInitial, avatarUrl, contractorId } = req.body as {
       name: string; email: string; password: string;
-      role?: string; avatarInitial: string; avatarUrl?: string;
+      role?: string; avatarInitial: string; avatarUrl?: string; contractorId?: string;
     };
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });
+    const finalRole = role === 'contractor' ? 'contractor' : role === 'admin' ? 'admin' : 'rep';
+    if (finalRole === 'contractor' && !contractorId) {
+      return res.status(400).json({ error: 'A contractor account must be linked to a contractor.' });
+    }
     const passwordHash = await bcrypt.hash(password, 10);
     try {
       const user = await prisma.user.create({
         data: {
           name, email: email.toLowerCase().trim(), passwordHash,
-          role: role ?? 'rep',
+          role: finalRole,
+          contractorId: finalRole === 'contractor' ? contractorId : null,
           avatarInitial: avatarInitial ?? name[0].toUpperCase(),
           avatarUrl: avatarUrl ?? null, active: true,
         },
-        select: { id: true, name: true, email: true, role: true, avatarInitial: true, avatarUrl: true, active: true },
+        select: { id: true, name: true, email: true, role: true, avatarInitial: true, avatarUrl: true, active: true, contractorId: true },
       });
       return res.status(201).json(user);
     } catch (err: unknown) {
@@ -274,6 +288,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (action === 'activities') {
     const user = await requireAuth(req, res);
     if (!user) return;
+    if (denyContractor(user, res)) return;
 
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store');

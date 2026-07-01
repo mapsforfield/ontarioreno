@@ -15,6 +15,7 @@ type PortalAuthContextValue = {
   logout: () => void;
   updateCurrentUser: (updates: Partial<User>) => void;
   isAdmin: boolean;
+  isContractor: boolean;
   isAuthLoading: boolean;
 };
 
@@ -44,12 +45,13 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
   // Keep an up-to-date user list for components that need it (e.g. user switcher).
   // Fetched lazily after auth resolves.
   useEffect(() => {
-    if (!currentUser) return;
+    // Contractor accounts don't get the team list.
+    if (!currentUser || currentUser.role === 'contractor') return;
     fetch('/api/users', { credentials: 'include' })
       .then((res) => (res.ok ? (res.json() as Promise<User[]>) : []))
       .then((list) => setUsers(list.filter((u) => u.active)))
       .catch(() => {/* ignore */});
-  }, [currentUser?.id]); // re-fetch when the logged-in user changes
+  }, [currentUser?.id, currentUser?.role]); // re-fetch when the logged-in user changes
 
   const value = useMemo<PortalAuthContextValue>(
     () => ({
@@ -77,6 +79,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
         setUsers([]);
       },
       isAdmin: currentUser?.role === 'admin',
+      isContractor: currentUser?.role === 'contractor',
     }),
     [currentUser, users, isAuthLoading]
   );

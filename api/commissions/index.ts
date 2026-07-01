@@ -1,12 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   const user = await requireAuth(req, res);
   if (!user) return;
+  if (denyContractor(user, res)) return;
 
   // Single-record ops are addressed via ?id= (merged from the former
   // commissions/[id].ts to stay under Vercel Hobby's 12-function cap).

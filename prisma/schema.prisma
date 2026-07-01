@@ -15,12 +15,15 @@ datasource db {
 model User {
   id            String   @id @default(cuid())
   name          String
-  role          String   // 'admin' | 'rep'
+  role          String   // 'admin' | 'rep' | 'contractor'
   email         String   @unique
   avatarInitial String
   avatarUrl     String?
   passwordHash  String?
   active        Boolean  @default(true)
+  /// For role='contractor' accounts: the Contractor this login is scoped to
+  /// (read-only, sees only that contractor's calendar + clients).
+  contractorId  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

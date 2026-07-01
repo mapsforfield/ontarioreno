@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { getCurrentUser } from '../../lib/auth.js';
+import { getCurrentUser, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
 
 const SELECT = {
@@ -14,6 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+    if (denyContractor(user, res)) return;
     const users = await withSchema(() =>
       prisma.user.findMany({
         orderBy: { name: 'asc' },

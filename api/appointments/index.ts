@@ -1,6 +1,6 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
@@ -56,6 +56,88 @@ async function sendPush(
     { endpoint, keys: { p256dh, auth } },
     JSON.stringify(payload)
   );
+}
+
+// ─── Contractor-scoped, read-only responses ─────────────────────────────────
+// A contractor account only ever receives its own contractor's calendar + clients,
+// and only a safe subset of fields (no internal sales notes, values, financing,
+// objections, deal/lead links, etc.).
+function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string) {
+  return {
+    id: a.id,
+    customerName: a.customerName,
+    phone: a.phone,
+    email: a.email,
+    address: a.address,
+    city: a.city,
+    postalCode: a.postalCode,
+    projectType: a.projectType,
+    appointmentDate: a.appointmentDate,
+    appointmentTime: a.appointmentTime,
+    durationMinutes: a.durationMinutes,
+    appointmentType: a.appointmentType,
+    status: a.status,
+    consultationStage: a.consultationStage,
+    customerNotes: a.customerNotes,
+    contractorId: a.contractorId,
+    assignedRepId: a.assignedRepId,
+    repName,
+    latitude: a.latitude,
+    longitude: a.longitude,
+  };
+}
+
+function scrubClientForContractor(c: Record<string, unknown>) {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    email: c.email,
+    address: c.address,
+    city: c.city,
+    postalCode: c.postalCode,
+    projectTypes: c.projectTypes,
+  };
+}
+
+async function handleContractorGet(
+  req: VercelRequest,
+  res: VercelResponse,
+  user: { contractorId?: string | null },
+) {
+  const cid = user.contractorId;
+  if (!cid) return res.status(200).json([]);
+
+  // Clients tied to this contractor (via any Galaxy consultation OR deal).
+  if (req.query['_resource'] === 'clients') {
+    const [appts, deals] = await Promise.all([
+      withSchema(() => prisma.appointment.findMany({ where: { contractorId: cid, deletedAt: null }, select: { clientId: true, email: true } })),
+      withSchema(() => prisma.deal.findMany({ where: { assignedContractorId: cid, deletedAt: null }, select: { clientId: true, email: true } })),
+    ]);
+    const ids = new Set<string>();
+    const emails = new Set<string>();
+    for (const r of [...appts, ...deals]) {
+      if (r.clientId) ids.add(r.clientId);
+      if (r.email) emails.add(r.email.trim().toLowerCase());
+    }
+    const or: object[] = [{ id: { in: [...ids] } }];
+    if (emails.size) or.push({ email: { in: [...emails], mode: 'insensitive' } });
+    const clients = await withSchema(() => prisma.client.findMany({ where: { deletedAt: null, OR: or }, orderBy: { name: 'asc' } }));
+    return res.status(200).json(clients.map((c) => scrubClientForContractor(c as unknown as Record<string, unknown>)));
+  }
+
+  // Anything else the contractor asks for that isn't the calendar → not available.
+  if (req.query['_resource']) return res.status(403).json({ error: 'Not available for contractor accounts.' });
+
+  // Default: this contractor's calendar only.
+  const appts = await withSchema(() => prisma.appointment.findMany({
+    where: { contractorId: cid, deletedAt: null },
+    orderBy: { appointmentDate: 'desc' },
+  }));
+  const repIds = [...new Set(appts.map((a) => a.assignedRepId).filter(Boolean))] as string[];
+  const reps = repIds.length ? await prisma.user.findMany({ where: { id: { in: repIds } }, select: { id: true, name: true } }) : [];
+  const repName = new Map(reps.map((r) => [r.id, r.name]));
+  return res.status(200).json(appts.map((a) => scrubAppointmentForContractor(a as unknown as Record<string, unknown>, repName.get(a.assignedRepId) ?? '')));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -581,6 +663,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+
+  // Contractor accounts: read-only, scoped to their own calendar + clients.
+  if (user.role === 'contractor') {
+    if (req.method !== 'GET') return res.status(403).json({ error: 'Not available for contractor accounts.' });
+    return handleContractorGet(req, res, user);
+  }
 
   if (req.method === 'GET') {
     // ── Client list ──
