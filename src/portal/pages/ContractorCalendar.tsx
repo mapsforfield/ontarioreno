@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Phone, Mail, MapPin, Clock, User, Wrench, FileText } from 'lucide-react';
 import { usePortalData } from '../data/store';
 import { usePortalAuth } from '../auth';
 import type { Appointment } from '../data/types';
@@ -19,6 +19,32 @@ function toKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function fmtLongDate(dateStr?: string | null) {
+  if (!dateStr) return '';
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  if (!y || !m || !d) return String(dateStr);
+  return new Date(y, m - 1, d).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  scheduled: 'Scheduled',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  rescheduled: 'Rescheduled',
+  cancelled: 'Cancelled',
+  no_show: 'No-show',
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  home_visit: 'Home visit',
+  phone_consultation: 'Phone consultation',
+  video_consultation: 'Video consultation',
+  showroom_visit: 'Showroom visit',
+  supplier_meeting: 'Supplier meeting',
+  site_check: 'Site check',
+  custom_event: 'Event',
+};
+
 function statusColor(a: Appointment): { bg: string; light: boolean } {
   switch (a.status) {
     case 'completed': return { bg: 'bg-emerald-500', light: true };
@@ -32,6 +58,128 @@ function statusColor(a: Appointment): { bg: string; light: boolean } {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+function telHref(phone?: string | null) {
+  return phone ? `tel:${String(phone).replace(/[^+\d]/g, '')}` : undefined;
+}
+
+function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 py-2.5">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.68rem] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+        <div className="mt-0.5 text-sm font-semibold text-slate-800 break-words">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => void }) {
+  const c = statusColor(appt);
+  const fullAddress = [appt.address, appt.city, appt.postalCode].filter(Boolean).join(', ');
+  const mapsHref = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : undefined;
+  const timeLabel = [fmt12(appt.appointmentTime), appt.durationMinutes ? `${appt.durationMinutes} min` : '']
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div className={`${c.bg} px-5 py-4`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={`text-[0.68rem] font-bold uppercase tracking-wide ${c.light ? 'text-white/70' : 'text-slate-700/70'}`}>
+                {STATUS_LABEL[appt.status] ?? appt.status}
+              </p>
+              <h2 className={`mt-0.5 truncate text-lg font-black tracking-[-0.01em] ${c.light ? 'text-white' : 'text-slate-900'}`}>
+                {appt.customerName || 'Consultation'}
+              </h2>
+              <p className={`mt-0.5 text-sm font-semibold ${c.light ? 'text-white/85' : 'text-slate-700'}`}>
+                {fmtLongDate(appt.appointmentDate)}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${c.light ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-slate-900/10 text-slate-700 hover:bg-slate-900/20'}`}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-100 overflow-y-auto px-5 py-2">
+          {timeLabel && (
+            <DetailRow icon={<Clock className="h-4 w-4" />} label="When">
+              {timeLabel}
+              {appt.appointmentType && TYPE_LABEL[appt.appointmentType] ? (
+                <span className="ml-1.5 text-slate-400">· {TYPE_LABEL[appt.appointmentType]}</span>
+              ) : null}
+            </DetailRow>
+          )}
+
+          {fullAddress && (
+            <DetailRow icon={<MapPin className="h-4 w-4" />} label="Address">
+              <span>{fullAddress}</span>
+              {mapsHref && (
+                <a href={mapsHref} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-xs font-bold text-[#1B3C6C] hover:underline">
+                  Open in Maps
+                </a>
+              )}
+            </DetailRow>
+          )}
+
+          {appt.phone && (
+            <DetailRow icon={<Phone className="h-4 w-4" />} label="Phone">
+              <a href={telHref(appt.phone)} className="text-[#1B3C6C] hover:underline">{appt.phone}</a>
+            </DetailRow>
+          )}
+
+          {appt.email && (
+            <DetailRow icon={<Mail className="h-4 w-4" />} label="Email">
+              <a href={`mailto:${appt.email}`} className="text-[#1B3C6C] hover:underline break-all">{appt.email}</a>
+            </DetailRow>
+          )}
+
+          {appt.projectType && (
+            <DetailRow icon={<Wrench className="h-4 w-4" />} label="Project">
+              {appt.projectType}
+            </DetailRow>
+          )}
+
+          {appt.repName && (
+            <DetailRow icon={<User className="h-4 w-4" />} label="OntarioReno rep">
+              {appt.repName}
+            </DetailRow>
+          )}
+
+          {appt.customerNotes && (
+            <DetailRow icon={<FileText className="h-4 w-4" />} label="Notes">
+              <span className="whitespace-pre-wrap font-medium text-slate-600">{appt.customerNotes}</span>
+            </DetailRow>
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 px-5 py-3">
+          <div className="flex gap-2">
+            {appt.phone && (
+              <a href={telHref(appt.phone)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#1B3C6C] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#16325a]">
+                <Phone className="h-4 w-4" /> Call
+              </a>
+            )}
+            {mapsHref && (
+              <a href={mapsHref} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <MapPin className="h-4 w-4" /> Directions
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ContractorCalendar() {
   const { currentUser } = usePortalAuth();
   const { appointments } = usePortalData();
@@ -41,6 +189,7 @@ export default function ContractorCalendar() {
     d.setHours(0, 0, 0, 0);
     return d;
   });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const byDate = useMemo(() => {
     const m = new Map<string, CxAppt[]>();
@@ -53,6 +202,11 @@ export default function ContractorCalendar() {
     for (const list of m.values()) list.sort((x, y) => (x.appointmentTime || '').localeCompare(y.appointmentTime || ''));
     return m;
   }, [appointments]);
+
+  const selected = useMemo(
+    () => (selectedId ? (appointments as CxAppt[]).find((a) => a.id === selectedId) ?? null : null),
+    [selectedId, appointments]
+  );
 
   const gridStart = useMemo(() => {
     const d = new Date(cursor);
@@ -102,10 +256,16 @@ export default function ContractorCalendar() {
                   {appts.slice(0, 4).map((a) => {
                     const c = statusColor(a);
                     return (
-                      <div key={a.id} className={`rounded ${c.bg} px-1.5 py-1`} title={`${fmt12(a.appointmentTime)} · ${a.customerName} · ${[a.city, a.projectType].filter(Boolean).join(' · ')}${a.repName ? ` · Rep: ${a.repName}` : ''}`}>
+                      <button
+                        type="button"
+                        key={a.id}
+                        onClick={() => setSelectedId(a.id)}
+                        className={`w-full rounded ${c.bg} px-1.5 py-1 text-left transition hover:brightness-110 hover:ring-2 hover:ring-slate-900/10 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]/40`}
+                        title={`${fmt12(a.appointmentTime)} · ${a.customerName} · ${[a.city, a.projectType].filter(Boolean).join(' · ')}${a.repName ? ` · Rep: ${a.repName}` : ''}`}
+                      >
                         <p className={`truncate text-[0.6rem] font-bold ${c.light ? 'text-white/80' : 'text-slate-700'}`}>{fmt12(a.appointmentTime)}</p>
                         <p className={`truncate text-[0.68rem] font-black leading-tight ${c.light ? 'text-white' : 'text-slate-900'}`}>{a.customerName || 'Consultation'}</p>
-                      </div>
+                      </button>
                     );
                   })}
                   {appts.length > 4 && <p className="px-1 text-[0.6rem] font-bold text-slate-400">+{appts.length - 4} more</p>}
@@ -115,7 +275,9 @@ export default function ContractorCalendar() {
           })}
         </div>
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of consultations assigned to {currentUser?.contractorName || 'your company'}.</p>
+      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of consultations assigned to {currentUser?.contractorName || 'your company'}. Tap a consultation to see contact details.</p>
+
+      {selected && <AppointmentDetail appt={selected} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }
