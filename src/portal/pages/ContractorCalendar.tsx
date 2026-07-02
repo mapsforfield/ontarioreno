@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, User, Wrench } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, User, Wrench, CalendarDays } from 'lucide-react';
 import { usePortalData } from '../data/store';
 import { torontoToday } from '../lib/time';
 import type { Appointment } from '../data/types';
@@ -14,7 +14,7 @@ function fmt12(t?: string | null) {
   const [h, m] = String(t).split(':').map(Number);
   if (Number.isNaN(h)) return String(t);
   const period = h >= 12 ? 'PM' : 'AM';
-  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''}${period}`;
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''} ${period}`;
 }
 
 function toKey(d: Date) {
@@ -59,6 +59,15 @@ function statusColor(a: Appointment): { bg: string; light: boolean } {
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function StatusPill({ a }: { a: Appointment }) {
+  const c = statusColor(a);
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide ${c.bg} ${c.light ? 'text-white' : 'text-slate-700'}`}>
+      {STATUS_LABEL[a.status] ?? a.status}
+    </span>
+  );
+}
 
 function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
@@ -132,6 +141,32 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
   );
 }
 
+/** Mobile-friendly full-width consultation card (agenda view). */
+function AgendaCard({ a, onOpen }: { a: CxAppt; onOpen: () => void }) {
+  const c = statusColor(a);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-stretch gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99]"
+    >
+      <span className={`w-1.5 shrink-0 rounded-full ${c.bg}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-black text-slate-900">{fmt12(a.appointmentTime) || 'Time TBD'}</span>
+          <StatusPill a={a} />
+        </div>
+        <p className="mt-1 truncate text-[0.95rem] font-bold text-slate-900">{a.customerName || 'Consultation'}</p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs font-semibold text-slate-500">
+          {a.projectType && <span className="truncate">{a.projectType}</span>}
+          {a.projectType && a.repName && <span className="text-slate-300">·</span>}
+          {a.repName && <span className="truncate text-slate-400">{a.repName}</span>}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function ContractorCalendar() {
   const { appointments } = usePortalData();
   const [cursor, setCursor] = useState(() => {
@@ -172,9 +207,20 @@ export default function ContractorCalendar() {
     () => Array.from({ length: 42 }, (_, i) => { const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d; }),
     [gridStart]
   );
+
+  const monthPrefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+  // Agenda (mobile): this month's days that have consultations, in date order.
+  const agenda = useMemo(() => {
+    return [...byDate.keys()]
+      .filter((k) => k.startsWith(monthPrefix))
+      .sort()
+      .map((k) => ({ key: k, items: byDate.get(k)! }));
+  }, [byDate, monthPrefix]);
+
   const todayKey = torontoToday();
   const monthLabel = cursor.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
   const shift = (n: number) => setCursor((c) => { const d = new Date(c); d.setMonth(c.getMonth() + n); return d; });
+  const goToday = () => { const [y, m] = torontoToday().split('-').map(Number); setCursor(new Date(y, m - 1, 1)); };
 
   return (
     <div>
@@ -185,12 +231,13 @@ export default function ContractorCalendar() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => shift(-1)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50" aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></button>
-          <button onClick={() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); setCursor(d); }} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Today</button>
+          <button onClick={goToday} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Today</button>
           <button onClick={() => shift(1)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50" aria-label="Next month"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
 
-      <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm">
+      {/* ── Desktop / tablet: month grid ────────────────────────────────── */}
+      <div className="hidden rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm sm:block">
         <h2 className="mb-3 text-xl font-black tracking-[-0.02em]">{monthLabel}</h2>
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAYS.map((d) => (
@@ -228,7 +275,40 @@ export default function ContractorCalendar() {
           })}
         </div>
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-400">Read-only view of the sales team's consultation schedule. Tap a consultation for details.</p>
+
+      {/* ── Mobile: agenda list ─────────────────────────────────────────── */}
+      <div className="sm:hidden">
+        <h2 className="mb-3 text-lg font-black tracking-[-0.02em]">{monthLabel}</h2>
+        {agenda.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
+            <CalendarDays className="mb-3 h-8 w-8 text-slate-300" />
+            <p className="text-sm font-bold text-slate-500">No consultations in {monthLabel}.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400">Use the arrows above to change month.</p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {agenda.map(({ key, items }) => {
+              const [y, m, d] = key.split('-').map(Number);
+              const isToday = key === todayKey;
+              const heading = new Date(y, m - 1, d).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
+              return (
+                <div key={key}>
+                  <div className="mb-2 flex items-center gap-2 px-0.5">
+                    <span className={`text-sm font-black ${isToday ? 'text-[#1B3C6C]' : 'text-slate-800'}`}>{heading}</span>
+                    {isToday && <span className="rounded-full bg-[#1B3C6C] px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-white">Today</span>}
+                    <span className="ml-auto text-xs font-bold text-slate-400">{items.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {items.map((a) => <AgendaCard key={a.id} a={a} onOpen={() => setSelectedId(a.id)} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="mt-4 text-xs font-semibold text-slate-400">Read-only view of the sales team's consultation schedule. Tap a consultation for details.</p>
 
       {selected && <AppointmentDetail appt={selected} onClose={() => setSelectedId(null)} />}
     </div>
