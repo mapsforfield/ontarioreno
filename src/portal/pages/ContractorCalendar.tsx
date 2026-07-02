@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, User, Wrench, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, User, Wrench } from 'lucide-react';
 import { usePortalData } from '../data/store';
 import { torontoToday } from '../lib/time';
 import type { Appointment } from '../data/types';
@@ -59,6 +59,7 @@ function statusColor(a: Appointment): { bg: string; light: boolean } {
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 function StatusPill({ a }: { a: Appointment }) {
   const c = statusColor(a);
@@ -141,7 +142,7 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
   );
 }
 
-/** Mobile-friendly full-width consultation card (agenda view). */
+/** Full-width consultation card used in the mobile selected-day panel. */
 function AgendaCard({ a, onOpen }: { a: CxAppt; onOpen: () => void }) {
   const c = statusColor(a);
   return (
@@ -180,6 +181,7 @@ export default function ContractorCalendar() {
     return d;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const byDate = useMemo(() => {
     const m = new Map<string, CxAppt[]>();
@@ -208,19 +210,32 @@ export default function ContractorCalendar() {
     [gridStart]
   );
 
-  const monthPrefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
-  // Agenda (mobile): this month's days that have consultations, in date order.
-  const agenda = useMemo(() => {
-    return [...byDate.keys()]
-      .filter((k) => k.startsWith(monthPrefix))
-      .sort()
-      .map((k) => ({ key: k, items: byDate.get(k)! }));
-  }, [byDate, monthPrefix]);
-
   const todayKey = torontoToday();
+  const monthPrefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
   const monthLabel = cursor.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+
+  // Which day the mobile day-panel shows: the tapped day (if in view), else
+  // today (if in this month), else the first day with a consultation, else the 1st.
+  const effectiveDay = useMemo(() => {
+    if (selectedDay && selectedDay.startsWith(monthPrefix)) return selectedDay;
+    if (todayKey.startsWith(monthPrefix)) return todayKey;
+    const firstWithAppt = [...byDate.keys()].filter((k) => k.startsWith(monthPrefix)).sort()[0];
+    return firstWithAppt ?? `${monthPrefix}-01`;
+  }, [selectedDay, monthPrefix, todayKey, byDate]);
+
+  const selItems = byDate.get(effectiveDay) ?? [];
+  const [sy, sm, sd] = effectiveDay.split('-').map(Number);
+  const selHeading = new Date(sy, sm - 1, sd).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+
   const shift = (n: number) => setCursor((c) => { const d = new Date(c); d.setMonth(c.getMonth() + n); return d; });
-  const goToday = () => { const [y, m] = torontoToday().split('-').map(Number); setCursor(new Date(y, m - 1, 1)); };
+  const goToday = () => { const [y, m] = torontoToday().split('-').map(Number); setCursor(new Date(y, m - 1, 1)); setSelectedDay(torontoToday()); };
+  const selectDay = (d: Date) => {
+    setSelectedDay(toKey(d));
+    // Tapping a trailing/leading day from an adjacent month follows it into view.
+    if (d.getMonth() !== cursor.getMonth() || d.getFullYear() !== cursor.getFullYear()) {
+      setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+  };
 
   return (
     <div>
@@ -236,7 +251,7 @@ export default function ContractorCalendar() {
         </div>
       </div>
 
-      {/* ── Desktop / tablet: month grid ────────────────────────────────── */}
+      {/* ── Desktop / tablet: month grid with inline pills ──────────────── */}
       <div className="hidden rounded-[0.9rem] border border-slate-200 bg-white p-4 shadow-sm sm:block">
         <h2 className="mb-3 text-xl font-black tracking-[-0.02em]">{monthLabel}</h2>
         <div className="grid grid-cols-7 gap-1">
@@ -276,39 +291,62 @@ export default function ContractorCalendar() {
         </div>
       </div>
 
-      {/* ── Mobile: agenda list ─────────────────────────────────────────── */}
+      {/* ── Mobile: tap-a-day month calendar with dots ──────────────────── */}
       <div className="sm:hidden">
-        <h2 className="mb-3 text-lg font-black tracking-[-0.02em]">{monthLabel}</h2>
-        {agenda.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
-            <CalendarDays className="mb-3 h-8 w-8 text-slate-300" />
-            <p className="text-sm font-bold text-slate-500">No consultations in {monthLabel}.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400">Use the arrows above to change month.</p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {agenda.map(({ key, items }) => {
-              const [y, m, d] = key.split('-').map(Number);
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <h2 className="mb-2 px-1 text-base font-black tracking-[-0.02em]">{monthLabel}</h2>
+          <div className="grid grid-cols-7">
+            {WEEKDAYS_SHORT.map((d) => (
+              <div key={d} className="pb-1 text-center text-[0.62rem] font-black uppercase tracking-wide text-slate-400">{d}</div>
+            ))}
+            {days.map((d) => {
+              const key = toKey(d);
+              const inMonth = d.getMonth() === cursor.getMonth();
+              const appts = byDate.get(key) ?? [];
               const isToday = key === todayKey;
-              const heading = new Date(y, m - 1, d).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
+              const isSel = key === effectiveDay;
               return (
-                <div key={key}>
-                  <div className="mb-2 flex items-center gap-2 px-0.5">
-                    <span className={`text-sm font-black ${isToday ? 'text-[#1B3C6C]' : 'text-slate-800'}`}>{heading}</span>
-                    {isToday && <span className="rounded-full bg-[#1B3C6C] px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-white">Today</span>}
-                    <span className="ml-auto text-xs font-bold text-slate-400">{items.length}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {items.map((a) => <AgendaCard key={a.id} a={a} onOpen={() => setSelectedId(a.id)} />)}
-                  </div>
+                <div key={key} className="flex justify-center py-0.5">
+                  <button
+                    type="button"
+                    onClick={() => selectDay(d)}
+                    className={`flex h-11 w-11 flex-col items-center justify-center rounded-full transition
+                      ${isSel ? 'bg-[#1B3C6C] text-white shadow-sm' : isToday ? 'bg-[#1B3C6C]/10 text-[#1B3C6C]' : inMonth ? 'text-slate-700 active:bg-slate-100' : 'text-slate-300 active:bg-slate-100'}`}
+                    aria-label={`${d.getDate()} — ${appts.length} consultation${appts.length === 1 ? '' : 's'}`}
+                  >
+                    <span className="text-sm font-bold leading-none">{d.getDate()}</span>
+                    <span className="mt-1 flex h-1.5 items-center justify-center gap-0.5">
+                      {appts.slice(0, 3).map((a) => (
+                        <span key={a.id} className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : statusColor(a).bg}`} />
+                      ))}
+                    </span>
+                  </button>
                 </div>
               );
             })}
           </div>
-        )}
+        </div>
+
+        {/* Selected day's consultations */}
+        <div className="mt-4">
+          <div className="mb-2 flex items-center gap-2 px-0.5">
+            <span className={`text-sm font-black ${effectiveDay === todayKey ? 'text-[#1B3C6C]' : 'text-slate-800'}`}>{selHeading}</span>
+            {effectiveDay === todayKey && <span className="rounded-full bg-[#1B3C6C] px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-white">Today</span>}
+            <span className="ml-auto text-xs font-bold text-slate-400">{selItems.length}</span>
+          </div>
+          {selItems.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-8 text-center text-sm font-semibold text-slate-400">
+              No consultations on this day.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {selItems.map((a) => <AgendaCard key={a.id} a={a} onOpen={() => setSelectedId(a.id)} />)}
+            </div>
+          )}
+        </div>
       </div>
 
-      <p className="mt-4 text-xs font-semibold text-slate-400">Read-only view of the sales team's consultation schedule. Tap a consultation for details.</p>
+      <p className="mt-4 text-xs font-semibold text-slate-400">Read-only view of the sales team's consultation schedule. Tap a day to see its consultations.</p>
 
       {selected && <AppointmentDetail appt={selected} onClose={() => setSelectedId(null)} />}
     </div>
