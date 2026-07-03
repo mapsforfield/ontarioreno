@@ -44,6 +44,7 @@ export type InvoiceData = {
   toAddr1: string;
   toAddr2: string;
   customerName: string;
+  customerAddress: string;
   salesPrice: number;
   commissionRate: number; // percent, e.g. 8.5
   amount: number;
@@ -181,6 +182,12 @@ export function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   dy += 15;
   doc.setFontSize(9.5);
   doc.setTextColor(95, 95, 95);
+  // Customer mailing address, under the name (optional — absent on old invoices)
+  if (d.customerAddress && d.customerAddress.trim()) {
+    const addrLines = doc.splitTextToSize(d.customerAddress.trim(), 380) as string[];
+    doc.text(addrLines, 43, dy);
+    dy += addrLines.length * 12 + 3;
+  }
   doc.text(`Sales price: $${fmtNum(d.salesPrice)} (incl. HST) · Commission ${d.commissionRate}%`, 43, dy);
   doc.setTextColor(INK[0], INK[1], INK[2]);
   dy += 20;
@@ -316,6 +323,7 @@ export default function CommissionInvoice({
     toAddr1: contractor?.address ?? '',
     toAddr2: [contractor?.city, contractor?.province, contractor?.postalCode].filter(Boolean).join(' '),
     customerName: deal.homeownerName,
+    customerAddress: [deal.address, deal.city, deal.postalCode].filter(Boolean).join(', '),
     salesPrice: deal.estimatedJobValue,
     commissionRate: rate,
     amount: Math.round(deal.estimatedJobValue * (rate / 100) * 100) / 100,
@@ -585,6 +593,7 @@ export default function CommissionInvoice({
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {field('Invoice #', 'invoiceNumber')}
                 {field('Customer', 'customerName')}
+                {field('Customer address', 'customerAddress', { full: true })}
                 {field('Sales price (incl. HST)', 'salesPrice', { type: 'number' })}
                 {field('Commission %', 'commissionRate', { type: 'number' })}
                 {field('Amount (CAD)', 'amount', { type: 'number' })}
