@@ -3,6 +3,7 @@ import {
   Building2,
   HandCoins,
   Plus,
+  Radar,
   Users,
   X,
 } from 'lucide-react';
@@ -76,6 +77,12 @@ const sections = [
     description: 'Review rep payouts and admin commission visibility.',
     href: '/portal/commissions',
     icon: HandCoins,
+  },
+  {
+    title: 'Grant Radar',
+    description: 'Track active government renovation & ADU grant programs across Ontario.',
+    href: '/portal/grants',
+    icon: Radar,
   },
 ];
 

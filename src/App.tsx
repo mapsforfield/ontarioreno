@@ -84,6 +84,7 @@ import { PortalGuard } from './portal/components/PortalGuard';
 import { PortalDataProvider } from './portal/data/store';
 import PortalLayout from './portal/components/PortalLayout';
 import PortalAdmin from './portal/pages/PortalAdmin';
+import PortalGrants from './portal/pages/PortalGrants';
 import PortalAppointments from './portal/pages/PortalAppointments';
 import PortalAnalytics from './portal/pages/PortalAnalytics';
 import PortalContractors from './portal/pages/PortalContractors';
@@ -138,6 +139,7 @@ export default function App() {
               <Route path="commissions" element={<PortalAnalytics />} />
               <Route element={<PortalGuard adminOnly />}>
                 <Route path="admin" element={<PortalAdmin />} />
+                <Route path="grants" element={<PortalGrants />} />
               </Route>
             </Route>
           </Route>

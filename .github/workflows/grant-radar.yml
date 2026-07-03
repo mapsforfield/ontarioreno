@@ -1,0 +1,59 @@
+name: Grant Radar
+
+# Heavy discovery + monitoring jobs run here (free) instead of on Vercel, which
+# caps functions/crons/duration on the Hobby plan. Writes to the same Neon DB the
+# portal reads, so results show up in /portal/grants automatically.
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'    # Mondays 11:00 UTC — weekly DISCOVERY (find new city pages)
+    - cron: '30 11 * * *'   # Daily 11:30 UTC — MONITOR scan of known pages
+  workflow_dispatch:        # lets you run it manually from the Actions tab
+    inputs:
+      mode:
+        description: 'discover or scan'
+        default: 'scan'
+        required: true
+      limit:
+        description: 'optional: cities (discover) or sources (scan) to process'
+        required: false
+
+concurrency:
+  group: grant-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Grant Radar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GRANT_ALERT_EMAIL: ${{ secrets.GRANT_ALERT_EMAIL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ github.event.inputs.mode }}"
+            LIMIT="${{ github.event.inputs.limit }}"
+          elif [ "${{ github.event.schedule }}" = "0 11 * * 1" ]; then
+            MODE="discover"; LIMIT=""
+          else
+            MODE="scan"; LIMIT=""
+          fi
+          echo "Running Grant Radar mode=$MODE limit=$LIMIT"
+          npx tsx scripts/grant-radar-worker.ts "$MODE" $LIMIT

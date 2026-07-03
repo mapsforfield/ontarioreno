@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
+import { handleGrantScanCron, handleGrantsApi } from '../../lib/grants.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -119,6 +120,17 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ── Grant Radar (folded into this function to stay under the 12-function cap) ──
+  // Daily cron scans government sources for new/changed renovation-grant programs;
+  // the admin API powers the /portal/grants review queue. Both fully self-contained
+  // in lib/grants.ts — this is just routing.
+  if (req.method === 'GET' && req.query['_cron'] === 'scan-grants') {
+    return handleGrantScanCron(req, res);
+  }
+  if (req.query['resource'] === 'grants') {
+    return handleGrantsApi(req, res);
+  }
+
   // ── Schema reconcile cron (no user auth — verified by CRON_SECRET) ──
   // A daily safety net that re-applies the generated schema DDL, in case a
   // deploy-time apply was skipped (e.g. a DB blip during build).
@@ -141,6 +153,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Daily schema reconcile (folded into an existing cron so we don't exceed the
     // Hobby plan's cron limit). Belt-and-suspenders behind the deploy-time apply.
     await ensureSchema();
+
+    // (Grant Radar's discovery + daily scan now run on the GitHub Actions worker,
+    // which has no Vercel timeout/cron limits — so nothing grant-related runs here.)
 
     const today = new Date().toISOString().slice(0, 10);
     const appointments = await prisma.appointment.findMany({

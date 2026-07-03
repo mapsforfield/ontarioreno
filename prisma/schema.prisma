@@ -490,3 +490,96 @@ model Task {
 
   user User @relation(fields: [userId], references: [id])
 }
+
+// ─── Grant Radar (admin-only government-program monitoring) ───────────────────
+// Discovers + watches official government pages for renovation / ADU / basement
+// incentive programs (e.g. Hamilton's HAF-funded ADU grant) and surfaces new or
+// newly-open programs to admins before competitors catch them.
+//   Municipality  = cities-first registry (HAF recipients = highest-probability).
+//   GrantSource   = a specific page found for a municipality, classified by type.
+//   GrantProgram  = structured program extracted from a "money" page.
+// A weekly discovery job (Tavily search) finds pages per city; a daily monitor
+// job re-scans known pages and re-extracts on change. All admin-only.
+
+model Municipality {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique          // 'hamilton', 'london', 'waterloo-region'
+  domain          String    @default("")     // primary official domain, e.g. 'hamilton.ca'
+  jurisdiction    String    @default("ON")
+  /// Housing Accelerator Fund recipient — where new homeowner grants are likeliest.
+  hafRecipient    Boolean   @default(false)
+  hafAmount       String    @default("")     // free-text, e.g. '$93.5M'
+  /// 'candidate' (search it) | 'watching' (found future/live pages) |
+  /// 'verified' (confirmed homeowner money) | 'rejected' (no program, stop searching)
+  discoveryState  String    @default("candidate")
+  lastDiscoveryAt DateTime?
+  notes           String    @default("")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sources GrantSource[]
+
+  @@index([discoveryState])
+  @@index([hafRecipient])
+}
+
+model GrantSource {
+  id             String    @id @default(cuid())
+  municipalityId String?                     // null for federal/provincial hubs
+  name           String
+  url            String    @unique           // dedupe discovered pages by URL
+  jurisdiction   String    @default("")      // 'Hamilton' | 'Toronto' | 'ON' | 'federal'
+  category       String    @default("")      // 'ADU' | 'basement' | 'energy' | 'general'
+  /// LLM page classification: 'money' (live homeowner funding) | 'future'
+  /// (proposed/upcoming) | 'zoning' (rules only) | 'developer' | 'news' | 'noise' | 'unknown'
+  pageType       String    @default("unknown")
+  discoveredVia  String    @default("")      // search query / 'seed' that surfaced it
+  hafLinked      Boolean   @default(false)
+  active         Boolean   @default(true)    // false = classified as noise/zoning; stop scanning
+  lastCheckedAt  DateTime?
+  lastHash       String    @default("")      // content hash — skip extraction if unchanged
+  lastError      String    @default("")      // last fetch/parse error (surfaces dead URLs)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  municipality Municipality?  @relation(fields: [municipalityId], references: [id], onDelete: SetNull)
+  programs     GrantProgram[]
+
+  @@index([active])
+  @@index([pageType])
+  @@index([municipalityId])
+}
+
+model GrantProgram {
+  id              String    @id @default(cuid())
+  sourceId        String
+  name            String
+  city            String    @default("")
+  jurisdiction    String    @default("")
+  /// 'active' | 'upcoming' | 'closed' | 'unknown'
+  status          String    @default("unknown")
+  category        String    @default("")
+  /// Free-text — gov pages phrase amounts inconsistently ("up to $40,000").
+  maxAmount       String    @default("")
+  eligibility     String    @default("")
+  deadline        String    @default("")
+  summary         String    @default("")
+  sourceUrl       String    @default("")
+  relevanceScore  Int       @default(0)     // 0-100; ADU/basement + ON city ranks high
+  /// 'new' | 'reviewed' | 'targeting' | 'dismissed' — drives the admin queue
+  reviewState     String    @default("new")
+  /// Stable dedupe key (sourceId + normalized name) so re-scans update, not dup.
+  fingerprint     String    @default("")
+  firstSeenAt     DateTime  @default(now())
+  lastConfirmedAt DateTime  @default(now())  // last scan that still saw this program
+  changedAt       DateTime?                   // last time a material field changed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  source GrantSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([reviewState])
+  @@index([status])
+  @@index([sourceId])
+}
