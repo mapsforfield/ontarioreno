@@ -583,3 +583,40 @@ model GrantProgram {
   @@index([status])
   @@index([sourceId])
 }
+
+// ─── Grant landing pages (AI-drafted, human-reviewed, published to ontarioreno.ca)
+// One row per public /grants/:slug page. Generated from a GrantProgram, edited in
+// the portal, then published. Rendered client-side from this record (same as the
+// rest of the SPA), so no per-page code/deploy. programSnapshot lets the monitor
+// flag a live page as stale when the underlying program changes.
+
+model GrantLandingPage {
+  id             String   @id @default(cuid())
+  programId      String?                          // source program (null = manual)
+  slug           String   @unique                 // 'hamilton-adu-grant'
+  city           String   @default("")
+  status         String   @default("draft")       // 'draft' | 'published'
+  // Content (AI-drafted, admin-editable)
+  heroEyebrow    String   @default("")            // e.g. 'Hamilton • ADU Grant'
+  heroTitle      String   @default("")
+  heroSubtitle   String   @default("")
+  amountLabel    String   @default("")            // e.g. 'Up to $40,000'
+  intro          String   @default("")
+  sections       Json?                             // [{heading, body}]
+  eligibility    Json?                             // string[]
+  faqs           Json?                             // [{q, a}]
+  ctaHeading     String   @default("")
+  ctaText        String   @default("Book a free consultation")
+  // SEO
+  seoTitle       String   @default("")
+  seoDescription String   @default("")
+  // Drift detection — snapshot of the program at draft time; monitor compares.
+  programSnapshot Json?                            // {status, maxAmount, deadline}
+  needsReview    Boolean  @default(false)          // program changed since publish
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+  @@index([programId])
+}

@@ -468,6 +468,94 @@ async function sendDigest(result: ScanResult): Promise<void> {
   }
 }
 
+// ─── Landing-page generation (AI draft → review → publish) ────────────────────
+type PageContent = {
+  heroEyebrow: string; heroTitle: string; heroSubtitle: string; amountLabel: string; intro: string;
+  sections: Array<{ heading: string; body: string }>; eligibility: string[];
+  faqs: Array<{ q: string; a: string }>; ctaHeading: string; seoTitle: string; seoDescription: string;
+};
+
+const PAGE_SYSTEM =
+  'You are a senior conversion copywriter for OntarioReno, an Ontario home-renovation company that helps ' +
+  'HOMEOWNERS access government ADU / basement / renovation grants and connects them with vetted contractors. ' +
+  'Write a landing page for ONE grant program, aimed at homeowners in that city. Voice: clear, warm, trustworthy, ' +
+  'plain-English, benefit-led — never hypey, no guarantees, no invented facts. Use ONLY the program details given; ' +
+  'where a detail is unknown, stay general and suggest confirming exact figures with the city. The page goal is to ' +
+  'get the homeowner to book a FREE consultation with OntarioReno. Return ONLY JSON (no prose, no code fences) with keys: ' +
+  'heroEyebrow (<=40 chars, "City • Grant"), heroTitle (<=75 chars, benefit + amount), heroSubtitle (<=160 chars), ' +
+  'amountLabel (short e.g. "Up to $40,000"), intro (one short paragraph), sections (3-5 items {heading, body} covering: ' +
+  'what the grant is, what it covers, how OntarioReno helps you qualify & build, why act now), eligibility (3-6 short ' +
+  'bullet strings), faqs (4-6 {q,a}), ctaHeading (<=60 chars), seoTitle (<=60 chars), seoDescription (<=155 chars).';
+
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60);
+}
+
+function parsePageJson(raw: string): PageContent {
+  let s = raw.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const start = s.indexOf('{'); const end = s.lastIndexOf('}');
+  const obj = start !== -1 && end !== -1 ? JSON.parse(s.slice(start, end + 1)) : {};
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const arr = (v: unknown) => (Array.isArray(v) ? v : []);
+  return {
+    heroEyebrow: str(obj.heroEyebrow), heroTitle: str(obj.heroTitle), heroSubtitle: str(obj.heroSubtitle),
+    amountLabel: str(obj.amountLabel), intro: str(obj.intro),
+    sections: arr(obj.sections).map((x: Record<string, unknown>) => ({ heading: str(x.heading), body: str(x.body) })).filter((x) => x.heading || x.body),
+    eligibility: arr(obj.eligibility).map((x: unknown) => str(x)).filter(Boolean),
+    faqs: arr(obj.faqs).map((x: Record<string, unknown>) => ({ q: str(x.q), a: str(x.a) })).filter((x) => x.q),
+    ctaHeading: str(obj.ctaHeading), seoTitle: str(obj.seoTitle), seoDescription: str(obj.seoDescription),
+  };
+}
+
+/** Generate a DRAFT landing page from a program (admin reviews before publishing). */
+export async function generatePage(programId: string): Promise<{ id: string; slug: string }> {
+  await ensureSchema();
+  const p = await prisma.grantProgram.findUnique({ where: { id: programId } });
+  if (!p) throw new Error('Program not found');
+  const user =
+    `PROGRAM DETAILS\nName: ${p.name}\nCity: ${p.city}\nJurisdiction: ${p.jurisdiction}\n` +
+    `Amount: ${p.maxAmount || 'unknown'}\nStatus: ${p.status}\nDeadline: ${p.deadline || 'unknown'}\n` +
+    `Category: ${p.category}\nEligibility: ${p.eligibility || 'unknown'}\nSummary: ${p.summary}\nOfficial source: ${p.sourceUrl}`;
+  const content = parsePageJson(await callClaude(PAGE_SYSTEM, user, 2500));
+  const base = slugify(`${p.city || p.jurisdiction}-${p.category || 'adu'}-grant`) || `grant-${Date.now()}`;
+  let slug = base, n = 2;
+  while (await prisma.grantLandingPage.findUnique({ where: { slug } })) slug = `${base}-${n++}`;
+  const page = await prisma.grantLandingPage.create({
+    data: {
+      programId: p.id, slug, city: p.city || p.jurisdiction, status: 'draft',
+      heroEyebrow: content.heroEyebrow, heroTitle: content.heroTitle, heroSubtitle: content.heroSubtitle,
+      amountLabel: content.amountLabel || p.maxAmount, intro: content.intro,
+      sections: content.sections, eligibility: content.eligibility, faqs: content.faqs,
+      ctaHeading: content.ctaHeading, ctaText: 'Book a free consultation',
+      seoTitle: content.seoTitle, seoDescription: content.seoDescription,
+      programSnapshot: { status: p.status, maxAmount: p.maxAmount, deadline: p.deadline },
+    },
+  });
+  return { id: page.id, slug: page.slug };
+}
+
+/** Public: fetch a PUBLISHED page by slug (unauthenticated, for the live site). */
+export async function getPublishedPage(slug: string) {
+  return withSchema(() => prisma.grantLandingPage.findFirst({ where: { slug, status: 'published' } }));
+}
+
+/** Public handler: GET /api/appointments?resource=grant-page&slug=… (no auth). */
+export async function handlePublicGrantPage(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const slug = String(req.query['slug'] ?? '');
+  const page = slug ? await getPublishedPage(slug) : null;
+  if (!page) { res.status(404).json({ error: 'Not found.' }); return; }
+  res.status(200).json(page);
+}
+
+// Flag a live page whose underlying program has materially changed since drafting.
+function pageDrift(page: { programSnapshot: unknown }, program?: { status: string; maxAmount: string; deadline: string } | null): boolean {
+  if (!program) return false;
+  const snap = (page.programSnapshot ?? {}) as { status?: string; maxAmount?: string; deadline?: string };
+  return snap.status !== program.status || snap.maxAmount !== program.maxAmount || snap.deadline !== program.deadline;
+}
+
 // ─── HTTP handlers (folded into the appointments function; Hobby 12-fn cap) ────
 export async function handleGrantScanCron(req: VercelRequest, res: VercelResponse): Promise<void> {
   const cronSecret = process.env.CRON_SECRET;
@@ -484,12 +572,16 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
 
   if (req.method === 'GET') {
     const data = await withSchema(async () => {
-      const [sources, programs, municipalities] = await Promise.all([
+      const [sources, programs, municipalities, pages] = await Promise.all([
         prisma.grantSource.findMany({ orderBy: { name: 'asc' } }),
         prisma.grantProgram.findMany({ orderBy: [{ relevanceScore: 'desc' }, { firstSeenAt: 'desc' }] }),
         prisma.municipality.findMany({ orderBy: { name: 'asc' } }),
+        prisma.grantLandingPage.findMany({ orderBy: { updatedAt: 'desc' } }),
       ]);
-      return { sources, programs, municipalities };
+      const byId = new Map(programs.map((p) => [p.id, p]));
+      // Attach live drift flag (program changed since the page was drafted).
+      const landingPages = pages.map((pg) => ({ ...pg, drift: pageDrift(pg, pg.programId ? byId.get(pg.programId) : null) }));
+      return { sources, programs, municipalities, landingPages };
     });
     res.status(200).json(data);
     return;
@@ -509,6 +601,32 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
       // timeout; the GitHub Actions worker does the full weekly sweep.
       const limit = Math.min(Math.max(Number(req.query['limit'] ?? 2) || 2, 1), 4);
       res.status(200).json({ ok: true, ...(await runDiscovery({ limit })) });
+      return;
+    }
+    if (action === 'generate-page') {
+      const id = String(req.query['id'] ?? '');
+      if (!id) { res.status(400).json({ error: 'program id required.' }); return; }
+      res.status(200).json({ ok: true, ...(await generatePage(id)) });
+      return;
+    }
+    if (action === 'save-page') {
+      // Save admin edits and/or publish state. Body carries any subset of fields.
+      const body = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) ?? {};
+      const id = String(body.id ?? '');
+      if (!id) { res.status(400).json({ error: 'page id required.' }); return; }
+      const editable = ['slug', 'city', 'status', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'amountLabel', 'intro', 'sections', 'eligibility', 'faqs', 'ctaHeading', 'ctaText', 'seoTitle', 'seoDescription'] as const;
+      const data: Record<string, unknown> = {};
+      for (const k of editable) if (k in body) data[k] = body[k];
+      if (data.status === 'published') { data.publishedAt = new Date(); data.needsReview = false; }
+      const updated = await withSchema(() => prisma.grantLandingPage.update({ where: { id }, data }));
+      res.status(200).json({ ok: true, page: updated });
+      return;
+    }
+    if (action === 'delete-page') {
+      const id = String(req.query['id'] ?? '');
+      if (!id) { res.status(400).json({ error: 'page id required.' }); return; }
+      await withSchema(() => prisma.grantLandingPage.delete({ where: { id } }));
+      res.status(200).json({ ok: true });
       return;
     }
     if (action === 'reset') {
