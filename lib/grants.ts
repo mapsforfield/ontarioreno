@@ -17,8 +17,12 @@ import { ensureSchema, withSchema } from './schema.js';
 // Extraction/classification = Claude via raw fetch (no SDK). Nothing auto-publishes.
 
 const EXTRACT_MODEL = process.env.GRANT_EXTRACT_MODEL ?? 'claude-haiku-4-5-20251001';
-const MAX_PAGE_CHARS = 60_000;
+const MAX_PAGE_CHARS = 60_000;       // cap on raw text kept for hashing (local, free)
+const LLM_INPUT_CHARS = 14_000;      // cap on what we actually send Claude (billed)
 const CAD_KEYWORDS = /(adu|additional dwelling|additional residential|secondary suite|garden suite|laneway|basement|granny flat|coach house|second unit|housing accelerator)/i;
+// A page with none of these has no funding signal at all — classify it as noise
+// locally and skip the (billed) Claude call entirely.
+const FUNDING_SIGNAL = /grant|loan|forgivable|rebate|incentive|subsid|fee waiver|community improvement|housing accelerator|\bADU\b|\bARU\b|additional residential|additional dwelling|secondary suite|garden suite|laneway|basement|coach house|second unit|granny flat|renovat/i;
 
 // ─── Municipality registry (cities-first) ─────────────────────────────────────
 // Ontario Housing Accelerator Fund recipients + large municipalities — the places
@@ -153,6 +157,20 @@ function relevantSignature(text: string): string {
   return createHash('sha256').update(joined).digest('hex');
 }
 
+// Extract just the funding-relevant portion of a page to send to the LLM, so we
+// don't pay to send nav/footer/boilerplate. Keeps each hit sentence plus one of
+// context on either side; falls back to the page head if nothing matches.
+function relevantExcerpt(text: string): string {
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const keep = new Set<number>();
+  sentences.forEach((s, i) => {
+    if (FUNDING_SIGNAL.test(s) || /\$\s?\d/.test(s)) { keep.add(i - 1); keep.add(i); keep.add(i + 1); }
+  });
+  if (keep.size === 0) return text.slice(0, 2_000);
+  const excerpt = [...keep].filter((i) => i >= 0 && i < sentences.length).sort((a, b) => a - b).map((i) => sentences[i]).join(' ');
+  return excerpt.slice(0, LLM_INPUT_CHARS);
+}
+
 // ─── LLM classify + extract (one call) ────────────────────────────────────────
 export type PageType = 'money' | 'future' | 'zoning' | 'developer' | 'news' | 'noise' | 'unknown';
 export type ExtractedProgram = {
@@ -189,7 +207,12 @@ async function callClaude(system: string, user: string, maxTokens = 2000): Promi
 }
 
 export async function classifyAndExtract(pageText: string, ctx: { name: string; url: string; jurisdiction: string }): Promise<Classification> {
-  const raw = await callClaude(SYSTEM_PROMPT, `Source: ${ctx.name} (${ctx.jurisdiction})\nURL: ${ctx.url}\n\nPAGE TEXT:\n${pageText}`);
+  // Cheap local pre-filter: no funding keyword anywhere → it's noise, don't pay
+  // for a Claude call at all.
+  if (!FUNDING_SIGNAL.test(pageText)) return { pageType: 'noise', programs: [] };
+  // Only send Claude the funding-relevant slice (cuts input tokens ~3-5x).
+  const excerpt = relevantExcerpt(pageText);
+  const raw = await callClaude(SYSTEM_PROMPT, `Source: ${ctx.name} (${ctx.jurisdiction})\nURL: ${ctx.url}\n\nPAGE TEXT (funding-relevant excerpt):\n${excerpt}`);
   return parseClassification(raw);
 }
 
