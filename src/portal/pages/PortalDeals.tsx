@@ -223,17 +223,17 @@ function todayIso() {
 }
 
 type ValueFilter = 'all' | 'under50' | '50to100' | 'over100';
-type WonRange = 'month' | 'quarter' | 'all';
+type WonRange = 'year' | 'quarter' | 'all';
 
 function isWonDealInRange(deal: Deal, range: WonRange): boolean {
   if (range === 'all') return true;
   // Pre-portal imports don't carry real win dates (updatedAt = import date),
-  // so they only appear under "All" — Month/Quarter is for portal-era deals
+  // so they only appear under "All" — Year/Quarter is for portal-era deals
   if (deal.isHistorical) return false;
   const updated = new Date(deal.updatedAt);
   const now = new Date();
-  if (range === 'month') {
-    return updated.getFullYear() === now.getFullYear() && updated.getMonth() === now.getMonth();
+  if (range === 'year') {
+    return updated.getFullYear() === now.getFullYear();
   }
   // quarter
   const quarter = Math.floor(now.getMonth() / 3);
@@ -294,7 +294,7 @@ export default function PortalDeals() {
   const [contractorFilter, setContractorFilter] = useState('all');
   const [valueFilter, setValueFilter] = useState<ValueFilter>('all');
   const [staleOnly, setStaleOnly] = useState(false);
-  const [wonRange, setWonRange] = useState<WonRange>('quarter');
+  const [wonRange, setWonRange] = useState<WonRange>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
 
   // ── Drag-and-drop + context menu ──────────────────────────────
@@ -1369,7 +1369,7 @@ OntarioReno Broker Portal`;
                 {isWonColumn && allColumnDeals.length > 0 && (
                   <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
                     {([
-                      { label: 'Month', value: 'month' },
+                      { label: 'Year', value: 'year' },
                       { label: 'Quarter', value: 'quarter' },
                       { label: 'All', value: 'all' },
                     ] as Array<{ label: string; value: WonRange }>).map((option) => (
