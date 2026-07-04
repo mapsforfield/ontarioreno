@@ -100,7 +100,8 @@ export default function GrantsHub() {
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-bold tracking-[-0.02em] text-slate-900 md:text-3xl">Where the grants are</h2>
         <p className="mt-1 text-slate-600">Hover a marker to see the programs available in that city.</p>
-        <div className="relative mt-6">
+        {/* z-0 keeps Leaflet's high internal z-indexes contained below the sticky header (z-50). */}
+        <div className="relative z-0 mt-6">
           <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} style={{ height: 460, width: '100%', borderRadius: 16 }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" maxZoom={13} />
             {mapCities.map((c) => (
