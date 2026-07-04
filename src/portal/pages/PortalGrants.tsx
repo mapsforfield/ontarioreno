@@ -15,7 +15,7 @@ type Program = {
   id: string; name: string; city: string; jurisdiction: string; status: string;
   category: string; maxAmount: string; eligibility: string; deadline: string;
   summary: string; sourceUrl: string; relevanceScore: number; reviewState: string;
-  firstSeenAt: string; changedAt: string | null;
+  linkUrl: string; firstSeenAt: string; changedAt: string | null;
 };
 type Source = {
   id: string; name: string; url: string; jurisdiction: string; category: string;
@@ -50,15 +50,17 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function ProgramCard({ p, onAction, busy, page, onGenerate, onEditPage, generating }: {
+function ProgramCard({ p, onAction, busy, page, onGenerate, onEditPage, onSetLink, generating }: {
   p: Program;
   onAction: (id: string, reviewState: string) => void;
   busy: boolean;
   page?: LandingPage;
   onGenerate?: () => void;
   onEditPage?: () => void;
+  onSetLink?: (url: string) => void;
   generating?: boolean;
 }) {
+  const [link, setLinkVal] = useState(p.linkUrl ?? '');
   return (
     <div className="flex flex-col gap-2 rounded-[0.5rem] border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -127,6 +129,18 @@ function ProgramCard({ p, onAction, busy, page, onGenerate, onEditPage, generati
           </button>
         )}
       </div>
+      {onSetLink && (
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            value={link}
+            onChange={(e) => setLinkVal(e.target.value)}
+            onBlur={() => { if (link !== (p.linkUrl ?? '')) onSetLink(link); }}
+            placeholder="Hub link URL (e.g. /hamilton-grant-guide) — optional"
+            className="min-w-0 flex-1 rounded-[0.5rem] border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 outline-none focus:border-[#1B3C6C]"
+          />
+          {p.linkUrl && <span className="shrink-0 text-[10px] font-bold uppercase text-emerald-600">linked</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -280,6 +294,17 @@ export default function PortalGrants() {
     await load();
   };
 
+  const setLink = async (id: string, linkUrl: string) => {
+    setPrograms((prev) => prev.map((p) => (p.id === id ? { ...p, linkUrl } : p)));
+    try {
+      await fetch(`${API}&id=${encodeURIComponent(id)}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ linkUrl }),
+      });
+    } catch { await load(); }
+  };
+
   const needsReview = useMemo(
     () => programs.filter((p) => p.reviewState === 'new' || (p.changedAt && p.reviewState !== 'dismissed' && p.reviewState !== 'targeting')),
     [programs]
@@ -342,18 +367,18 @@ export default function PortalGrants() {
         <>
           <Section title="Needs review" count={needsReview.length} accent
             empty="Nothing new to review. The daily scan will surface new or changed programs here.">
-            {needsReview.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} />)}
+            {needsReview.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} onSetLink={(url) => setLink(p.id, url)} />)}
           </Section>
 
           {targeting.length > 0 && (
             <Section title="Targeting" count={targeting.length}>
-              {targeting.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} />)}
+              {targeting.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} onSetLink={(url) => setLink(p.id, url)} />)}
             </Section>
           )}
 
           <Section title="Active programs" count={active.length}
             empty="No confirmed active programs yet — run a scan or wait for the daily sweep.">
-            {active.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} />)}
+            {active.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} onSetLink={(url) => setLink(p.id, url)} />)}
           </Section>
 
           <div className="rounded-[0.5rem] border border-slate-200 bg-white p-4 text-xs text-slate-500">

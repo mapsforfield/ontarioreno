@@ -571,6 +571,9 @@ model GrantProgram {
   reviewState     String    @default("new")
   /// Stable dedupe key (sourceId + normalized name) so re-scans update, not dup.
   fingerprint     String    @default("")
+  /// Admin-set URL the /grants hub row links to (an existing site page or a
+  /// generated grant page). Empty = fall back to generated page / consultation.
+  linkUrl         String    @default("")
   firstSeenAt     DateTime  @default(now())
   lastConfirmedAt DateTime  @default(now())  // last scan that still saw this program
   changedAt       DateTime?                   // last time a material field changed
