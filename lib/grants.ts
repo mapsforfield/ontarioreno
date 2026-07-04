@@ -798,6 +798,18 @@ function statusBadge(status: string): string {
   return `<span class="badge" style="background:${color}1a;color:${color}">${esc(label)}</span>`;
 }
 
+// Pull a short headline amount from a free-text maxAmount → "$40k" / "$1.2M".
+// Uses the FIRST dollar figure (usually the per-unit/homeowner headline).
+function shortAmount(text: string): string {
+  const m = (text || '').match(/\$\s?[\d,]+(?:\.\d+)?/);
+  if (!m) return '';
+  const n = parseFloat(m[0].replace(/[^0-9.]/g, ''));
+  if (!isFinite(n) || n <= 0) return '';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(n % 1e6 ? 1 : 0).replace(/\.0$/, '') + 'M';
+  if (n >= 1000) return '$' + Math.round(n / 1000) + 'k';
+  return '$' + n;
+}
+
 export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string {
   const slugByProgram = new Map<string, string>();
   for (const p of pages) if (p.programId) slugByProgram.set(p.programId, p.slug);
@@ -839,14 +851,16 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
   }).join('');
 
   // Aggregate rows by city (with known coords) for the interactive map markers.
-  const cityAgg = new Map<string, { city: string; lat: number; lng: number; count: number; href: string }>();
+  // Each marker shows the city's headline grant amount as a tag (Zillow-style).
+  const cityAgg = new Map<string, { city: string; lat: number; lng: number; count: number; href: string; amount: string }>();
   for (const p of rows) {
     const co = cityCoords(p.city);
     if (!co) continue;
     const key = p.city.toLowerCase();
     const ex = cityAgg.get(key);
-    if (ex) ex.count++;
-    else cityAgg.set(key, { city: p.city, lat: co[0], lng: co[1], count: 1, href: linkFor(p) || '/match?ref=grants-hub' });
+    if (ex) { ex.count++; if (!ex.amount) ex.amount = shortAmount(p.maxAmount); }
+    // rows are highest-score first, so the first program per city sets the tag.
+    else cityAgg.set(key, { city: p.city, lat: co[0], lng: co[1], count: 1, href: linkFor(p) || '/match?ref=grants-hub', amount: shortAmount(p.maxAmount) });
   }
   const mapData = ldJson([...cityAgg.values()]);
 
@@ -874,9 +888,9 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#f8fafc;line-height:1.55}
 a{color:var(--navy)}.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 #map{height:460px;width:100%;border-radius:16px;border:1px solid #e2e8f0;z-index:1}
-.opin{position:relative;width:40px;height:40px;filter:drop-shadow(0 3px 5px rgba(15,23,42,.35))}
-.opin img{width:40px;height:40px;display:block}
-.opin .cnt{position:absolute;top:-5px;right:-7px;background:#1B3C6C;color:#fff;font-size:11px;font-weight:800;min-width:19px;height:19px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;padding:0 4px}
+.atag{position:absolute;transform:translate(-50%,-100%);background:#1B3C6C;color:#fff;font-weight:800;font-size:13px;padding:6px 12px;border-radius:16px;white-space:nowrap;box-shadow:0 4px 9px rgba(15,23,42,.35);border:2px solid #fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;cursor:pointer}
+.atag:after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff}
+.atag i{position:absolute;top:-9px;right:-9px;background:#fff;color:#1B3C6C;border-radius:999px;font-size:10px;font-style:normal;font-weight:800;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;border:1.5px solid #1B3C6C;padding:0 3px}
 .pop b{color:#1B3C6C}.pop a{display:inline-block;margin-top:6px;background:#1B3C6C;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700}
 .hero{background:#0f172a;color:#fff;padding:56px 0}
 .hero h1{font-size:34px;line-height:1.1;letter-spacing:-.03em;margin:0 0 14px;max-width:16em}
@@ -933,9 +947,10 @@ ${siteFooterHtml()}
 (function(){var CITIES=${mapData};if(!window.L||!document.getElementById('map'))return;
 var map=L.map('map',{scrollWheelZoom:false}).setView([43.95,-79.2],8);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:13}).addTo(map);
-CITIES.forEach(function(c){var icon=L.divIcon({className:'',html:'<div class="opin"><img src="/icon-512.png" alt=""><span class="cnt">'+c.count+'</span></div>',iconSize:[40,40],iconAnchor:[20,20],popupAnchor:[0,-18]});
+CITIES.forEach(function(c){var label=c.amount||'Grant';var badge=c.count>1?'<i>'+c.count+'</i>':'';
+var icon=L.divIcon({className:'',html:'<div class="atag">'+label+badge+'</div>',iconSize:[0,0],iconAnchor:[0,0],popupAnchor:[0,-42]});
 var m=L.marker([c.lat,c.lng],{icon:icon}).addTo(map);
-m.bindPopup('<div class="pop"><b>'+c.city+'</b><br>'+c.count+' grant program'+(c.count>1?'s':'')+'<br><a href="'+c.href+'">View →</a></div>');
+m.bindPopup('<div class="pop"><b>'+c.city+'</b><br>'+c.count+' grant program'+(c.count>1?'s':'')+(c.amount?' · up to '+c.amount:'')+'<br><a href="'+c.href+'">View →</a></div>');
 m.on('mouseover',function(){this.openPopup();});});
 // Frame the southern-Ontario cluster (where most grants are) for a closer default;
 // far-north markers (e.g. Sudbury) stay on the map but don't drag the zoom out.
