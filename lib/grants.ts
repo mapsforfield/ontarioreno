@@ -594,7 +594,7 @@ export function renderPageHtml(page: RenderPage): string {
 
   // Internal links (SEO) — point at existing hub/topic pages.
   const internal = [
-    ['/', 'Home'], ['/basements', 'Basement Apartments'], ['/legal-suites', 'Legal Suites'],
+    ['/', 'Home'], ['/grants', 'All Ontario Grants'], ['/basements', 'Basement Apartments'], ['/legal-suites', 'Legal Suites'],
     ['/garden-suites-laneway-suites-ontario', 'Garden & Laneway Suites'], ['/costs', 'Renovation Costs'],
     ['/financing', 'Financing'], ['/cities', 'All Cities'],
   ];
@@ -749,6 +749,178 @@ ${faqs.length ? `<section class="block alt"><div class="wrap"><h2 class="h2">Com
 </script>
 </body>
 </html>`;
+}
+
+// ─── /grants hub — living, auto-updating comparison of every Ontario grant ────
+// Server-rendered for SEO. Comprehensive (every relevant grant the monitor found)
+// so it's a genuine resource, not a doorway link-menu: rows link to a published
+// page where one exists, otherwise a consultation CTA. Freshness ("Updated …")
+// comes free from the live monitor — a real edge over manually-kept lists.
+
+type HubProgram = { id: string; programId?: string | null; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; updatedAt: Date | string };
+type HubPage = { programId: string | null; slug: string; city: string };
+
+function statusBadge(status: string): string {
+  const map: Record<string, [string, string]> = {
+    active: ['#059669', 'Open now'], upcoming: ['#d97706', 'Upcoming'],
+    closed: ['#64748b', 'Closed'], unknown: ['#64748b', 'Check status'],
+  };
+  const [color, label] = map[status] ?? map.unknown;
+  return `<span class="badge" style="background:${color}1a;color:${color}">${esc(label)}</span>`;
+}
+
+export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string {
+  const slugByProgram = new Map<string, string>();
+  for (const p of pages) if (p.programId) slugByProgram.set(p.programId, p.slug);
+
+  // De-dupe near-identical rows (same city + amount), keep highest score.
+  const seen = new Set<string>();
+  const rows = programs.filter((p) => {
+    const k = `${p.city.toLowerCase()}|${p.name.toLowerCase().slice(0, 24)}`;
+    if (seen.has(k)) return false; seen.add(k); return true;
+  }).slice(0, 60);
+
+  const latest = programs.reduce((acc, p) => {
+    const t = new Date(p.updatedAt).getTime();
+    return t > acc ? t : acc;
+  }, 0);
+  const updatedLabel = latest ? new Date(latest).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+  const rowsHtml = rows.map((p) => {
+    const slug = p.programId ? slugByProgram.get(p.programId) : undefined;
+    const action = slug
+      ? `<a class="rowbtn" href="/grants/${esc(slug)}">View grant →</a>`
+      : `<a class="rowbtn ghost" href="#apply">Check eligibility</a>`;
+    return `<tr>
+      <td data-l="City"><strong>${esc(p.city || '—')}</strong></td>
+      <td data-l="Program">${esc(p.name)}</td>
+      <td data-l="Amount">${esc(p.maxAmount || '—')}</td>
+      <td data-l="Status">${statusBadge(p.status)}</td>
+      <td data-l="">${action}</td>
+    </tr>`;
+  }).join('');
+
+  const itemListLd = ldJson({
+    '@context': 'https://schema.org', '@type': 'ItemList',
+    name: 'Ontario Home Renovation & ADU Grants by City',
+    itemListElement: rows.slice(0, 25).map((p, i) => ({ '@type': 'ListItem', position: i + 1, name: `${p.city} — ${p.name}` })),
+  });
+
+  const internal = [
+    ['/', 'Home'], ['/basements', 'Basement Apartments'], ['/legal-suites', 'Legal Suites'],
+    ['/garden-suites-laneway-suites-ontario', 'Garden & Laneway Suites'], ['/costs', 'Renovation Costs'],
+    ['/financing', 'Financing'], ['/grant-eligibility-calculator', 'Grant Eligibility Calculator'], ['/cities', 'All Cities'],
+  ];
+  const title = 'Ontario Home Renovation & ADU Grants by City (2026) | OntarioReno';
+  const desc = 'A living, regularly-updated list of Ontario homeowner renovation, ADU, and basement-suite grants — by city, with amounts, status, and how to apply. Free eligibility check.';
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+<link rel="canonical" href="https://ontarioreno.ca/grants">
+<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
+<meta property="og:url" content="https://ontarioreno.ca/grants"><meta name="robots" content="index,follow">
+<script type="application/ld+json">${itemListLd}</script>
+<style>
+:root{--navy:#1B3C6C;--navy2:#2b5a96;--emerald:#059669;--slate:#475569;--ink:#0f172a}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#f8fafc;line-height:1.55}
+a{color:var(--navy)}.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header.site{background:#fff;border-bottom:1px solid #e2e8f0}header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+header.site .logo{font-weight:800;font-size:20px;color:var(--navy);text-decoration:none;letter-spacing:-.02em}
+header.site nav a{margin-left:18px;font-size:14px;font-weight:600;color:var(--slate);text-decoration:none}
+.hero{background:#0f172a;color:#fff;padding:56px 0}
+.hero h1{font-size:34px;line-height:1.1;letter-spacing:-.03em;margin:0 0 14px;max-width:16em}
+@media(min-width:860px){.hero h1{font-size:44px}}
+.hero p{font-size:18px;color:#cbd5e1;max-width:40em;margin:0 0 16px}
+.fresh{display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.16);color:#6ee7b7;font-weight:700;font-size:14px;padding:7px 14px;border-radius:999px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--navy2);color:#fff;font-weight:700;padding:14px 26px;border-radius:12px;text-decoration:none;border:0;cursor:pointer;font-size:16px}
+.btn:hover{background:#3163a3}
+section.block{padding:48px 0}.h2{font-size:28px;letter-spacing:-.03em;margin:0 0 8px}
+.sub{color:var(--slate);margin:0 0 24px}
+table.grants{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}
+table.grants th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;padding:12px 14px;border-bottom:2px solid #e2e8f0;background:#f8fafc}
+table.grants td{padding:14px;border-bottom:1px solid #eef2f7;font-size:15px;color:#334155;vertical-align:middle}
+.badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.rowbtn{display:inline-block;background:var(--navy);color:#fff;font-weight:700;font-size:13px;padding:8px 14px;border-radius:9px;text-decoration:none;white-space:nowrap}
+.rowbtn.ghost{background:#eef2f7;color:var(--navy)}
+.formcard{background:#fff;border-radius:18px;padding:26px;box-shadow:0 20px 40px rgba(15,23,42,.1);max-width:520px;margin:0 auto}
+.formcard h3{margin:0 0 4px;font-size:20px}.formcard p.small{margin:0 0 16px;color:#64748b;font-size:14px}
+.formcard label{display:block;font-size:13px;font-weight:700;color:#334155;margin:12px 0 6px}
+.formcard input{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px}
+.formcard button{width:100%;margin-top:18px}.hidden{display:none}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:12px;padding:18px;text-align:center}
+.apply{background:#0f172a;color:#fff}
+footer.site{background:#0b1220;color:#94a3b8;padding:36px 0;font-size:14px}
+footer.site .links{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px}footer.site a{color:#cbd5e1;text-decoration:none}
+@media(max-width:680px){table.grants,table.grants tbody,table.grants tr,table.grants td{display:block;width:100%}table.grants thead{display:none}table.grants tr{border-bottom:1px solid #e2e8f0;padding:8px 0}table.grants td{border:0;padding:6px 14px}table.grants td[data-l]:before{content:attr(data-l)" ";font-weight:700;color:#64748b}}
+</style></head><body>
+<header class="site"><div class="wrap">
+  <a class="logo" href="/">OntarioReno</a>
+  <nav>${internal.slice(0, 5).map(([h, l]) => `<a href="${esc(h)}">${esc(l)}</a>`).join('')}</nav>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <h1>Ontario Home Renovation &amp; ADU Grants — by City</h1>
+  <p>Ontario cities are funding homeowners to build basement apartments, garden suites, and additional dwelling units. We track every active program so you never miss one — here's the current landscape.</p>
+  ${updatedLabel ? `<div class="fresh">● Updated ${esc(updatedLabel)}</div>` : ''}
+  <p style="margin-top:20px"><a class="btn" href="#apply">Check your eligibility — free →</a></p>
+</div></section>
+
+<section class="block"><div class="wrap">
+  <h2 class="h2">Grants by city</h2>
+  <p class="sub">${rows.length} programs tracked across Ontario. Amounts and eligibility are set by each municipality — we'll confirm the current details with you.</p>
+  <table class="grants">
+    <thead><tr><th>City</th><th>Program</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="5">Programs are being added — check back shortly.</td></tr>'}</tbody>
+  </table>
+</div></section>
+
+<section class="block apply" id="apply"><div class="wrap">
+  <form class="formcard" id="leadform">
+    <h3>Find out which grants you qualify for</h3>
+    <p class="small">Free eligibility check. A local specialist will call you back — no cost, no obligation.</p>
+    <div id="fields">
+      <label>Full name</label><input name="name" autocomplete="name" required>
+      <label>City</label><input name="city" autocomplete="address-level2">
+      <label>Phone</label><input name="phone" inputmode="tel" autocomplete="tel">
+      <label>Email</label><input name="email" inputmode="email" autocomplete="email">
+      <input class="hidden" name="companyWebsite" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Check my eligibility</button>
+    </div>
+    <div id="thanks" class="ok hidden"><strong>You're on the list.</strong><br>We'll call you shortly to go over which grants you qualify for.</div>
+  </form>
+</div></section>
+
+<footer class="site"><div class="wrap">
+  <div class="links">${internal.map(([h, l]) => `<a href="${esc(h)}">${esc(l)}</a>`).join('')}</div>
+  <div>© ${new Date().getFullYear()} OntarioReno — helping Ontario homeowners access renovation grants and vetted contractors.</div>
+</div></footer>
+
+<script>
+(function(){var f=document.getElementById('leadform');if(!f)return;
+f.addEventListener('submit',function(e){e.preventDefault();if(f.companyWebsite.value)return;
+var name=f.name.value.trim();if(!name||(!f.phone.value.trim()&&!f.email.value.trim())){alert('Please add your name and a phone or email.');return;}
+var payload={type:'grant',source:'grants-hub',name:name,phone:f.phone.value.trim(),email:f.email.value.trim(),city:f.city.value.trim(),projectType:'ADU / Grant',notes:'Grants hub lead. '+location.href,pageUrl:location.href};
+fetch(${JSON.stringify(GRANT_LEAD_ENDPOINT)},{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).catch(function(){});
+document.getElementById('fields').classList.add('hidden');document.getElementById('thanks').classList.remove('hidden');});})();
+</script>
+</body></html>`;
+}
+
+/** Public: GET /api/appointments?resource=grants-hub → the /grants hub page. */
+export async function handleGrantsHubHtml(_req: VercelRequest, res: VercelResponse): Promise<void> {
+  const { pages, programs } = await withSchema(async () => {
+    const [pages, programs] = await Promise.all([
+      prisma.grantLandingPage.findMany({ where: { status: 'published' }, select: { programId: true, slug: true, city: true } }),
+      prisma.grantProgram.findMany({ where: { reviewState: { not: 'dismissed' }, relevanceScore: { gte: 55 } }, orderBy: [{ relevanceScore: 'desc' }, { city: 'asc' }] }),
+    ]);
+    return { pages, programs };
+  });
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
+  res.status(200).send(renderHubHtml(pages as HubPage[], programs as unknown as HubProgram[]));
 }
 
 /** Public: GET /api/appointments?resource=grant-html&slug=… → full HTML page. */

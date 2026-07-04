@@ -86,6 +86,7 @@ export default function Navbar() {
   ];
 
   const grantLinks = [
+    { name: 'All Ontario Grants', href: '/grants' },
     { name: 'Hamilton Grant Guide', href: '/hamilton-grant-guide' },
     { name: 'Grant Eligibility Calculator', href: '/grant-eligibility-calculator' },
     { name: 'Barrie Secondary Suite Funding', href: '/barrie-secondary-suite-funding' },
@@ -94,6 +95,12 @@ export default function Navbar() {
   ];
 
   const grantSections = [
+    {
+      label: 'Browse',
+      items: [
+        { name: 'All Ontario Grants →', href: '/grants' },
+      ],
+    },
     {
       label: 'Core Grant Resources',
       items: [
@@ -367,22 +374,24 @@ export default function Navbar() {
                         {section.label}
                       </p>
                       <div className="space-y-1">
-                        {section.items.map((grant, itemIndex) => (
-                          <Link
-                            key={grant.name}
-                            to={grant.href}
-                            className={cn(
-                              'block rounded-[0.72rem] px-3 py-2.25 text-sm leading-6 tracking-[-0.01em] transition-[background-color,color] duration-150 hover:bg-slate-50/80 hover:text-[#1B3C6C]',
-                              sectionIndex === 0 && itemIndex === 0 && 'font-semibold text-slate-900/95',
-                              !(sectionIndex === 0 && itemIndex === 0) && 'font-medium',
-                              location.pathname === grant.href
-                                ? 'bg-slate-50 text-[#1B3C6C]'
-                                : 'text-slate-700'
-                            )}
-                          >
-                            {grant.name}
-                          </Link>
-                        ))}
+                        {section.items.map((grant, itemIndex) => {
+                          const itemClass = cn(
+                            'block rounded-[0.72rem] px-3 py-2.25 text-sm leading-6 tracking-[-0.01em] transition-[background-color,color] duration-150 hover:bg-slate-50/80 hover:text-[#1B3C6C]',
+                            sectionIndex === 0 && itemIndex === 0 && 'font-semibold text-slate-900/95',
+                            !(sectionIndex === 0 && itemIndex === 0) && 'font-medium',
+                            location.pathname === grant.href
+                              ? 'bg-slate-50 text-[#1B3C6C]'
+                              : 'text-slate-700'
+                          );
+                          // /grants and /grants/:slug are server-rendered (no SPA
+                          // route) — use a real anchor so they full-page navigate.
+                          const serverRoute = grant.href === '/grants' || grant.href.startsWith('/grants/');
+                          return serverRoute ? (
+                            <a key={grant.name} href={grant.href} className={itemClass}>{grant.name}</a>
+                          ) : (
+                            <Link key={grant.name} to={grant.href} className={itemClass}>{grant.name}</Link>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -637,18 +646,18 @@ export default function Navbar() {
                             {section.label}
                           </p>
                           <div className="grid gap-2">
-                            {section.items.map((grant) => (
-                              <Link
-                                key={grant.name}
-                                to={grant.href}
-                                className={cn(
-                                  'rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]',
-                                  location.pathname === grant.href && 'border-slate-200 bg-slate-50 text-[#1B3C6C]'
-                                )}
-                              >
-                                {grant.name}
-                              </Link>
-                            ))}
+                            {section.items.map((grant) => {
+                              const mClass = cn(
+                                'rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]',
+                                location.pathname === grant.href && 'border-slate-200 bg-slate-50 text-[#1B3C6C]'
+                              );
+                              const serverRoute = grant.href === '/grants' || grant.href.startsWith('/grants/');
+                              return serverRoute ? (
+                                <a key={grant.name} href={grant.href} className={mClass}>{grant.name}</a>
+                              ) : (
+                                <Link key={grant.name} to={grant.href} className={mClass}>{grant.name}</Link>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
