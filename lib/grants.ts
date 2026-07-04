@@ -888,6 +888,9 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#f8fafc;line-height:1.55}
 a{color:var(--navy)}.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 #map{height:460px;width:100%;border-radius:16px;border:1px solid #e2e8f0;z-index:1}
+.mapwrap{position:relative}
+.mapbrand{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(255,255,255,.94);border-radius:10px;padding:6px 11px;box-shadow:0 2px 10px rgba(15,23,42,.22)}
+.mapbrand img{height:22px;display:block}
 .atag{position:absolute;transform:translate(-50%,-100%);background:#1B3C6C;color:#fff;font-weight:800;font-size:13px;padding:6px 12px;border-radius:16px;white-space:nowrap;box-shadow:0 4px 9px rgba(15,23,42,.35);border:2px solid #fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;cursor:pointer}
 .atag:after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff}
 .atag i{position:absolute;top:-9px;right:-9px;background:#fff;color:#1B3C6C;border-radius:999px;font-size:10px;font-style:normal;font-weight:800;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;border:1.5px solid #1B3C6C;padding:0 3px}
@@ -921,8 +924,8 @@ ${siteHeaderHtml()}
 
 <section class="block"><div class="wrap">
   <h2 class="h2">Where the grants are</h2>
-  <p class="sub">Hover a marker to see active grant programs in that city.</p>
-  <div id="map"></div>
+  <p class="sub">Hover a marker to see the programs available in that city.</p>
+  <div class="mapwrap"><div id="map"></div><a class="mapbrand" href="/"><img src="/logo.png" alt="OntarioReno"></a></div>
 </div></section>
 
 <section class="block" style="background:#fff"><div class="wrap">
@@ -947,15 +950,17 @@ ${siteFooterHtml()}
 (function(){var CITIES=${mapData};if(!window.L||!document.getElementById('map'))return;
 var map=L.map('map',{scrollWheelZoom:false}).setView([43.95,-79.2],8);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:13}).addTo(map);
-CITIES.forEach(function(c){var label=c.amount||'Grant';var badge=c.count>1?'<i>'+c.count+'</i>':'';
+CITIES.forEach(function(c){var label=c.amount||'Incentive';var badge=c.count>1?'<i>'+c.count+'</i>':'';
 var icon=L.divIcon({className:'',html:'<div class="atag">'+label+badge+'</div>',iconSize:[0,0],iconAnchor:[0,0],popupAnchor:[0,-42]});
 var m=L.marker([c.lat,c.lng],{icon:icon}).addTo(map);
-m.bindPopup('<div class="pop"><b>'+c.city+'</b><br>'+c.count+' grant program'+(c.count>1?'s':'')+(c.amount?' · up to '+c.amount:'')+'<br><a href="'+c.href+'">View →</a></div>');
+m.bindPopup('<div class="pop"><b>'+c.city+'</b><br>'+c.count+' program'+(c.count>1?'s':'')+(c.amount?' · up to '+c.amount:'')+'<br><a href="'+c.href+'">View →</a></div>');
 m.on('mouseover',function(){this.openPopup();});});
-// Frame the southern-Ontario cluster (where most grants are) for a closer default;
-// far-north markers (e.g. Sudbury) stay on the map but don't drag the zoom out.
-var south=CITIES.filter(function(c){return c.lat<45.6;});
-if(south.length){var g=L.featureGroup(south.map(function(c){return L.marker([c.lat,c.lng]);}));map.fitBounds(g.getBounds().pad(0.35),{maxZoom:9});}
+// Frame the Golden Horseshoe core for a close default; far-flung markers (Sudbury,
+// Kingston, Ottawa) stay on the map but don't widen the initial view.
+var core=CITIES.filter(function(c){return c.lat>42.8&&c.lat<44.6&&c.lng>-81&&c.lng<-78.2;});
+var frame=core.length?core:CITIES;
+var g=L.featureGroup(frame.map(function(c){return L.marker([c.lat,c.lng]);}));
+map.fitBounds(g.getBounds().pad(0.3),{maxZoom:10});
 })();
 </script>
 </body></html>`;
