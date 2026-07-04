@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
-import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantHtml, handleGrantsHubHtml } from '../../lib/grants.js';
+import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -131,13 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET' && req.query['resource'] === 'grant-page') {
     return handlePublicGrantPage(req, res);
   }
-  // Public server-rendered HTML for /grants/:slug (SEO — via vercel.json rewrite).
-  if (req.method === 'GET' && req.query['resource'] === 'grant-html') {
-    return handleGrantHtml(req, res);
-  }
-  // Public server-rendered /grants hub (SEO — via vercel.json rewrite).
-  if (req.method === 'GET' && req.query['resource'] === 'grants-hub') {
-    return handleGrantsHubHtml(req, res);
+  // Public JSON for the React /grants hub (curated pages + approved programs).
+  if (req.method === 'GET' && req.query['resource'] === 'grants-hub-data') {
+    return handleGrantsHubData(req, res);
   }
   if (req.query['resource'] === 'grants') {
     return handleGrantsApi(req, res);

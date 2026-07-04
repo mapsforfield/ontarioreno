@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
+import GrantsHub from './pages/GrantsHub';
 import GrantLandingPage from './pages/GrantLandingPage';
 import Basements from './pages/Basements';
 import LegalSuites from './pages/LegalSuites';
@@ -148,6 +149,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="basements" element={<Basements />} />
+          <Route path="grants" element={<GrantsHub />} />
           <Route path="grants/:slug" element={<GrantLandingPage />} />
           <Route path="legal-suites" element={<LegalSuites />} />
           <Route

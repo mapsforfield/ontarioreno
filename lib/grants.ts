@@ -966,6 +966,66 @@ map.fitBounds(g.getBounds().pad(0.3),{maxZoom:10});
 </body></html>`;
 }
 
+// Your existing hand-made grant pages (built before the scanner). These ALWAYS
+// appear on the hub/map and link to their real pages — no scanner approval needed.
+// The scanner only adds NEW cities you don't already have a page for.
+export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; url: string }> = [
+  { city: 'Hamilton', name: 'Hamilton ADU / Secondary Suite Grant', amount: '$40k', url: '/hamilton-grant-guide' },
+  { city: 'St. Catharines', name: 'St. Catharines ADU Grant', amount: '$40k', url: '/st-catharines-adu-grant' },
+  { city: 'Burlington', name: 'Burlington ARU Incentive Program', amount: '$95k', url: '/burlington-aru-incentive-program' },
+  { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
+];
+
+export type HubRow = { city: string; name: string; amount: string; status: string; href: string; lat: number | null; lng: number | null };
+export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
+
+/** Structured hub data (JSON) for the React /grants page: curated existing pages
+ *  + scanner-approved programs, plus map aggregation. */
+export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow[]; mapCities: HubMapCity[] }> {
+  await ensureSchema();
+  const [pages, programs] = await Promise.all([
+    prisma.grantLandingPage.findMany({ where: { status: 'published' }, select: { programId: true, slug: true } }),
+    prisma.grantProgram.findMany({ where: { reviewState: { in: ['reviewed', 'targeting'] } }, orderBy: [{ relevanceScore: 'desc' }, { city: 'asc' }] }),
+  ]);
+  const slugByProgram = new Map<string, string>();
+  for (const p of pages) if (p.programId) slugByProgram.set(p.programId, p.slug);
+
+  const curatedCities = new Set(CURATED_PAGES.map((c) => c.city.toLowerCase()));
+  const rows: HubRow[] = [];
+
+  for (const c of CURATED_PAGES) {
+    const co = cityCoords(c.city);
+    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+  }
+  const seen = new Set<string>();
+  for (const p of programs) {
+    if (curatedCities.has(p.city.toLowerCase())) continue; // curated page wins
+    const k = `${p.city.toLowerCase()}|${p.name.toLowerCase().slice(0, 24)}`;
+    if (seen.has(k)) continue; seen.add(k);
+    const slug = slugByProgram.get(p.id);
+    const href = (p.linkUrl && p.linkUrl.trim()) || (slug ? `/grants/${slug}` : knownLink(p.city, p.name)) || '/match?ref=grants-hub';
+    const co = cityCoords(p.city);
+    rows.push({ city: p.city, name: p.name, amount: shortAmount(p.maxAmount), status: p.status, href, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+  }
+
+  const agg = new Map<string, HubMapCity>();
+  for (const r of rows) {
+    if (r.lat == null || r.lng == null) continue;
+    const key = r.city.toLowerCase();
+    const ex = agg.get(key);
+    if (ex) { ex.count++; if (!ex.amount) ex.amount = r.amount; }
+    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: r.amount, href: r.href });
+  }
+  const latest = programs.reduce((a, p) => Math.max(a, new Date(p.updatedAt).getTime()), 0);
+  const updatedLabel = latest ? new Date(latest).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  return { updatedLabel, rows, mapCities: [...agg.values()] };
+}
+
+/** Public JSON for the React hub: GET /api/appointments?resource=grants-hub-data */
+export async function handleGrantsHubData(_req: VercelRequest, res: VercelResponse): Promise<void> {
+  res.status(200).json(await withSchema(() => getHubData()));
+}
+
 /** Public: GET /api/appointments?resource=grants-hub → the /grants hub page. */
 export async function handleGrantsHubHtml(_req: VercelRequest, res: VercelResponse): Promise<void> {
   const { pages, programs } = await withSchema(async () => {

@@ -383,14 +383,7 @@ export default function Navbar() {
                               ? 'bg-slate-50 text-[#1B3C6C]'
                               : 'text-slate-700'
                           );
-                          // /grants and /grants/:slug are server-rendered (no SPA
-                          // route) — use a real anchor so they full-page navigate.
-                          const serverRoute = grant.href === '/grants' || grant.href.startsWith('/grants/');
-                          return serverRoute ? (
-                            <a key={grant.name} href={grant.href} className={itemClass}>{grant.name}</a>
-                          ) : (
-                            <Link key={grant.name} to={grant.href} className={itemClass}>{grant.name}</Link>
-                          );
+                          return <Link key={grant.name} to={grant.href} className={itemClass}>{grant.name}</Link>;
                         })}
                       </div>
                     </div>
@@ -651,12 +644,7 @@ export default function Navbar() {
                                 'rounded-[1rem] border border-transparent bg-white px-4 py-3 text-sm font-medium tracking-[-0.01em] text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 hover:text-[#1B3C6C]',
                                 location.pathname === grant.href && 'border-slate-200 bg-slate-50 text-[#1B3C6C]'
                               );
-                              const serverRoute = grant.href === '/grants' || grant.href.startsWith('/grants/');
-                              return serverRoute ? (
-                                <a key={grant.name} href={grant.href} className={mClass}>{grant.name}</a>
-                              ) : (
-                                <Link key={grant.name} to={grant.href} className={mClass}>{grant.name}</Link>
-                              );
+                              return <Link key={grant.name} to={grant.href} className={mClass}>{grant.name}</Link>;
                             })}
                           </div>
                         </div>
