@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/grants/:slug", "destination": "/api/appointments?resource=grant-html&slug=:slug" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {

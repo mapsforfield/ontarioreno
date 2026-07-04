@@ -549,6 +549,222 @@ export async function handlePublicGrantPage(req: VercelRequest, res: VercelRespo
   res.status(200).json(page);
 }
 
+// ─── Server-side HTML render (SEO) ────────────────────────────────────────────
+// The public /grants/:slug URL is served as full HTML (content + meta + FAQ
+// schema present on first byte) so it indexes/ranks like a real static page,
+// not a client-fetched SPA. Rendered on the fly from the DB; the lead form is
+// plain HTML + a tiny inline script, so the page works with zero JavaScript.
+
+const GRANT_LEAD_ENDPOINT =
+  'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec';
+
+function esc(s: unknown): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+// Safe JSON for a <script type="application/ld+json"> block.
+function ldJson(obj: unknown): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+type RenderPage = {
+  slug: string; city: string; heroEyebrow: string; heroTitle: string; heroSubtitle: string;
+  amountLabel: string; intro: string; ctaHeading: string; ctaText: string;
+  seoTitle: string; seoDescription: string;
+  sections: unknown; eligibility: unknown; faqs: unknown;
+};
+
+export function renderPageHtml(page: RenderPage): string {
+  const sections = (Array.isArray(page.sections) ? page.sections : []) as Array<{ heading: string; body: string }>;
+  const eligibility = (Array.isArray(page.eligibility) ? page.eligibility : []) as string[];
+  const faqs = (Array.isArray(page.faqs) ? page.faqs : []) as Array<{ q: string; a: string }>;
+  const title = page.seoTitle || page.heroTitle;
+  const desc = page.seoDescription || page.heroSubtitle;
+  const url = `https://ontarioreno.ca/grants/${page.slug}`;
+  const cta = page.ctaText || 'Book a free consultation';
+
+  const faqLd = faqs.length
+    ? ldJson({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) })
+    : '';
+  const serviceLd = ldJson({
+    '@context': 'https://schema.org', '@type': 'GovernmentService',
+    name: page.heroTitle, serviceType: 'Home renovation / ADU grant assistance',
+    areaServed: page.city || 'Ontario', provider: { '@type': 'Organization', name: 'OntarioReno', url: 'https://ontarioreno.ca' },
+    description: desc,
+  });
+
+  // Internal links (SEO) — point at existing hub/topic pages.
+  const internal = [
+    ['/', 'Home'], ['/basements', 'Basement Apartments'], ['/legal-suites', 'Legal Suites'],
+    ['/garden-suites-laneway-suites-ontario', 'Garden & Laneway Suites'], ['/costs', 'Renovation Costs'],
+    ['/financing', 'Financing'], ['/cities', 'All Cities'],
+  ];
+
+  const sectionsHtml = sections.map((s) => `
+      <div class="card">
+        <h3>${esc(s.heading)}</h3>
+        <p>${esc(s.body)}</p>
+      </div>`).join('');
+  const eligibilityHtml = eligibility.map((e) => `<li>${esc(e)}</li>`).join('');
+  const faqsHtml = faqs.map((f) => `
+      <details class="faq">
+        <summary>${esc(f.q)}</summary>
+        <p>${esc(f.a)}</p>
+      </details>`).join('');
+  const internalHtml = internal.map(([href, label]) => `<a href="${esc(href)}">${esc(label)}</a>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+<link rel="canonical" href="${esc(url)}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:url" content="${esc(url)}">
+<meta name="robots" content="index,follow">
+${faqLd ? `<script type="application/ld+json">${faqLd}</script>` : ''}
+<script type="application/ld+json">${serviceLd}</script>
+<style>
+:root{--navy:#1B3C6C;--navy2:#2b5a96;--emerald:#059669;--slate:#475569;--ink:#0f172a}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#f8fafc;line-height:1.55}
+a{color:var(--navy)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header.site{background:#fff;border-bottom:1px solid #e2e8f0}
+header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+header.site .logo{font-weight:800;font-size:20px;color:var(--navy);text-decoration:none;letter-spacing:-.02em}
+header.site nav a{margin-left:18px;font-size:14px;font-weight:600;color:var(--slate);text-decoration:none}
+.hero{background:#0f172a;color:#fff}
+.hero .grid{display:grid;grid-template-columns:1fr;gap:32px;padding:56px 0}
+@media(min-width:860px){.hero .grid{grid-template-columns:1.1fr .9fr;padding:72px 0}}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:18px}
+.hero h1{font-size:34px;line-height:1.08;letter-spacing:-.03em;margin:0 0 16px}
+@media(min-width:860px){.hero h1{font-size:46px}}
+.amount{display:inline-block;background:rgba(16,185,129,.16);color:#6ee7b7;font-weight:800;font-size:20px;padding:8px 16px;border-radius:12px;margin-bottom:16px}
+.hero p.sub{font-size:18px;color:#cbd5e1;max-width:34em;margin:0 0 24px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--navy2);color:#fff;font-weight:700;padding:14px 26px;border-radius:12px;text-decoration:none;border:0;cursor:pointer;font-size:16px}
+.btn:hover{background:#3163a3}
+.trust{margin-top:18px;color:#94a3b8;font-size:14px}
+section.block{padding:56px 0}
+section.alt{background:#fff}
+.lead{max-width:44em;margin:0 auto;text-align:center;font-size:20px;color:var(--slate)}
+.h2{font-size:30px;letter-spacing:-.03em;text-align:center;margin:0 0 28px}
+.cards{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:760px){.cards{grid-template-columns:1fr 1fr}}
+.card{background:#f8fafc;border:1px solid #eef2f7;border-radius:16px;padding:24px}
+.card h3{margin:0 0 8px;font-size:19px;letter-spacing:-.02em}
+.card p{margin:0;color:var(--slate)}
+ul.elig{list-style:none;padding:0;max-width:44em;margin:0 auto;display:grid;gap:12px}
+ul.elig li{background:#fff;border:1px solid #eef2f7;border-radius:12px;padding:14px 16px 14px 44px;position:relative}
+ul.elig li:before{content:"✓";position:absolute;left:16px;color:var(--emerald);font-weight:800}
+.faq{border-bottom:1px solid #e2e8f0;padding:14px 0;max-width:44em;margin:0 auto}
+.faq summary{font-weight:700;cursor:pointer}
+.faq p{color:var(--slate)}
+.formcard{background:#fff;border-radius:18px;padding:26px;box-shadow:0 20px 40px rgba(15,23,42,.14)}
+.formcard h3{margin:0 0 4px;font-size:19px}
+.formcard p.small{margin:0 0 16px;color:#64748b;font-size:14px}
+.formcard label{display:block;font-size:13px;font-weight:700;color:#334155;margin:12px 0 6px}
+.formcard input{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px}
+.formcard button{width:100%;margin-top:18px}
+.hidden{display:none}
+.cta{background:#0f172a;color:#fff;text-align:center}
+.cta .h2{color:#fff}
+.disc{color:#94a3b8;font-size:12px;max-width:40em;margin:18px auto 0}
+footer.site{background:#0b1220;color:#94a3b8;padding:36px 0;font-size:14px}
+footer.site .links{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px}
+footer.site a{color:#cbd5e1;text-decoration:none}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:12px;padding:18px;text-align:center}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="logo" href="/">OntarioReno</a>
+  <nav>${internal.slice(0, 5).map(([h, l]) => `<a href="${esc(h)}">${esc(l)}</a>`).join('')}</nav>
+</div></header>
+
+<section class="hero"><div class="wrap"><div class="grid">
+  <div>
+    ${page.heroEyebrow ? `<div class="eyebrow">📍 ${esc(page.heroEyebrow)}</div>` : ''}
+    <h1>${esc(page.heroTitle)}</h1>
+    ${page.amountLabel ? `<div class="amount">${esc(page.amountLabel)}</div>` : ''}
+    <p class="sub">${esc(page.heroSubtitle)}</p>
+    <a class="btn" href="#apply">${esc(cta)} →</a>
+    <div class="trust">🛡️ Free, no-obligation consultation with a local specialist</div>
+  </div>
+  <div id="apply">
+    <form class="formcard" id="leadform">
+      <h3>Check your eligibility — free</h3>
+      <p class="small">A local specialist will call you back. No cost, no obligation.</p>
+      <div id="fields">
+        <label>Full name</label><input name="name" autocomplete="name" required>
+        <label>Phone</label><input name="phone" inputmode="tel" autocomplete="tel">
+        <label>Email</label><input name="email" inputmode="email" autocomplete="email">
+        <label>Property address (optional)</label><input name="address" autocomplete="street-address">
+        <input class="hidden" name="companyWebsite" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn" type="submit">${esc(cta)}</button>
+      </div>
+      <div id="thanks" class="ok hidden"><strong>You're on the list.</strong><br>We'll call you shortly to confirm your eligibility and next steps.</div>
+    </form>
+  </div>
+</div></div></section>
+
+${page.intro ? `<section class="block"><div class="wrap"><p class="lead">${esc(page.intro)}</p></div></section>` : ''}
+
+${sections.length ? `<section class="block alt"><div class="wrap"><div class="cards">${sectionsHtml}</div></div></section>` : ''}
+
+${eligibility.length ? `<section class="block"><div class="wrap"><h2 class="h2">Do you qualify?</h2><ul class="elig">${eligibilityHtml}</ul></div></section>` : ''}
+
+${faqs.length ? `<section class="block alt"><div class="wrap"><h2 class="h2">Common questions</h2>${faqsHtml}</div></section>` : ''}
+
+<section class="block cta"><div class="wrap">
+  <h2 class="h2">${esc(page.ctaHeading || `Ready to explore your ${page.city} grant?`)}</h2>
+  <p style="color:#cbd5e1">Book a free consultation — we'll confirm your eligibility and map out next steps.</p>
+  <p><a class="btn" href="#apply">${esc(cta)} →</a></p>
+  <p class="disc">Grant amounts and eligibility are set by the municipality and can change — we'll confirm the current details with you directly.</p>
+</div></section>
+
+<footer class="site"><div class="wrap">
+  <div class="links">${internalHtml}</div>
+  <div>© ${new Date().getFullYear()} OntarioReno — helping Ontario homeowners access renovation grants and vetted contractors.</div>
+</div></footer>
+
+<script>
+(function(){
+  var f=document.getElementById('leadform');
+  if(!f)return;
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(f.companyWebsite.value)return;
+    var name=f.name.value.trim();
+    if(!name||(!f.phone.value.trim()&&!f.email.value.trim())){alert('Please add your name and a phone or email.');return;}
+    var payload={type:'grant',source:'grant-${esc(page.slug)}',name:name,phone:f.phone.value.trim(),email:f.email.value.trim(),address:f.address.value.trim(),city:${JSON.stringify(page.city)},projectType:'ADU / Grant',notes:'Grant landing page lead — ${esc(page.heroTitle)} (${esc(page.city)}). '+location.href,pageUrl:location.href};
+    fetch(${JSON.stringify(GRANT_LEAD_ENDPOINT)},{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).catch(function(){});
+    document.getElementById('fields').classList.add('hidden');
+    document.getElementById('thanks').classList.remove('hidden');
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
+/** Public: GET /api/appointments?resource=grant-html&slug=… → full HTML page. */
+export async function handleGrantHtml(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const slug = String(req.query['slug'] ?? '');
+  const page = slug ? await getPublishedPage(slug) : null;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (!page) {
+    res.status(404).send('<!DOCTYPE html><meta charset="utf-8"><title>Not found</title><p>This page isn’t available. <a href="https://ontarioreno.ca">Return to OntarioReno</a>.</p>');
+    return;
+  }
+  // Short CDN cache: fast + crawler-friendly, refreshes soon after an edit.
+  res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
+  res.status(200).send(renderPageHtml(page as unknown as RenderPage));
+}
+
 // Flag a live page whose underlying program has materially changed since drafting.
 function pageDrift(page: { programSnapshot: unknown }, program?: { status: string; maxAmount: string; deadline: string } | null): boolean {
   if (!program) return false;
