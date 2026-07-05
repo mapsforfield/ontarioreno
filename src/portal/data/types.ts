@@ -483,6 +483,9 @@ export type Commission = {
    *  contractor. Tracked independently of the rep payout. Optional only so
    *  older records/seed data compile; the DB column is non-null (default 0). */
   adminNetPaidCommission?: number;
+  /** One-off flat payout: total + rep amounts are entered manually and NOT
+   *  recomputed from job value × rate. */
+  customPayout?: boolean;
 };
 
 export type ProposalTemplateType =

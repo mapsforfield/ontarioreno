@@ -190,7 +190,9 @@ type PortalDataContextValue = PortalDataState & {
         | 'adminTotalCommissionRate'
         | 'adminTotalEstimatedCommission'
         | 'adminNetPaidCommission'
+        | 'customPayout'
         | 'payoutStatus'
+        | 'repEstimatedCommission'
         | 'repPaidCommission'
       >
     >,
@@ -534,6 +536,7 @@ function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommission
     adminNetPaidCommission: 0,
     adminTotalCommissionRate: defaultRate,
     adminTotalEstimatedCommission,
+    customPayout: false,
     dealId: deal.id,
     payoutStatus: 'pending',
     repCommissionRate: 0.05,
@@ -551,6 +554,17 @@ function createMissingCommissionForDeal(deal: Deal): Commission {
 }
 
 function syncCommissionWithDeal(commission: Commission, deal: Deal) {
+  // Custom one-off payout: keep the manually-entered total & rep cut untouched;
+  // only re-derive the admin net and keep the rep link current.
+  if (commission.customPayout) {
+    return {
+      ...commission,
+      adminNetCommission:
+        commission.adminTotalEstimatedCommission - commission.repEstimatedCommission,
+      repId: deal.assignedRepId,
+    };
+  }
+
   const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
   const adminTotalEstimatedCommission = Math.round(
     deal.estimatedJobValue * commission.adminTotalCommissionRate
@@ -2327,16 +2341,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               const deal = current.deals.find(
                 (d) => d.id === commission.dealId
               );
-              const repEst = deal
-                ? Math.round(deal.estimatedJobValue * 0.05)
-                : commission.repEstimatedCommission;
+              const customPayout = updates.customPayout ?? commission.customPayout ?? false;
               const adminTotalCommissionRate =
                 updates.adminTotalCommissionRate ?? commission.adminTotalCommissionRate;
-              const adminTotalEstimatedCommission =
-                updates.adminTotalEstimatedCommission ??
-                (deal
-                  ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
-                  : commission.adminTotalEstimatedCommission);
+              // Custom payouts keep manually-entered rep + total; standard ones
+              // derive them from job value (rep = 5%, total = job × rate).
+              const repEst = customPayout
+                ? Math.round(updates.repEstimatedCommission ?? commission.repEstimatedCommission)
+                : deal
+                  ? Math.round(deal.estimatedJobValue * 0.05)
+                  : commission.repEstimatedCommission;
+              const adminTotalEstimatedCommission = customPayout
+                ? Math.round(updates.adminTotalEstimatedCommission ?? commission.adminTotalEstimatedCommission)
+                : updates.adminTotalEstimatedCommission ??
+                  (deal
+                    ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
+                    : commission.adminTotalEstimatedCommission);
               const requestedPaid =
                 updates.repPaidCommission ?? commission.repPaidCommission;
               const repPaidCommission =
@@ -2361,6 +2381,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 adminNetPaidCommission,
                 adminTotalCommissionRate,
                 adminTotalEstimatedCommission,
+                customPayout,
                 payoutStatus,
                 repEstimatedCommission: repEst,
                 repPaidCommission,

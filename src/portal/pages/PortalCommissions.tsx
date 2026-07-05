@@ -63,7 +63,9 @@ const paymentFilterOptions: Array<{ label: string; value: PaymentFilter }> = [
 /** Overall settlement across BOTH ledgers (rep payout + your net collection):
  *  'paid' = fully settled, 'unpaid' = nothing paid on either side, else 'partial'. */
 function overallPaymentStatus(commission: Commission, deal: Deal): Exclude<PaymentFilter, 'all'> {
-  const repEst = calculateRepEstimatedCommission(deal);
+  const repEst = commission.customPayout
+    ? commission.repEstimatedCommission
+    : calculateRepEstimatedCommission(deal);
   const repPaid = commission.repPaidCommission;
   const adminNet = commission.adminTotalEstimatedCommission - repEst;
   const adminPaid = commission.adminNetPaidCommission ?? 0;
@@ -382,12 +384,13 @@ export default function PortalCommissions() {
                   if (isNaN(val) || val < 0 || val > 100) return;
                   const rate = val / 100;
                   setDefaultCommissionRate(rate);
-                  // Update every commission row to the new rate
+                  // Update every commission row to the new rate — but leave
+                  // custom one-off payouts untouched.
                   visibleCommissions.forEach((c) => {
+                    if (c.customPayout) return;
                     const deal = getDeal(c.dealId);
                     if (!deal) return;
                     const newTotal = Math.round(deal.estimatedJobValue * rate);
-                    const repEst = Math.round(deal.estimatedJobValue * 0.05);
                     updateCommission(c.id, {
                       adminTotalCommissionRate: rate,
                       adminTotalEstimatedCommission: newTotal,
@@ -422,8 +425,12 @@ export default function PortalCommissions() {
               <tbody className="divide-y divide-slate-200">
                 {filteredRows.map(({ commission, deal }) => {
                   if (!deal) return null;
+                  const isCustom = commission.customPayout ?? false;
                   // Rep ledger: what the rep is owed vs. what you've paid them.
-                  const repEstimatedCommission = calculateRepEstimatedCommission(deal);
+                  // Custom payouts use the manually-entered rep cut, not 5% of job.
+                  const repEstimatedCommission = isCustom
+                    ? commission.repEstimatedCommission
+                    : calculateRepEstimatedCommission(deal);
                   const repRemaining = Math.max(repEstimatedCommission - commission.repPaidCommission, 0);
                   const repStatus = derivePayoutStatus(commission.repPaidCommission, repEstimatedCommission);
                   // Your ledger: your net vs. what you've collected from the contractor.
@@ -457,19 +464,30 @@ export default function PortalCommissions() {
                         />
                       </td>
                       <td className="px-4 py-4">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          value={commission.adminTotalCommissionRate * 100}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              adminTotalCommissionRate:
-                                (Number(event.target.value) || 0) / 100,
-                            }, currentUser)
-                          }
-                          className="w-20"
-                        />
+                        {isCustom ? (
+                          <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={commission.adminTotalCommissionRate * 100}
+                            onChange={(event) =>
+                              updateCommission(commission.id, {
+                                adminTotalCommissionRate:
+                                  (Number(event.target.value) || 0) / 100,
+                              }, currentUser)
+                            }
+                            className="w-20"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => updateCommission(commission.id, { customPayout: !isCustom }, currentUser)}
+                          className="mt-1 block text-[0.6rem] font-black uppercase tracking-wide text-slate-400 transition hover:text-[#1B3C6C]"
+                        >
+                          {isCustom ? 'Use % rate' : 'Custom'}
+                        </button>
                       </td>
                       <td className="px-4 py-4">
                         <input
@@ -486,8 +504,23 @@ export default function PortalCommissions() {
                         />
                       </td>
                       {/* ── Rep ledger ── */}
-                      <td className="px-4 py-4 font-black bg-[#f6faff]">
-                        {formatCurrency(repEstimatedCommission)}
+                      <td className="px-4 py-4 bg-[#f6faff]">
+                        {isCustom ? (
+                          <input
+                            type="number"
+                            min={0}
+                            value={commission.repEstimatedCommission}
+                            onChange={(event) =>
+                              updateCommission(commission.id, {
+                                repEstimatedCommission: Number(event.target.value) || 0,
+                              }, currentUser)
+                            }
+                            className="w-24 font-black text-slate-900"
+                            title="Rep's cut on this custom deal"
+                          />
+                        ) : (
+                          <span className="font-black">{formatCurrency(repEstimatedCommission)}</span>
+                        )}
                         <p className="mt-1 text-xs font-semibold text-slate-500">
                           Remaining {formatCurrency(repRemaining)}
                         </p>

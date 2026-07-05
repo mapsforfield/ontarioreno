@@ -264,7 +264,10 @@ model Commission {
   // How much of the admin's net (total − rep) has actually been collected from
   // the contractor. Tracked separately from the rep payout so a deal can show
   // the rep fully paid while the admin is still owed on staggered payments.
-  adminNetPaidCommission        Float  @default(0)
+  adminNetPaidCommission        Float   @default(0)
+  // One-off flat payout not based on the % rate. When true, the total and rep
+  // amounts are entered manually and NOT recomputed from job value × rate.
+  customPayout                  Boolean @default(false)
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   rep  User @relation(fields: [repId], references: [id])
