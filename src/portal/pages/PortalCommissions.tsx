@@ -65,6 +65,31 @@ function PayoutBadge({ status }: { status: CommissionPayoutStatus }) {
   );
 }
 
+/** Editable sales price (admin). Commits on blur / Enter so we don't fire a
+ *  save + activity-log entry on every keystroke. Editing it cascades to every
+ *  commission calculation via updateDeal's re-sync. */
+function JobValueInput({ value, onCommit }: { value: number; onCommit: (next: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  const commit = () => {
+    const next = Math.max(Math.round(Number(draft) || 0), 0);
+    if (next !== value) onCommit(next);
+    else setDraft(String(value));
+  };
+  return (
+    <input
+      type="number"
+      min={0}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      className="w-32 font-black text-[#1B3C6C]"
+      title="Sales price — edit to correct it; all commissions recalculate"
+    />
+  );
+}
+
 function metricCard(
   label: string,
   value: string,
@@ -109,6 +134,7 @@ export default function PortalCommissions() {
     deleteInvoice,
     setDefaultCommissionRate,
     updateCommission,
+    updateDeal,
     users,
   } = usePortalData();
   const [rateInput, setRateInput] = useState(String(Math.round(defaultCommissionRate * 100)));
@@ -379,8 +405,13 @@ export default function PortalCommissions() {
                       <td className="px-4 py-4 font-semibold text-slate-600">
                         {formatDealStatus(deal.status)}
                       </td>
-                      <td className="px-4 py-4 font-black text-[#1B3C6C]">
-                        {formatCurrency(deal.estimatedJobValue)}
+                      <td className="px-4 py-4">
+                        <JobValueInput
+                          value={deal.estimatedJobValue}
+                          onCommit={(next) =>
+                            updateDeal(deal.id, { estimatedJobValue: next }, currentUser)
+                          }
+                        />
                       </td>
                       <td className="px-4 py-4">
                         <input
