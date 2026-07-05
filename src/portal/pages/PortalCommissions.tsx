@@ -168,6 +168,7 @@ export default function PortalCommissions() {
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
   const [yearFilter, setYearFilter] = useState<number | 'all'>(() => Number(torontoToday().slice(0, 4)));
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [payoutView, setPayoutView] = useState<'reps' | 'me'>('reps');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
 
@@ -240,6 +241,7 @@ export default function PortalCommissions() {
       (acc, { commission, deal }) => {
         if (!deal) return acc;
         acc.paidOut += commission.repPaidCommission;
+        acc.paidToMe += commission.adminNetPaidCommission ?? 0;
         if (!deal.isHistorical && projectedStatuses.includes(deal.status)) {
           acc.projected += commission.adminTotalEstimatedCommission;
         }
@@ -257,7 +259,7 @@ export default function PortalCommissions() {
         }
         return acc;
       },
-      { projected: 0, pendingRep: 0, adminNetPending: 0, paidOut: 0 }
+      { projected: 0, pendingRep: 0, adminNetPending: 0, paidOut: 0, paidToMe: 0 }
     );
 
     const filterLabel =
@@ -347,12 +349,39 @@ export default function PortalCommissions() {
             isFiltered ? `${filterLabel} deals only` : 'All active projected deals',
             TrendingUp
           )}
-          {metricCard(
-            'Paid Out to Reps',
-            formatCurrency(totals.paidOut),
-            isFiltered ? `${filterLabel} · recorded payouts` : 'Recorded rep payouts',
-            Banknote
-          )}
+          <article className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex rounded-full bg-slate-100 p-0.5">
+                  {(['reps', 'me'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setPayoutView(v)}
+                      className={
+                        payoutView === v
+                          ? 'rounded-full bg-[#1B3C6C] px-3 py-1 text-xs font-black text-white'
+                          : 'rounded-full px-3 py-1 text-xs font-black text-slate-500 transition hover:text-slate-700'
+                      }
+                    >
+                      {v === 'reps' ? 'Reps' : 'Me'}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-3xl font-black tracking-[-0.02em] text-slate-950">
+                  {formatCurrency(payoutView === 'reps' ? totals.paidOut : totals.paidToMe)}
+                </p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-[0.5rem] bg-[#e8f1fb] text-[#1B3C6C]">
+                <Banknote className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-4 text-sm font-medium text-slate-500">
+              {payoutView === 'reps'
+                ? (isFiltered ? `${filterLabel} · paid out to reps` : 'Paid out to reps (recorded)')
+                : (isFiltered ? `${filterLabel} · your net collected` : 'Your net collected (recorded)')}
+            </p>
+          </article>
         </section>
 
         <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
