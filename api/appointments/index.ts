@@ -66,10 +66,11 @@ async function sendPush(
 // notes of any kind. Only enough to show that a consultation exists.
 // The scrub happens server-side so these fields never leave the database for a
 // contractor account — there is nothing to recover in dev tools.
-// Only genuine homeowner consultations are shared with contractor accounts —
-// never internal/operational events (showroom visits, supplier meetings, site
-// checks, custom events). Those can expose specific high-value closing clients
-// that don't belong to the contractor.
+// Consultation types shared with contractor accounts for EVERY rep/contractor.
+// Other appointment types (showroom visits, supplier meetings, site checks,
+// custom events) are hidden unless they belong to the contractor's own company
+// (handled separately in handleContractorGet), because someone else's custom
+// event can expose a specific high-value closing client that isn't theirs.
 const CONTRACTOR_VISIBLE_TYPES = ['home_visit', 'phone_consultation', 'video_consultation'];
 
 function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string) {
@@ -94,7 +95,7 @@ function scrubClientForContractor(c: Record<string, unknown>) {
   };
 }
 
-async function handleContractorGet(req: VercelRequest, res: VercelResponse) {
+async function handleContractorGet(req: VercelRequest, res: VercelResponse, contractorId: string | null) {
   // Contractor accounts see the FULL calendar + client roster, but anonymized —
   // no contact details and no contractor attribution (see scrub helpers above).
 
@@ -107,10 +108,15 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse) {
   // Anything else the contractor asks for that isn't the calendar → not available.
   if (req.query['_resource']) return res.status(403).json({ error: 'Not available for contractor accounts.' });
 
-  // Default: the whole sales calendar (every rep / every contractor), scrubbed —
-  // but consultations ONLY (no custom/operational events).
+  // Default: the whole sales calendar (every rep / every contractor), scrubbed.
+  // Consultations are shown for everyone; custom/operational events are shown
+  // ONLY when they belong to THIS contractor (their own jobs — e.g. a cheque
+  // pickup for a Galaxy Renovations customer). Other contractors' custom events
+  // stay hidden.
+  const typeOrOwn: object[] = [{ appointmentType: { in: CONTRACTOR_VISIBLE_TYPES } }];
+  if (contractorId) typeOrOwn.push({ contractorId });
   const appts = await withSchema(() => prisma.appointment.findMany({
-    where: { deletedAt: null, appointmentType: { in: CONTRACTOR_VISIBLE_TYPES } },
+    where: { deletedAt: null, OR: typeOrOwn },
     orderBy: { appointmentDate: 'desc' },
   }));
   const repIds = [...new Set(appts.map((a) => a.assignedRepId).filter(Boolean))] as string[];
@@ -666,10 +672,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   // Contractor accounts: read-only, full calendar but anonymized (no contact
-  // details, no contractor attribution, no notes).
+  // details, no contractor attribution, no notes). Their own contractor's
+  // appointments (any type) are also included — see handleContractorGet.
   if (user.role === 'contractor') {
     if (req.method !== 'GET') return res.status(403).json({ error: 'Not available for contractor accounts.' });
-    return handleContractorGet(req, res);
+    return handleContractorGet(req, res, (user as { contractorId?: string | null }).contractorId ?? null);
   }
 
   if (req.method === 'GET') {
