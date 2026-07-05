@@ -189,6 +189,7 @@ type PortalDataContextValue = PortalDataState & {
         Commission,
         | 'adminTotalCommissionRate'
         | 'adminTotalEstimatedCommission'
+        | 'adminNetPaidCommission'
         | 'payoutStatus'
         | 'repPaidCommission'
       >
@@ -530,6 +531,7 @@ function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommission
     id: createId('commission'),
     adminNetCommission:
       adminTotalEstimatedCommission - repEstimatedCommission,
+    adminNetPaidCommission: 0,
     adminTotalCommissionRate: defaultRate,
     adminTotalEstimatedCommission,
     dealId: deal.id,
@@ -579,6 +581,11 @@ function normalizeCommissionWithDeal(commission: Commission, deal: Deal) {
     Math.max(synced.repPaidCommission, 0),
     synced.repEstimatedCommission
   );
+  // Admin's collected-net can't exceed the admin's net owed, nor go negative.
+  const adminNetPaidCommission = Math.min(
+    Math.max(synced.adminNetPaidCommission ?? 0, 0),
+    Math.max(synced.adminNetCommission, 0)
+  );
 
   return {
     ...synced,
@@ -587,6 +594,7 @@ function normalizeCommissionWithDeal(commission: Commission, deal: Deal) {
       synced.repEstimatedCommission
     ),
     repPaidCommission,
+    adminNetPaidCommission,
   };
 }
 
@@ -2338,10 +2346,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                     ? 0
                     : Math.min(Math.max(requestedPaid, 0), repEst);
               const payoutStatus = normalizePayoutStatus(repPaidCommission, repEst);
+              const adminNetCommission = adminTotalEstimatedCommission - repEst;
+              // Independent ledger: how much of the admin's net has been collected.
+              const requestedNetPaid =
+                updates.adminNetPaidCommission ?? commission.adminNetPaidCommission ?? 0;
+              const adminNetPaidCommission = Math.min(
+                Math.max(requestedNetPaid, 0),
+                Math.max(adminNetCommission, 0)
+              );
 
               return {
                 ...commission,
-                adminNetCommission: adminTotalEstimatedCommission - repEst,
+                adminNetCommission,
+                adminNetPaidCommission,
                 adminTotalCommissionRate,
                 adminTotalEstimatedCommission,
                 payoutStatus,

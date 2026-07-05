@@ -261,6 +261,10 @@ model Commission {
   adminTotalCommissionRate      Float
   adminTotalEstimatedCommission Float
   adminNetCommission            Float
+  // How much of the admin's net (total − rep) has actually been collected from
+  // the contractor. Tracked separately from the rep payout so a deal can show
+  // the rep fully paid while the admin is still owed on staggered payments.
+  adminNetPaidCommission        Float  @default(0)
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   rep  User @relation(fields: [repId], references: [id])

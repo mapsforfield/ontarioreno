@@ -479,6 +479,10 @@ export type Commission = {
   adminTotalCommissionRate: number;
   adminTotalEstimatedCommission: number;
   adminNetCommission: number;
+  /** How much of the admin's net (total − rep) has been collected from the
+   *  contractor. Tracked independently of the rep payout. Optional only so
+   *  older records/seed data compile; the DB column is non-null (default 0). */
+  adminNetPaidCommission?: number;
 };
 
 export type ProposalTemplateType =

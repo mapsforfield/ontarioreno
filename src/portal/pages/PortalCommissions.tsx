@@ -44,6 +44,27 @@ function calculateRepEstimatedCommission(deal: Deal) {
   return Math.round(deal.estimatedJobValue * 0.05);
 }
 
+/** Pending / Partial / Paid derived from an amount paid vs. an amount owed. */
+function derivePayoutStatus(paid: number, owed: number): CommissionPayoutStatus {
+  if (paid <= 0) return 'pending';
+  if (paid >= owed) return 'paid';
+  return 'partial';
+}
+
+function PayoutBadge({ status }: { status: CommissionPayoutStatus }) {
+  const cls =
+    status === 'paid'
+      ? 'bg-emerald-100 text-emerald-700'
+      : status === 'partial'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-slate-100 text-slate-500';
+  return (
+    <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide ${cls}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+}
+
 function metricCard(
   label: string,
   value: string,
@@ -168,12 +189,17 @@ export default function PortalCommissions() {
         if (!deal.isHistorical && projectedStatuses.includes(deal.status)) {
           acc.projected += commission.adminTotalEstimatedCommission;
         }
-        if (deal.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid') {
+        if (deal.status === 'won' && !deal.isHistorical) {
+          // Two independent ledgers: what's still owed to the rep, and what's
+          // still owed to you (net not yet collected from the contractor).
           acc.pendingRep += Math.max(
             commission.repEstimatedCommission - commission.repPaidCommission,
             0
           );
-          acc.adminNetPending += commission.adminNetCommission;
+          acc.adminNetPending += Math.max(
+            commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0),
+            0
+          );
         }
         return acc;
       },
@@ -233,15 +259,15 @@ export default function PortalCommissions() {
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {metricCard(
-            'Total Pending Rep Commission',
+            'Owed to Reps',
             formatCurrency(totals.pendingRep),
-            isFiltered ? `${filterLabel} · won deals still owed` : 'Won deals still owed',
+            isFiltered ? `${filterLabel} · rep commission still unpaid` : 'Rep commission still unpaid on won deals',
             HandCoins
           )}
           {metricCard(
-            'Total Admin Net Pending',
+            'Owed to You (net)',
             formatCurrency(totals.adminNetPending),
-            isFiltered ? `${filterLabel} · admin net on unpaid won` : 'Admin net on unpaid won deals',
+            isFiltered ? `${filterLabel} · your net not yet collected` : 'Your net not yet collected from contractors',
             BadgeDollarSign
           )}
           {metricCard(
@@ -316,23 +342,26 @@ export default function PortalCommissions() {
                   <th className="px-4 py-3">Deal</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Job Value</th>
-                  <th className="px-4 py-3">Rep Commission</th>
-                  <th className="px-4 py-3">Paid</th>
-                  <th className="px-4 py-3">Payout</th>
                   <th className="px-4 py-3">Total Rate</th>
                   <th className="px-4 py-3">Total Commission</th>
-                  <th className="px-4 py-3">Admin Net</th>
+                  <th className="px-4 py-3 bg-[#f6faff]">Rep Commission</th>
+                  <th className="px-4 py-3 bg-[#f6faff]">Paid to Rep</th>
+                  <th className="px-4 py-3 bg-[#eef6ff]">Your Net</th>
+                  <th className="px-4 py-3 bg-[#eef6ff]">Received</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredRows.map(({ commission, deal }) => {
                   if (!deal) return null;
-                  const repEstimatedCommission =
-                    calculateRepEstimatedCommission(deal);
-                  const remaining = Math.max(
-                    repEstimatedCommission - commission.repPaidCommission,
-                    0
-                  );
+                  // Rep ledger: what the rep is owed vs. what you've paid them.
+                  const repEstimatedCommission = calculateRepEstimatedCommission(deal);
+                  const repRemaining = Math.max(repEstimatedCommission - commission.repPaidCommission, 0);
+                  const repStatus = derivePayoutStatus(commission.repPaidCommission, repEstimatedCommission);
+                  // Your ledger: your net vs. what you've collected from the contractor.
+                  const adminNet = commission.adminTotalEstimatedCommission - repEstimatedCommission;
+                  const adminReceived = commission.adminNetPaidCommission ?? 0;
+                  const adminRemaining = Math.max(adminNet - adminReceived, 0);
+                  const adminStatus = derivePayoutStatus(adminReceived, adminNet);
 
                   return (
                     <tr key={commission.id} className="align-top">
@@ -353,41 +382,6 @@ export default function PortalCommissions() {
                       <td className="px-4 py-4 font-black text-[#1B3C6C]">
                         {formatCurrency(deal.estimatedJobValue)}
                       </td>
-                      <td className="px-4 py-4 font-black">
-                        {formatCurrency(repEstimatedCommission)}
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          Remaining {formatCurrency(remaining)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <input
-                          type="number"
-                          min={0}
-                          value={commission.repPaidCommission}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              repPaidCommission:
-                                Number(event.target.value) || 0,
-                            }, currentUser)
-                          }
-                          className="w-28"
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <select
-                          value={commission.payoutStatus}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              payoutStatus: event.target
-                                .value as CommissionPayoutStatus,
-                            }, currentUser)
-                          }
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="partial">Partial</option>
-                          <option value="paid">Paid</option>
-                        </select>
-                      </td>
                       <td className="px-4 py-4">
                         <input
                           type="number"
@@ -400,7 +394,7 @@ export default function PortalCommissions() {
                                 (Number(event.target.value) || 0) / 100,
                             }, currentUser)
                           }
-                          className="w-24"
+                          className="w-20"
                         />
                       </td>
                       <td className="px-4 py-4">
@@ -414,14 +408,50 @@ export default function PortalCommissions() {
                                 Number(event.target.value) || 0,
                             }, currentUser)
                           }
-                          className="w-32"
+                          className="w-28"
                         />
                       </td>
-                      <td className="px-4 py-4 font-black text-slate-950">
-                        {formatCurrency(
-                          commission.adminTotalEstimatedCommission -
-                            repEstimatedCommission
-                        )}
+                      {/* ── Rep ledger ── */}
+                      <td className="px-4 py-4 font-black bg-[#f6faff]">
+                        {formatCurrency(repEstimatedCommission)}
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Remaining {formatCurrency(repRemaining)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 bg-[#f6faff]">
+                        <input
+                          type="number"
+                          min={0}
+                          value={commission.repPaidCommission}
+                          onChange={(event) =>
+                            updateCommission(commission.id, {
+                              repPaidCommission: Number(event.target.value) || 0,
+                            }, currentUser)
+                          }
+                          className="w-28"
+                        />
+                        <div><PayoutBadge status={repStatus} /></div>
+                      </td>
+                      {/* ── Your (admin) ledger ── */}
+                      <td className="px-4 py-4 font-black bg-[#eef6ff]">
+                        {formatCurrency(adminNet)}
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Remaining {formatCurrency(adminRemaining)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 bg-[#eef6ff]">
+                        <input
+                          type="number"
+                          min={0}
+                          value={adminReceived}
+                          onChange={(event) =>
+                            updateCommission(commission.id, {
+                              adminNetPaidCommission: Number(event.target.value) || 0,
+                            }, currentUser)
+                          }
+                          className="w-28"
+                        />
+                        <div><PayoutBadge status={adminStatus} /></div>
                       </td>
                     </tr>
                   );
