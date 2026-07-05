@@ -14,6 +14,7 @@ import {
 } from '../data/selectors';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
+import { torontoToday } from '../lib/time';
 import type { InvoiceData } from '../components/CommissionInvoice';
 const InvoiceViewer = lazy(() => import('../components/InvoiceViewer'));
 import { CommissionInvoiceRecord, CommissionPayoutStatus, Deal, DealStatus } from '../data/types';
@@ -92,6 +93,7 @@ export default function PortalCommissions() {
   const [rateInput, setRateInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const [rateSaved, setRateSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
+  const [yearFilter, setYearFilter] = useState<number | 'all'>(() => Number(torontoToday().slice(0, 4)));
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
 
@@ -145,10 +147,18 @@ export default function PortalCommissions() {
       }))
       .filter((row) => row.deal);
 
-    // Filter rows by deal status, and recompute the summary totals so the
-    // cards reflect exactly what's shown in the table below.
+    // Years present in the data (by win-date proxy = updatedAt), plus the current
+    // year so it's always selectable even before any deal is won this year.
+    const yearSet = new Set<number>(adminRows.map((r) => new Date(r.deal!.updatedAt).getFullYear()));
+    yearSet.add(Number(torontoToday().slice(0, 4)));
+    const availableYears = Array.from(yearSet).sort((a, b) => b - a);
+
+    // Filter rows by deal status AND year, and recompute the summary totals so
+    // the cards reflect exactly what's shown in the table below.
     const filteredRows = adminRows.filter(
-      (row) => statusFilter === 'all' || row.deal!.status === statusFilter
+      (row) =>
+        (statusFilter === 'all' || row.deal!.status === statusFilter) &&
+        (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter)
     );
 
     const totals = filteredRows.reduce(
@@ -202,6 +212,23 @@ export default function PortalCommissions() {
               {option.label}
             </button>
           ))}
+
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
+          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Year</span>
+          {([{ label: 'All years', value: 'all' as const }, ...availableYears.map((y) => ({ label: String(y), value: y }))] as Array<{ label: string; value: number | 'all' }>).map((option) => (
+            <button
+              key={String(option.value)}
+              type="button"
+              onClick={() => setYearFilter(option.value)}
+              className={
+                yearFilter === option.value
+                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -236,7 +263,7 @@ export default function PortalCommissions() {
             <h2 className="text-lg font-black tracking-[-0.01em]">
               Commission table
               <span className="ml-2 text-sm font-bold text-slate-400">
-                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}
+                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}
               </span>
             </h2>
             <div className="flex items-center gap-2">
