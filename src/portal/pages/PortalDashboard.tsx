@@ -17,6 +17,7 @@ import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
 import { ConsultationStage } from '../data/types';
 import { torontoToday } from '../lib/time';
+import EarningPotentialCard from '../components/EarningPotentialCard';
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -253,6 +254,8 @@ export default function PortalDashboard() {
           </Link>
         </div>
       </section>
+
+      <EarningPotentialCard />
 
       <section className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-2">
