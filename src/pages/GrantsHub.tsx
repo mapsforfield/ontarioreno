@@ -47,6 +47,8 @@ const CSS = `
 .grantpop b{color:#1B3C6C}.grantpop a{display:inline-block;margin-top:6px;background:#1B3C6C;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700}
 .grantmap-brand{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(255,255,255,.94);border-radius:10px;padding:6px 11px;box-shadow:0 2px 10px rgba(15,23,42,.22)}
 .grantmap-brand img{height:22px;display:block}
+.grantmapbox{height:460px;width:100%;border-radius:16px}
+@media(max-width:640px){.grantmapbox{height:340px}.grantmap-brand img{height:18px}}
 `;
 
 export default function GrantsHub() {
@@ -102,7 +104,7 @@ export default function GrantsHub() {
         <p className="mt-1 text-slate-600">Hover a marker to see the programs available in that city.</p>
         {/* z-0 keeps Leaflet's high internal z-indexes contained below the sticky header (z-50). */}
         <div className="relative z-0 mt-6">
-          <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} style={{ height: 460, width: '100%', borderRadius: 16 }}>
+          <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} className="grantmapbox">
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" maxZoom={13} />
             {mapCities.map((c) => (
               <Marker key={c.city} position={[c.lat, c.lng]} icon={tagIcon(c)} eventHandlers={{ mouseover: (e) => (e.target as L.Marker).openPopup() }}>
@@ -128,7 +130,12 @@ export default function GrantsHub() {
           <p className="mt-1 text-slate-600">
             {rows.length} programs across Ontario. Amounts and eligibility are set by each municipality — we'll confirm the current details with you.
           </p>
-          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          {rows.length === 0 && (
+            <p className="mt-6 text-slate-400">{data ? 'Programs are being reviewed — check back shortly.' : 'Loading…'}</p>
+          )}
+
+          {/* Desktop: table */}
+          <div className="mt-6 hidden overflow-hidden rounded-2xl border border-slate-200 md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -140,9 +147,6 @@ export default function GrantsHub() {
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-6 text-slate-400">{data ? 'Programs are being reviewed — check back shortly.' : 'Loading…'}</td></tr>
-                )}
                 {rows.map((r, i) => {
                   const s = STATUS[r.status] ?? STATUS.unknown;
                   const external = r.href.startsWith('/match');
@@ -151,7 +155,7 @@ export default function GrantsHub() {
                       <td className="px-4 py-3 font-bold text-slate-900">{r.city || '—'}</td>
                       <td className="px-4 py-3 text-slate-700">{r.name}</td>
                       <td className="px-4 py-3 text-slate-700">{r.amount || '—'}</td>
-                      <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${s.c}`}>{s.t}</span></td>
+                      <td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${s.c}`}>{s.t}</span></td>
                       <td className="px-4 py-3">
                         <a href={r.href} className="inline-block whitespace-nowrap rounded-lg bg-[#1B3C6C] px-3 py-1.5 text-xs font-bold text-white">
                           {external ? 'Check eligibility' : 'View grant →'}
@@ -162,6 +166,31 @@ export default function GrantsHub() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: tap-friendly cards (whole card is a link) */}
+          <div className="mt-6 space-y-3 md:hidden">
+            {rows.map((r, i) => {
+              const s = STATUS[r.status] ?? STATUS.unknown;
+              const external = r.href.startsWith('/match');
+              return (
+                <a key={i} href={r.href} className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-base font-black tracking-[-0.01em] text-slate-900">{r.city || '—'}</div>
+                      <div className="mt-0.5 text-sm leading-snug text-slate-600">{r.name}</div>
+                    </div>
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${s.c}`}>{s.t}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                    <span className="text-lg font-black text-[#1B3C6C]">{r.amount || 'Incentive'}</span>
+                    <span className="inline-flex items-center gap-1 text-sm font-bold text-[#1B3C6C]">
+                      {external ? 'Check eligibility' : 'View grant'} <ArrowRight className="h-4 w-4" />
+                    </span>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </div>
       </section>
