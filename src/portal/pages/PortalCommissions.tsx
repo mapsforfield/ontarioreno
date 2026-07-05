@@ -17,7 +17,7 @@ import { showToast } from '../lib/toast';
 import { torontoToday } from '../lib/time';
 import type { InvoiceData } from '../components/CommissionInvoice';
 const InvoiceViewer = lazy(() => import('../components/InvoiceViewer'));
-import { CommissionInvoiceRecord, CommissionPayoutStatus, Deal, DealStatus } from '../data/types';
+import { Commission, CommissionInvoiceRecord, CommissionPayoutStatus, Deal, DealStatus } from '../data/types';
 
 const projectedStatuses = [
   'new_lead',
@@ -48,6 +48,30 @@ function calculateRepEstimatedCommission(deal: Deal) {
 function derivePayoutStatus(paid: number, owed: number): CommissionPayoutStatus {
   if (paid <= 0) return 'pending';
   if (paid >= owed) return 'paid';
+  return 'partial';
+}
+
+type PaymentFilter = 'all' | 'unpaid' | 'partial' | 'paid';
+
+const paymentFilterOptions: Array<{ label: string; value: PaymentFilter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Unpaid', value: 'unpaid' },
+  { label: 'Partial', value: 'partial' },
+  { label: 'Paid', value: 'paid' },
+];
+
+/** Overall settlement across BOTH ledgers (rep payout + your net collection):
+ *  'paid' = fully settled, 'unpaid' = nothing paid on either side, else 'partial'. */
+function overallPaymentStatus(commission: Commission, deal: Deal): Exclude<PaymentFilter, 'all'> {
+  const repEst = calculateRepEstimatedCommission(deal);
+  const repPaid = commission.repPaidCommission;
+  const adminNet = commission.adminTotalEstimatedCommission - repEst;
+  const adminPaid = commission.adminNetPaidCommission ?? 0;
+  const remaining = Math.max(repEst - repPaid, 0) + Math.max(adminNet - adminPaid, 0);
+  const paidSoFar =
+    Math.max(Math.min(repPaid, repEst), 0) + Math.max(Math.min(adminPaid, Math.max(adminNet, 0)), 0);
+  if (remaining <= 0.005) return 'paid';
+  if (paidSoFar <= 0.005) return 'unpaid';
   return 'partial';
 }
 
@@ -141,6 +165,7 @@ export default function PortalCommissions() {
   const [rateSaved, setRateSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
   const [yearFilter, setYearFilter] = useState<number | 'all'>(() => Number(torontoToday().slice(0, 4)));
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
 
@@ -205,7 +230,8 @@ export default function PortalCommissions() {
     const filteredRows = adminRows.filter(
       (row) =>
         (statusFilter === 'all' || row.deal!.status === statusFilter) &&
-        (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter)
+        (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter) &&
+        (paymentFilter === 'all' || overallPaymentStatus(row.commission, row.deal!) === paymentFilter)
     );
 
     const totals = filteredRows.reduce(
@@ -281,6 +307,23 @@ export default function PortalCommissions() {
               {option.label}
             </button>
           ))}
+
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
+          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Payment</span>
+          {paymentFilterOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPaymentFilter(option.value)}
+              className={
+                paymentFilter === option.value
+                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+              }
+            >
+              {option.label}
+            </button>
+          ))}
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -315,7 +358,7 @@ export default function PortalCommissions() {
             <h2 className="text-lg font-black tracking-[-0.01em]">
               Commission table
               <span className="ml-2 text-sm font-bold text-slate-400">
-                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}
+                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}{paymentFilter !== 'all' ? ` · ${paymentFilter}` : ''}
               </span>
             </h2>
             <div className="flex items-center gap-2">
