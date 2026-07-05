@@ -1,4 +1,5 @@
 import {
+  ArrowUpDown,
   BadgeDollarSign,
   Banknote,
   CircleDollarSign,
@@ -75,6 +76,59 @@ function overallPaymentStatus(commission: Commission, deal: Deal): Exclude<Payme
   if (remaining <= 0.005) return 'paid';
   if (paidSoFar <= 0.005) return 'unpaid';
   return 'partial';
+}
+
+/** Rep-only settlement (their payout ledger, not your net) for the rep view. */
+function repPaymentStatus(commission: Commission, deal: Deal): Exclude<PaymentFilter, 'all'> {
+  const repEst = commission.customPayout
+    ? commission.repEstimatedCommission
+    : calculateRepEstimatedCommission(deal);
+  const s = derivePayoutStatus(commission.repPaidCommission, repEst);
+  return s === 'pending' ? 'unpaid' : s;
+}
+
+type SortMode = 'newest' | 'oldest' | 'az' | 'amount';
+
+const sortModes: Array<{ value: SortMode; label: string }> = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'az', label: 'A–Z' },
+  { value: 'amount', label: 'Value ↓' },
+];
+
+function nextSortMode(mode: SortMode): SortMode {
+  const i = sortModes.findIndex((m) => m.value === mode);
+  return sortModes[(i + 1) % sortModes.length].value;
+}
+
+function sortCommissionRows<T extends { deal?: Deal }>(rows: T[], mode: SortMode): T[] {
+  const arr = [...rows];
+  switch (mode) {
+    case 'oldest':
+      return arr.sort((a, b) => (a.deal?.createdAt ?? '').localeCompare(b.deal?.createdAt ?? ''));
+    case 'az':
+      return arr.sort((a, b) => (a.deal?.homeownerName ?? '').localeCompare(b.deal?.homeownerName ?? ''));
+    case 'amount':
+      return arr.sort((a, b) => (b.deal?.estimatedJobValue ?? 0) - (a.deal?.estimatedJobValue ?? 0));
+    case 'newest':
+    default:
+      return arr.sort((a, b) => (b.deal?.createdAt ?? '').localeCompare(a.deal?.createdAt ?? ''));
+  }
+}
+
+function SortButton({ mode, onClick }: { mode: SortMode; onClick: () => void }) {
+  const label = sortModes.find((m) => m.value === mode)?.label ?? 'Newest';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+      title="Click to change sort order"
+    >
+      <ArrowUpDown className="h-4 w-4 text-slate-400" />
+      Sort: {label}
+    </button>
+  );
 }
 
 function PayoutBadge({ status }: { status: CommissionPayoutStatus }) {
@@ -169,6 +223,7 @@ export default function PortalCommissions() {
   const [yearFilter, setYearFilter] = useState<number | 'all'>(() => Number(torontoToday().slice(0, 4)));
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [payoutView, setPayoutView] = useState<'reps' | 'me'>('reps');
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
 
@@ -392,7 +447,8 @@ export default function PortalCommissions() {
                 {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}{paymentFilter !== 'all' ? ` · ${paymentFilter}` : ''}
               </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SortButton mode={sortMode} onClick={() => setSortMode(nextSortMode(sortMode))} />
               <span className="text-sm font-semibold text-slate-500">Default rate:</span>
               <div className="relative w-28">
                 <input
@@ -452,7 +508,7 @@ export default function PortalCommissions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredRows.map(({ commission, deal }) => {
+                {sortCommissionRows(filteredRows, sortMode).map(({ commission, deal }) => {
                   if (!deal) return null;
                   const isCustom = commission.customPayout ?? false;
                   // Rep ledger: what the rep is owed vs. what you've paid them.
@@ -671,10 +727,17 @@ export default function PortalCommissions() {
     }))
     .filter((row) => row.deal);
 
+  const repYearSet = new Set<number>(repRows.map((r) => new Date(r.deal!.updatedAt).getFullYear()));
+  repYearSet.add(Number(torontoToday().slice(0, 4)));
+  const repAvailableYears = Array.from(repYearSet).sort((a, b) => b - a);
+
   const repFilteredRows = repRows.filter(
-    (row) => statusFilter === 'all' || row.deal!.status === statusFilter
+    (row) =>
+      (statusFilter === 'all' || row.deal!.status === statusFilter) &&
+      (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter) &&
+      (paymentFilter === 'all' || repPaymentStatus(row.commission, row.deal!) === paymentFilter)
   );
-  const repIsFiltered = statusFilter !== 'all';
+  const repIsFiltered = statusFilter !== 'all' || yearFilter !== 'all' || paymentFilter !== 'all';
   const repFilterLabel =
     statusFilterOptions.find((o) => o.value === statusFilter)?.label ?? 'All statuses';
 
@@ -720,7 +783,7 @@ export default function PortalCommissions() {
         </p>
       </header>
 
-      {/* Status filter — drives both the cards and the deal list */}
+      {/* Status / Year / Payment filters — drive both the cards and the deal list */}
       <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
         <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Showing</span>
         {statusFilterOptions.map((option) => (
@@ -730,6 +793,40 @@ export default function PortalCommissions() {
             onClick={() => setStatusFilter(option.value)}
             className={
               statusFilter === option.value
+                ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+            }
+          >
+            {option.label}
+          </button>
+        ))}
+
+        <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
+        <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Year</span>
+        {([{ label: 'All years', value: 'all' as const }, ...repAvailableYears.map((y) => ({ label: String(y), value: y }))] as Array<{ label: string; value: number | 'all' }>).map((option) => (
+          <button
+            key={String(option.value)}
+            type="button"
+            onClick={() => setYearFilter(option.value)}
+            className={
+              yearFilter === option.value
+                ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
+                : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+            }
+          >
+            {option.label}
+          </button>
+        ))}
+
+        <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
+        <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Payment</span>
+        {paymentFilterOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setPaymentFilter(option.value)}
+            className={
+              paymentFilter === option.value
                 ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
                 : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
             }
@@ -767,13 +864,14 @@ export default function PortalCommissions() {
       </section>
 
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
-        <div className="border-b border-slate-200 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <h2 className="text-lg font-black tracking-[-0.01em]">
             Commission by Deal
             <span className="ml-2 text-sm font-bold text-slate-400">
-              {repFilteredRows.length} {repIsFiltered ? repFilterLabel.toLowerCase() : ''} deal{repFilteredRows.length !== 1 ? 's' : ''}
+              {repFilteredRows.length} {repIsFiltered ? repFilterLabel.toLowerCase() : ''} deal{repFilteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}{paymentFilter !== 'all' ? ` · ${paymentFilter}` : ''}
             </span>
           </h2>
+          <SortButton mode={sortMode} onClick={() => setSortMode(nextSortMode(sortMode))} />
         </div>
         {repFilteredRows.length === 0 ? (
           <p className="mt-4 rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">
@@ -781,9 +879,11 @@ export default function PortalCommissions() {
           </p>
         ) : (
         <div className="mt-4 grid gap-3">
-          {repFilteredRows.map(({ commission, deal }) => {
+          {sortCommissionRows(repFilteredRows, sortMode).map(({ commission, deal }) => {
             if (!deal) return null;
-            const repEstimatedCommission = calculateRepEstimatedCommission(deal);
+            const repEstimatedCommission = commission.customPayout
+              ? commission.repEstimatedCommission
+              : calculateRepEstimatedCommission(deal);
             const remaining = Math.max(
               repEstimatedCommission - commission.repPaidCommission,
               0
