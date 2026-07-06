@@ -223,9 +223,9 @@ function todayIso() {
 }
 
 type ValueFilter = 'all' | 'under50' | '50to100' | 'over100';
-type WonRange = 'year' | 'quarter' | 'all';
+type RangeFilter = 'year' | 'quarter' | 'all';
 
-function isWonDealInRange(deal: Deal, range: WonRange): boolean {
+function isDealInRange(deal: Deal, range: RangeFilter): boolean {
   if (range === 'all') return true;
   // Pre-portal imports don't carry real win dates (updatedAt = import date),
   // so they only appear under "All" — Year/Quarter is for portal-era deals
@@ -294,7 +294,8 @@ export default function PortalDeals() {
   const [contractorFilter, setContractorFilter] = useState('all');
   const [valueFilter, setValueFilter] = useState<ValueFilter>('all');
   const [staleOnly, setStaleOnly] = useState(false);
-  const [wonRange, setWonRange] = useState<WonRange>('year');
+  const [wonRange, setWonRange] = useState<RangeFilter>('year');
+  const [lostRange, setLostRange] = useState<RangeFilter>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
 
   // ── Drag-and-drop + context menu ──────────────────────────────
@@ -1306,12 +1307,17 @@ OntarioReno Broker Portal`;
         <div ref={boardInnerRef} className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
           {columnsToRender.map((column) => {
             const isWonColumn = column.status === 'won';
+            const isLostColumn = column.status === 'lost';
+            const isRangeColumn = isWonColumn || isLostColumn;
+            const columnRange = isLostColumn ? lostRange : wonRange;
+            const setColumnRange = isLostColumn ? setLostRange : setWonRange;
             const allColumnDeals = filteredDeals.filter(
               (deal) => deal.status === column.status
             );
-            // Won column: date-range toggle + collapse deals older than 90 days
-            const rangeFiltered = isWonColumn
-              ? allColumnDeals.filter((deal) => isWonDealInRange(deal, wonRange))
+            // Won/Lost columns get a Year/Quarter/All toggle; the Won column also
+            // collapses deals older than 90 days under "All".
+            const rangeFiltered = isRangeColumn
+              ? allColumnDeals.filter((deal) => isDealInRange(deal, columnRange))
               : allColumnDeals;
             const recentDeals =
               isWonColumn && wonRange === 'all' && !showOlderWon
@@ -1366,20 +1372,20 @@ OntarioReno Broker Portal`;
                     {rangeFiltered.length}
                   </span>
                 </div>
-                {isWonColumn && allColumnDeals.length > 0 && (
+                {isRangeColumn && allColumnDeals.length > 0 && (
                   <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
                     {([
                       { label: 'Year', value: 'year' },
                       { label: 'Quarter', value: 'quarter' },
                       { label: 'All', value: 'all' },
-                    ] as Array<{ label: string; value: WonRange }>).map((option) => (
+                    ] as Array<{ label: string; value: RangeFilter }>).map((option) => (
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setWonRange(option.value)}
+                        onClick={() => setColumnRange(option.value)}
                         className={cn(
                           'flex-1 rounded-full px-2 py-1 text-[0.65rem] font-black transition',
-                          wonRange === option.value
+                          columnRange === option.value
                             ? 'bg-emerald-600 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-700'
                         )}
