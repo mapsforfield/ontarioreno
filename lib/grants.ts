@@ -935,8 +935,16 @@ function pillLabel(amount: string, fundingType: string): string {
     if (suf) return `$${m[0].replace(/[^0-9.]/g, '').replace(/\.0$/, '')}${suf}`;
     return shortAmount(amount);
   }
-  const label: Record<string, string> = { waiver: 'Waiver', loan: 'Loan', rebate: 'Rebate', deferral: 'Deferral', tax: 'Tax credit', grant: 'Grant' };
-  return label[fundingType] || 'Incentive';
+  // Non-cash: infer a short word from the label text (so an override reads right
+  // without a re-scan), falling back to the scraped fundingType, then "Incentive".
+  const t = `${amount} ${fundingType}`.toLowerCase();
+  if (/waiver|waive/.test(t)) return 'Waiver';
+  if (/deferral|defer/.test(t)) return 'Deferral';
+  if (/loan|financ|refinanc/.test(t)) return 'Loan';
+  if (/tax/.test(t)) return 'Tax credit';
+  if (/grant/.test(t)) return 'Grant';
+  if (/rebate|reimburs|cash.?back/.test(t)) return 'Rebate';
+  return 'Incentive';
 }
 
 export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string {
