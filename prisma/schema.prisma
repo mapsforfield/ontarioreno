@@ -571,6 +571,10 @@ model GrantProgram {
   /// figure/range ("$5,000–$18,000"), or a non-cash benefit ("100% DC waiver",
   /// "up to $125k low-interest loan", "development-charge deferral").
   maxAmount       String    @default("")
+  /// Admin-set display value that OVERRIDES the scraped maxAmount everywhere it
+  /// shows (hub table, map, cards). Survives re-scans — the scanner never writes
+  /// this field. Empty = fall back to the scraped/auto-shortened amount.
+  amountOverride  String    @default("")
   /// 'grant' | 'loan' | 'rebate' | 'waiver' | 'deferral' | 'tax' | 'other'
   /// Part of the merge key so a grant and a loan in the same city stay separate.
   fundingType     String    @default("")

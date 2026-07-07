@@ -1121,16 +1121,20 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     const slug = slugByProgram.get(p.id);
     const href = (p.linkUrl && p.linkUrl.trim()) || (slug ? `/grants/${slug}` : knownLink(p.city, p.name)) || '/match?ref=grants-hub';
     const co = cityCoords(p.city);
-    rows.push({ city: p.city, name: p.name, amount: shortAmount(p.maxAmount), status: p.status, href, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    // Admin override wins; else auto-shorten the scraped value. Full text goes to
+    // the table; the map pill uses a short $-form (or "Incentive" for non-cash).
+    const displayAmount = (p.amountOverride && p.amountOverride.trim()) || shortAmount(p.maxAmount);
+    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
   const agg = new Map<string, HubMapCity>();
   for (const r of rows) {
     if (r.lat == null || r.lng == null) continue;
     const key = r.city.toLowerCase();
+    const pillAmount = shortAmount(r.amount) || (/\$/.test(r.amount) ? r.amount : ''); // keep pills short
     const ex = agg.get(key);
-    if (ex) { ex.count++; if (!ex.amount) ex.amount = r.amount; }
-    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: r.amount, href: r.href });
+    if (ex) { ex.count++; if (!ex.amount) ex.amount = pillAmount; }
+    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: pillAmount, href: r.href });
   }
   const latest = programs.reduce((a, p) => Math.max(a, new Date(p.updatedAt).getTime()), 0);
   const updatedLabel = latest ? new Date(latest).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
@@ -1286,6 +1290,7 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
       data.reviewState = rs;
     }
     if ('linkUrl' in body) data.linkUrl = String(body.linkUrl ?? '');
+    if ('amountOverride' in body) data.amountOverride = String(body.amountOverride ?? '');
     if (Object.keys(data).length === 0) { res.status(400).json({ error: 'nothing to update.' }); return; }
     res.status(200).json(await withSchema(() => prisma.grantProgram.update({ where: { id }, data })));
     return;
