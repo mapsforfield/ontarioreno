@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ExternalLink, FileText, Loader2, Plus, RadarIcon, RefreshCw,
-  Sparkles, Target, Trash2, Wand2, X,
+  Search, Sparkles, Target, Trash2, Wand2, X,
 } from 'lucide-react';
 import { usePortalAuth } from '../auth';
 
@@ -154,6 +154,9 @@ export default function PortalGrants() {
   const [editing, setEditing] = useState<LandingPage | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
+  const [cityQuery, setCityQuery] = useState('');
+  const [citySearching, setCitySearching] = useState(false);
+  const [cityResult, setCityResult] = useState<{ city: string; found: Array<{ name: string; amount: string; status: string; url: string }>; pagesChecked: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -207,6 +210,25 @@ export default function PortalGrants() {
       setNotice(`Discovery failed: ${(err as Error).message}. (Discovery needs TAVILY_API_KEY — normally it runs on the GitHub Actions worker.)`);
     } finally {
       setDiscovering(false);
+    }
+  };
+
+  const searchCity = async () => {
+    const city = cityQuery.trim();
+    if (!city) return;
+    setCitySearching(true);
+    setCityResult(null);
+    setNotice('');
+    try {
+      const res = await fetch(`${API}&action=search-city&city=${encodeURIComponent(city)}`, { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Search failed');
+      setCityResult({ city: data.city, found: data.found ?? [], pagesChecked: data.pagesChecked ?? 0 });
+      await load(); // new programs land in the review queue
+    } catch (err) {
+      setNotice(`City search failed: ${(err as Error).message}`);
+    } finally {
+      setCitySearching(false);
     }
   };
 
@@ -360,6 +382,56 @@ export default function PortalGrants() {
       {notice && (
         <div className="rounded-[0.5rem] border border-[#b8c9dd] bg-[#eef3f9] px-4 py-3 text-sm font-semibold text-[#1B3C6C]">{notice}</div>
       )}
+
+      {/* Live single-city lookup — for a customer on the phone */}
+      <section className="rounded-[0.5rem] border border-[#1B3C6C] bg-[#f7faff] p-4 sm:p-5">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-[#1B3C6C]" />
+          <h2 className="text-sm font-black uppercase tracking-[0.14em] text-[#1B3C6C]">Look up a city — live</h2>
+        </div>
+        <p className="mt-1 text-sm text-slate-600">Customer on the line? Type their city and search its active programs on the spot (~30s). Results also save to your review queue.</p>
+        <form
+          onSubmit={(e) => { e.preventDefault(); void searchCity(); }}
+          className="mt-3 flex flex-col gap-2 sm:flex-row"
+        >
+          <input
+            value={cityQuery}
+            onChange={(e) => setCityQuery(e.target.value)}
+            placeholder="e.g. Belleville"
+            className="min-w-0 flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+          />
+          <button
+            type="submit" disabled={citySearching || !cityQuery.trim()}
+            className="inline-flex items-center justify-center gap-1.5 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#153158] disabled:opacity-50"
+          >
+            {citySearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {citySearching ? 'Searching…' : 'Search city'}
+          </button>
+        </form>
+        {citySearching && <p className="mt-2 text-xs text-slate-500">Searching official sources for {cityQuery.trim()}… this can take up to 30 seconds.</p>}
+        {cityResult && !citySearching && (
+          <div className="mt-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
+            {cityResult.found.length === 0 ? (
+              <p className="text-sm text-slate-600">No homeowner grant/incentive programs found for <strong>{cityResult.city}</strong> (checked {cityResult.pagesChecked} pages). It may not have a program yet — worth a manual check.</p>
+            ) : (
+              <>
+                <p className="mb-2 text-sm font-bold text-slate-800">{cityResult.found.length} program{cityResult.found.length > 1 ? 's' : ''} found for {cityResult.city}:</p>
+                <ul className="space-y-2">
+                  {cityResult.found.map((f, i) => (
+                    <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <span className="font-bold text-slate-900">{f.name}</span>
+                      {f.amount && <span className="font-bold text-[#1B3C6C]">{f.amount}</span>}
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold capitalize text-slate-600">{f.status}</span>
+                      <a href={f.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-[#32639b] hover:underline"><ExternalLink className="h-3 w-3" /> verify</a>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-slate-500">Saved to your review queue below. Verify the source before quoting a customer.</p>
+              </>
+            )}
+          </div>
+        )}
+      </section>
 
       {loading ? (
         <div className="flex items-center gap-2 p-8 text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading…</div>

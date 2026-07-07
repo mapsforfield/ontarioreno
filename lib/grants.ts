@@ -445,6 +445,72 @@ export async function runDiscovery(opts: { limit?: number } = {}): Promise<Disco
   return out;
 }
 
+// ─── On-demand single-city search (live, for a customer on the phone) ─────────
+export type CitySearchResult = {
+  city: string; pagesChecked: number; errors: number;
+  found: Array<{ name: string; amount: string; status: string; category: string; pageType: PageType; url: string }>;
+};
+
+/** Search ONE city right now (even one not in the registry). Bounded so it stays
+ *  under the Vercel 60s limit. Saves results (reviewState 'new') so the city also
+ *  becomes monitored going forward, and returns what it found for instant display. */
+export async function discoverCity(cityName: string): Promise<CitySearchResult> {
+  await ensureSchema();
+  const city = cityName.trim();
+  if (!city) throw new Error('Enter a city name.');
+  if (!process.env.TAVILY_API_KEY) throw new Error('TAVILY_API_KEY is not set in Vercel — add it in Project → Settings → Environment Variables.');
+
+  const slug = slugify(city) || `city-${Date.now()}`;
+  let muni = await prisma.municipality.findUnique({ where: { slug } });
+  if (!muni) muni = await prisma.municipality.create({ data: { name: city, slug, jurisdiction: 'ON', discoveryState: 'candidate' } });
+
+  // Unrestricted searches (we don't know the city's domain) — Tavily finds the
+  // official pages. Kept to 3 queries for speed.
+  const queries = [
+    `${city} Ontario additional residential unit ADU grant incentive`,
+    `${city} Ontario secondary suite / basement apartment grant program`,
+    `${city} Ontario community improvement plan housing incentive homeowner`,
+  ];
+  const urls = new Set<string>();
+  for (const q of queries) {
+    try { for (const r of await tavilySearch(q, '')) if (r.url) urls.add(r.url.split('#')[0]); }
+    catch { /* skip a failed query */ }
+  }
+
+  const out: CitySearchResult = { city, pagesChecked: 0, errors: 0, found: [] };
+  const digest: ScanResult['digest'] = [];
+  let sawMoney = false, sawFuture = false;
+
+  for (const url of [...urls].slice(0, 4)) { // top 4 pages — keeps us under the timeout
+    try {
+      const text = await fetchPageText(url);
+      out.pagesChecked++;
+      const cls = await classifyAndExtract(text, { name: `${city} — search`, url, jurisdiction: city });
+      const keepActive = cls.pageType === 'money' || cls.pageType === 'future';
+      const existing = await prisma.grantSource.findUnique({ where: { url } });
+      const source = existing ?? await prisma.grantSource.create({
+        data: {
+          municipalityId: muni.id, name: `${city} — ${cls.programs[0]?.name ?? cls.pageType}`.slice(0, 140),
+          url, jurisdiction: city, category: cls.programs[0]?.category ?? '', pageType: cls.pageType,
+          discoveredVia: 'city-search', hafLinked: muni.hafRecipient, active: keepActive,
+        },
+      });
+      await applyClassification({ id: source.id, url, hafLinked: muni.hafRecipient, jurisdiction: city }, cls, digest);
+      if (keepActive) {
+        for (const p of cls.programs) out.found.push({ name: p.name, amount: p.maxAmount, status: p.status, category: p.category, pageType: cls.pageType, url });
+        if (cls.pageType === 'money') sawMoney = true;
+        if (cls.pageType === 'future') sawFuture = true;
+      }
+    } catch { out.errors++; }
+  }
+
+  await prisma.municipality.update({
+    where: { id: muni.id },
+    data: { lastDiscoveryAt: new Date(), discoveryState: sawMoney ? 'verified' : sawFuture ? 'watching' : (muni.discoveryState === 'candidate' ? 'rejected' : muni.discoveryState) },
+  });
+  return out;
+}
+
 // ─── Digest email ─────────────────────────────────────────────────────────────
 async function sendDigest(result: ScanResult): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
@@ -1100,6 +1166,16 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
       await seedSources();
       const limit = Math.min(Math.max(Number(req.query['limit'] ?? 6) || 6, 1), 8);
       res.status(200).json({ ok: true, ...(await scanAllSources({ force: true, limit })) });
+      return;
+    }
+    if (action === 'search-city') {
+      const city = String(req.query['city'] ?? '');
+      if (!city.trim()) { res.status(400).json({ error: 'city required.' }); return; }
+      try {
+        res.status(200).json({ ok: true, ...(await discoverCity(city)) });
+      } catch (err) {
+        res.status(500).json({ error: (err as Error).message });
+      }
       return;
     }
     if (action === 'discover') {
