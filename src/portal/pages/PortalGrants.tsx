@@ -14,7 +14,8 @@ const API = '/api/appointments?resource=grants';
 type Program = {
   id: string; name: string; city: string; jurisdiction: string; status: string;
   category: string; maxAmount: string; eligibility: string; deadline: string;
-  summary: string; sourceUrl: string; relevanceScore: number; reviewState: string;
+  summary: string; sourceUrl: string; sourceUrls: string[] | null; fundingType: string;
+  relevanceScore: number; reviewState: string;
   linkUrl: string; firstSeenAt: string; changedAt: string | null;
 };
 type Source = {
@@ -82,12 +83,14 @@ function ProgramCard({ p, onAction, busy, page, onGenerate, onEditPage, onSetLin
       {p.summary && <p className="text-sm text-slate-600">{p.summary}</p>}
       {p.eligibility && <p className="text-xs text-slate-500"><span className="font-bold">Who:</span> {p.eligibility}</p>}
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <a
-          href={p.sourceUrl} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
-        >
-          <ExternalLink className="h-3.5 w-3.5" /> Verify source
-        </a>
+        {(p.sourceUrls && p.sourceUrls.length ? p.sourceUrls : [p.sourceUrl]).filter(Boolean).map((u, i, arr) => (
+          <a
+            key={u} href={u} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> {arr.length > 1 ? `Source ${i + 1}` : 'Verify source'}
+          </a>
+        ))}
         {p.reviewState !== 'targeting' && (
           <button
             type="button" disabled={busy} onClick={() => onAction(p.id, 'targeting')}

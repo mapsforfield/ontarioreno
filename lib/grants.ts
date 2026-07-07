@@ -175,7 +175,7 @@ function relevantExcerpt(text: string): string {
 export type PageType = 'money' | 'future' | 'zoning' | 'developer' | 'news' | 'noise' | 'unknown';
 export type ExtractedProgram = {
   name: string; city: string; jurisdiction: string; status: string;
-  category: string; maxAmount: string; eligibility: string; deadline: string; summary: string;
+  category: string; fundingType: string; maxAmount: string; eligibility: string; deadline: string; summary: string;
 };
 export type Classification = { pageType: PageType; programs: ExtractedProgram[] };
 
@@ -189,9 +189,15 @@ const SYSTEM_PROMPT =
   '- news: an announcement/news item with no program a homeowner can apply to.\n' +
   '- noise: unrelated to homeowner renovation incentives.\n' +
   'STEP 2 — ONLY if pageType is "money" or "future", extract the program(s); otherwise programs = [].\n' +
-  'Return ONLY JSON (no prose, no code fences): {"pageType":"...","programs":[{"name","city","jurisdiction","status","category","maxAmount","eligibility","deadline","summary"}]}. ' +
+  'Return ONLY JSON (no prose, no code fences): {"pageType":"...","programs":[{"name","city","jurisdiction","status","category","fundingType","maxAmount","eligibility","deadline","summary"}]}. ' +
   'status: active|upcoming|closed|unknown. category: ADU|basement|energy|accessibility|general. ' +
-  'maxAmount/eligibility/deadline: short free-text ("" if unknown). summary <= 240 chars.';
+  'fundingType: grant|loan|rebate|waiver|deferral|tax|other (grant=cash grant; loan=forgivable/low-interest loan; waiver=fee/development-charge waiver; deferral=deferred charges; tax=tax incentive).\n' +
+  'maxAmount — capture the homeowner value EXACTLY AS STATED; NEVER estimate, calculate, or guess a figure. ' +
+  'Rules: cash → the amount or range including explicitly-stated stackable top-ups (e.g. "$5,000–$18,000"); ' +
+  'fee/DC waiver → describe it ("100% development-charge waiver", "building permit fee waiver"); ' +
+  'forgivable/low-interest loan → the stated limit ("up to $125k low-interest loan"); ' +
+  'deferral/tax → describe it ("development-charge deferral"). Only leave "" if the source truly states no value. ' +
+  'eligibility/deadline: short free-text ("" if unknown). summary <= 240 chars.';
 
 async function callClaude(system: string, user: string, maxTokens = 2000): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -246,6 +252,7 @@ function normalizeProgram(p: Record<string, unknown>): ExtractedProgram {
     jurisdiction: String(p.jurisdiction ?? '').trim(),
     status: normalizeStatus(String(p.status ?? 'unknown')),
     category: String(p.category ?? 'general').trim().toLowerCase(),
+    fundingType: normalizeFundingType(String(p.fundingType ?? '')),
     maxAmount: String(p.maxAmount ?? '').trim(),
     eligibility: String(p.eligibility ?? '').trim(),
     deadline: String(p.deadline ?? '').trim(),
@@ -261,6 +268,12 @@ function normalizeStatus(s: string): string {
   return 'unknown';
 }
 
+function normalizeFundingType(s: string): string {
+  const v = s.toLowerCase();
+  const allowed = ['grant', 'loan', 'rebate', 'waiver', 'deferral', 'tax'];
+  return allowed.find((k) => v.includes(k)) ?? 'other';
+}
+
 function scoreRelevance(p: ExtractedProgram, source: { hafLinked: boolean }): number {
   let score = 20;
   if (['adu', 'basement'].includes(p.category)) score += 35;
@@ -274,11 +287,27 @@ function scoreRelevance(p: ExtractedProgram, source: { hafLinked: boolean }): nu
   return Math.max(0, Math.min(100, score));
 }
 
-// Identity = source page + program category (stable across the LLM's name drift
-// and across amount/deadline changes, which are treated as updatable fields).
-function fingerprint(sourceId: string, category: string): string {
-  return `${sourceId}:${(category || 'general').toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
+// Merge key: same city + category + fundingType = the SAME program, even when its
+// info is spread across several official pages. Source-independent, so those pages
+// merge into one card — while a grant and a loan in the same city stay separate.
+function programKey(city: string, category: string, fundingType: string): string {
+  const c = (city || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return `${c}:${(category || 'general').toLowerCase()}:${(fundingType || 'other').toLowerCase()}`;
 }
+const longer = (a: string, b: string): string => ((b || '').length > (a || '').length ? b : a);
+// Prefer a value that states a dollar figure; else the more descriptive one.
+function richerAmount(a: string, b: string): string {
+  const ha = /\$/.test(a || ''), hb = /\$/.test(b || '');
+  if (ha && !hb) return a;
+  if (hb && !ha) return b;
+  return longer(a, b);
+}
+function existingUrls(existing: { sourceUrls: unknown; sourceUrl: string }): string[] {
+  if (Array.isArray(existing.sourceUrls)) return existing.sourceUrls as string[];
+  return existing.sourceUrl ? [existing.sourceUrl] : [];
+}
+const REVIEW_RANK: Record<string, number> = { targeting: 3, reviewed: 2, new: 1, dismissed: 0 };
+const bestReview = (a: string, b: string): string => ((REVIEW_RANK[b] ?? 1) > (REVIEW_RANK[a] ?? 1) ? b : a);
 
 // Persist a page's classification + extracted programs. Returns what changed.
 async function applyClassification(
@@ -294,33 +323,54 @@ async function applyClassification(
   if (!keepActive) return { newPrograms, updatedPrograms };
 
   for (const p of cls.programs) {
-    const fp = fingerprint(source.id, p.category);
+    const city = p.city || source.jurisdiction;
+    const fp = programKey(city, p.category, p.fundingType);
+    // Old-scheme key (sourceId + category) so pre-existing records get re-keyed &
+    // absorbed on scan instead of duplicating alongside the new merged record.
+    const legacyFp = `${source.id}:${(p.category || 'general').toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
     const score = scoreRelevance(p, { hafLinked: source.hafLinked });
-    const existing = await prisma.grantProgram.findFirst({ where: { fingerprint: fp } });
+    const byNew = await prisma.grantProgram.findFirst({ where: { fingerprint: fp } });
+    const byLegacy = await prisma.grantProgram.findFirst({ where: { fingerprint: legacyFp } });
+    const existing = byNew ?? byLegacy;
     if (!existing) {
       await prisma.grantProgram.create({
         data: {
-          sourceId: source.id, fingerprint: fp, name: p.name, city: p.city || source.jurisdiction,
+          sourceId: source.id, fingerprint: fp, name: p.name, city,
           jurisdiction: p.jurisdiction || source.jurisdiction, status: p.status, category: p.category,
-          maxAmount: p.maxAmount, eligibility: p.eligibility, deadline: p.deadline, summary: p.summary,
-          sourceUrl: source.url, relevanceScore: score, reviewState: 'new',
+          fundingType: p.fundingType, maxAmount: p.maxAmount, eligibility: p.eligibility, deadline: p.deadline,
+          summary: p.summary, sourceUrl: source.url, sourceUrls: [source.url], relevanceScore: score, reviewState: 'new',
         },
       });
       newPrograms++;
-      digest.push({ program: p.name, city: p.city || source.jurisdiction, status: p.status, kind: 'new', url: source.url });
+      digest.push({ program: p.name, city, status: p.status, kind: 'new', url: source.url });
     } else {
-      const materiallyChanged = existing.status !== p.status || existing.maxAmount !== p.maxAmount || existing.deadline !== p.deadline;
+      const absorb = byNew && byLegacy && byNew.id !== byLegacy.id ? byLegacy : null;
+      // MERGE — combine info split across pages; keep the richest of each field and
+      // every source link. (Never fabricates: only chooses among stated values.)
+      const sourceUrls = Array.from(new Set([...existingUrls(existing), ...(absorb ? existingUrls(absorb) : []), source.url]));
+      const maxAmount = richerAmount(existing.maxAmount, p.maxAmount);
+      const eligibility = longer(existing.eligibility, p.eligibility);
+      const summary = longer(existing.summary, p.summary);
+      const deadline = existing.deadline || p.deadline;
+      const status = p.status !== 'unknown' ? p.status : existing.status;
+      const name = existing.name.length >= p.name.length ? existing.name : p.name;
+      const materiallyChanged = existing.status !== status || existing.maxAmount !== maxAmount || existing.deadline !== deadline;
+      // Preserve the most-advanced review state across the target and any absorbed record.
+      let reviewState = bestReview(existing.reviewState, absorb ? absorb.reviewState : existing.reviewState);
+      if (materiallyChanged && reviewState === 'dismissed') reviewState = 'new';
       await prisma.grantProgram.update({
         where: { id: existing.id },
         data: {
-          name: p.name, status: p.status, maxAmount: p.maxAmount, deadline: p.deadline, eligibility: p.eligibility,
-          summary: p.summary, relevanceScore: score, lastConfirmedAt: new Date(),
-          ...(materiallyChanged ? { changedAt: new Date(), reviewState: existing.reviewState === 'dismissed' ? 'new' : existing.reviewState } : {}),
+          fingerprint: fp, name, status, maxAmount, deadline, eligibility, summary, sourceUrls, reviewState,
+          category: existing.category || p.category, fundingType: existing.fundingType || p.fundingType,
+          relevanceScore: Math.max(existing.relevanceScore, score), lastConfirmedAt: new Date(),
+          ...(materiallyChanged ? { changedAt: new Date() } : {}),
         },
       });
+      if (absorb) await prisma.grantProgram.delete({ where: { id: absorb.id } }).catch(() => { /* already gone */ });
       if (materiallyChanged) {
         updatedPrograms++;
-        digest.push({ program: p.name, city: p.city || source.jurisdiction, status: p.status, kind: 'changed', url: source.url });
+        digest.push({ program: name, city, status, kind: 'changed', url: source.url });
       }
     }
   }

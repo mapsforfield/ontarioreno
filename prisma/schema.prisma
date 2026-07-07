@@ -567,8 +567,15 @@ model GrantProgram {
   /// 'active' | 'upcoming' | 'closed' | 'unknown'
   status          String    @default("unknown")
   category        String    @default("")
-  /// Free-text — gov pages phrase amounts inconsistently ("up to $40,000").
+  /// Free-text benefit as STATED by the source — never estimated. May be a cash
+  /// figure/range ("$5,000–$18,000"), or a non-cash benefit ("100% DC waiver",
+  /// "up to $125k low-interest loan", "development-charge deferral").
   maxAmount       String    @default("")
+  /// 'grant' | 'loan' | 'rebate' | 'waiver' | 'deferral' | 'tax' | 'other'
+  /// Part of the merge key so a grant and a loan in the same city stay separate.
+  fundingType     String    @default("")
+  /// All official source URLs merged into this program (info split across pages).
+  sourceUrls      Json?
   eligibility     String    @default("")
   deadline        String    @default("")
   summary         String    @default("")
