@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { ArrowRight } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
 
@@ -27,6 +29,31 @@ function tagIcon(c: MapCity) {
   return L.divIcon({ className: '', html: `<div class="atag">${c.amount || 'Incentive'}${badge}</div>`, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -42] });
 }
 
+const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// Cluster nearby pins so the dense Golden Horseshoe doesn't overlap into a blob;
+// spread-out cities keep their amount pins. Click a cluster to expand.
+function ClusterLayer({ cities }: { cities: MapCity[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const group = L.markerClusterGroup({
+      maxClusterRadius: 48,
+      showCoverageOnHover: false,
+      spiderfyDistanceMultiplier: 1.6,
+      iconCreateFunction: (cluster) => L.divIcon({ html: `<div class="ocluster">${cluster.getChildCount()}</div>`, className: '', iconSize: L.point(42, 42) }),
+    });
+    cities.forEach((c) => {
+      const m = L.marker([c.lat, c.lng], { icon: tagIcon(c) });
+      m.bindPopup(`<div class="grantpop"><b>${esc(c.city)}</b><br>${c.count} program${c.count > 1 ? 's' : ''}${c.amount ? ` · ${esc(c.amount)}` : ''}<br><a href="${esc(c.href)}">View →</a></div>`);
+      m.on('mouseover', () => m.openPopup());
+      group.addLayer(m);
+    });
+    map.addLayer(group);
+    return () => { map.removeLayer(group); };
+  }, [cities, map]);
+  return null;
+}
+
 // Frame the Golden Horseshoe core on load; far pins stay but don't widen the view.
 function FitCore({ cities }: { cities: MapCity[] }) {
   const map = useMap();
@@ -45,6 +72,7 @@ const CSS = `
 .atag:after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff}
 .atag i{position:absolute;top:-9px;right:-9px;background:#fff;color:#1B3C6C;border-radius:999px;font-size:10px;font-style:normal;font-weight:800;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;border:1.5px solid #1B3C6C;padding:0 3px}
 .grantpop b{color:#1B3C6C}.grantpop a{display:inline-block;margin-top:6px;background:#1B3C6C;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700}
+.ocluster{background:#1B3C6C;color:#fff;border:3px solid #fff;border-radius:999px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;box-shadow:0 3px 9px rgba(15,23,42,.4);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
 .grantmap-brand{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(255,255,255,.94);border-radius:10px;padding:6px 11px;box-shadow:0 2px 10px rgba(15,23,42,.22)}
 .grantmap-brand img{height:22px;display:block}
 .grantmapbox{height:460px;width:100%;border-radius:16px}
@@ -106,17 +134,7 @@ export default function GrantsHub() {
         <div className="relative z-0 mt-6">
           <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} className="grantmapbox">
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" maxZoom={13} />
-            {mapCities.map((c) => (
-              <Marker key={c.city} position={[c.lat, c.lng]} icon={tagIcon(c)} eventHandlers={{ mouseover: (e) => (e.target as L.Marker).openPopup() }}>
-                <Popup>
-                  <div className="grantpop">
-                    <b>{c.city}</b><br />
-                    {c.count} program{c.count > 1 ? 's' : ''}{c.amount ? ` · up to ${c.amount}` : ''}<br />
-                    <a href={c.href}>View →</a>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            <ClusterLayer cities={mapCities} />
             <FitCore cities={mapCities} />
           </MapContainer>
           <a className="grantmap-brand" href="/"><img src="/logo.png" alt="OntarioReno" /></a>

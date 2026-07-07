@@ -926,6 +926,19 @@ function shortAmount(text: string): string {
   return '$' + n;
 }
 
+// A compact label for a map pin. Keeps a $-figure short & correct ("$40k",
+// "$125k" — preserving an existing k/M), else falls back to a funding-type word.
+function pillLabel(amount: string, fundingType: string): string {
+  const m = (amount || '').match(/\$\s?[\d,]+(?:\.\d+)?\s*([kmKM])?/);
+  if (m) {
+    const suf = m[1] ? m[1].toLowerCase() : '';
+    if (suf) return `$${m[0].replace(/[^0-9.]/g, '').replace(/\.0$/, '')}${suf}`;
+    return shortAmount(amount);
+  }
+  const label: Record<string, string> = { waiver: 'Waiver', loan: 'Loan', rebate: 'Rebate', deferral: 'Deferral', tax: 'Tax credit', grant: 'Grant' };
+  return label[fundingType] || 'Incentive';
+}
+
 export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string {
   const slugByProgram = new Map<string, string>();
   for (const p of pages) if (p.programId) slugByProgram.set(p.programId, p.slug);
@@ -1092,7 +1105,7 @@ export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; 
   { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
 ];
 
-export type HubRow = { city: string; name: string; amount: string; status: string; href: string; lat: number | null; lng: number | null };
+export type HubRow = { city: string; name: string; amount: string; status: string; href: string; fundingType: string; lat: number | null; lng: number | null };
 export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
 
 /** Structured hub data (JSON) for the React /grants page: curated existing pages
@@ -1111,7 +1124,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
 
   for (const c of CURATED_PAGES) {
     const co = cityCoords(c.city);
-    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
   const seen = new Set<string>();
   for (const p of programs) {
@@ -1122,19 +1135,18 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     const href = (p.linkUrl && p.linkUrl.trim()) || (slug ? `/grants/${slug}` : knownLink(p.city, p.name)) || '/match?ref=grants-hub';
     const co = cityCoords(p.city);
     // Admin override wins; else auto-shorten the scraped value. Full text goes to
-    // the table; the map pill uses a short $-form (or "Incentive" for non-cash).
+    // the table; the map pin uses a compact label (pillLabel).
     const displayAmount = (p.amountOverride && p.amountOverride.trim()) || shortAmount(p.maxAmount);
-    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
   const agg = new Map<string, HubMapCity>();
   for (const r of rows) {
     if (r.lat == null || r.lng == null) continue;
     const key = r.city.toLowerCase();
-    const pillAmount = shortAmount(r.amount) || (/\$/.test(r.amount) ? r.amount : ''); // keep pills short
     const ex = agg.get(key);
-    if (ex) { ex.count++; if (!ex.amount) ex.amount = pillAmount; }
-    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: pillAmount, href: r.href });
+    if (ex) ex.count++;
+    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: pillLabel(r.amount, r.fundingType), href: r.href });
   }
   const latest = programs.reduce((a, p) => Math.max(a, new Date(p.updatedAt).getTime()), 0);
   const updatedLabel = latest ? new Date(latest).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
