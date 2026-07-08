@@ -120,7 +120,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
         include: {
-          activity: { orderBy: { createdAt: 'desc' } },
+          // Only the recent activity is needed for a deal's detail timeline; the
+          // full history would grow unbounded and be re-serialized on every
+          // refetch (the pipeline board + activity feed don't use this at all).
+          activity: { orderBy: { createdAt: 'desc' }, take: 30 },
           proposals: { orderBy: { sentAt: 'desc' } },
           dispatches: { orderBy: { createdAt: 'desc' } },
         },

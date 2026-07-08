@@ -148,11 +148,31 @@ function PayoutBadge({ status }: { status: CommissionPayoutStatus }) {
 /** Editable sales price (admin). Commits on blur / Enter so we don't fire a
  *  save + activity-log entry on every keystroke. Editing it cascades to every
  *  commission calculation via updateDeal's re-sync. */
-function JobValueInput({ value, onCommit }: { value: number; onCommit: (next: number) => void }) {
+/**
+ * Number input that commits its value ONCE on blur / Enter instead of on every
+ * keystroke. This avoids a save (and a realtime reload on every other open tab)
+ * per character typed — same end result, far fewer server calls.
+ */
+function CommitNumberInput({
+  value,
+  onCommit,
+  className,
+  step,
+  title,
+  round,
+}: {
+  value: number;
+  onCommit: (next: number) => void;
+  className?: string;
+  step?: number;
+  title?: string;
+  round?: boolean;
+}) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
   const commit = () => {
-    const next = Math.max(Math.round(Number(draft) || 0), 0);
+    const raw = Number(draft);
+    const next = Math.max(Number.isFinite(raw) ? (round ? Math.round(raw) : raw) : 0, 0);
     if (next !== value) onCommit(next);
     else setDraft(String(value));
   };
@@ -160,12 +180,13 @@ function JobValueInput({ value, onCommit }: { value: number; onCommit: (next: nu
     <input
       type="number"
       min={0}
+      step={step}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      className="w-32 font-black text-[#1B3C6C]"
-      title="Sales price — edit to correct it; all commissions recalculate"
+      className={className}
+      title={title}
     />
   );
 }
@@ -541,8 +562,11 @@ export default function PortalCommissions() {
                         {formatDealStatus(deal.status)}
                       </td>
                       <td className="px-4 py-4">
-                        <JobValueInput
+                        <CommitNumberInput
                           value={deal.estimatedJobValue}
+                          round
+                          className="w-32 font-black text-[#1B3C6C]"
+                          title="Sales price — edit to correct it; all commissions recalculate"
                           onCommit={(next) =>
                             updateDeal(deal.id, { estimatedJobValue: next }, currentUser)
                           }
@@ -552,18 +576,13 @@ export default function PortalCommissions() {
                         {isCustom ? (
                           <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
                         ) : (
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.5}
+                          <CommitNumberInput
                             value={commission.adminTotalCommissionRate * 100}
-                            onChange={(event) =>
-                              updateCommission(commission.id, {
-                                adminTotalCommissionRate:
-                                  (Number(event.target.value) || 0) / 100,
-                              }, currentUser)
-                            }
+                            step={0.5}
                             className="w-20"
+                            onCommit={(v) =>
+                              updateCommission(commission.id, { adminTotalCommissionRate: v / 100 }, currentUser)
+                            }
                           />
                         )}
                         <button
@@ -575,33 +594,24 @@ export default function PortalCommissions() {
                         </button>
                       </td>
                       <td className="px-4 py-4">
-                        <input
-                          type="number"
-                          min={0}
+                        <CommitNumberInput
                           value={commission.adminTotalEstimatedCommission}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              adminTotalEstimatedCommission:
-                                Number(event.target.value) || 0,
-                            }, currentUser)
-                          }
                           className="w-28"
+                          onCommit={(v) =>
+                            updateCommission(commission.id, { adminTotalEstimatedCommission: v }, currentUser)
+                          }
                         />
                       </td>
                       {/* ── Rep ledger ── */}
                       <td className="px-4 py-4 bg-[#f6faff]">
                         {isCustom ? (
-                          <input
-                            type="number"
-                            min={0}
+                          <CommitNumberInput
                             value={commission.repEstimatedCommission}
-                            onChange={(event) =>
-                              updateCommission(commission.id, {
-                                repEstimatedCommission: Number(event.target.value) || 0,
-                              }, currentUser)
-                            }
                             className="w-24 font-black text-slate-900"
                             title="Rep's cut on this custom deal"
+                            onCommit={(v) =>
+                              updateCommission(commission.id, { repEstimatedCommission: v }, currentUser)
+                            }
                           />
                         ) : (
                           <span className="font-black">{formatCurrency(repEstimatedCommission)}</span>
@@ -611,16 +621,12 @@ export default function PortalCommissions() {
                         </p>
                       </td>
                       <td className="px-4 py-4 bg-[#f6faff]">
-                        <input
-                          type="number"
-                          min={0}
+                        <CommitNumberInput
                           value={commission.repPaidCommission}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              repPaidCommission: Number(event.target.value) || 0,
-                            }, currentUser)
-                          }
                           className="w-28"
+                          onCommit={(v) =>
+                            updateCommission(commission.id, { repPaidCommission: v }, currentUser)
+                          }
                         />
                         <div><PayoutBadge status={repStatus} /></div>
                       </td>
@@ -632,16 +638,12 @@ export default function PortalCommissions() {
                         </p>
                       </td>
                       <td className="px-4 py-4 bg-[#eef6ff]">
-                        <input
-                          type="number"
-                          min={0}
+                        <CommitNumberInput
                           value={adminReceived}
-                          onChange={(event) =>
-                            updateCommission(commission.id, {
-                              adminNetPaidCommission: Number(event.target.value) || 0,
-                            }, currentUser)
-                          }
                           className="w-28"
+                          onCommit={(v) =>
+                            updateCommission(commission.id, { adminNetPaidCommission: v }, currentUser)
+                          }
                         />
                         <div><PayoutBadge status={adminStatus} /></div>
                       </td>
