@@ -854,19 +854,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const results: Array<{ id: string; latitude: number | null; longitude: number | null }> = [];
       const startTime = Date.now();
       const TIME_BUDGET = 8500; // leave headroom under the function timeout
+      // Every client is in Ontario — reject anything outside Canada's bounds so an
+      // ambiguous freeform address (e.g. an event's "120 Cittadella Boulevard"
+      // with no city) can never resolve to a same-named place in Europe.
+      const inCanada = (lat: number, lon: number) =>
+        lat >= 41 && lat <= 84 && lon >= -142 && lon <= -50;
       const geocodeOne = async (q: string) => {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+        // countrycodes=ca locks results to Canada.
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ca&q=${encodeURIComponent(q)}`;
         const resp = await fetch(url, {
           headers: { 'User-Agent': 'OntarioReno-Portal/1.0 (info@ontarioreno.ca)' },
         });
         const json = (await resp.json()) as Array<{ lat: string; lon: string }>;
         const hit = json[0];
-        return hit ? { lat: parseFloat(hit.lat), lon: parseFloat(hit.lon) } : null;
+        if (!hit) return null;
+        const lat = parseFloat(hit.lat);
+        const lon = parseFloat(hit.lon);
+        return inCanada(lat, lon) ? { lat, lon } : null;
       };
 
       for (const row of rows) {
-        // Already cached → return as-is
-        if (row.latitude != null && row.longitude != null) {
+        // Already cached AND sane → return as-is. A cached point outside Canada
+        // is stale/wrong (from before the country lock) — fall through & re-geocode.
+        if (row.latitude != null && row.longitude != null && inCanada(row.latitude, row.longitude)) {
           results.push({ id: row.id, latitude: row.latitude, longitude: row.longitude });
           continue;
         }
