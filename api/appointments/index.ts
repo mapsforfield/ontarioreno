@@ -876,15 +876,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           continue;
         }
         const addr = (row.address ?? '').trim();
-        // Events' address is a full freeform location (e.g. a showroom in another
-        // city) — geocode by address only so a stale client city can't drag the
-        // pin. Consultations may use a city-level fallback for messy addresses.
+        const city = (row.city ?? '').trim();
+        const postal = (row.postalCode ?? '').trim();
         const isEvent = GEO_EVENT_TYPES.includes(row.appointmentType);
-        const city = isEvent ? '' : (row.city ?? '').trim();
-        const queries = [
-          [addr, city, 'Ontario, Canada'].filter(Boolean).join(', '),
-          !isEvent && city ? `${city}, Ontario, Canada` : '',
-        ].filter((q, i, arr) => q && q !== 'Ontario, Canada' && arr.indexOf(q) === i);
+        // Build geocode candidates from most-specific to least. A wrong/informal
+        // city (e.g. "Upper Stoney Creek") makes Nominatim return NOTHING, so the
+        // reliable anchors are the postal code and an ADDRESS-ONLY attempt — both
+        // added as fallbacks so a pin still resolves. Events skip the client city
+        // (it may be stale) but still use address + postal.
+        const seen = new Set<string>();
+        const queries: string[] = [];
+        const addQ = (...parts: string[]) => {
+          const q = parts.filter(Boolean).join(', ').trim();
+          if (q && q !== 'Ontario, Canada' && q !== 'Canada' && !seen.has(q)) {
+            seen.add(q);
+            queries.push(q);
+          }
+        };
+        if (addr) {
+          if (!isEvent && city) addQ(addr, city, 'Ontario, Canada');
+          if (postal) addQ(addr, postal, 'Ontario, Canada');
+          addQ(addr, 'Ontario, Canada'); // address-only — works when the city is wrong
+        }
+        if (postal) addQ(postal, 'Canada'); // postal-only → at least a neighbourhood pin
+        if (!isEvent && city) addQ(city, 'Ontario, Canada'); // city-level last resort
 
         let found: { lat: number; lon: number } | null = null;
         for (const q of queries) {
