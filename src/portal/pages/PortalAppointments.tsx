@@ -289,10 +289,10 @@ function toDateKey(date: Date) {
   return localDateKey(date);
 }
 
-/** Canada bounding box — coords outside it are stale/wrong (e.g. an ambiguous
- *  address that resolved to Europe) and should be re-geocoded. */
-function coordsInCanada(lat?: number | null, lon?: number | null) {
-  return lat != null && lon != null && lat >= 41 && lat <= 84 && lon >= -142 && lon <= -50;
+/** Ontario bounding box — coords outside it are stale/wrong (e.g. an ambiguous
+ *  address that resolved to Calgary or Europe) and should be re-geocoded. */
+function coordsInOntario(lat?: number | null, lon?: number | null) {
+  return lat != null && lon != null && lat >= 41.5 && lat <= 57 && lon >= -95.5 && lon <= -74;
 }
 
 function getDaysSince(value: string) {
@@ -923,8 +923,8 @@ export default function PortalAppointments() {
       .filter(
         (a) =>
           (a.address?.trim() || a.city?.trim()) &&
-          // No coords yet, OR cached coords that landed outside Canada (stale/wrong).
-          !coordsInCanada(a.latitude, a.longitude) &&
+          // No coords yet, OR cached coords that landed outside Ontario (stale/wrong).
+          !coordsInOntario(a.latitude, a.longitude) &&
           (geocodeAttemptsRef.current.get(a.id) ?? 0) < 3
       )
       .map((a) => a.id);

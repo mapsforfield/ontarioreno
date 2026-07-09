@@ -854,14 +854,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const results: Array<{ id: string; latitude: number | null; longitude: number | null }> = [];
       const startTime = Date.now();
       const TIME_BUDGET = 8500; // leave headroom under the function timeout
-      // Every client is in Ontario — reject anything outside Canada's bounds so an
-      // ambiguous freeform address (e.g. an event's "120 Cittadella Boulevard"
-      // with no city) can never resolve to a same-named place in Europe.
-      const inCanada = (lat: number, lon: number) =>
-        lat >= 41 && lat <= 84 && lon >= -142 && lon <= -50;
+      // Every client is in Ontario — reject anything outside Ontario's bounds so
+      // an ambiguous freeform address (e.g. an event's "106 Summerlea Rd") can't
+      // resolve to a same-named street in another province (Calgary) or country.
+      const inOntario = (lat: number, lon: number) =>
+        lat >= 41.5 && lat <= 57 && lon >= -95.5 && lon <= -74;
       const geocodeOne = async (q: string) => {
-        // countrycodes=ca locks results to Canada.
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ca&q=${encodeURIComponent(q)}`;
+        // Lock to Canada and bias toward Ontario (viewbox, unbounded so valid
+        // addresses are never dropped); a hit outside Ontario is rejected below.
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ca&viewbox=-95.5,41.5,-74,57&q=${encodeURIComponent(q)}`;
         const resp = await fetch(url, {
           headers: { 'User-Agent': 'OntarioReno-Portal/1.0 (info@ontarioreno.ca)' },
         });
@@ -870,13 +871,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!hit) return null;
         const lat = parseFloat(hit.lat);
         const lon = parseFloat(hit.lon);
-        return inCanada(lat, lon) ? { lat, lon } : null;
+        return inOntario(lat, lon) ? { lat, lon } : null;
       };
 
       for (const row of rows) {
-        // Already cached AND sane → return as-is. A cached point outside Canada
-        // is stale/wrong (from before the country lock) — fall through & re-geocode.
-        if (row.latitude != null && row.longitude != null && inCanada(row.latitude, row.longitude)) {
+        // Already cached AND sane → return as-is. A cached point outside Ontario
+        // is stale/wrong (from before this lock) — fall through & re-geocode.
+        if (row.latitude != null && row.longitude != null && inOntario(row.latitude, row.longitude)) {
           results.push({ id: row.id, latitude: row.latitude, longitude: row.longitude });
           continue;
         }
