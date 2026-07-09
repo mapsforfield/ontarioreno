@@ -886,9 +886,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           results.push({ id: row.id, latitude: null, longitude: null });
           continue;
         }
-        const addr = (row.address ?? '').trim();
+        // De-double / clean a messy freeform address: if a Canadian postal code
+        // appears, cut everything after the FIRST one — this fixes addresses that
+        // got saved twice (e.g. "…Brampton, ON L6T 5E5106 Summerlea Rd…L6T 5E5"),
+        // which otherwise geocode to garbage / the wrong province.
+        const rawAddr = (row.address ?? '').trim();
+        const postalMatch = rawAddr.match(/[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d/);
+        const addr = postalMatch
+          ? rawAddr.slice(0, (postalMatch.index ?? 0) + postalMatch[0].length).trim()
+          : rawAddr;
         const city = (row.city ?? '').trim();
-        const postal = (row.postalCode ?? '').trim();
+        // Prefer an explicit postal field; otherwise use one found in the address.
+        const postal = (row.postalCode ?? '').trim() || (postalMatch ? postalMatch[0].trim() : '');
         const isEvent = GEO_EVENT_TYPES.includes(row.appointmentType);
         // Build geocode candidates from most-specific to least. A wrong/informal
         // city (e.g. "Upper Stoney Creek") makes Nominatim return NOTHING, so the
@@ -927,6 +936,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await prisma.appointment.update({ where: { id: row.id }, data: { latitude: found.lat, longitude: found.lon } });
           results.push({ id: row.id, latitude: found.lat, longitude: found.lon });
         } else {
+          // Couldn't resolve. If a stale out-of-Ontario point was cached, wipe it
+          // so we never keep showing a wrong pin (Calgary/Europe).
+          if (row.latitude != null && row.longitude != null && !inOntario(row.latitude, row.longitude)) {
+            await prisma.appointment.update({ where: { id: row.id }, data: { latitude: null, longitude: null } });
+          }
           results.push({ id: row.id, latitude: null, longitude: null });
         }
       }
