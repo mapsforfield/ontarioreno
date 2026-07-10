@@ -56,12 +56,11 @@
     />
     <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
 
-    <!-- Favicon: use the square 512x512 icon (Google requires a square favicon;
-         the old favicon.png was 64x66 and got dropped from search results). A
-         /favicon.ico rewrite (vercel.json) serves this same image for Google's
-         default fetch. -->
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512" />
+    <!-- Favicon: the blue-circle favicon.png that Google already recognises and
+         displays in search results. (/favicon.ico also serves it via the
+         vercel.json rewrite for Google's default root fetch.) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
 
     <!-- PWA manifest — enables standalone mode + push on iOS 16.4+ -->
     <link rel="manifest" href="/manifest.json" />
