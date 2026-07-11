@@ -99,6 +99,7 @@ export async function seedMunicipalities(): Promise<number> {
 export async function seedSources(): Promise<number> {
   await ensureSchema();
   await seedMunicipalities();
+  await purgeBlockedSources(); // remove anything already recorded from a blocked domain
   let added = 0;
   for (const s of SEED_SOURCES) {
     const muni = s.slug ? await prisma.municipality.findUnique({ where: { slug: s.slug } }) : null;
@@ -419,13 +420,31 @@ export async function scanAllSources(opts: { force?: boolean; limit?: number } =
 
 // ─── DISCOVERY job (Tavily) ───────────────────────────────────────────────────
 type TavilyResult = { url: string; title?: string };
+// Domains to keep OUT of discovery results — low-quality aggregators / competitor
+// sites whose listings are unreliable. Add a domain here to block it everywhere.
+export const BLOCKED_DOMAINS = ['backyardhomescanada.ca'];
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
+}
+export function isBlocked(url: string): boolean {
+  const h = hostOf(url);
+  return BLOCKED_DOMAINS.some((d) => h === d || h.endsWith('.' + d));
+}
+/** Delete any existing sources on a blocked domain (cascade removes their programs). */
+async function purgeBlockedSources(): Promise<void> {
+  const sources = await prisma.grantSource.findMany({ select: { id: true, url: true } });
+  const ids = sources.filter((s) => isBlocked(s.url)).map((s) => s.id);
+  if (ids.length) await prisma.grantSource.deleteMany({ where: { id: { in: ids } } }).catch(() => { /* best-effort */ });
+}
+
 async function tavilySearch(query: string, includeDomain: string): Promise<TavilyResult[]> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) throw new Error('TAVILY_API_KEY not configured');
   const resp = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ api_key: apiKey, query, search_depth: 'basic', max_results: 5, include_domains: includeDomain ? [includeDomain] : undefined }),
+    // exclude_domains keeps blocked sites out of results (never fetched/classified).
+    body: JSON.stringify({ api_key: apiKey, query, search_depth: 'basic', max_results: 5, include_domains: includeDomain ? [includeDomain] : undefined, exclude_domains: BLOCKED_DOMAINS }),
     signal: AbortSignal.timeout(20_000),
   });
   if (!resp.ok) throw new Error(`Tavily ${resp.status}: ${(await resp.text().catch(() => '')).slice(0, 200)}`);
@@ -460,7 +479,7 @@ export async function runDiscovery(opts: { limit?: number } = {}): Promise<Disco
       const urls = new Set<string>();
       for (const q of DISCOVERY_QUERIES) {
         const results = await tavilySearch(`${muni.name} ${q}`, muni.domain);
-        for (const r of results) if (r.url) urls.add(r.url.split('#')[0]);
+        for (const r of results) if (r.url && !isBlocked(r.url)) urls.add(r.url.split('#')[0]);
       }
       // Classify only URLs we haven't already recorded.
       for (const url of [...urls].slice(0, 8)) {
@@ -523,7 +542,7 @@ export async function discoverCity(cityName: string): Promise<CitySearchResult> 
   ];
   const urls = new Set<string>();
   for (const q of queries) {
-    try { for (const r of await tavilySearch(q, '')) if (r.url) urls.add(r.url.split('#')[0]); }
+    try { for (const r of await tavilySearch(q, '')) if (r.url && !isBlocked(r.url)) urls.add(r.url.split('#')[0]); }
     catch { /* skip a failed query */ }
   }
 
