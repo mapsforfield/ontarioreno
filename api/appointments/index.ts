@@ -17,6 +17,28 @@ const CREATE_CLIENT_VIDEO_TABLE =
   '"uploadedByUserId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024; // 250 MB per clip
+const MAX_FINANCE_BYTES = 25 * 1024 * 1024; // 25 MB per finance doc/photo
+
+// Self-healing table for the per-consultation Finance send-in application.
+// The whole questionnaire (plus R2 file keys) lives in one JSON payload.
+const CREATE_FINANCE_TABLE =
+  'CREATE TABLE IF NOT EXISTS "FinanceApplication" (' +
+  '"id" TEXT PRIMARY KEY, "appointmentId" TEXT UNIQUE NOT NULL, ' +
+  '"payload" TEXT NOT NULL DEFAULT \'{}\', "updatedByUserId" TEXT, ' +
+  '"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, ' +
+  '"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
+
+// Collect every R2 key referenced in a finance payload and hand back fresh
+// signed view URLs so the browser can render the DL photo & documents.
+function financeFileUrls(payload: unknown): Record<string, string> {
+  const urls: Record<string, string> = {};
+  if (!payload || typeof payload !== 'object') return urls;
+  const p = payload as { dlPhotoKey?: string; documents?: Array<{ key?: string }> };
+  const add = (k?: string) => { if (k && !urls[k]) urls[k] = presignGetUrl(k); };
+  add(p.dlPhotoKey);
+  (p.documents ?? []).forEach((d) => add(d?.key));
+  return urls;
+}
 
 // Runs the one-time event-city cleanup at most once per warm instance.
 let eventCityBackfillDone = false;
@@ -738,6 +760,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ── Finance send-in application for a consultation ──
+    if (req.query['_resource'] === 'finance') {
+      const appointmentId = String(req.query['appointmentId'] ?? '');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      try {
+        const rows = (await prisma.$queryRawUnsafe(
+          'SELECT payload FROM "FinanceApplication" WHERE "appointmentId" = $1',
+          appointmentId,
+        )) as Array<{ payload: string }>;
+        const payload = rows[0]?.payload ? JSON.parse(rows[0].payload) : null;
+        return res.status(200).json({ payload, urls: financeFileUrls(payload) });
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_FINANCE_TABLE);
+        return res.status(200).json({ payload: null, urls: {} });
+      }
+    }
+
     // ── Client videos (metadata + fresh signed view URLs) ──
     if (req.query['_resource'] === 'client_videos') {
       const clientId = String(req.query['clientId'] ?? '');
@@ -945,6 +984,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       return res.status(200).json({ results });
+    }
+
+    // ── Finance: save the whole application payload (upsert per consultation) ──
+    if (data._action === 'finance_save') {
+      const appointmentId = String(data.appointmentId ?? '');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      const payload = JSON.stringify(data.payload ?? {});
+      const upsert = () =>
+        prisma.$executeRawUnsafe(
+          'INSERT INTO "FinanceApplication" (id, "appointmentId", payload, "updatedByUserId", "updatedAt") ' +
+          'VALUES ($1,$2,$3,$4, CURRENT_TIMESTAMP) ' +
+          'ON CONFLICT ("appointmentId") DO UPDATE SET payload = EXCLUDED.payload, "updatedByUserId" = EXCLUDED."updatedByUserId", "updatedAt" = CURRENT_TIMESTAMP',
+          randomUUID(), appointmentId, payload, user.id,
+        );
+      try {
+        await upsert();
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_FINANCE_TABLE);
+        await upsert();
+      }
+      return res.status(200).json({ ok: true, urls: financeFileUrls(data.payload) });
+    }
+
+    // ── Finance: presigned upload for the DL photo or a supporting document ──
+    if (data._action === 'finance_presign') {
+      if (!isR2Configured()) return res.status(503).json({ error: 'File storage is not configured.' });
+      const appointmentId = String(data.appointmentId ?? '');
+      const kind = String(data.kind ?? 'doc');
+      const contentType = String(data.contentType ?? '');
+      const sizeBytes = Number(data.sizeBytes ?? 0);
+      const fileName = String(data.fileName ?? 'file');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      if (!contentType.startsWith('image/') && contentType !== 'application/pdf') {
+        return res.status(400).json({ error: 'Only images or PDFs are allowed.' });
+      }
+      if (sizeBytes <= 0 || sizeBytes > MAX_FINANCE_BYTES) {
+        return res.status(400).json({ error: `File must be between 0 and ${Math.round(MAX_FINANCE_BYTES / 1024 / 1024)} MB.` });
+      }
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
+      const rand = Math.random().toString(36).slice(2, 10);
+      const key = `finance/${appointmentId}/${kind}-${Date.now()}-${rand}-${safeName}`;
+      return res.status(200).json({ uploadUrl: presignPutUrl(key), key, url: presignGetUrl(key) });
     }
 
     // ── Client video: step 1, hand the browser a presigned upload URL ──

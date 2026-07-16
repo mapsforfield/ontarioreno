@@ -27,6 +27,7 @@ import {
   ClientVideo,
   CommissionInvoiceRecord,
   ConsultationStage,
+  FinancePayload,
   Household,
   Interaction,
   CallOutcome,
@@ -161,6 +162,9 @@ type PortalDataContextValue = PortalDataState & {
   deleteClientVideo: (id: string) => Promise<void>;
   updateClientMedia: (id: string, label: string) => Promise<void>;
   sendClientMedia: (id: string, to: string, note: string) => Promise<{ ok: boolean; error?: string }>;
+  getFinance: (appointmentId: string) => Promise<{ payload: FinancePayload | null; urls: Record<string, string> }>;
+  saveFinance: (appointmentId: string, payload: FinancePayload) => Promise<Record<string, string>>;
+  financeUpload: (appointmentId: string, kind: string, file: File, onProgress?: (pct: number) => void) => Promise<{ key: string; url: string } | null>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -1874,6 +1878,40 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       updateClientMedia: async (id, label) => {
         await apiCall('/api/appointments', { method: 'POST', body: JSON.stringify({ _action: 'client_video_update', id, label }) });
+      },
+
+      getFinance: async (appointmentId) => {
+        const r = await apiCall<{ payload: FinancePayload | null; urls: Record<string, string> }>(
+          `/api/appointments?_resource=finance&appointmentId=${encodeURIComponent(appointmentId)}`,
+        );
+        return r ?? { payload: null, urls: {} };
+      },
+
+      saveFinance: async (appointmentId, payload) => {
+        const r = await apiCall<{ ok: boolean; urls: Record<string, string> }>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'finance_save', appointmentId, payload }),
+        });
+        return r?.urls ?? {};
+      },
+
+      financeUpload: async (appointmentId, kind, file, onProgress) => {
+        const contentType = file.type || 'application/octet-stream';
+        const presign = await apiCall<{ uploadUrl: string; key: string; url: string }>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'finance_presign', appointmentId, kind, fileName: file.name, contentType, sizeBytes: file.size }),
+        });
+        if (!presign?.uploadUrl) return null;
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', presign.uploadUrl);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.send(file);
+        });
+        return { key: presign.key, url: presign.url };
       },
 
       sendClientMedia: async (id, to, note) => {
