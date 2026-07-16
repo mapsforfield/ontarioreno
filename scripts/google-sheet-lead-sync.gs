@@ -124,3 +124,28 @@ function setUp() {
   ScriptApp.newTrigger('syncNewLeads').timeBased().everyMinutes(5).create();
   syncNewLeads(); // first pass now
 }
+
+/**
+ * OPTIONAL — run this ONCE *before* setUp if you only want NEW rows from now on.
+ * It stamps every existing row as already-synced so your current backlog is NOT
+ * pushed into the Call Flow. Skip it if you DO want your whole list imported.
+ */
+function markAllSyncedWithoutSending() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+  const headers = values[0];
+  let syncedIdx = headers.findIndex((h) => normHeader(h) === normHeader(CONFIG.SYNCED_HEADER));
+  if (syncedIdx < 0) {
+    syncedIdx = headers.length;
+    sheet.getRange(1, syncedIdx + 1).setValue(CONFIG.SYNCED_HEADER);
+  }
+  const now = new Date();
+  let marked = 0;
+  for (let r = 1; r < values.length; r++) {
+    if (!values[r][syncedIdx]) { sheet.getRange(r + 1, syncedIdx + 1).setValue(now); marked++; }
+  }
+  console.log('Marked ' + marked + ' existing row(s) as already-synced.');
+}
