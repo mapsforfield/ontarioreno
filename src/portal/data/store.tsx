@@ -528,11 +528,17 @@ function sortLeadQueue(leads: Lead[]): Lead[] {
     });
 }
 
+// Value commission is calculated on: the job value minus any promotional finance
+// fee (e.g. a 2% fee on a $100k job → commissions are figured on $98k).
+export function commissionableValue(deal: Pick<Deal, 'estimatedJobValue' | 'financeFeePercent'>): number {
+  const fee = Math.max(0, Math.min(Number(deal.financeFeePercent) || 0, 100));
+  return Math.round(deal.estimatedJobValue * (1 - fee / 100));
+}
+
 function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
-  const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
-  const adminTotalEstimatedCommission = Math.round(
-    deal.estimatedJobValue * defaultRate
-  );
+  const base = commissionableValue(deal);
+  const repEstimatedCommission = Math.round(base * 0.05);
+  const adminTotalEstimatedCommission = Math.round(base * defaultRate);
 
   return {
     id: createId('commission'),
@@ -570,10 +576,9 @@ function syncCommissionWithDeal(commission: Commission, deal: Deal) {
     };
   }
 
-  const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
-  const adminTotalEstimatedCommission = Math.round(
-    deal.estimatedJobValue * commission.adminTotalCommissionRate
-  );
+  const base = commissionableValue(deal);
+  const repEstimatedCommission = Math.round(base * 0.05);
+  const adminTotalEstimatedCommission = Math.round(base * commission.adminTotalCommissionRate);
 
   return {
     ...commission,
@@ -1958,8 +1963,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             lockedRate !== null && deal
               ? current.commissions.map((c) => {
                   if (c.dealId !== dealId) return c;
-                  const repEst = Math.round(deal.estimatedJobValue * 0.05);
-                  const totalEst = Math.round(deal.estimatedJobValue * lockedRate);
+                  const feeBase = commissionableValue(deal);
+                  const repEst = Math.round(feeBase * 0.05);
+                  const totalEst = Math.round(feeBase * lockedRate);
                   return {
                     ...c,
                     adminTotalCommissionRate: lockedRate,
@@ -2339,7 +2345,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           );
           const repName = relatedRep?.name ?? 'rep';
           const repEstimatedCommission = relatedDeal
-            ? Math.round(relatedDeal.estimatedJobValue * 0.05)
+            ? Math.round(commissionableValue(relatedDeal) * 0.05)
             : existingCommission?.repEstimatedCommission ?? 0;
           const nextPaidAmount = (() => {
             if (!existingCommission) return 0;
@@ -2400,13 +2406,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               const repEst = customPayout
                 ? Math.round(updates.repEstimatedCommission ?? commission.repEstimatedCommission)
                 : deal
-                  ? Math.round(deal.estimatedJobValue * 0.05)
+                  ? Math.round(commissionableValue(deal) * 0.05)
                   : commission.repEstimatedCommission;
               const adminTotalEstimatedCommission = customPayout
                 ? Math.round(updates.adminTotalEstimatedCommission ?? commission.adminTotalEstimatedCommission)
                 : updates.adminTotalEstimatedCommission ??
                   (deal
-                    ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
+                    ? Math.round(commissionableValue(deal) * adminTotalCommissionRate)
                     : commission.adminTotalEstimatedCommission);
               const requestedPaid =
                 updates.repPaidCommission ?? commission.repPaidCommission;

@@ -42,6 +42,7 @@ type DealFormState = {
   city: string;
   email: string;
   estimatedJobValue: string;
+  financeFeePercent: string;
   financingRequired: boolean;
   homeownerName: string;
   nextFollowUpDate: string;
@@ -87,6 +88,7 @@ const emptyDealForm: DealFormState = {
   city: '',
   email: '',
   estimatedJobValue: '0',
+  financeFeePercent: '',
   financingRequired: true,
   homeownerName: '',
   nextFollowUpDate: '',
@@ -117,6 +119,7 @@ function dealToForm(deal: Deal): DealFormState {
     city: deal.city,
     email: deal.email,
     estimatedJobValue: String(deal.estimatedJobValue),
+    financeFeePercent: deal.financeFeePercent ? String(deal.financeFeePercent) : '',
     financingRequired: deal.financingRequired,
     homeownerName: deal.homeownerName,
     nextFollowUpDate: deal.nextFollowUpDate,
@@ -708,6 +711,7 @@ export default function PortalDeals() {
       city: form.city.trim(),
       email: form.email.trim(),
       estimatedJobValue: Number(form.estimatedJobValue) || 0,
+      financeFeePercent: Math.max(0, Math.min(Number(form.financeFeePercent) || 0, 100)),
       financingRequired: form.financingRequired,
       homeownerName: form.homeownerName.trim(),
       notes: form.notes.trim(),
@@ -1859,6 +1863,31 @@ OntarioReno Broker Portal`;
                     <option value="yes">Yes</option>
                     <option value="no">No</option>
                   </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Finance Fee %
+                  <input
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    type="number"
+                    placeholder="0"
+                    value={form.financeFeePercent}
+                    onChange={(event) =>
+                      updateForm('financeFeePercent', event.target.value)
+                    }
+                  />
+                  {(() => {
+                    const fee = Math.max(0, Math.min(Number(form.financeFeePercent) || 0, 100));
+                    if (fee <= 0) return null;
+                    const jv = Number(form.estimatedJobValue) || 0;
+                    const feeAmt = Math.round(jv * (fee / 100));
+                    return (
+                      <span className="text-xs font-medium text-slate-500">
+                        −{formatCurrency(feeAmt)} deducted → commission on {formatCurrency(jv - feeAmt)}
+                      </span>
+                    );
+                  })()}
                 </label>
                 {!isAddingDeal && (
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">

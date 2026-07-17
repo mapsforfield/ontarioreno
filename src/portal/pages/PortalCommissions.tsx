@@ -13,7 +13,7 @@ import {
   formatCurrency,
   formatDealStatus,
 } from '../data/selectors';
-import { usePortalData } from '../data/store';
+import { commissionableValue, usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
 import { torontoToday } from '../lib/time';
 import type { InvoiceData } from '../components/CommissionInvoice';
@@ -42,7 +42,7 @@ const statusFilterOptions: Array<{ label: string; value: DealStatus | 'all' }> =
 
 function calculateRepEstimatedCommission(deal: Deal) {
   if (deal.status === 'lost') return 0;
-  return Math.round(deal.estimatedJobValue * 0.05);
+  return Math.round(commissionableValue(deal) * 0.05);
 }
 
 /** Pending / Partial / Paid derived from an amount paid vs. an amount owed. */
@@ -496,7 +496,7 @@ export default function PortalCommissions() {
                     if (c.customPayout) return;
                     const deal = getDeal(c.dealId);
                     if (!deal) return;
-                    const newTotal = Math.round(deal.estimatedJobValue * rate);
+                    const newTotal = Math.round(commissionableValue(deal) * rate);
                     updateCommission(c.id, {
                       adminTotalCommissionRate: rate,
                       adminTotalEstimatedCommission: newTotal,

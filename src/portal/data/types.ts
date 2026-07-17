@@ -246,6 +246,8 @@ export type Deal = {
   postalCode: string;
   projectType: string;
   estimatedJobValue: number;
+  /** Promotional finance fee (%) deducted from the job value before commission. */
+  financeFeePercent?: number;
   financingRequired: boolean;
   assignedRepId: string;
   assignedContractorId: string | null;
