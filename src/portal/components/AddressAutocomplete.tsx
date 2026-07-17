@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-type Picked = { address: string; city: string; postalCode: string };
+type Picked = { address: string; city: string; postalCode: string; formatted?: string };
 type Suggestion = { placeId: string; description: string };
 
 function newToken(): string {
@@ -65,7 +65,7 @@ export default function AddressAutocomplete({
       );
       const p = (await res.json()) as Picked;
       if (p && p.address) {
-        onSelect({ address: p.address, city: fillCityPostal ? p.city : '', postalCode: fillCityPostal ? p.postalCode : '' });
+        onSelect({ address: p.address, city: fillCityPostal ? p.city : '', postalCode: fillCityPostal ? p.postalCode : '', formatted: p.formatted });
       }
     } catch {
       /* keep the description text we already set */

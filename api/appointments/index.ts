@@ -754,7 +754,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const city = (get('locality') ?? get('postal_town') ?? get('sublocality') ?? get('administrative_area_level_2'))?.longText ?? '';
         const postalCode = get('postal_code')?.longText ?? '';
         const address = [streetNum, route].filter(Boolean).join(' ') || (j.formattedAddress?.split(',')[0] ?? '');
-        return res.status(200).json({ address, city, postalCode });
+        // Google's own one-line address (minus the country) — used by single-field
+        // forms so they don't have to recompose from components that Google may
+        // omit (e.g. postal code missing on some route-level results).
+        const formatted = (j.formattedAddress ?? '').replace(/,\s*(Canada|CA)\s*$/i, '').trim();
+        return res.status(200).json({ address, city, postalCode, formatted });
       } catch {
         return res.status(500).json({ error: 'Lookup failed.' });
       }

@@ -15,10 +15,11 @@ const DEFAULT_DOCS: FinanceDocument[] = [
 
 type Prefill = { firstName?: string; lastName?: string; phone?: string; email?: string; address?: string };
 
-// Google Places gives us the street line, city and postal separately; the
-// finance form keeps a single address string, so compose the full one-liner
-// (street, city + postal) instead of dropping city/postal on the floor.
-function fullAddress(p: { address: string; city: string; postalCode: string }): string {
+// The finance form keeps a single address string. Prefer Google's own one-line
+// formatted address (already complete); only fall back to composing from the
+// street/city/postal components when that isn't available.
+function fullAddress(p: { address: string; city: string; postalCode: string; formatted?: string }): string {
+  if (p.formatted && p.formatted.trim()) return p.formatted.trim();
   const cityPostal = [p.city, p.postalCode].filter(Boolean).join(' ');
   return [p.address, cityPostal].filter(Boolean).join(', ');
 }
