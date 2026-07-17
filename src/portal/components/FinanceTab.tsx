@@ -253,7 +253,7 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
         {field('Employment position', 'employmentPosition')}
         <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
           Employer's address
-          <AddressAutocomplete value={form.employerAddress} onChange={(v) => set('employerAddress', v)} onSelect={({ address }) => set('employerAddress', address)} placeholder="Start typing the employer's address…" />
+          <AddressAutocomplete value={form.employerAddress} onChange={(v) => set('employerAddress', v)} onSelect={(p) => set('employerAddress', fullAddress(p))} placeholder="Start typing the employer's address…" />
         </label>
       </div>
 
