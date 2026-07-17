@@ -1018,6 +1018,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         firstName?: string; middleName?: string; lastName?: string; birthday?: string; phone?: string;
         email?: string; address?: string; incomeWithTaxes?: string; otherIncome?: string; employer?: string;
         employmentPosition?: string; employerAddress?: string; status?: string; dlPhotoKey?: string;
+        mailingSameAsInstall?: boolean; mailingAddress?: string;
         documents?: Array<{ label?: string; key?: string }>;
       } | null = null;
       try {
@@ -1034,7 +1035,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         payload.birthday ? `DOB: ${payload.birthday}` : '',
         payload.phone ? `Phone: ${payload.phone}` : '',
         payload.email ? `Email: ${payload.email}` : '',
-        payload.address ? `Address: ${payload.address}` : '',
+        payload.address ? `Install address: ${payload.address}` : '',
+        payload.mailingSameAsInstall === false
+          ? `Mailing address: ${payload.mailingAddress || '(not provided)'}`
+          : (payload.address ? 'Mailing address: same as install address' : ''),
         payload.incomeWithTaxes ? `Income (incl. taxes): ${payload.incomeWithTaxes}` : '',
         payload.otherIncome ? `Other income: ${payload.otherIncome}` : '',
         payload.employer ? `Employer: ${payload.employer}` : '',

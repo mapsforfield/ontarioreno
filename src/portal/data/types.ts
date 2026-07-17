@@ -321,6 +321,8 @@ export type FinancePayload = {
   birthday: string; // YYYY-MM-DD
   phone: string;
   address: string;
+  mailingSameAsInstall?: boolean; // mailing address = install (home) address
+  mailingAddress?: string; // used only when mailingSameAsInstall is false
   email: string;
   incomeWithTaxes: string;
   otherIncome: string;

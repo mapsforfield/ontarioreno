@@ -15,6 +15,14 @@ const DEFAULT_DOCS: FinanceDocument[] = [
 
 type Prefill = { firstName?: string; lastName?: string; phone?: string; email?: string; address?: string };
 
+// Google Places gives us the street line, city and postal separately; the
+// finance form keeps a single address string, so compose the full one-liner
+// (street, city + postal) instead of dropping city/postal on the floor.
+function fullAddress(p: { address: string; city: string; postalCode: string }): string {
+  const cityPostal = [p.city, p.postalCode].filter(Boolean).join(' ');
+  return [p.address, cityPostal].filter(Boolean).join(', ');
+}
+
 function blankPayload(prefill: Prefill): FinancePayload {
   return {
     firstName: prefill.firstName ?? '',
@@ -23,6 +31,8 @@ function blankPayload(prefill: Prefill): FinancePayload {
     birthday: '',
     phone: prefill.phone ?? '',
     address: prefill.address ?? '',
+    mailingSameAsInstall: true,
+    mailingAddress: '',
     email: prefill.email ?? '',
     incomeWithTaxes: '',
     otherIncome: '',
@@ -214,9 +224,28 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
         {field('Phone number', 'phone')}
         {field('Email', 'email', { type: 'email' })}
         <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
-          Address
-          <AddressAutocomplete value={form.address} onChange={(v) => set('address', v)} onSelect={({ address }) => set('address', address)} placeholder="Start typing the home address…" />
+          Address (where the product is installed)
+          <AddressAutocomplete value={form.address} onChange={(v) => set('address', v)} onSelect={(p) => set('address', fullAddress(p))} placeholder="Start typing the home address…" />
         </label>
+        <div className="grid gap-2 sm:col-span-2">
+          <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
+            <button
+              type="button"
+              onClick={() => set('mailingSameAsInstall', !(form.mailingSameAsInstall ?? true))}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${(form.mailingSameAsInstall ?? true) ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-300 hover:border-[#1B3C6C]'}`}
+              aria-label="Mailing address same as install address"
+            >
+              {(form.mailingSameAsInstall ?? true) && <Check className="h-3 w-3" />}
+            </button>
+            Mailing address is the same as the install address
+          </label>
+          {!(form.mailingSameAsInstall ?? true) && (
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Mailing address
+              <AddressAutocomplete value={form.mailingAddress ?? ''} onChange={(v) => set('mailingAddress', v)} onSelect={(p) => set('mailingAddress', fullAddress(p))} placeholder="Start typing the mailing address…" />
+            </label>
+          )}
+        </div>
         {field('Income (including taxes)', 'incomeWithTaxes', { placeholder: 'e.g. 85,000' })}
         {field('Other income', 'otherIncome')}
         {field('Employer', 'employer')}
