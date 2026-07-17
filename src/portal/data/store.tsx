@@ -165,6 +165,7 @@ type PortalDataContextValue = PortalDataState & {
   getFinance: (appointmentId: string) => Promise<{ payload: FinancePayload | null; urls: Record<string, string> }>;
   saveFinance: (appointmentId: string, payload: FinancePayload) => Promise<Record<string, string>>;
   financeUpload: (appointmentId: string, kind: string, file: File, onProgress?: (pct: number) => void) => Promise<{ key: string; url: string } | null>;
+  sendFinance: (appointmentId: string, method: 'email' | 'whatsapp', recipient: string) => Promise<{ ok: boolean; waUrl?: string; error?: string }>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -1912,6 +1913,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           xhr.send(file);
         });
         return { key: presign.key, url: presign.url };
+      },
+
+      sendFinance: async (appointmentId, method, recipient) => {
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _action: 'finance_send', appointmentId, method, recipient }),
+        });
+        if (res.ok) return (await res.json()) as { ok: boolean; waUrl?: string };
+        const msg = await res.json().catch(() => null);
+        return { ok: false, error: (msg && msg.error) || `Failed (${res.status})` };
       },
 
       sendClientMedia: async (id, to, note) => {

@@ -1,4 +1,4 @@
-import { Check, FileText, Loader2, Save, Upload } from 'lucide-react';
+import { Check, FileText, Loader2, Mail, MessageCircle, Save, Send, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
@@ -42,8 +42,13 @@ function mergeDocs(saved: FinanceDocument[] | undefined): FinanceDocument[] {
 }
 
 export default function FinanceTab({ appointmentId, prefill }: { appointmentId: string; prefill: Prefill }) {
-  const { getFinance, saveFinance, financeUpload } = usePortalData();
+  const { getFinance, saveFinance, financeUpload, sendFinance, contractors } = usePortalData();
   const [form, setForm] = useState<FinancePayload>(() => blankPayload(prefill));
+  const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email');
+  const [sendContractorId, setSendContractorId] = useState('');
+  const [sendEmail, setSendEmail] = useState('');
+  const [sendPhone, setSendPhone] = useState('');
+  const [sendBusy, setSendBusy] = useState(false);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,6 +127,44 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
   const toggleDoc = (docType: string, requested: boolean) => {
     set('documents', form.documents.map((d) => (d.type === docType ? { ...d, requested } : d)));
   };
+
+  const onPickContractor = (id: string) => {
+    setSendContractorId(id);
+    const c = contractors.find((x) => x.id === id);
+    if (c) {
+      setSendEmail((c.email ?? '').trim());
+      setSendPhone((c.phone ?? '').trim());
+    }
+  };
+
+  const doSend = async () => {
+    const recipient = (sendMethod === 'email' ? sendEmail : sendPhone).trim();
+    if (!recipient) {
+      showToast({ variant: 'error', message: sendMethod === 'email' ? 'Enter an email.' : 'Enter a phone number.' });
+      return;
+    }
+    // Open the tab synchronously (within the click) so it isn't popup-blocked;
+    // we redirect it to the WhatsApp URL once the server returns it.
+    const waWindow = sendMethod === 'whatsapp' ? window.open('', '_blank') : null;
+    setSendBusy(true);
+    try {
+      await saveFinance(appointmentId, form); // send the latest saved info
+      const r = await sendFinance(appointmentId, sendMethod, recipient);
+      if (!r.ok) { waWindow?.close(); showToast({ variant: 'error', message: 'Could not send', description: r.error }); return; }
+      if (sendMethod === 'whatsapp' && r.waUrl) {
+        if (waWindow) waWindow.location.href = r.waUrl; else window.open(r.waUrl, '_blank', 'noopener');
+        showToast({ variant: 'success', message: 'Opening WhatsApp…' });
+      } else {
+        showToast({ variant: 'success', message: 'Finance application emailed', description: recipient });
+      }
+    } catch {
+      showToast({ variant: 'error', message: 'Could not send. Try again.' });
+    } finally {
+      setSendBusy(false);
+    }
+  };
+
+  const contractorsWithContact = contractors.filter((c) => (c.email ?? '').trim() || (c.phone ?? '').trim());
 
   const field = (label: string, key: keyof FinancePayload, opts: { type?: string; full?: boolean; placeholder?: string } = {}) => (
     <label className={`grid gap-1.5 text-sm font-bold text-slate-700 ${opts.full ? 'sm:col-span-2' : ''}`}>
@@ -254,6 +297,66 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
           </div>
         </section>
       )}
+
+      {/* Send to a contractor */}
+      <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">Send to contractor</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Contractor
+            <select value={sendContractorId} onChange={(e) => onPickContractor(e.target.value)}>
+              <option value="">Select a contractor…</option>
+              {contractorsWithContact.map((c) => (
+                <option key={c.id} value={c.id}>{c.companyName}</option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Send via
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSendMethod('email')}
+                className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.5rem] border px-3 py-2 text-xs font-bold transition ${sendMethod === 'email' ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Mail className="h-3.5 w-3.5" /> Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendMethod('whatsapp')}
+                className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.5rem] border px-3 py-2 text-xs font-bold transition ${sendMethod === 'whatsapp' ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+              </button>
+            </div>
+          </div>
+          {sendMethod === 'email' ? (
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+              Email (edit if needed)
+              <input type="email" value={sendEmail} onChange={(e) => setSendEmail(e.target.value)} placeholder="contractor@example.com" />
+            </label>
+          ) : (
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+              WhatsApp number (edit if needed)
+              <input type="tel" value={sendPhone} onChange={(e) => setSendPhone(e.target.value)} placeholder="e.g. 416-555-0100" />
+            </label>
+          )}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={doSend}
+            disabled={sendBusy}
+            className={`inline-flex items-center gap-2 rounded-[0.5rem] px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-50 ${sendMethod === 'whatsapp' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#1B3C6C] hover:bg-[#153158]'}`}
+          >
+            {sendBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : sendMethod === 'whatsapp' ? <MessageCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            {sendBusy ? 'Sending…' : sendMethod === 'whatsapp' ? 'Open in WhatsApp' : 'Send email'}
+          </button>
+        </div>
+        <p className="mt-2 text-[0.7rem] font-semibold text-slate-400">
+          Sends the applicant details plus secure 7-day links to the licence &amp; documents. Saves the form first.
+        </p>
+      </section>
 
       <label className="grid gap-1.5 text-sm font-bold text-slate-700">
         Notes (optional)
