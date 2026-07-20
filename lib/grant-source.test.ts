@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validOfficialSourceUrl } from './grant-source.js';
+import { officialSourceFromProgram, validOfficialSourceUrl } from './grant-source.js';
 import { renderHubHtml, renderPageHtml } from './grants.js';
 
 const program = {
@@ -15,6 +15,11 @@ test('accepts only HTTP and HTTPS official source URLs', () => {
   assert.equal(validOfficialSourceUrl('javascript:alert(1)'), null);
   assert.equal(validOfficialSourceUrl('not a URL'), null);
   assert.equal(validOfficialSourceUrl(''), null);
+});
+
+test('resolves historical scanner storage before the related scan source', () => {
+  assert.equal(officialSourceFromProgram({ sourceUrl: '', sourceUrls: ['https://ontario.ca/historical'], source: { url: 'https://canada.ca/fallback' } }), 'https://ontario.ca/historical');
+  assert.equal(officialSourceFromProgram({ sourceUrl: 'invalid', sourceUrls: [], source: { url: 'https://www.toronto.ca/program' } }), 'https://www.toronto.ca/program');
 });
 
 test('hub shows a secure source link and keeps View grant routing', () => {

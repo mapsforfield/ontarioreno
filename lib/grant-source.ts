@@ -8,3 +8,23 @@ export function validOfficialSourceUrl(value: unknown): string | null {
     return null;
   }
 }
+
+type StoredGrantSource = {
+  sourceUrl?: unknown;
+  sourceUrls?: unknown;
+  source?: { url?: unknown } | null;
+};
+
+/** Resolve both current and legacy scanner storage without duplicating source data. */
+export function officialSourceFromProgram(program: StoredGrantSource): string | null {
+  const candidates = [
+    program.sourceUrl,
+    ...(Array.isArray(program.sourceUrls) ? program.sourceUrls : []),
+    program.source?.url,
+  ];
+  for (const candidate of candidates) {
+    const valid = validOfficialSourceUrl(candidate);
+    if (valid) return valid;
+  }
+  return null;
+}

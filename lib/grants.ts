@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validOfficialSourceUrl } from './grant-source.js';
+import { officialSourceFromProgram, validOfficialSourceUrl } from './grant-source.js';
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
 import { prisma } from './prisma.js';
@@ -365,6 +365,7 @@ async function applyClassification(
         data: {
           fingerprint: fp, name, status, maxAmount, deadline, eligibility, summary, sourceUrls, reviewState,
           category: existing.category || p.category, fundingType: existing.fundingType || p.fundingType,
+          sourceUrl: officialSourceFromProgram({ sourceUrl: existing.sourceUrl, sourceUrls, source: { url: source.url } }) || source.url,
           relevanceScore: Math.max(existing.relevanceScore, score), lastConfirmedAt: new Date(),
           ...(materiallyChanged ? { changedAt: new Date() } : {}),
         },
@@ -680,12 +681,12 @@ export async function getPublishedPage(slug: string) {
     const program = page.programId
       ? await prisma.grantProgram.findUnique({
           where: { id: page.programId },
-          select: { sourceUrl: true, jurisdiction: true, city: true, source: { select: { name: true } } },
+          select: { sourceUrl: true, sourceUrls: true, jurisdiction: true, city: true, source: { select: { name: true, url: true } } },
         })
       : null;
     return {
       ...page,
-      officialSourceUrl: validOfficialSourceUrl(program?.sourceUrl),
+      officialSourceUrl: program ? officialSourceFromProgram(program) : null,
       officialSourceLabel: program?.jurisdiction || program?.city || program?.source.name || page.city,
     };
   });
@@ -943,7 +944,7 @@ ${siteFooterHtml()}
 // page where one exists, otherwise a consultation CTA. Freshness ("Updated …")
 // comes free from the live monitor — a real edge over manually-kept lists.
 
-type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; linkUrl: string; sourceUrl: string; updatedAt: Date | string };
+type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; linkUrl: string; sourceUrl: string; sourceUrls?: unknown; source?: { url: string } | null; updatedAt: Date | string };
 type HubPage = { programId: string | null; slug: string; city: string };
 
 function statusBadge(status: string): string {
@@ -1016,7 +1017,7 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
 
   const rowsHtml = rows.map((p) => {
     const href = linkFor(p);
-    const sourceUrl = validOfficialSourceUrl(p.sourceUrl);
+    const sourceUrl = officialSourceFromProgram(p);
     const action = href
       ? `<a class="rowbtn" href="${esc(href)}">View grant →</a>`
       : `<a class="rowbtn ghost" href="/match?ref=grants-hub">Check eligibility</a>`;
@@ -1165,7 +1166,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
   await ensureSchema();
   const [pages, programs] = await Promise.all([
     prisma.grantLandingPage.findMany({ where: { status: 'published' }, select: { programId: true, slug: true } }),
-    prisma.grantProgram.findMany({ where: { reviewState: { in: ['reviewed', 'targeting'] } }, orderBy: [{ relevanceScore: 'desc' }, { city: 'asc' }] }),
+    prisma.grantProgram.findMany({ where: { reviewState: { in: ['reviewed', 'targeting'] } }, include: { source: { select: { url: true } } }, orderBy: [{ relevanceScore: 'desc' }, { city: 'asc' }] }),
   ]);
   const slugByProgram = new Map<string, string>();
   for (const p of pages) if (p.programId) slugByProgram.set(p.programId, p.slug);
@@ -1176,7 +1177,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
   for (const c of CURATED_PAGES) {
     const co = cityCoords(c.city);
     const matchingProgram = programs.find((p) => p.city.trim().toLowerCase() === c.city.toLowerCase());
-    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, sourceUrl: validOfficialSourceUrl(matchingProgram?.sourceUrl), fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, sourceUrl: matchingProgram ? officialSourceFromProgram(matchingProgram) : null, fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
   const seen = new Set<string>();
   for (const p of programs) {
@@ -1189,7 +1190,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     // Admin override wins; else auto-shorten the scraped value. Full text goes to
     // the table; the map pin uses a compact label (pillLabel).
     const displayAmount = (p.amountOverride && p.amountOverride.trim()) || shortAmount(p.maxAmount);
-    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, sourceUrl: validOfficialSourceUrl(p.sourceUrl), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, sourceUrl: officialSourceFromProgram(p), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
   const agg = new Map<string, HubMapCity>();
