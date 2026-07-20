@@ -20,6 +20,7 @@ type Page = {
   eligibility: string[] | null;
   faqs: Array<{ q: string; a: string }> | null;
   ctaHeading: string; ctaText: string; seoTitle: string; seoDescription: string;
+  officialSourceUrl?: string | null; officialSourceLabel?: string;
 };
 
 export default function GrantLandingPage() {
@@ -149,6 +150,17 @@ export default function GrantLandingPage() {
               {page.faqs.map((f, i) => <Faq key={i} q={f.q} a={f.a} />)}
             </div>
           </div>
+        </section>
+      )}
+
+      {page.officialSourceUrl && (
+        <section className="border-t border-slate-200 bg-white py-5">
+          <p className="mx-auto max-w-3xl px-4 text-center text-sm text-slate-600 sm:px-6 lg:px-8">
+            Official source: Verify current program details on the{' '}
+            <a href={page.officialSourceUrl} target="_blank" rel="noopener noreferrer" className="inline-block min-h-11 py-3 font-semibold text-[#1B3C6C] underline decoration-slate-300 underline-offset-2">
+              {page.officialSourceLabel || page.city || 'program administrator'} website ↗
+            </a>
+          </p>
         </section>
       )}
 

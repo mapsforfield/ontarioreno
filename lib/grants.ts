@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { validOfficialSourceUrl } from './grant-source.js';
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
 import { prisma } from './prisma.js';
@@ -673,7 +674,21 @@ export async function generatePage(programId: string): Promise<{ id: string; slu
 
 /** Public: fetch a PUBLISHED page by slug (unauthenticated, for the live site). */
 export async function getPublishedPage(slug: string) {
-  return withSchema(() => prisma.grantLandingPage.findFirst({ where: { slug, status: 'published' } }));
+  return withSchema(async () => {
+    const page = await prisma.grantLandingPage.findFirst({ where: { slug, status: 'published' } });
+    if (!page) return null;
+    const program = page.programId
+      ? await prisma.grantProgram.findUnique({
+          where: { id: page.programId },
+          select: { sourceUrl: true, jurisdiction: true, city: true, source: { select: { name: true } } },
+        })
+      : null;
+    return {
+      ...page,
+      officialSourceUrl: validOfficialSourceUrl(program?.sourceUrl),
+      officialSourceLabel: program?.jurisdiction || program?.city || program?.source.name || page.city,
+    };
+  });
 }
 
 /** Public handler: GET /api/appointments?resource=grant-page&slug=… (no auth). */
@@ -779,6 +794,7 @@ type RenderPage = {
   amountLabel: string; intro: string; ctaHeading: string; ctaText: string;
   seoTitle: string; seoDescription: string;
   sections: unknown; eligibility: unknown; faqs: unknown;
+  officialSourceUrl?: string | null; officialSourceLabel?: string;
 };
 
 export function renderPageHtml(page: RenderPage): string {
@@ -789,6 +805,8 @@ export function renderPageHtml(page: RenderPage): string {
   const desc = page.seoDescription || page.heroSubtitle;
   const url = `https://ontarioreno.ca/grants/${page.slug}`;
   const cta = page.ctaText || 'Book a free consultation';
+  const officialSourceUrl = validOfficialSourceUrl(page.officialSourceUrl);
+  const officialSourceLabel = page.officialSourceLabel || page.city || 'program administrator';
 
   const faqLd = faqs.length
     ? ldJson({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) })
@@ -872,6 +890,8 @@ ul.elig li:before{content:"✓";position:absolute;left:16px;color:var(--emerald)
 .cta{background:#0f172a;color:#fff;text-align:center}
 .cta .h2{color:#fff}
 .disc{color:#94a3b8;font-size:12px;max-width:40em;margin:18px auto 0}
+.source{padding:20px 0;background:#fff;border-top:1px solid #e2e8f0;text-align:center;color:var(--slate);font-size:14px}
+.source a{display:inline-block;padding:10px 4px;font-weight:700;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -903,6 +923,8 @@ ${eligibility.length ? `<section class="block"><div class="wrap"><h2 class="h2">
 
 ${faqs.length ? `<section class="block alt"><div class="wrap"><h2 class="h2">Common questions</h2>${faqsHtml}</div></section>` : ''}
 
+${officialSourceUrl ? `<section class="source"><div class="wrap">Official source: Verify current program details on the <a href="${esc(officialSourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(officialSourceLabel)} website ↗</a></div></section>` : ''}
+
 <section class="block cta"><div class="wrap">
   <h2 class="h2">${esc(page.ctaHeading || `Ready to explore your ${page.city} grant?`)}</h2>
   <p style="color:#cbd5e1">Book a free consultation — we'll confirm your eligibility and map out next steps.</p>
@@ -921,7 +943,7 @@ ${siteFooterHtml()}
 // page where one exists, otherwise a consultation CTA. Freshness ("Updated …")
 // comes free from the live monitor — a real edge over manually-kept lists.
 
-type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; linkUrl: string; updatedAt: Date | string };
+type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; linkUrl: string; sourceUrl: string; updatedAt: Date | string };
 type HubPage = { programId: string | null; slug: string; city: string };
 
 function statusBadge(status: string): string {
@@ -994,12 +1016,13 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
 
   const rowsHtml = rows.map((p) => {
     const href = linkFor(p);
+    const sourceUrl = validOfficialSourceUrl(p.sourceUrl);
     const action = href
       ? `<a class="rowbtn" href="${esc(href)}">View grant →</a>`
       : `<a class="rowbtn ghost" href="/match?ref=grants-hub">Check eligibility</a>`;
     return `<tr>
       <td data-l="City"><strong>${esc(p.city || '—')}</strong></td>
-      <td data-l="Program">${esc(p.name)}</td>
+      <td data-l="Program">${esc(p.name)}${sourceUrl ? `<br><a class="sourcelink" href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Official program source ↗</a>` : ''}</td>
       <td data-l="Amount">${esc(p.maxAmount || '—')}</td>
       <td data-l="Status">${statusBadge(p.status)}</td>
       <td data-l="">${action}</td>
@@ -1066,6 +1089,7 @@ table.grants td{padding:14px;border-bottom:1px solid #eef2f7;font-size:15px;colo
 .badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
 .rowbtn{display:inline-block;background:var(--navy);color:#fff;font-weight:700;font-size:13px;padding:8px 14px;border-radius:9px;text-decoration:none;white-space:nowrap}
 .rowbtn.ghost{background:#eef2f7;color:var(--navy)}
+.sourcelink{display:inline-block;margin-top:4px;padding:6px 0;font-size:13px;font-weight:600;text-underline-offset:3px}
 .apply{background:#0f172a;color:#fff;text-align:center}.apply .h2{color:#fff}.apply p{color:#cbd5e1;max-width:40em;margin:0 auto 20px}
 @media(max-width:680px){table.grants,table.grants tbody,table.grants tr,table.grants td{display:block;width:100%}table.grants thead{display:none}table.grants tr{border-bottom:1px solid #e2e8f0;padding:8px 0}table.grants td{border:0;padding:6px 14px}table.grants td[data-l]:before{content:attr(data-l)" ";font-weight:700;color:#64748b}}
 </style></head><body>
@@ -1132,7 +1156,7 @@ export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; 
   { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
 ];
 
-export type HubRow = { city: string; name: string; amount: string; status: string; href: string; fundingType: string; lat: number | null; lng: number | null };
+export type HubRow = { city: string; name: string; amount: string; status: string; href: string; sourceUrl: string | null; fundingType: string; lat: number | null; lng: number | null };
 export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
 
 /** Structured hub data (JSON) for the React /grants page: curated existing pages
@@ -1151,7 +1175,8 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
 
   for (const c of CURATED_PAGES) {
     const co = cityCoords(c.city);
-    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    const matchingProgram = programs.find((p) => p.city.trim().toLowerCase() === c.city.toLowerCase());
+    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, sourceUrl: validOfficialSourceUrl(matchingProgram?.sourceUrl), fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
   const seen = new Set<string>();
   for (const p of programs) {
@@ -1164,7 +1189,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     // Admin override wins; else auto-shorten the scraped value. Full text goes to
     // the table; the map pin uses a compact label (pillLabel).
     const displayAmount = (p.amountOverride && p.amountOverride.trim()) || shortAmount(p.maxAmount);
-    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, sourceUrl: validOfficialSourceUrl(p.sourceUrl), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
   const agg = new Map<string, HubMapCity>();

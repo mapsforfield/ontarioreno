@@ -13,7 +13,7 @@ import { buttonStyles } from '../lib/uiStyles';
 // Layout), fed by /api/appointments?resource=grants-hub-data — which merges the
 // hand-made grant pages (always shown) with scanner-approved programs.
 
-type Row = { city: string; name: string; amount: string; status: string; href: string; lat: number | null; lng: number | null };
+type Row = { city: string; name: string; amount: string; status: string; href: string; sourceUrl: string | null; lat: number | null; lng: number | null };
 type MapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
 type HubData = { updatedLabel: string; rows: Row[]; mapCities: MapCity[] };
 
@@ -171,7 +171,14 @@ export default function GrantsHub() {
                   return (
                     <tr key={i} className="border-t border-slate-100">
                       <td className="px-4 py-3 font-bold text-slate-900">{r.city || '—'}</td>
-                      <td className="px-4 py-3 text-slate-700">{r.name}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <div>{r.name}</div>
+                        {r.sourceUrl && (
+                          <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block py-1.5 text-xs font-semibold text-[#1B3C6C] underline decoration-slate-300 underline-offset-2 hover:decoration-[#1B3C6C]">
+                            Official program source ↗
+                          </a>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-700">{r.amount || '—'}</td>
                       <td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${s.c}`}>{s.t}</span></td>
                       <td className="px-4 py-3">
@@ -192,21 +199,26 @@ export default function GrantsHub() {
               const s = STATUS[r.status] ?? STATUS.unknown;
               const external = r.href.startsWith('/match');
               return (
-                <a key={i} href={r.href} className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50">
+                <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-base font-black tracking-[-0.01em] text-slate-900">{r.city || '—'}</div>
                       <div className="mt-0.5 text-sm leading-snug text-slate-600">{r.name}</div>
+                      {r.sourceUrl && (
+                        <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center py-1 text-sm font-semibold text-[#1B3C6C] underline decoration-slate-300 underline-offset-2">
+                          Official program source ↗
+                        </a>
+                      )}
                     </div>
                     <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${s.c}`}>{s.t}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
                     <span className="text-lg font-black text-[#1B3C6C]">{r.amount || 'Incentive'}</span>
-                    <span className="inline-flex items-center gap-1 text-sm font-bold text-[#1B3C6C]">
+                    <a href={r.href} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-bold text-[#1B3C6C] active:bg-slate-50">
                       {external ? 'Check eligibility' : 'View grant'} <ArrowRight className="h-4 w-4" />
-                    </span>
+                    </a>
                   </div>
-                </a>
+                </div>
               );
             })}
           </div>
