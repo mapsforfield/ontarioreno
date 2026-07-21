@@ -11,6 +11,25 @@ export type JwtPayload = {
   role: string;
 };
 
+// Authentication runs in front of nearly every portal API request. Keep this
+// projection deliberately small: avatarUrl can be a base64 image and pulling it
+// (plus the password hash and timestamps) on every request creates substantial
+// Neon egress without contributing to authorization.
+const AUTH_USER_SELECT = {
+  id: true,
+  name: true,
+  role: true,
+  email: true,
+  active: true,
+  contractorId: true,
+} as const;
+
+const PROFILE_USER_SELECT = {
+  ...AUTH_USER_SELECT,
+  avatarInitial: true,
+  avatarUrl: true,
+} as const;
+
 export function signToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: MAX_AGE });
 }
@@ -56,7 +75,22 @@ export async function getCurrentUser(req: VercelRequest) {
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  return prisma.user.findUnique({ where: { id: payload.userId, active: true } });
+  return prisma.user.findUnique({
+    where: { id: payload.userId, active: true },
+    select: AUTH_USER_SELECT,
+  });
+}
+
+/** Session profile lookup used only by /auth/me, where avatar data is needed. */
+export async function getCurrentUserProfile(req: VercelRequest) {
+  const token = getTokenFromRequest(req);
+  if (!token) return null;
+  const payload = verifyToken(token);
+  if (!payload) return null;
+  return prisma.user.findUnique({
+    where: { id: payload.userId, active: true },
+    select: PROFILE_USER_SELECT,
+  });
 }
 
 /** Middleware helper — returns user or sends 401 and returns null. */

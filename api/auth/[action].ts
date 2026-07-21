@@ -8,6 +8,7 @@ import {
   setAuthCookie,
   clearAuthCookie,
   getCurrentUser,
+  getCurrentUserProfile,
   requireAuth,
   requireAdmin,
   denyContractor,
@@ -238,7 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── /api/auth/me ─────────────────────────────────────────────────────────────
   if (action === 'me') {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
-    const user = await getCurrentUser(req);
+    const user = await getCurrentUserProfile(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated.' });
     const contractorName = user.role === 'contractor' && user.contractorId
       ? (await prisma.contractor.findUnique({ where: { id: user.contractorId }, select: { companyName: true } }).catch(() => null))?.companyName ?? null

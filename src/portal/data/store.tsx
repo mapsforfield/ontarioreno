@@ -676,6 +676,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const hasFetched = useRef(false);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hiddenAt = useRef<number | null>(null);
+
+  // Realtime is the primary freshness mechanism. The visibility fallback is
+  // only needed after a meaningful absence; reloading all 15 portal datasets on
+  // every Alt-Tab/window focus was the dominant source of avoidable DB egress.
+  const MIN_HIDDEN_REFRESH_MS = 5 * 60 * 1000;
 
   // Fetch the full portal dataset. `silent` skips the loading flag so
   // background refreshes (realtime pings, tab focus) don't flash a spinner.
@@ -782,17 +788,27 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, currentUser?.id]);
 
-  // Refresh when the rep returns to the tab — the zero-cost safety net that
-  // keeps data fresh even if realtime is unavailable.
+  // Refresh after returning to a browser tab that was actually hidden for at
+  // least five minutes. Window focus alone is intentionally ignored: switching
+  // between the portal and Quo/WhatsApp used to reload the full database.
   useEffect(() => {
     if (!currentUser) return;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') scheduleRefetch();
+      if (document.visibilityState === 'hidden') {
+        hiddenAt.current = Date.now();
+        return;
+      }
+      if (
+        document.visibilityState === 'visible' &&
+        hiddenAt.current !== null &&
+        Date.now() - hiddenAt.current >= MIN_HIDDEN_REFRESH_MS
+      ) {
+        scheduleRefetch();
+      }
+      hiddenAt.current = null;
     };
-    window.addEventListener('focus', scheduleRefetch);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      window.removeEventListener('focus', scheduleRefetch);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [currentUser?.id, scheduleRefetch]);

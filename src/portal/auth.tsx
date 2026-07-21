@@ -10,7 +10,6 @@ import { User } from './data/types';
 
 type PortalAuthContextValue = {
   currentUser: User | null;
-  users: User[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateCurrentUser: (updates: Partial<User>) => void;
@@ -25,7 +24,6 @@ const PortalAuthContext = createContext<PortalAuthContextValue | undefined>(
 
 export function PortalAuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // On mount, check if there's an existing JWT session
@@ -42,21 +40,9 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsAuthLoading(false));
   }, []);
 
-  // Keep an up-to-date user list for components that need it (e.g. user switcher).
-  // Fetched lazily after auth resolves.
-  useEffect(() => {
-    // Contractor accounts don't get the team list.
-    if (!currentUser || currentUser.role === 'contractor') return;
-    fetch('/api/users', { credentials: 'include' })
-      .then((res) => (res.ok ? (res.json() as Promise<User[]>) : []))
-      .then((list) => setUsers(list.filter((u) => u.active)))
-      .catch(() => {/* ignore */});
-  }, [currentUser?.id, currentUser?.role]); // re-fetch when the logged-in user changes
-
   const value = useMemo<PortalAuthContextValue>(
     () => ({
       currentUser,
-      users,
       isAuthLoading,
       updateCurrentUser: (updates) => setCurrentUser((u) => u ? { ...u, ...updates } : u),
       login: async (email, password) => {
@@ -76,12 +62,11 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
           () => {/* ignore */}
         );
         setCurrentUser(null);
-        setUsers([]);
       },
       isAdmin: currentUser?.role === 'admin',
       isContractor: currentUser?.role === 'contractor',
     }),
-    [currentUser, users, isAuthLoading]
+    [currentUser, isAuthLoading]
   );
 
   return (
