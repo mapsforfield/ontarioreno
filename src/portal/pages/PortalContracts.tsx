@@ -26,6 +26,8 @@ import { CONTRACT_TEMPLATES, templateForContractor, type ContractTemplateId } fr
 import { usePortalData } from '../data/store';
 import { presetsForProjectType, type ScopeLine } from '../data/scopePresets';
 import { buildContractPdf, contractFileName, loadImageAsDataUrl, prepareScopeImage, type ContractData, type PaymentMethod } from '../lib/contractPdf';
+import { ensureContractFonts } from '../lib/contractFonts';
+import { accentOptions, extractBrandColor, type AccentChoice, type RGB } from '../lib/brandColor';
 import { showToast } from '../lib/toast';
 
 const HST = 0.13;
@@ -74,6 +76,8 @@ type Draft = {
   cashSchedule: Array<{ pct: string; when: string }>;
   scope: ScopeLine[];
   specialTerms: string;
+  /** Which accent the rep picked: the contractor's brand, or the template's own. */
+  accentChoice: AccentChoice;
 };
 
 const DRAFT_KEY = (dealId: string) => `orp:contract-draft:${dealId || 'standalone'}`;
@@ -95,6 +99,13 @@ export default function PortalContracts() {
   const [logo, setLogo] = useState<string | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
   const [imagingLine, setImagingLine] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState<RGB | null>(null);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  // The embedded typefaces are a lazily-loaded chunk. Nothing renders until
+  // they've settled — otherwise the first preview draws in the fallback face
+  // and visibly reflows a moment later.
+  useEffect(() => { ensureContractFonts().then(() => setFontsReady(true)); }, []);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -142,6 +153,7 @@ export default function PortalContracts() {
       cashSchedule: DEFAULT_CASH.map((s) => ({ ...s })),
       scope: [newLine()],
       specialTerms: '',
+      accentChoice: 'brand',
     };
   }, [deal, contractors, dealId]);
 
@@ -180,11 +192,15 @@ export default function PortalContracts() {
     let cancelled = false;
     setLogo(null);
     setLogoFailed(false);
+    setBrandColor(null);
     if (contractor?.logoUrl) {
-      loadImageAsDataUrl(contractor.logoUrl).then((url) => {
+      loadImageAsDataUrl(contractor.logoUrl).then(async (url) => {
         if (cancelled) return;
         setLogo(url);
         setLogoFailed(url === null);
+        // Reuse the same decode to pull the brand colour out of the mark.
+        const brand = url ? await extractBrandColor(url) : null;
+        if (!cancelled) setBrandColor(brand);
       });
     }
     return () => { cancelled = true; };
@@ -192,6 +208,8 @@ export default function PortalContracts() {
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setD((cur) => (cur ? { ...cur, [key]: value } : cur));
+
+  const palette = useMemo(() => accentOptions(brandColor), [brandColor]);
 
   // ── Assemble the render payload ────────────────────────────────────────────
   const contractData: ContractData | null = useMemo(() => {
@@ -225,12 +243,13 @@ export default function PortalContracts() {
       scope: d.scope,
       specialTerms: d.specialTerms,
       templateId: d.templateId,
+      accentOverride: palette.find((o) => o.key === d.accentChoice)?.value ?? null,
     };
-  }, [d, contractors, logo]);
+  }, [d, contractors, logo, palette]);
 
   // ── Live preview, debounced so typing stays smooth ─────────────────────────
   useEffect(() => {
-    if (!contractData) return;
+    if (!contractData || !fontsReady) return;
     const timer = window.setTimeout(() => {
       try {
         const blob = buildContractPdf(contractData).output('blob') as Blob;
@@ -248,8 +267,9 @@ export default function PortalContracts() {
   useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current); }, []);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const download = () => {
+  const download = async () => {
     if (!contractData) return;
+    await ensureContractFonts();
     buildContractPdf(contractData).save(contractFileName(contractData));
   };
 
@@ -257,6 +277,7 @@ export default function PortalContracts() {
     if (!contractData || !deal) return;
     setAttaching(true);
     try {
+      await ensureContractFonts();
       const blob = buildContractPdf(contractData).output('blob') as Blob;
       const fileName = contractFileName(contractData);
       const file = new File([blob], fileName, { type: 'application/pdf' });
@@ -493,6 +514,39 @@ export default function PortalContracts() {
               </div>
             </div>
 
+            {/* Accent picker — the contractor's own colour, pulled off their
+                logo, with the template's authored colour as an escape hatch. */}
+            <div className="mt-4">
+              <p className={label}>Document colour</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {palette.map((opt) => {
+                  const active = d.accentChoice === opt.key;
+                  const swatch = opt.value
+                    ? `rgb(${opt.value.join(',')})`
+                    : `rgb(${(CONTRACT_TEMPLATES.find((t) => t.id === d.templateId)?.accent ?? [30, 30, 30]).join(',')})`;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => set('accentChoice', opt.key)}
+                      className={`inline-flex items-center gap-2 rounded-[0.5rem] border px-3 py-2 text-xs font-bold transition ${
+                        active ? 'border-[#1B3C6C] bg-[#f6faff] text-[#1B3C6C]' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="h-4 w-4 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
+                      {opt.label}
+                      {active && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs font-semibold text-slate-400">
+                {brandColor
+                  ? 'Brand colours are read from the contractor’s logo and darkened where needed so they stay legible.'
+                  : 'No brand colour could be read from this contractor’s logo — the template’s own colour is used.'}
+              </p>
+            </div>
+
             {/* Style picker */}
             <div className="mt-4">
               <p className={label}>Document style</p>
@@ -511,7 +565,7 @@ export default function PortalContracts() {
                     >
                       <span
                         className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.4rem] text-xs font-black text-white"
-                        style={{ backgroundColor: `rgb(${t.accent.join(',')})`, fontFamily: t.font === 'times' ? 'Georgia, serif' : 'inherit' }}
+                        style={{ backgroundColor: `rgb(${t.accent.join(',')})`, fontFamily: t.fontFallback === 'times' ? 'Georgia, serif' : 'inherit' }}
                       >
                         {t.name[0]}
                       </span>

@@ -12,6 +12,8 @@
 import { jsPDF } from 'jspdf';
 import type { RGB, SectionKey, TemplateSpec } from '../data/contractTemplates';
 import { getTemplate } from '../data/contractTemplates';
+import { contractFontsReady } from './contractFonts';
+import { tintOf } from './brandColor';
 import type { ScopeLine } from '../data/scopePresets';
 
 const PAGE_W = 612;
@@ -60,6 +62,8 @@ export type ContractData = {
   specialTerms: string;
 
   templateId: string;
+  /** Contractor brand colour chosen by the rep; null keeps the template's own. */
+  accentOverride?: [number, number, number] | null;
 };
 
 // ── Small helpers ────────────────────────────────────────────────────────────
@@ -190,19 +194,73 @@ class Layout {
   get width() { return this.right - this.left; }
   get bottom() { return PAGE_H - this.t.margin.bottom; }
 
+  // ── Column flow ──
+  // Body clauses can run in two columns (Harbor), which is one of the strongest
+  // signals that two documents came from different firms. Page furniture —
+  // masthead, scope table, signatures — always spans the full measure, so
+  // `left`/`width` stay page-level and body copy uses `flowLeft`/`flowWidth`.
+  private columns = 1;
+  private col = 0;
+  private readonly colGap = 24;
+  /**
+   * The y the current page's column flow starts at. On page one that sits below
+   * the masthead and parties block, so wrapping into the second column must
+   * return here — not to the page margin, which would run under the masthead.
+   */
+  private colTop = 0;
+
+  get flowWidth() { return this.columns === 1 ? this.width : (this.width - this.colGap) / 2; }
+  get flowLeft() { return this.left + this.col * (this.flowWidth + this.colGap); }
+
+  /** Switch the body into `n` columns, starting a fresh flow at the top. */
+  setColumns(n: 1 | 2) {
+    if (n === this.columns) return;
+    this.columns = n;
+    this.col = 0;
+    this.colTop = this.y;
+  }
+
+  /** Finish column flow and drop back to a full-measure single column. */
+  endColumns() {
+    if (this.columns === 1) return;
+    this.columns = 1;
+    this.col = 0;
+  }
+
+  /**
+   * The typeface to actually set. The embedded faces live in a lazily-loaded
+   * chunk; if it hasn't arrived (or failed), fall back to a built-in so the
+   * document still renders rather than throwing.
+   */
+  get family(): string {
+    return contractFontsReady() ? this.t.font : this.t.fontFallback;
+  }
+
   ink(c: RGB = this.t.ink) { this.doc.setTextColor(c[0], c[1], c[2]); }
   stroke(c: RGB = this.t.rule) { this.doc.setDrawColor(c[0], c[1], c[2]); }
   fill(c: RGB) { this.doc.setFillColor(c[0], c[1], c[2]); }
   font(style: 'normal' | 'bold' | 'italic' = 'normal', size = this.t.bodySize) {
-    this.doc.setFont(this.t.font, style);
+    // The embedded faces are subset to regular + bold to keep the chunk small,
+    // so italic resolves to regular. Secondary text already reads as secondary
+    // through colour, so nothing is lost.
+    const resolved = style === 'italic' && contractFontsReady() ? 'normal' : style;
+    this.doc.setFont(this.family, resolved);
     this.doc.setFontSize(size);
   }
 
-  /** Break to a new page if `need` points won't fit. */
+  /** Break to the next column, or the next page, if `need` points won't fit. */
   ensure(need: number) {
     if (this.y + need <= this.bottom) return;
+    if (this.columns === 2 && this.col === 0) {
+      this.col = 1;
+      this.y = this.colTop;
+      return;
+    }
     this.doc.addPage();
-    this.y = this.t.margin.top;
+    this.col = 0;
+    // A fresh page has no masthead above the flow, so columns start at the top.
+    this.colTop = this.t.margin.top;
+    this.y = this.colTop;
     this.runningHeader();
   }
 
@@ -240,12 +298,12 @@ class Layout {
     const indent = opts.indent ?? 0;
     const lh = size * t.leading;
     this.font(opts.style ?? 'normal', size);
-    const lines = this.doc.splitTextToSize(text, this.width - indent) as string[];
+    const lines = this.doc.splitTextToSize(text, this.flowWidth - indent) as string[];
     lines.forEach((line) => {
       this.ensure(lh);
       this.ink(opts.color ?? t.ink);
       this.font(opts.style ?? 'normal', size);
-      this.doc.text(line, this.left + indent, this.y + size * 0.85);
+      this.doc.text(line, this.flowLeft + indent, this.y + size * 0.85);
       this.y += lh;
     });
     this.y += opts.gap ?? size * 0.45;
@@ -258,7 +316,7 @@ class Layout {
     const lh = size * t.leading;
     const gutter = t.bullet === 'none' ? 0 : marker ? 24 : 16;
     this.font('normal', size);
-    const lines = this.doc.splitTextToSize(text, this.width - gutter) as string[];
+    const lines = this.doc.splitTextToSize(text, this.flowWidth - gutter) as string[];
 
     lines.forEach((line, i) => {
       this.ensure(lh);
@@ -268,27 +326,27 @@ class Layout {
           // Sterling's numbered sub-clauses (1.1, 1.2 …).
           this.font('bold', size - 0.5);
           this.ink(t.accent);
-          this.doc.text(marker, this.left, baseline);
+          this.doc.text(marker, this.flowLeft, baseline);
         } else if (t.bullet === 'square') {
           this.fill(t.accent);
-          this.doc.rect(this.left + 1, this.y + size * 0.32, 3.2, 3.2, 'F');
+          this.doc.rect(this.flowLeft + 1, this.y + size * 0.32, 3.2, 3.2, 'F');
         } else if (t.bullet === 'arrow') {
           this.fill(t.accent);
           this.doc.triangle(
-            this.left + 1, this.y + size * 0.22,
-            this.left + 1, this.y + size * 0.66,
-            this.left + 5.2, this.y + size * 0.44,
+            this.flowLeft + 1, this.y + size * 0.22,
+            this.flowLeft + 1, this.y + size * 0.66,
+            this.flowLeft + 5.2, this.y + size * 0.44,
             'F',
           );
         } else {
           this.font('normal', size);
           this.ink(t.accent);
-          this.doc.text(t.bullet === 'dash' ? '–' : '•', this.left + 1, baseline);
+          this.doc.text(t.bullet === 'dash' ? '–' : '•', this.flowLeft + 1, baseline);
         }
       }
       this.ink(t.ink);
       this.font('normal', size);
-      this.doc.text(line, this.left + gutter, baseline);
+      this.doc.text(line, this.flowLeft + gutter, baseline);
       this.y += lh;
     });
     this.y += size * 0.3;
@@ -321,10 +379,10 @@ class Layout {
       case 'accent-bar': {
         // Vertex: a short thick accent bar sitting left of the heading.
         this.fill(t.accent);
-        this.doc.rect(this.left, this.y + 2, 3, size + 2, 'F');
+        this.doc.rect(this.flowLeft, this.y + 2, 3, size + 2, 'F');
         this.font('bold', size);
         this.ink(t.accent);
-        this.doc.text(`${label}${text}`, this.left + 11, this.y + size);
+        this.doc.text(`${label}${text}`, this.flowLeft + 11, this.y + size);
         this.y += size * 1.75;
         break;
       }
@@ -342,11 +400,11 @@ class Layout {
         // Sterling: heading over a full-width hairline.
         this.font('bold', size);
         this.ink(t.accent);
-        this.doc.text(`${label}${text.toUpperCase()}`, this.left, this.y + size);
+        this.doc.text(`${label}${text.toUpperCase()}`, this.flowLeft, this.y + size);
         this.y += size * 1.35;
         this.stroke(t.rule);
         this.doc.setLineWidth(0.7);
-        this.doc.line(this.left, this.y, this.right, this.y);
+        this.doc.line(this.flowLeft, this.y, this.flowLeft + this.flowWidth, this.y);
         this.y += size * 0.75;
         break;
       }
@@ -354,11 +412,11 @@ class Layout {
         // Harbor: heading sitting in a tinted rounded tab.
         const txt = `${label}${text}`;
         this.font('bold', size);
-        const w = this.doc.getTextWidth(txt) + 18;
-        this.fill([236, 250, 247]);
-        this.doc.roundedRect(this.left - 6, this.y, w, size + 9, 3, 3, 'F');
+        const w = Math.min(this.doc.getTextWidth(txt) + 18, this.flowWidth);
+        this.fill(t.tint);
+        this.doc.roundedRect(this.flowLeft - 6, this.y, w, size + 9, 3, 3, 'F');
         this.ink(t.accent);
-        this.doc.text(txt, this.left + 3, this.y + size + 1.5);
+        this.doc.text(txt, this.flowLeft + 3, this.y + size + 1.5);
         this.y += size * 2.1;
         break;
       }
@@ -375,6 +433,129 @@ class Layout {
   }
 
   gap(h: number) { this.y += h; }
+}
+
+// ── Cover pages ──────────────────────────────────────────────────────────────
+
+/** Draw the template's cover, if it has one. Returns true if a page was used. */
+function drawCover(L: Layout, d: ContractData): boolean {
+  const t = L.t;
+  const doc = L.doc;
+  if (t.cover === 'none') return false;
+
+  if (t.cover === 'brand-block') {
+    // Vertex — a confident, brand-forward cover: full-bleed accent field, the
+    // project and the price stated plainly. Reads like a proposal cover.
+    L.fill(t.accent);
+    doc.rect(0, 0, PAGE_W, 340, 'F');
+
+    const logoW = drawLogo(doc, d.logoDataUrl, L.left, 60, 150, 56);
+    doc.setTextColor(255, 255, 255);
+    L.font('bold', 26);
+    const nameLines = doc.splitTextToSize(d.contractorName, L.width) as string[];
+    let cy = 60 + (logoW ? 76 : 0) + 30;
+    nameLines.forEach((line) => { doc.text(line, L.left, cy); cy += 30; });
+
+    L.font('normal', 11);
+    doc.text('HOME IMPROVEMENT SERVICE AGREEMENT', L.left, cy + 8);
+
+    // Below the field: the particulars, set large and calm.
+    let by = 400;
+    const row = (label: string, value: string) => {
+      if (!value) return;
+      L.font('bold', 8);
+      L.ink(t.muted);
+      doc.text(label.toUpperCase(), L.left, by);
+      L.font('normal', 13);
+      L.ink(t.ink);
+      const lines = doc.splitTextToSize(value, L.width) as string[];
+      lines.forEach((line, i) => doc.text(line, L.left, by + 19 + i * 17));
+      by += 19 + lines.length * 17 + 22;
+    };
+    row('Prepared for', d.ownerName);
+    row('Property', d.propertyAddress);
+    row('Agreement date', d.agreementDate);
+
+    L.stroke(t.rule);
+    doc.setLineWidth(0.8);
+    doc.line(L.left, by + 2, L.right, by + 2);
+    L.font('bold', 8);
+    L.ink(t.muted);
+    doc.text('TOTAL PRICE', L.left, by + 26);
+    L.font('bold', 24);
+    L.ink(t.accent);
+    doc.text(`${money(d.totalPrice)}${d.taxNote ? ` ${d.taxNote}` : ''}`, L.left, by + 50);
+
+    doc.addPage();
+    L.y = t.margin.top;
+    return true;
+  }
+
+  // Sterling — an institutional cover: centred title inside a ruled frame with
+  // a document-control table beneath. Reads like a contract from a large firm.
+  L.stroke(t.accent);
+  doc.setLineWidth(1.4);
+  doc.rect(46, 46, PAGE_W - 92, PAGE_H - 92);
+  doc.setLineWidth(0.5);
+  doc.rect(54, 54, PAGE_W - 108, PAGE_H - 108);
+
+  const logoW = drawLogo(doc, d.logoDataUrl, (PAGE_W - 130) / 2, 130, 130, 54);
+  L.font('bold', 17);
+  L.ink(t.accent);
+  doc.text(d.contractorName, PAGE_W / 2, logoW ? 232 : 200, { align: 'center', maxWidth: PAGE_W - 160 });
+
+  L.stroke(t.rule);
+  doc.setLineWidth(0.6);
+  doc.line(160, 268, PAGE_W - 160, 268);
+
+  L.font('bold', 15);
+  L.ink(t.ink);
+  doc.text('HOME IMPROVEMENT', PAGE_W / 2, 316, { align: 'center' });
+  doc.text('SERVICE AGREEMENT', PAGE_W / 2, 338, { align: 'center' });
+
+  // Document-control block — the detail that makes it read as institutional.
+  const bx = 118;
+  const bw = PAGE_W - 236;
+  let by = 420;
+  L.font('bold', 8);
+  L.ink(t.muted);
+  doc.text('DOCUMENT CONTROL', bx, by);
+  by += 10;
+  L.stroke(t.rule);
+  doc.setLineWidth(0.7);
+  doc.line(bx, by, bx + bw, by);
+  by += 6;
+
+  const ctrl: Array<[string, string]> = [
+    ['Owner', d.ownerName || '—'],
+    ['Property', d.propertyAddress || '—'],
+    ['Agreement date', d.agreementDate],
+    ['Commencement', d.startDate || '—'],
+    ['Completion', d.completionDate || '—'],
+    ['Contract price', `${money(d.totalPrice)}${d.taxNote ? ` ${d.taxNote}` : ''}`],
+  ];
+  ctrl.forEach(([k, v]) => {
+    L.font('normal', 8.5);
+    L.ink(t.muted);
+    doc.text(k.toUpperCase(), bx, by + 11);
+    L.font('bold', 9.5);
+    L.ink(t.ink);
+    const lines = doc.splitTextToSize(v, bw - 140) as string[];
+    lines.forEach((line, i) => doc.text(line, bx + 140, by + 11 + i * 12));
+    by += Math.max(1, lines.length) * 12 + 8;
+    L.stroke([230, 234, 240]);
+    doc.setLineWidth(0.4);
+    doc.line(bx, by - 3, bx + bw, by - 3);
+  });
+
+  L.font('normal', 7.5);
+  L.ink(t.muted);
+  doc.text('This document contains the full terms of agreement between the parties named above.',
+    PAGE_W / 2, PAGE_H - 96, { align: 'center' });
+
+  doc.addPage();
+  L.y = t.margin.top;
+  return true;
 }
 
 // ── Masthead ─────────────────────────────────────────────────────────────────
@@ -483,7 +664,7 @@ function drawMasthead(L: Layout, d: ContractData) {
       L.stroke(t.accent);
       doc.setLineWidth(1);
       doc.rect(L.left, L.y, L.width, boxH);
-      L.fill([243, 245, 248]);
+      L.fill(t.tint);
       doc.rect(L.left, L.y, L.width, boxH, 'F');
       doc.rect(L.left, L.y, L.width, boxH);
       const boxLogoW = drawLogo(doc, d.logoDataUrl, L.left + 12, L.y + 15, 54, 46);
@@ -567,7 +748,7 @@ function drawTitle(L: Layout) {
       L.ink(t.ink);
       doc.text('Service Agreement', L.left, L.y + 16);
       L.y += 24;
-      L.fill([204, 240, 233]);
+      L.fill(tintOf(t.accent, 0.78));
       doc.rect(L.left, L.y - 4, 150, 5, 'F');
       L.y += 20;
       break;
@@ -642,7 +823,7 @@ function drawPayment(L: Layout, d: ContractData) {
   L.ensure(30);
   if (t.id === 'harbor' || t.id === 'vertex') {
     const boxH = 30;
-    L.fill(t.id === 'harbor' ? [236, 250, 247] : [237, 244, 247]);
+    L.fill(t.tint);
     L.doc.rect(L.left, L.y, L.width, boxH, 'F');
     L.font('bold', t.bodySize - 0.6);
     L.ink(t.muted);
@@ -733,7 +914,7 @@ function drawScope(L: Layout, d: ContractData) {
     const h = 20;
     L.ensure(h);
     if (t.scopeTable === 'zebra' || t.scopeTable === 'boxed-header') {
-      L.fill(t.scopeTable === 'zebra' ? t.accent : [226, 232, 240]);
+      L.fill(t.scopeTable === 'zebra' ? t.accent : tintOf(t.accent, 0.84));
       doc.rect(L.left, L.y, L.width, h, 'F');
     }
     if (t.scopeTable === 'bordered' || t.scopeTable === 'boxed-header') {
@@ -787,7 +968,7 @@ function drawScope(L: Layout, d: ContractData) {
 
     // Row background / borders.
     if (t.scopeTable === 'zebra' && idx % 2 === 1) {
-      L.fill([243, 247, 250]);
+      L.fill(tintOf(t.accent, 0.955));
       doc.rect(L.left, L.y, L.width, rowH, 'F');
     }
     if (t.scopeTable === 'bordered' || t.scopeTable === 'boxed-header') {
@@ -923,10 +1104,11 @@ function drawFooters(L: Layout, d: ContractData) {
   const t = L.t;
   const doc = L.doc;
   const total = doc.getNumberOfPages();
-  for (let p = 1; p <= total; p += 1) {
+  const firstBody = t.cover === 'none' ? 1 : 2;
+  for (let p = firstBody; p <= total; p += 1) {
     doc.setPage(p);
     const yF = PAGE_H - t.margin.bottom + 26;
-    doc.setFont(t.font, 'normal');
+    doc.setFont(contractFontsReady() ? t.font : t.fontFallback, 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(t.muted[0], t.muted[1], t.muted[2]);
 
@@ -962,12 +1144,23 @@ const SECTION_RENDERERS: Partial<Record<SectionKey, (L: Layout, d: ContractData)
 };
 
 export function buildContractPdf(data: ContractData): jsPDF {
-  const t = getTemplate(data.templateId);
+  const base = getTemplate(data.templateId);
+  // The accent (and therefore every wash derived from it) can be replaced by the
+  // contractor's brand colour without the template knowing anything about it.
+  const accent = data.accentOverride ?? base.accent;
+  const t: TemplateSpec = { ...base, accent, tint: tintOf(accent) };
   const L = new Layout(t);
 
-  drawMasthead(L, data);
-  drawTitle(L);
+  const covered = drawCover(L, data);
+  // A cover already carries the branding and the title, so the body page opens
+  // with a lighter running head instead of repeating the full masthead.
+  if (covered) L.runningHeader();
+  else drawMasthead(L, data);
+  if (!covered) drawTitle(L);
   drawParties(L, data);
+
+  // Clause body may run in columns; the scope table and signatures never do.
+  L.setColumns(t.columns);
 
   t.order.forEach((key) => {
     const clause = t.clauses[key];
@@ -1002,7 +1195,15 @@ export function buildContractPdf(data: ContractData): jsPDF {
       .forEach((p) => L.para(p));
   }
 
+  L.endColumns();
+
   drawScope(L, data);
+
+  if (t.signaturePage) {
+    L.doc.addPage();
+    L.y = t.margin.top;
+    L.runningHeader();
+  }
   drawSignatures(L, data);
   drawFooters(L, data);
 

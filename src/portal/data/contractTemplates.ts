@@ -18,6 +18,8 @@
 // Adding a contractor requires no work here: `templateForContractor` hashes the
 // contractor id to a stable pick, and the rep can override it in the UI.
 
+import type { ContractFontFamily } from '../lib/contractFonts';
+
 export type ContractTemplateId = 'meridian' | 'vertex' | 'atlas' | 'sterling' | 'harbor';
 
 export type RGB = [number, number, number];
@@ -53,12 +55,21 @@ export type TemplateSpec = {
   blurb: string;
 
   // ── Typography & colour ──
-  font: 'times' | 'helvetica';
+  /** Embedded typeface — see contractFonts.ts for why each was chosen. */
+  font: ContractFontFamily;
+  /** Built-in stand-in used if the embedded font chunk fails to load. */
+  fontFallback: 'times' | 'helvetica';
   /** Point size of body copy. */
   bodySize: number;
   /** Leading multiplier applied to bodySize. */
   leading: number;
   accent: RGB;
+  /**
+   * Light wash of the accent, used behind dark text (callouts, table headers).
+   * Derived at render time so it always tracks the accent actually in use,
+   * including a contractor's brand colour.
+   */
+  tint: RGB;
   ink: RGB;
   muted: RGB;
   rule: RGB;
@@ -81,6 +92,16 @@ export type TemplateSpec = {
   signatures: 'stacked-lines' | 'two-column' | 'boxed-pair' | 'rule-pair';
   /** Page footer treatment. */
   footer: 'centered-page' | 'rule-left' | 'minimal-right' | 'boxed';
+  /**
+   * Optional cover page. Different firms produce differently *shaped*
+   * paperwork, not just differently styled paperwork — a cover is the
+   * strongest shape signal available.
+   */
+  cover: 'none' | 'brand-block' | 'document-control';
+  /** Clause body column count. Two columns reads as a different firm entirely. */
+  columns: 1 | 2;
+  /** Force the signature block onto a page of its own. */
+  signaturePage: boolean;
 
   /** Every clause, worded for this template. */
   clauses: Record<SectionKey, Clause>;
@@ -102,10 +123,12 @@ const meridian: TemplateSpec = {
   id: 'meridian',
   name: 'Meridian',
   blurb: 'Traditional legal instrument — serif, roman numerals, no colour',
-  font: 'times',
-  bodySize: 10.5,
+  font: 'EBGaramond',
+  fontFallback: 'times',
+  bodySize: 11.4,
   leading: 1.42,
   accent: [30, 30, 30],
+  tint: [237, 237, 237],
   ink: [20, 20, 20],
   muted: [95, 95, 95],
   rule: [140, 140, 140],
@@ -118,6 +141,9 @@ const meridian: TemplateSpec = {
   scopeTable: 'rules-only',
   signatures: 'stacked-lines',
   footer: 'centered-page',
+  cover: 'none',
+  columns: 1,
+  signaturePage: true,
   scopeHeading: 'Schedule "A" — Scope of Work',
   scopeNote:
     'The works enumerated in this Schedule form part of and are governed by the Agreement to which it is attached.',
@@ -227,10 +253,12 @@ const vertex: TemplateSpec = {
   id: 'vertex',
   name: 'Vertex',
   blurb: 'Modern branded — colour masthead band, accent headings, striped table',
-  font: 'helvetica',
-  bodySize: 9.5,
+  font: 'Manrope',
+  fontFallback: 'helvetica',
+  bodySize: 9.2,
   leading: 1.5,
   accent: [21, 94, 117],
+  tint: [236, 242, 244],
   ink: [28, 32, 36],
   muted: [110, 118, 128],
   rule: [200, 212, 220],
@@ -243,6 +271,9 @@ const vertex: TemplateSpec = {
   scopeTable: 'zebra',
   signatures: 'two-column',
   footer: 'rule-left',
+  cover: 'brand-block',
+  columns: 1,
+  signaturePage: false,
   scopeHeading: 'Scope of Work',
   scopeNote:
     'Everything below is included in your project price. Where a material is listed, you will be shown a selection to choose from.',
@@ -349,10 +380,12 @@ const atlas: TemplateSpec = {
   id: 'atlas',
   name: 'Atlas',
   blurb: 'Minimal editorial — wide margin rail, tracked labels, lots of white space',
-  font: 'helvetica',
-  bodySize: 9,
+  font: 'Karla',
+  fontFallback: 'helvetica',
+  bodySize: 9.2,
   leading: 1.62,
   accent: [161, 98, 7],
+  tint: [247, 242, 235],
   ink: [38, 38, 38],
   muted: [130, 130, 130],
   rule: [222, 222, 222],
@@ -365,6 +398,9 @@ const atlas: TemplateSpec = {
   scopeTable: 'open',
   signatures: 'rule-pair',
   footer: 'minimal-right',
+  cover: 'none',
+  columns: 1,
+  signaturePage: true,
   scopeHeading: 'Scope',
   scopeNote:
     'Materials shown are indicative. Selections outside the ranges we carry are accommodated against a stated budget.',
@@ -471,10 +507,12 @@ const sterling: TemplateSpec = {
   id: 'sterling',
   name: 'Sterling',
   blurb: 'Corporate formal — boxed masthead, 1.1 sub-numbering, grey banded tables',
-  font: 'helvetica',
-  bodySize: 9.5,
+  font: 'IBMPlexSerif',
+  fontFallback: 'times',
+  bodySize: 9.3,
   leading: 1.45,
   accent: [51, 65, 85],
+  tint: [239, 240, 241],
   ink: [24, 28, 34],
   muted: [100, 108, 118],
   rule: [176, 186, 198],
@@ -487,6 +525,9 @@ const sterling: TemplateSpec = {
   scopeTable: 'boxed-header',
   signatures: 'boxed-pair',
   footer: 'boxed',
+  cover: 'document-control',
+  columns: 1,
+  signaturePage: false,
   scopeHeading: 'Appendix I — Statement of Work',
   scopeNote:
     'The following items constitute the agreed statement of work. Material selections are made from the Contractor’s standard offering unless otherwise budgeted.',
@@ -596,10 +637,12 @@ const harbor: TemplateSpec = {
   id: 'harbor',
   name: 'Harbor',
   blurb: 'Contemporary compact — side tabs, tinted callouts, lettered clauses',
-  font: 'helvetica',
-  bodySize: 9,
+  font: 'Nunito',
+  fontFallback: 'helvetica',
+  bodySize: 8.9,
   leading: 1.48,
   accent: [15, 118, 110],
+  tint: [236, 244, 243],
   ink: [30, 34, 38],
   muted: [115, 124, 132],
   rule: [198, 214, 210],
@@ -612,6 +655,9 @@ const harbor: TemplateSpec = {
   scopeTable: 'bordered',
   signatures: 'two-column',
   footer: 'rule-left',
+  cover: 'none',
+  columns: 2,
+  signaturePage: false,
   scopeHeading: 'What’s Included',
   scopeNote:
     'This is the full scope for your project. Where materials are listed we will walk you through the options we carry; anything outside that gets a set budget.',
