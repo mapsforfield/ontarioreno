@@ -76,22 +76,72 @@ function isFormal(t: TemplateSpec): boolean {
   return t.id === 'meridian' || t.id === 'sterling' || t.id === 'atlas';
 }
 
-/** Fetch an image URL and turn it into a data URL jsPDF can embed. */
+/**
+ * Fetch a logo and normalise it to a PNG data URL.
+ *
+ * We rasterise through a canvas rather than handing the raw bytes to jsPDF:
+ * contractors upload whatever they have (JPEG, WebP, SVG), and jsPDF only
+ * accepts a few formats — passing it a WebP silently throws. Going via the
+ * browser's decoder means anything the browser can display, the PDF can embed.
+ */
 export async function loadImageAsDataUrl(url: string): Promise<string | null> {
   if (!url) return null;
   try {
     const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    return await rasterise(await res.blob());
   } catch {
     // Cross-origin or offline — the document renders fine without the logo.
     return null;
+  }
+}
+
+/** Decode a blob via the browser and re-encode as PNG, capped at 512px. */
+function rasterise(blob: Blob): Promise<string | null> {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const MAX = 512;
+        const nw = img.naturalWidth || MAX;
+        const nh = img.naturalHeight || MAX;
+        const scale = Math.min(1, MAX / Math.max(nw, nh));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(nw * scale));
+        canvas.height = Math.max(1, Math.round(nh * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      } catch {
+        resolve(null);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(null); };
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Draw a logo letterboxed inside a box, preserving its aspect ratio, and report
+ * the width actually used so the caller can set text beside it. Returns 0 when
+ * there's nothing to draw — callers fall back to a text-only masthead.
+ */
+function drawLogo(doc: jsPDF, dataUrl: string | null, x: number, y: number, boxW: number, boxH: number): number {
+  if (!dataUrl) return 0;
+  try {
+    const props = doc.getImageProperties(dataUrl);
+    const scale = Math.min(boxW / props.width, boxH / props.height);
+    const w = props.width * scale;
+    const h = props.height * scale;
+    // Centre vertically in the box; left-align so text gutters stay predictable.
+    doc.addImage(dataUrl, 'PNG', x, y + (boxH - h) / 2, w, h);
+    return w;
+  } catch {
+    return 0;
   }
 }
 
@@ -317,7 +367,18 @@ function drawMasthead(L: Layout, d: ContractData) {
 
   switch (t.header) {
     case 'stacked-serif': {
-      // Meridian — centred serif letterhead, hairline beneath.
+      // Meridian — centred serif letterhead, hairline beneath. The mark sits
+      // centred above the company name, the way an engraved letterhead reads.
+      if (d.logoDataUrl) {
+        try {
+          const props = doc.getImageProperties(d.logoDataUrl);
+          const scale = Math.min(112 / props.width, 44 / props.height);
+          const w = props.width * scale;
+          const h = props.height * scale;
+          doc.addImage(d.logoDataUrl, 'PNG', (PAGE_W - w) / 2, L.y, w, h);
+          L.y += h + 12;
+        } catch { /* text-only letterhead */ }
+      }
       L.font('bold', 15);
       L.ink(t.accent);
       doc.text(d.contractorName, PAGE_W / 2, L.y + 14, { align: 'center' });
@@ -343,13 +404,8 @@ function drawMasthead(L: Layout, d: ContractData) {
       // Vertex — full-bleed accent band with logo and contact reversed out.
       L.fill(t.accent);
       doc.rect(0, 0, PAGE_W, 92, 'F');
-      let textX = L.left;
-      if (d.logoDataUrl) {
-        try {
-          doc.addImage(d.logoDataUrl, 'PNG', L.left, 22, 48, 48);
-          textX = L.left + 60;
-        } catch { /* unsupported image — fall back to text-only */ }
-      }
+      const bandLogoW = drawLogo(doc, d.logoDataUrl, L.left, 22, 56, 48);
+      const textX = bandLogoW ? L.left + bandLogoW + 14 : L.left;
       doc.setTextColor(255, 255, 255);
       L.font('bold', 17);
       doc.text(d.contractorName, textX, 44);
@@ -366,6 +422,21 @@ function drawMasthead(L: Layout, d: ContractData) {
       const railX = t.margin.left - 108;
       const railW = 96;
       let ry = L.y + 9;
+      // The mark leads the rail, sized to the rail width rather than a square.
+      const railLogoH = (() => {
+        if (!d.logoDataUrl) return 0;
+        try {
+          const props = doc.getImageProperties(d.logoDataUrl);
+          const scale = Math.min(railW / props.width, 40 / props.height);
+          const w = props.width * scale;
+          const h = props.height * scale;
+          doc.addImage(d.logoDataUrl, 'PNG', railX, L.y, w, h);
+          return h + 12;
+        } catch {
+          return 0;
+        }
+      })();
+      ry += railLogoH;
       L.font('bold', 9);
       L.ink(t.ink);
       const nameLines = doc.splitTextToSize(d.contractorName, railW) as string[];
@@ -393,13 +464,8 @@ function drawMasthead(L: Layout, d: ContractData) {
       L.fill([243, 245, 248]);
       doc.rect(L.left, L.y, L.width, boxH, 'F');
       doc.rect(L.left, L.y, L.width, boxH);
-      let textX = L.left + 14;
-      if (d.logoDataUrl) {
-        try {
-          doc.addImage(d.logoDataUrl, 'PNG', L.left + 12, L.y + 15, 46, 46);
-          textX = L.left + 68;
-        } catch { /* ignore */ }
-      }
+      const boxLogoW = drawLogo(doc, d.logoDataUrl, L.left + 12, L.y + 15, 54, 46);
+      const textX = boxLogoW ? L.left + 12 + boxLogoW + 14 : L.left + 14;
       L.font('bold', 13);
       L.ink(t.accent);
       doc.text(d.contractorName, textX, L.y + 30);
@@ -414,13 +480,8 @@ function drawMasthead(L: Layout, d: ContractData) {
       // Harbor — accent rule down the left edge, details stacked beside it.
       L.fill(t.accent);
       doc.rect(0, 0, 14, PAGE_H, 'F');
-      let textX = L.left;
-      if (d.logoDataUrl) {
-        try {
-          doc.addImage(d.logoDataUrl, 'PNG', L.left, L.y, 42, 42);
-          textX = L.left + 54;
-        } catch { /* ignore */ }
-      }
+      const tabLogoW = drawLogo(doc, d.logoDataUrl, L.left, L.y, 50, 42);
+      const textX = tabLogoW ? L.left + tabLogoW + 14 : L.left;
       L.font('bold', 15);
       L.ink(t.accent);
       doc.text(d.contractorName, textX, L.y + 16);

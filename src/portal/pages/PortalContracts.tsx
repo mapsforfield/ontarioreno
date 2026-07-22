@@ -90,6 +90,7 @@ export default function PortalContracts() {
   const [dealId, setDealId] = useState(preselectedDealId);
   const [d, setD] = useState<Draft | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
+  const [logoFailed, setLogoFailed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -158,12 +159,19 @@ export default function PortalContracts() {
     try { localStorage.setItem(DRAFT_KEY(dealId), JSON.stringify(d)); } catch { /* quota — ignore */ }
   }, [d, dealId]);
 
-  // Contractor logo, fetched once per contractor.
+  // Contractor logo, fetched once per contractor. A logo that's configured but
+  // won't load (CORS, 404, dead link) is called out rather than silently
+  // dropped — otherwise the rep just sees a logo-less PDF and can't tell why.
   useEffect(() => {
     let cancelled = false;
     setLogo(null);
+    setLogoFailed(false);
     if (contractor?.logoUrl) {
-      loadImageAsDataUrl(contractor.logoUrl).then((url) => { if (!cancelled) setLogo(url); });
+      loadImageAsDataUrl(contractor.logoUrl).then((url) => {
+        if (cancelled) return;
+        setLogo(url);
+        setLogoFailed(url === null);
+      });
     }
     return () => { cancelled = true; };
   }, [contractor?.logoUrl]);
@@ -453,6 +461,12 @@ export default function PortalContracts() {
                   ))}
                 </select>
               </div>
+              {logoFailed && (
+                <p className="sm:col-span-2 -mt-1 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  This contractor has a logo set, but it could not be loaded — the agreement will
+                  generate without it. Re-upload the logo under Admin → Contractors.
+                </p>
+              )}
               <div>
                 <label className={label} htmlFor="signatory">Signs for the contractor</label>
                 <input
