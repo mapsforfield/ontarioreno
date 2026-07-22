@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileText, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -2552,17 +2552,28 @@ OntarioReno Broker Portal`;
                         <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Sales Agreement</p>
                         <h3 className="mt-1 text-lg font-black text-slate-950">Signed Agreement</h3>
                       </div>
-                      <label className={`inline-flex cursor-pointer items-center gap-2 rounded-[0.5rem] border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 ${agreementUploading ? 'pointer-events-none opacity-50' : ''}`}>
-                        <Upload className="h-4 w-4" />
-                        {agreementUploading ? 'Uploading…' : 'Attach PDF'}
-                        <input
-                          type="file"
-                          accept=".pdf,application/pdf"
-                          className="sr-only"
-                          disabled={agreementUploading}
-                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAgreementUpload(f); e.target.value = ''; }}
-                        />
-                      </label>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {/* Generate a branded agreement for this deal in the Contract Creator. */}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/portal/contracts', { state: { dealId: selectedDeal.id } })}
+                          className="inline-flex items-center gap-2 rounded-[0.5rem] bg-emerald-700 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-800"
+                        >
+                          <FileSignature className="h-4 w-4" />
+                          Generate
+                        </button>
+                        <label className={`inline-flex cursor-pointer items-center gap-2 rounded-[0.5rem] border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 ${agreementUploading ? 'pointer-events-none opacity-50' : ''}`}>
+                          <Upload className="h-4 w-4" />
+                          {agreementUploading ? 'Uploading…' : 'Attach PDF'}
+                          <input
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            className="sr-only"
+                            disabled={agreementUploading}
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAgreementUpload(f); e.target.value = ''; }}
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     {agreementError && (
