@@ -38,6 +38,7 @@ import {
   ProposalHistory,
   RepDayOff,
   SalesAgreement,
+  ContractPreset,
   SaleTrackerRow,
   Task,
   User,
@@ -80,6 +81,7 @@ type PortalDataState = {
   daysOff: RepDayOff[];
   households: Household[];
   salesAgreements: SalesAgreement[];
+  contractPresets: ContractPreset[];
   tasks: Task[];
   users: User[];
   contractors: Contractor[];
@@ -209,6 +211,16 @@ type PortalDataContextValue = PortalDataState & {
   /** Returns a short-lived signed URL for viewing/downloading a private agreement blob. */
   getAgreementLink: (agreementId: string, dealId: string) => Promise<string | null>;
   deleteSalesAgreement: (id: string) => Promise<void>;
+  /** Create or update a Contract Creator preset. */
+  saveContractPreset: (draft: {
+    id?: string;
+    name: string;
+    shared?: boolean;
+    contractorId: string;
+    templateId: string;
+    payload: unknown;
+  }) => Promise<ContractPreset | null>;
+  deleteContractPreset: (id: string) => Promise<void>;
   removeDayOff: (id: string) => Promise<void>;
   addHousehold: (name: string, notes: string, memberIds: string[]) => Promise<Household | null>;
   updateHousehold: (householdId: string, updates: { name?: string; notes?: string; addMemberId?: string; removeMemberId?: string }) => Promise<Household | null>;
@@ -321,6 +333,7 @@ const emptyState: PortalDataState = {
   trackerRows: [],
   users: [],
   defaultCommissionRate: loadDefaultCommissionRate(),
+  contractPresets: [],
   loadError: false,
   repAccess: {},
   noteTemplates: [],
@@ -721,7 +734,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Lead[]>('/api/leads'),
       apiCall<Record<string, boolean>>('/api/auth/rep-access'),
       apiCall<NoteTemplate[]>('/api/auth/note-templates'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates]) => {
+      apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates, contractPresets]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -752,6 +766,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         loadError: [users, contractors, rawDeals, appointments, commissions].some((r) => r === null),
         repAccess: repAccess ?? {},
         noteTemplates: noteTemplates ?? [],
+        contractPresets: contractPresets ?? [],
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1501,6 +1516,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           daysOff: current.daysOff,
           households: current.households,
           salesAgreements: current.salesAgreements,
+          contractPresets: current.contractPresets,
           tasks: current.tasks,
           contractors: current.contractors,
           deals: [...current.deals, deal],
@@ -2540,6 +2556,38 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           salesAgreements: current.salesAgreements.filter((a) => a.id !== id),
+        }));
+      },
+
+      // ── Contract Creator presets ────────────────────────────────────────────
+
+      saveContractPreset: async (draft) => {
+        const saved = await apiCall<ContractPreset>('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'save_contract_preset', ...draft }),
+        });
+        if (saved) {
+          setState((current) => {
+            const without = current.contractPresets.filter((p) => p.id !== saved.id);
+            return {
+              ...current,
+              contractPresets: [...without, saved].sort(
+                (a, b) => Number(b.shared) - Number(a.shared) || a.name.localeCompare(b.name),
+              ),
+            };
+          });
+        }
+        return saved;
+      },
+
+      deleteContractPreset: async (id) => {
+        await apiCall('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_contract_preset', id }),
+        });
+        setState((current) => ({
+          ...current,
+          contractPresets: current.contractPresets.filter((p) => p.id !== id),
         }));
       },
 

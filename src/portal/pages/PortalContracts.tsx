@@ -2,6 +2,8 @@ import { upload } from '@vercel/blob/client';
 import {
   ArrowDown,
   ArrowUp,
+  BookmarkCheck,
+  BookmarkPlus,
   Calculator,
   Check,
   ClipboardPaste,
@@ -90,7 +92,8 @@ const DEFAULT_CASH: Array<{ pct: string; when: string }> = [
 
 export default function PortalContracts() {
   const { currentUser } = usePortalAuth();
-  const { deals, contractors, addSalesAgreement, isLoading, loadError, refetch } = usePortalData();
+  const { deals, contractors, addSalesAgreement, isLoading, loadError, refetch,
+    contractPresets, saveContractPreset, deleteContractPreset } = usePortalData();
   const location = useLocation();
   const preselectedDealId = (location.state as { dealId?: string } | null)?.dealId ?? '';
 
@@ -100,6 +103,9 @@ export default function PortalContracts() {
   const [logoFailed, setLogoFailed] = useState(false);
   const [imagingLine, setImagingLine] = useState<string | null>(null);
   const [brandColor, setBrandColor] = useState<RGB | null>(null);
+  const [presetName, setPresetName] = useState('');
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [presetShared, setPresetShared] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
 
   // The embedded typefaces are a lazily-loaded chunk. Nothing renders until
@@ -210,6 +216,57 @@ export default function PortalContracts() {
     setD((cur) => (cur ? { ...cur, [key]: value } : cur));
 
   const palette = useMemo(() => accentOptions(brandColor), [brandColor]);
+
+  // A preset stores what repeats between deals and nothing that identifies a
+  // client — name, contact, address, dates and price all change every time, and
+  // carrying a previous homeowner's details into a new contract is a real
+  // hazard, not a convenience.
+  type PresetPayload = Omit<Draft,
+    'dealId' | 'ownerName' | 'ownerPhone' | 'ownerEmail' | 'propertyAddress'
+    | 'agreementDate' | 'startDate' | 'completionDate' | 'totalPrice'>;
+
+  const presetPayload = (draft: Draft): PresetPayload => {
+    const {
+      dealId: _d, ownerName: _n, ownerPhone: _p, ownerEmail: _e, propertyAddress: _a,
+      agreementDate: _ad, startDate: _sd, completionDate: _cd, totalPrice: _tp,
+      ...reusable
+    } = draft;
+    return reusable;
+  };
+
+  const applyPresetToDraft = (payload: PresetPayload) => {
+    setD((cur) => {
+      if (!cur) return cur;
+      return {
+        ...cur,
+        ...payload,
+        // Fresh ids so editing one line can't mutate the stored preset's rows.
+        scope: payload.scope.map((l) => ({ ...l, id: newLine().id })),
+      };
+    });
+  };
+
+  const savePreset = async () => {
+    if (!d) return;
+    const name = presetName.trim();
+    if (!name) return;
+    setSavingPreset(true);
+    const saved = await saveContractPreset({
+      name,
+      shared: currentUser?.role === 'admin' ? presetShared : false,
+      contractorId: d.contractorId,
+      templateId: d.templateId,
+      payload: presetPayload(d),
+    });
+    setSavingPreset(false);
+    if (saved) {
+      setPresetName('');
+      setPresetShared(false);
+      showToast({ message: `Saved preset “${saved.name}”`, variant: 'success' });
+    } else {
+      showToast({ message: 'Could not save the preset', variant: 'error' });
+    }
+  };
 
   // ── Assemble the render payload ────────────────────────────────────────────
   const contractData: ContractData | null = useMemo(() => {
@@ -454,6 +511,64 @@ export default function PortalContracts() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
         {/* ── Form column ─────────────────────────────────────────────── */}
         <div className={`space-y-5 ${mobileTab === 'preview' ? 'hidden lg:block' : ''}`}>
+          {/* Saved presets */}
+          {contractPresets.length > 0 && (
+            <section className={card}>
+              <h2 className="mb-3 text-sm font-black uppercase tracking-[0.1em] text-slate-900">
+                Start from a saved preset
+              </h2>
+              <div className="space-y-2">
+                {contractPresets.map((preset) => {
+                  const owned = preset.ownerUserId === currentUser?.id;
+                  const contractorName = contractors.find((x) => x.id === preset.contractorId)?.companyName;
+                  return (
+                    <div key={preset.id} className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2.5">
+                      <BookmarkCheck className="h-4 w-4 shrink-0 text-[#1B3C6C]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-slate-900">
+                          {preset.name}
+                          {preset.shared && (
+                            <span className="ml-2 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-emerald-700">
+                              Team
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                          {[contractorName, CONTRACT_TEMPLATES.find((t) => t.id === preset.templateId)?.name]
+                            .filter(Boolean).join(' · ') || 'Preset'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          applyPresetToDraft(preset.payload as never);
+                          showToast({ message: `Loaded “${preset.name}”`, variant: 'success' });
+                        }}
+                        className="shrink-0 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 py-2 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+                      >
+                        Load
+                      </button>
+                      {(owned || currentUser?.role === 'admin') && (
+                        <button
+                          type="button"
+                          onClick={() => deleteContractPreset(preset.id)}
+                          className="shrink-0 rounded-[0.5rem] border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          aria-label={`Delete preset ${preset.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-400">
+                Loading a preset replaces the contractor, style, payment terms and scope. The client
+                details, dates and price on this deal are left alone.
+              </p>
+            </section>
+          )}
+
           {/* Deal + contractor */}
           <section className={card}>
             <h2 className="mb-3 text-sm font-black uppercase tracking-[0.1em] text-slate-900">Deal &amp; Contractor</h2>
@@ -960,6 +1075,44 @@ export default function PortalContracts() {
               onChange={(e) => set('specialTerms', e.target.value)}
               placeholder="Anything negotiated for this deal specifically — special payment arrangements, exclusions, side agreements. Blank paragraphs separate clauses."
             />
+          </section>
+
+          {/* Save the reusable part of this draft for next time */}
+          <section className={card}>
+            <h2 className="mb-1 text-sm font-black uppercase tracking-[0.1em] text-slate-900">Save as preset</h2>
+            <p className="mb-3 text-xs font-semibold text-slate-500">
+              Stores the contractor, style, colour, payment terms and the whole scope of work —
+              including product photos and links. Client details, dates and price are never saved.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                className={`${input} min-w-0 flex-1`}
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="e.g. Galaxy — Legal Basement Suite"
+                aria-label="Preset name"
+              />
+              <button
+                type="button"
+                onClick={savePreset}
+                disabled={!presetName.trim() || savingPreset}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-[0.5rem] bg-[#1B3C6C] px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#16325a] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {savingPreset ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookmarkPlus className="h-4 w-4" />}
+                Create preset
+              </button>
+            </div>
+            {currentUser?.role === 'admin' && (
+              <label className="mt-2.5 inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={presetShared}
+                  onChange={(e) => setPresetShared(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-300"
+                />
+                Publish to the whole team
+              </label>
+            )}
           </section>
         </div>
 

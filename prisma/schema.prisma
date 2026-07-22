@@ -41,6 +41,7 @@ model User {
   tasks                Task[]
   leads                Lead[]
   interactions         Interaction[]
+  contractPresets      ContractPreset[]
 }
 
 // ─── Contractors ─────────────────────────────────────────────────────────────
@@ -353,6 +354,32 @@ model SalesAgreement {
 
   deal         Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   uploadedBy   User @relation(fields: [uploadedByUserId], references: [id])
+}
+
+// ─── Contract Presets ─────────────────────────────────────────────────────────
+// A saved starting point for the Contract Creator. Reps quote the same packages
+// over and over (a legal basement suite runs to ~35 scope lines), so a preset
+// captures everything that repeats — contractor, template, payment structure,
+// the whole scope of work including product photos and links — and deliberately
+// omits everything client-specific (name, address, contact, dates, price),
+// which changes on every deal.
+
+model ContractPreset {
+  id          String   @id @default(cuid())
+  name        String
+  ownerUserId String
+  /// Shared presets are usable by every rep; personal ones only by their owner.
+  /// Only admins may publish a shared preset.
+  shared      Boolean  @default(false)
+  /// Denormalised for the picker, so it can label presets without a join.
+  contractorId String  @default("")
+  templateId   String  @default("")
+  /// The reusable slice of a draft, stored as JSON.
+  payload     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 }
 
 // ─── Rep Days Off ─────────────────────────────────────────────────────────────

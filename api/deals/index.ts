@@ -91,6 +91,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(agreements);
     }
 
+    // ── Contract Creator presets ──
+    // A rep sees their own presets plus anything an admin has published to the
+    // team; admins see everything so they can curate the shared set.
+    if (req.query['_resource'] === 'contract_presets') {
+      const where = user.role === 'admin'
+        ? {}
+        : { OR: [{ ownerUserId: user.id }, { shared: true }] };
+      const presets = await withSchema(() =>
+        prisma.contractPreset.findMany({ where, orderBy: [{ shared: 'desc' }, { name: 'asc' }] })
+      );
+      return res.status(200).json(presets);
+    }
+
     // ── Sales Tracker rows ──
     if (req.query['_resource'] === 'tracker') {
       const where = user.role === 'admin' ? {} : { repId: user.id };
@@ -262,6 +275,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
       return res.status(200).json(updated);
+    }
+
+    // ── Contract Creator presets ──
+    if (data._action === 'save_contract_preset') {
+      const name = String(data.name ?? '').trim();
+      if (!name) return res.status(400).json({ error: 'A preset needs a name.' });
+      if (data.payload == null) return res.status(400).json({ error: 'Missing payload.' });
+      // Only admins may publish a preset to the whole team.
+      const shared = user.role === 'admin' ? Boolean(data.shared) : false;
+      const fields = {
+        name,
+        shared,
+        contractorId: String(data.contractorId ?? ''),
+        templateId: String(data.templateId ?? ''),
+        payload: data.payload,
+      };
+
+      if (data.id) {
+        const existing = await withSchema(() =>
+          prisma.contractPreset.findUnique({ where: { id: String(data.id) } })
+        );
+        if (!existing) return res.status(404).json({ error: 'Preset not found.' });
+        if (user.role !== 'admin' && existing.ownerUserId !== user.id) {
+          return res.status(403).json({ error: 'You can only edit your own presets.' });
+        }
+        const updated = await withSchema(() =>
+          prisma.contractPreset.update({ where: { id: String(data.id) }, data: fields })
+        );
+        return res.status(200).json(updated);
+      }
+
+      const created = await withSchema(() =>
+        prisma.contractPreset.create({ data: { ...fields, ownerUserId: user.id } })
+      );
+      return res.status(201).json(created);
+    }
+
+    if (data._action === 'delete_contract_preset') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const existing = await withSchema(() =>
+        prisma.contractPreset.findUnique({ where: { id: String(data.id) } })
+      );
+      if (!existing) return res.status(404).json({ error: 'Preset not found.' });
+      if (user.role !== 'admin' && existing.ownerUserId !== user.id) {
+        return res.status(403).json({ error: 'You can only delete your own presets.' });
+      }
+      await withSchema(() => prisma.contractPreset.delete({ where: { id: String(data.id) } }));
+      return res.status(200).json({ ok: true });
     }
 
     if (data._action === 'delete_tracker_row') {
