@@ -71,6 +71,26 @@ export type ContractData = {
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+/**
+ * Drop a unit the value already carries. Reps type "40%" as readily as "40",
+ * and a figure lifted out of an imported agreement usually arrives with its
+ * unit attached — so the renderer must not append a second one.
+ */
+export function stripUnits(value: string | undefined): string {
+  return (value ?? '')
+    .trim()
+    .replace(/^\$\s*/, '')
+    .replace(/\s*%$/, '')
+    .replace(/\s*(?:months?|mos?|mths?)$/i, '')
+    .trim();
+}
+
+/** Parse a possibly unit-carrying field, falling back when it isn't a number. */
+export function numberOr(value: string | undefined, fallback: number): number {
+  const n = Number(stripUnits(value).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export function money(v: number): string {
   return `$${v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -208,6 +228,12 @@ class Layout {
    * return here — not to the page margin, which would run under the masthead.
    */
   private colTop = 0;
+  /**
+   * The deepest y reached by any column on this page. Column one often ends
+   * far short of column zero, so full-measure content that follows must resume
+   * below whichever ran longest — otherwise it draws back over the taller one.
+   */
+  private colMaxY = 0;
 
   get flowWidth() { return this.columns === 1 ? this.width : (this.width - this.colGap) / 2; }
   get flowLeft() { return this.left + this.col * (this.flowWidth + this.colGap); }
@@ -218,11 +244,13 @@ class Layout {
     this.columns = n;
     this.col = 0;
     this.colTop = this.y;
+    this.colMaxY = this.y;
   }
 
   /** Finish column flow and drop back to a full-measure single column. */
   endColumns() {
     if (this.columns === 1) return;
+    this.y = Math.max(this.y, this.colMaxY);
     this.columns = 1;
     this.col = 0;
   }
@@ -252,6 +280,8 @@ class Layout {
   ensure(need: number) {
     if (this.y + need <= this.bottom) return;
     if (this.columns === 2 && this.col === 0) {
+      // Remember how far column zero ran before handing over to column one.
+      this.colMaxY = Math.max(this.colMaxY, this.y);
       this.col = 1;
       this.y = this.colTop;
       return;
@@ -260,6 +290,7 @@ class Layout {
     this.col = 0;
     // A fresh page has no masthead above the flow, so columns start at the top.
     this.colTop = this.t.margin.top;
+    this.colMaxY = this.colTop;
     this.y = this.colTop;
     this.runningHeader();
   }
@@ -843,14 +874,21 @@ function drawPayment(L: Layout, d: ContractData) {
 
   if (financing) {
     L.para(formal ? 'Financing.' : 'Financing', { style: 'bold', gap: 5 });
+    // Values may already carry their unit — from a rep typing "40%", or from a
+    // figure lifted out of an imported agreement. Normalise before formatting.
+    const rate = stripUnits(d.financeRate) || '—';
+    const term = stripUnits(d.financeTermMonths) || '—';
+    const amort = stripUnits(d.financeAmortMonths) || '—';
+    const monthly = stripUnits(d.financeMonthlyPayment);
+    const upfront = numberOr(d.financeUpfrontPct, 40);
     const lines = [
-      `${d.financeRate || '—'}% interest, ${d.financeTermMonths || '—'}-month term, ${d.financeAmortMonths || '—'}-month amortisation. Monthly payment: ${d.financeMonthlyPayment ? `$${d.financeMonthlyPayment}` : '—'} (including taxes).`,
+      `${rate}% interest, ${term}-month term, ${amort}-month amortisation. Monthly payment: ${monthly ? `$${monthly}` : '—'} (including taxes).`,
       formal
-        ? `Up to ${d.financeUpfrontPct || '40'}% of funds may be released upon execution of this Agreement or at project commencement, subject to the Owner's authorisation.`
-        : `Up to ${d.financeUpfrontPct || '40'}% of the funds can be released when you sign or when we start, with your authorisation.`,
+        ? `Up to ${upfront}% of funds may be released upon execution of this Agreement or at project commencement, subject to the Owner's authorisation.`
+        : `Up to ${upfront}% of the funds can be released when you sign or when we start, with your authorisation.`,
       formal
-        ? `The balance of ${100 - Number(d.financeUpfrontPct || 40)}% is released upon completion of the works.`
-        : `The remaining ${100 - Number(d.financeUpfrontPct || 40)}% is released once the project is complete.`,
+        ? `The balance of ${100 - upfront}% is released upon completion of the works.`
+        : `The remaining ${100 - upfront}% is released once the project is complete.`,
       formal
         ? 'No upfront cost, no early payment penalty, and no lien is registered against the Property.'
         : 'No upfront cost, no early-payment penalties, and no liens registered against your property.',
@@ -869,7 +907,10 @@ function drawPayment(L: Layout, d: ContractData) {
     if (schedule.length === 0) {
       L.listItem('Not applicable.');
     } else {
-      schedule.forEach((s) => { sub += 1; L.listItem(`${s.pct || '—'}% ${s.when || ''}`.trim(), marker()); });
+      schedule.forEach((s) => {
+        sub += 1;
+        L.listItem(`${stripUnits(s.pct) || '—'}% ${s.when || ''}`.trim(), marker());
+      });
     }
     L.gap(6);
   }

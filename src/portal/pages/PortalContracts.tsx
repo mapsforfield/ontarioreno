@@ -28,7 +28,7 @@ import { usePortalAuth } from '../auth';
 import { CONTRACT_TEMPLATES, templateForContractor, type ContractTemplateId } from '../data/contractTemplates';
 import { usePortalData } from '../data/store';
 import { presetsForProjectType, type ScopeLine } from '../data/scopePresets';
-import { buildContractPdf, contractFileName, loadImageAsDataUrl, prepareScopeImage, type ContractData, type PaymentMethod } from '../lib/contractPdf';
+import { buildContractPdf, contractFileName, loadImageAsDataUrl, prepareScopeImage, stripUnits, type ContractData, type PaymentMethod } from '../lib/contractPdf';
 import { ensureContractFonts } from '../lib/contractFonts';
 import { accentOptions, extractBrandColor, type AccentChoice, type RGB } from '../lib/brandColor';
 import { showToast } from '../lib/toast';
@@ -299,13 +299,13 @@ export default function PortalContracts() {
           paymentMethod: (['financing', 'cash', 'both'] as const).includes(payload.paymentMethod)
             ? payload.paymentMethod
             : cur.paymentMethod,
-          financeRate: payload.financeRate || cur.financeRate,
-          financeTermMonths: payload.financeTermMonths || cur.financeTermMonths,
-          financeAmortMonths: payload.financeAmortMonths || cur.financeAmortMonths,
-          financeMonthlyPayment: payload.financeMonthlyPayment || cur.financeMonthlyPayment,
-          financeUpfrontPct: payload.financeUpfrontPct || cur.financeUpfrontPct,
+          financeRate: stripUnits(payload.financeRate) || cur.financeRate,
+          financeTermMonths: stripUnits(payload.financeTermMonths) || cur.financeTermMonths,
+          financeAmortMonths: stripUnits(payload.financeAmortMonths) || cur.financeAmortMonths,
+          financeMonthlyPayment: stripUnits(payload.financeMonthlyPayment) || cur.financeMonthlyPayment,
+          financeUpfrontPct: stripUnits(payload.financeUpfrontPct) || cur.financeUpfrontPct,
           cashSchedule: Array.isArray(payload.cashSchedule) && payload.cashSchedule.length > 0
-            ? payload.cashSchedule.map((x: { pct?: string; when?: string }) => ({ pct: x.pct ?? '', when: x.when ?? '' }))
+            ? payload.cashSchedule.map((x: { pct?: string; when?: string }) => ({ pct: stripUnits(x.pct), when: x.when ?? '' }))
             : cur.cashSchedule,
           startDate: payload.startDate || cur.startDate,
           completionDate: payload.completionDate || cur.completionDate,
