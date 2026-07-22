@@ -14,6 +14,14 @@ export type ScopeLine = {
   item: string;
   /** Right column — the spec, material, count or qualifier. */
   detail: string;
+  /**
+   * Optional product photo shown in the spec column, exactly as the signed
+   * agreements do for appliances, tile, fixtures and finishes. Stored as a
+   * downscaled data URL so the whole draft stays self-contained.
+   */
+  imageDataUrl?: string;
+  /** Optional "Product Link here" destination for the item. */
+  linkUrl?: string;
 };
 
 export type ScopePreset = {

@@ -96,24 +96,36 @@ export async function loadImageAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
-/** Decode a blob via the browser and re-encode as PNG, capped at 512px. */
-function rasterise(blob: Blob): Promise<string | null> {
+/**
+ * Decode a blob via the browser and re-encode it, capped at `max` px.
+ *
+ * Logos keep PNG for transparency. Scope photos go to JPEG — a rep shooting a
+ * tile sample on their phone produces a multi-megabyte file, and the draft is
+ * autosaved into localStorage, so photos have to come down hard or the whole
+ * draft stops saving.
+ */
+function rasterise(blob: Blob, max = 512, mime: 'image/png' | 'image/jpeg' = 'image/png', quality = 0.82): Promise<string | null> {
   return new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
       try {
-        const MAX = 512;
-        const nw = img.naturalWidth || MAX;
-        const nh = img.naturalHeight || MAX;
-        const scale = Math.min(1, MAX / Math.max(nw, nh));
+        const nw = img.naturalWidth || max;
+        const nh = img.naturalHeight || max;
+        const scale = Math.min(1, max / Math.max(nw, nh));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(nw * scale));
         canvas.height = Math.max(1, Math.round(nh * scale));
         const ctx = canvas.getContext('2d');
         if (!ctx) { resolve(null); return; }
+        if (mime === 'image/jpeg') {
+          // JPEG has no alpha — flatten onto white so transparent PNGs don't
+          // come out with a black background.
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/png'));
+        resolve(canvas.toDataURL(mime, quality));
       } catch {
         resolve(null);
       } finally {
@@ -123,6 +135,16 @@ function rasterise(blob: Blob): Promise<string | null> {
     img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(null); };
     img.src = objectUrl;
   });
+}
+
+/** Prepare a rep-selected product photo for a scope line. */
+export function prepareScopeImage(file: File): Promise<string | null> {
+  return rasterise(file, 460, 'image/jpeg', 0.8);
+}
+
+/** jsPDF needs the format named explicitly; infer it from the data URL. */
+function imageFormat(dataUrl: string): 'JPEG' | 'PNG' {
+  return dataUrl.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
 }
 
 /**
@@ -138,7 +160,7 @@ function drawLogo(doc: jsPDF, dataUrl: string | null, x: number, y: number, boxW
     const w = props.width * scale;
     const h = props.height * scale;
     // Centre vertically in the box; left-align so text gutters stay predictable.
-    doc.addImage(dataUrl, 'PNG', x, y + (boxH - h) / 2, w, h);
+    doc.addImage(dataUrl, imageFormat(dataUrl), x, y + (boxH - h) / 2, w, h);
     return w;
   } catch {
     return 0;
@@ -733,7 +755,28 @@ function drawScope(L: Layout, d: ContractData) {
     L.font('normal', size);
     const itemLines = doc.splitTextToSize(line.item || '—', itemW - padX * 2) as string[];
     const detailLines = doc.splitTextToSize(line.detail || '', detailW - padX * 2) as string[];
-    const rowH = Math.max(itemLines.length, detailLines.length, 1) * lh + padY * 2;
+
+    // The spec column can carry a product photo and a link beneath its text,
+    // the way the signed agreements present appliances and finishes.
+    const linkH = line.linkUrl ? lh : 0;
+    let imgW = 0;
+    let imgH = 0;
+    if (line.imageDataUrl) {
+      try {
+        const props = doc.getImageProperties(line.imageDataUrl);
+        const boxW = detailW - padX * 2;
+        const boxH = 104;
+        const scale = Math.min(boxW / props.width, boxH / props.height);
+        imgW = props.width * scale;
+        imgH = props.height * scale;
+      } catch {
+        imgW = 0;
+        imgH = 0;
+      }
+    }
+
+    const detailH = detailLines.length * lh + linkH + (imgH ? imgH + 6 : 0);
+    const rowH = Math.max(itemLines.length * lh, detailH, lh) + padY * 2;
 
     if (L.y + rowH > L.bottom) {
       doc.addPage();
@@ -767,8 +810,30 @@ function drawScope(L: Layout, d: ContractData) {
     L.font('normal', size);
     L.ink(t.ink);
     itemLines.forEach((ln, i) => doc.text(ln, L.left + numW + padX, L.y + padY + size + i * lh));
+
+    const detailX = L.left + numW + itemW + padX;
     L.ink(t.muted);
-    detailLines.forEach((ln, i) => doc.text(ln, L.left + numW + itemW + padX, L.y + padY + size + i * lh));
+    detailLines.forEach((ln, i) => doc.text(ln, detailX, L.y + padY + size + i * lh));
+
+    let dy = L.y + padY + detailLines.length * lh;
+    if (line.linkUrl) {
+      L.font('normal', size);
+      L.ink(t.muted);
+      doc.text('Product Link ', detailX, dy + size);
+      const linkX = detailX + doc.getTextWidth('Product Link ');
+      L.ink(t.accent);
+      doc.textWithLink('here', linkX, dy + size, { url: line.linkUrl });
+      // jsPDF doesn't underline, so draw the rule ourselves.
+      L.stroke(t.accent);
+      doc.setLineWidth(0.4);
+      doc.line(linkX, dy + size + 1.5, linkX + doc.getTextWidth('here'), dy + size + 1.5);
+      dy += lh;
+    }
+    if (imgH) {
+      try {
+        doc.addImage(line.imageDataUrl as string, imageFormat(line.imageDataUrl as string), detailX, dy + 4, imgW, imgH);
+      } catch { /* undecodable photo — the row still reads correctly without it */ }
+    }
 
     L.y += rowH;
   });

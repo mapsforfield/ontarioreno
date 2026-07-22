@@ -8,6 +8,8 @@ import {
   Copy,
   Download,
   FileSignature,
+  ImagePlus,
+  Link2,
   Layers,
   Loader2,
   Paperclip,
@@ -15,6 +17,7 @@ import {
   RotateCcw,
   Trash2,
   Wand2,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -22,7 +25,7 @@ import { usePortalAuth } from '../auth';
 import { CONTRACT_TEMPLATES, templateForContractor, type ContractTemplateId } from '../data/contractTemplates';
 import { usePortalData } from '../data/store';
 import { presetsForProjectType, type ScopeLine } from '../data/scopePresets';
-import { buildContractPdf, contractFileName, loadImageAsDataUrl, type ContractData, type PaymentMethod } from '../lib/contractPdf';
+import { buildContractPdf, contractFileName, loadImageAsDataUrl, prepareScopeImage, type ContractData, type PaymentMethod } from '../lib/contractPdf';
 import { showToast } from '../lib/toast';
 
 const HST = 0.13;
@@ -91,6 +94,7 @@ export default function PortalContracts() {
   const [d, setD] = useState<Draft | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [imagingLine, setImagingLine] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -156,7 +160,17 @@ export default function PortalContracts() {
   // Autosave — reps close the tablet mid-appointment more often than you'd think.
   useEffect(() => {
     if (!d) return;
-    try { localStorage.setItem(DRAFT_KEY(dealId), JSON.stringify(d)); } catch { /* quota — ignore */ }
+    try {
+      localStorage.setItem(DRAFT_KEY(dealId), JSON.stringify(d));
+    } catch {
+      // Product photos are the only thing here big enough to blow the quota.
+      // Losing the photos on restore beats losing the whole scope, so retry
+      // without them rather than dropping the save entirely.
+      try {
+        const lean = { ...d, scope: d.scope.map(({ imageDataUrl: _omit, ...rest }) => rest) };
+        localStorage.setItem(DRAFT_KEY(dealId), JSON.stringify(lean));
+      } catch { /* still too big — the in-memory draft is unaffected */ }
+    }
   }, [d, dealId]);
 
   // Contractor logo, fetched once per contractor. A logo that's configured but
@@ -767,6 +781,84 @@ export default function PortalContracts() {
                       }}
                       aria-label={`Scope line ${i + 1} specification`}
                     />
+
+                    {/* Product photo + link, mirroring how the signed
+                        agreements present appliances, tile and fixtures. */}
+                    <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                      {line.imageDataUrl ? (
+                        <span className="relative inline-flex">
+                          <img
+                            src={line.imageDataUrl}
+                            alt={`Scope line ${i + 1} product`}
+                            className="h-12 w-12 rounded-[0.4rem] border border-slate-200 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...d.scope];
+                              next[i] = { ...next[i], imageDataUrl: undefined };
+                              set('scope', next);
+                            }}
+                            className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-slate-400 shadow-sm ring-1 ring-slate-200 transition hover:text-red-600"
+                            aria-label={`Remove photo from line ${i + 1}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ) : (
+                        <label
+                          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[0.5rem] border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition hover:border-[#1B3C6C] hover:text-[#1B3C6C] ${
+                            imagingLine === line.id ? 'pointer-events-none opacity-50' : ''
+                          }`}
+                        >
+                          {imagingLine === line.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <ImagePlus className="h-3.5 w-3.5" />
+                          )}
+                          Photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = '';
+                              if (!file) return;
+                              setImagingLine(line.id);
+                              const dataUrl = await prepareScopeImage(file);
+                              setImagingLine(null);
+                              if (!dataUrl) {
+                                showToast({ message: 'Could not read that image', variant: 'error' });
+                                return;
+                              }
+                              setD((cur) => {
+                                if (!cur) return cur;
+                                const next = [...cur.scope];
+                                const at = next.findIndex((l) => l.id === line.id);
+                                if (at === -1) return cur;
+                                next[at] = { ...next[at], imageDataUrl: dataUrl };
+                                return { ...cur, scope: next };
+                              });
+                            }}
+                          />
+                        </label>
+                      )}
+                      <span className="relative min-w-0 flex-1">
+                        <Link2 className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-300" />
+                        <input
+                          className={`${input} py-1.5 pl-8 text-xs`}
+                          value={line.linkUrl ?? ''}
+                          placeholder="Product link (optional)"
+                          onChange={(e) => {
+                            const next = [...d.scope];
+                            next[i] = { ...next[i], linkUrl: e.target.value || undefined };
+                            set('scope', next);
+                          }}
+                          aria-label={`Scope line ${i + 1} product link`}
+                        />
+                      </span>
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-col gap-0.5 sm:flex-row">
                     <button type="button" onClick={() => moveLine(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30" aria-label="Move up">
