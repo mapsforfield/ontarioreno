@@ -277,6 +277,106 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(updated);
     }
 
+    // ── Parse an existing signed agreement into Contract Creator fields ──
+    //
+    // Reps rebuild the same 35-line scope by hand for every deal. Uploading a
+    // previously signed agreement and lifting its scope and terms is far
+    // faster than retyping it.
+    //
+    // The extraction is deliberately scoped to the *reusable* parts: scope
+    // lines, pricing structure, payment terms and dates. It never returns the
+    // previous homeowner's name, contact details or address — those change on
+    // every deal, and carrying them into a new contract is a hazard rather
+    // than a convenience. The prompt says so and the schema has nowhere to put
+    // them, so a stray value can't ride along.
+    if (data._action === 'parse_agreement') {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return res.status(503).json({ error: 'Agreement parsing is not configured.' });
+      const pdfBase64 = typeof data.pdfBase64 === 'string' ? data.pdfBase64 : '';
+      if (!pdfBase64) return res.status(400).json({ error: 'Missing document.' });
+
+      const schema = {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          scope: {
+            type: 'array',
+            description: 'Every line of the scope of work, in document order.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                item: { type: 'string', description: 'The work item description.' },
+                detail: { type: 'string', description: 'The specification, material, count or qualifier. Empty string if none.' },
+              },
+              required: ['item', 'detail'],
+            },
+          },
+          totalPrice: { type: 'number', description: 'Total contract price before tax. 0 if not stated.' },
+          taxNote: { type: 'string', description: 'Tax wording, e.g. "+ HST". Empty if none.' },
+          paymentMethod: { type: 'string', enum: ['financing', 'cash', 'both'] },
+          financeRate: { type: 'string' },
+          financeTermMonths: { type: 'string' },
+          financeAmortMonths: { type: 'string' },
+          financeMonthlyPayment: { type: 'string' },
+          financeUpfrontPct: { type: 'string' },
+          cashSchedule: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                pct: { type: 'string' },
+                when: { type: 'string', description: 'The milestone the instalment is due at.' },
+              },
+              required: ['pct', 'when'],
+            },
+          },
+          startDate: { type: 'string', description: 'YYYY-MM-DD, or empty string if not stated.' },
+          completionDate: { type: 'string', description: 'YYYY-MM-DD, or empty string if not stated.' },
+          specialTerms: { type: 'string', description: 'Deal-specific clauses beyond the standard boilerplate. Empty if none.' },
+        },
+        required: [
+          'scope', 'totalPrice', 'taxNote', 'paymentMethod', 'financeRate', 'financeTermMonths',
+          'financeAmortMonths', 'financeMonthlyPayment', 'financeUpfrontPct', 'cashSchedule',
+          'startDate', 'completionDate', 'specialTerms',
+        ],
+      };
+
+      try {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        const anthropic = new Anthropic({ apiKey });
+        const message = await anthropic.messages.create({
+          model: 'claude-opus-4-8',
+          max_tokens: 16000,
+          thinking: { type: 'adaptive' },
+          system:
+            "You extract reusable contract structure from signed home-renovation service agreements so a sales rep can reuse it as a template for a NEW client.\n\nExtract the scope of work verbatim, one entry per numbered line, preserving the document order. Put the work description in `item` and any specification, material, count or qualifier in `detail`. Also extract the pricing structure, payment terms and project dates.\n\nNEVER extract the previous homeowner's name, phone number, email address, or property address, and never copy them into any field including specialTerms. They belong to a different client and must not carry over. If a scope line names the previous owner or their address, omit that name or address from the text you return.\n\nUse empty strings for anything the document does not state. Do not invent values.",
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+                { type: 'text', text: 'Extract the reusable scope and terms from this agreement.' },
+              ],
+            },
+          ],
+          output_config: { format: { type: 'json_schema', schema } },
+        });
+
+        const textBlock = message.content.find((b) => b.type === 'text');
+        if (!textBlock || textBlock.type !== 'text') {
+          return res.status(502).json({ error: 'The document could not be read.' });
+        }
+        const parsed = JSON.parse(textBlock.text);
+        return res.status(200).json(parsed);
+      } catch (err) {
+        console.error('[deals] parse_agreement failed:', err);
+        const msg = err instanceof Error ? err.message : 'Parsing failed.';
+        return res.status(502).json({ error: msg.slice(0, 300) });
+      }
+    }
+
     // ── Contract Creator presets ──
     if (data._action === 'save_contract_preset') {
       const name = String(data.name ?? '').trim();

@@ -4,7 +4,8 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/appointments/index.ts": { "maxDuration": 60 }
+    "api/appointments/index.ts": { "maxDuration": 60 },
+    "api/deals/index.ts": { "maxDuration": 120 }
   },
   "crons": [
     {

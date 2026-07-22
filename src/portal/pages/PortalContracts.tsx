@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   FileSignature,
+  FileUp,
   ImagePlus,
   Link2,
   Layers,
@@ -105,6 +106,7 @@ export default function PortalContracts() {
   const [brandColor, setBrandColor] = useState<RGB | null>(null);
   const [presetName, setPresetName] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [presetShared, setPresetShared] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
 
@@ -244,6 +246,86 @@ export default function PortalContracts() {
         scope: payload.scope.map((l) => ({ ...l, id: newLine().id })),
       };
     });
+  };
+
+  // Vercel caps a request body at ~4.5MB and base64 inflates by a third, so the
+  // raw file has to stay meaningfully under that.
+  const MAX_AGREEMENT_BYTES = 3 * 1024 * 1024;
+
+  const importAgreement = async (file: File) => {
+    if (file.size > MAX_AGREEMENT_BYTES) {
+      showToast({
+        message: 'That PDF is too large to import',
+        description: `${(file.size / 1024 / 1024).toFixed(1)}MB — the limit is 3MB. Try a smaller export of the agreement.`,
+        variant: 'error',
+      });
+      return;
+    }
+    setImporting(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      // btoa on a 3MB string blows the call stack if done in one go — chunk it.
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      }
+      const pdfBase64 = btoa(binary);
+
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ _action: 'parse_agreement', pdfBase64 }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || 'Could not read that agreement.');
+
+      const lines: ScopeLine[] = Array.isArray(payload.scope)
+        ? payload.scope
+            .filter((l: { item?: string }) => (l?.item ?? '').trim())
+            .map((l: { item?: string; detail?: string }) => newLine(l.item ?? '', l.detail ?? ''))
+        : [];
+
+      setD((cur) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          // Only the reusable half is touched — the client details, address and
+          // agreement date on this deal are deliberately left alone.
+          scope: lines.length > 0 ? lines : cur.scope,
+          totalPrice: payload.totalPrice ? String(payload.totalPrice) : cur.totalPrice,
+          taxNote: payload.taxNote || cur.taxNote,
+          paymentMethod: (['financing', 'cash', 'both'] as const).includes(payload.paymentMethod)
+            ? payload.paymentMethod
+            : cur.paymentMethod,
+          financeRate: payload.financeRate || cur.financeRate,
+          financeTermMonths: payload.financeTermMonths || cur.financeTermMonths,
+          financeAmortMonths: payload.financeAmortMonths || cur.financeAmortMonths,
+          financeMonthlyPayment: payload.financeMonthlyPayment || cur.financeMonthlyPayment,
+          financeUpfrontPct: payload.financeUpfrontPct || cur.financeUpfrontPct,
+          cashSchedule: Array.isArray(payload.cashSchedule) && payload.cashSchedule.length > 0
+            ? payload.cashSchedule.map((x: { pct?: string; when?: string }) => ({ pct: x.pct ?? '', when: x.when ?? '' }))
+            : cur.cashSchedule,
+          startDate: payload.startDate || cur.startDate,
+          completionDate: payload.completionDate || cur.completionDate,
+          specialTerms: payload.specialTerms || cur.specialTerms,
+        };
+      });
+
+      showToast({
+        message: `Imported ${lines.length} scope lines`,
+        description: 'Client details were not imported — check the figures against the original before sending.',
+        variant: 'success',
+      });
+    } catch (err) {
+      showToast({
+        message: 'Could not import that agreement',
+        description: err instanceof Error ? err.message : 'Parsing failed.',
+        variant: 'error',
+      });
+    }
+    setImporting(false);
   };
 
   const savePreset = async () => {
@@ -568,6 +650,42 @@ export default function PortalContracts() {
               </p>
             </section>
           )}
+
+          {/* Import an existing signed agreement */}
+          <section className={card}>
+            <h2 className="mb-1 text-sm font-black uppercase tracking-[0.1em] text-slate-900">
+              Import from an old agreement
+            </h2>
+            <p className="mb-3 text-xs font-semibold text-slate-500">
+              Upload a signed PDF and its scope of work, pricing and payment terms are read out and
+              filled in — no retyping. The previous client&apos;s name, contact details and address are
+              never imported.
+            </p>
+            <label
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-[0.5rem] border border-dashed border-slate-300 px-3.5 py-2.5 text-sm font-bold text-slate-600 transition hover:border-[#1B3C6C] hover:text-[#1B3C6C] ${
+                importing ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+              {importing ? 'Reading the agreement…' : 'Upload a signed agreement (PDF)'}
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                className="sr-only"
+                disabled={importing}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) importAgreement(f);
+                }}
+              />
+            </label>
+            {importing && (
+              <p className="mt-2 text-xs font-semibold text-slate-400">
+                This can take up to a minute for a long agreement.
+              </p>
+            )}
+          </section>
 
           {/* Deal + contractor */}
           <section className={card}>
