@@ -942,27 +942,36 @@ export default function PortalContracts() {
                 <p className={label}>Cash schedule</p>
                 <div className="space-y-2">
                   {d.cashSchedule.map((s, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input
-                        className={`${input} w-20 shrink-0`}
-                        value={s.pct}
-                        onChange={(e) => {
-                          const next = [...d.cashSchedule];
-                          next[i] = { ...next[i], pct: e.target.value };
-                          set('cashSchedule', next);
-                        }}
-                        aria-label={`Milestone ${i + 1} percentage`}
-                      />
-                      <input
-                        className={input}
-                        value={s.when}
-                        onChange={(e) => {
-                          const next = [...d.cashSchedule];
-                          next[i] = { ...next[i], when: e.target.value };
-                          set('cashSchedule', next);
-                        }}
-                        aria-label={`Milestone ${i + 1} description`}
-                      />
+                    <div key={i} className="flex items-stretch gap-2">
+                      <span className="relative flex w-24 shrink-0">
+                        <input
+                          className={`${input} pr-7`}
+                          value={s.pct}
+                          inputMode="decimal"
+                          onChange={(e) => {
+                            const next = [...d.cashSchedule];
+                            next[i] = { ...next[i], pct: e.target.value };
+                            set('cashSchedule', next);
+                          }}
+                          aria-label={`Milestone ${i + 1} percentage`}
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                          %
+                        </span>
+                      </span>
+                      <span className="flex min-w-0 flex-1">
+                        <input
+                          className={input}
+                          value={s.when}
+                          placeholder="e.g. upon contract signing"
+                          onChange={(e) => {
+                            const next = [...d.cashSchedule];
+                            next[i] = { ...next[i], when: e.target.value };
+                            set('cashSchedule', next);
+                          }}
+                          aria-label={`Milestone ${i + 1} description`}
+                        />
+                      </span>
                       <button
                         type="button"
                         onClick={() => set('cashSchedule', d.cashSchedule.filter((_, j) => j !== i))}
