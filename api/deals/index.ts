@@ -295,53 +295,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const pdfBase64 = typeof data.pdfBase64 === 'string' ? data.pdfBase64 : '';
       if (!pdfBase64) return res.status(400).json({ error: 'Missing document.' });
 
-      const schema = {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          scope: {
-            type: 'array',
-            description: 'Every line of the scope of work, in document order.',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                item: { type: 'string', description: 'The work item description.' },
-                detail: { type: 'string', description: 'The specification, material, count or qualifier. Empty string if none.' },
-              },
-              required: ['item', 'detail'],
-            },
-          },
-          totalPrice: { type: 'number', description: 'Total contract price before tax. 0 if not stated.' },
-          taxNote: { type: 'string', description: 'Tax wording, e.g. "+ HST". Empty if none.' },
-          paymentMethod: { type: 'string', enum: ['financing', 'cash', 'both'] },
-          financeRate: { type: 'string', description: 'Annual interest rate as a bare number, no % sign. Empty if none.' },
-          financeTermMonths: { type: 'string', description: 'Term in months as a bare number, no unit word.' },
-          financeAmortMonths: { type: 'string', description: 'Amortisation in months as a bare number, no unit word.' },
-          financeMonthlyPayment: { type: 'string', description: 'Monthly payment as a bare number, no $ sign.' },
-          financeUpfrontPct: { type: 'string', description: 'Percentage released up front as a bare number, no % sign.' },
-          cashSchedule: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                pct: { type: 'string', description: 'Percentage as a bare number, no % sign.' },
-                when: { type: 'string', description: 'The milestone the instalment is due at.' },
-              },
-              required: ['pct', 'when'],
-            },
-          },
-          startDate: { type: 'string', description: 'YYYY-MM-DD, or empty string if not stated.' },
-          completionDate: { type: 'string', description: 'YYYY-MM-DD, or empty string if not stated.' },
-          specialTerms: { type: 'string', description: 'Deal-specific clauses beyond the standard boilerplate. Empty if none.' },
-        },
-        required: [
-          'scope', 'totalPrice', 'taxNote', 'paymentMethod', 'financeRate', 'financeTermMonths',
-          'financeAmortMonths', 'financeMonthlyPayment', 'financeUpfrontPct', 'cashSchedule',
-          'startDate', 'completionDate', 'specialTerms',
-        ],
-      };
 
       try {
         const { default: Anthropic } = await import('@anthropic-ai/sdk');
@@ -349,31 +302,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const message = await anthropic.messages.create({
           model: 'claude-opus-4-8',
           max_tokens: 16000,
-          thinking: { type: 'adaptive' },
+          thinking: { type: 'disabled' },
           system:
-            "You extract reusable contract structure from signed home-renovation service agreements so a sales rep can reuse it as a template for a NEW client.\n\nExtract the scope of work verbatim, one entry per numbered line, preserving the document order. Put the work description in `item` and any specification, material, count or qualifier in `detail`. Also extract the pricing structure, payment terms and project dates.\n\nNEVER extract the previous homeowner's name, phone number, email address, or property address, and never copy them into any field including specialTerms. They belong to a different client and must not carry over. If a scope line names the previous owner or their address, omit that name or address from the text you return.\n\nUse empty strings for anything the document does not state. Do not invent values.",
+            "You extract reusable contract structure from signed home-renovation service agreements so a sales rep can reuse it as a template for a NEW client.\n\nExtract the scope of work verbatim, one entry per numbered line, preserving the document order. Put the work description in `item` and any specification, material, count or qualifier in `detail`. Also extract the pricing structure, payment terms and project dates.\n\nNEVER extract the previous homeowner's name, phone number, email address, or property address, and never copy them into any field including specialTerms. They belong to a different client and must not carry over. If a scope line names the previous owner or their address, omit that name or address from the text you return.\n\nUse empty strings for anything the document does not state. Do not invent values.\n\nRespond with ONE JSON object and nothing else — no prose, no explanation, no markdown code fence. Its keys are exactly: scope (array of {item, detail}), totalPrice (number), taxNote (string), paymentMethod (\"financing\"|\"cash\"|\"both\"), financeRate, financeTermMonths, financeAmortMonths, financeMonthlyPayment, financeUpfrontPct (all bare-number strings, no % or $), cashSchedule (array of {pct, when}), startDate, completionDate (YYYY-MM-DD or empty), specialTerms (string).",
           messages: [
             {
               role: 'user',
               content: [
                 { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-                { type: 'text', text: 'Extract the reusable scope and terms from this agreement.' },
+                { type: 'text', text: 'Extract the reusable scope and terms from this agreement as the JSON object described.' },
               ],
             },
           ],
-          output_config: { format: { type: 'json_schema', schema } },
         });
 
         const textBlock = message.content.find((b) => b.type === 'text');
         if (!textBlock || textBlock.type !== 'text') {
           return res.status(502).json({ error: 'The document could not be read.' });
         }
-        const parsed = JSON.parse(textBlock.text);
+        // The model is told to return bare JSON; strip a stray code fence or any
+        // surrounding prose before parsing, defensively.
+        const rawText = textBlock.text.trim();
+        const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const jsonText = fenceMatch ? fenceMatch[1].trim() : rawText;
+        const firstBrace = jsonText.indexOf('{');
+        const lastBrace = jsonText.lastIndexOf('}');
+        if (firstBrace === -1 || lastBrace <= firstBrace) {
+          return res.status(502).json({ error: 'The agreement could not be read into fields.' });
+        }
+        const parsed = JSON.parse(jsonText.slice(firstBrace, lastBrace + 1));
         return res.status(200).json(parsed);
       } catch (err) {
         console.error('[deals] parse_agreement failed:', err);
-        const msg = err instanceof Error ? err.message : 'Parsing failed.';
-        return res.status(502).json({ error: msg.slice(0, 300) });
+        // Surface the API's own reason where there is one, so a genuine failure
+        // is legible instead of a wall of error JSON.
+        let reason = err instanceof Error ? err.message : 'Parsing failed.';
+        const inner = (err as { error?: { error?: { message?: string } } })?.error?.error?.message;
+        if (typeof inner === 'string' && inner) reason = inner;
+        return res.status(502).json({ error: reason.slice(0, 300) });
       }
     }
 
