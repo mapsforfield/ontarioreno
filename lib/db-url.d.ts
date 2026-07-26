@@ -10,6 +10,13 @@ export declare class PreviewDatabaseConfigError extends Error {
 export declare function isPreviewEnv(env?: NodeJS.ProcessEnv): boolean;
 
 /**
+ * True only for a genuine postgres:// or postgresql:// URL with a host.
+ * Vercel hands encrypted variables to the CLI as the literal `""`, which is
+ * non-empty and would otherwise fail later as an opaque driver "Invalid URL".
+ */
+export declare function isPostgresUrl(value: unknown): boolean;
+
+/**
  * Database URL for the current environment.
  * Preview resolves only from PREVIEW_DATABASE_* and throws rather than falling
  * back to production. Production/local keep the existing unprefixed precedence.

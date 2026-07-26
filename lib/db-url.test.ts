@@ -4,6 +4,7 @@ import {
   resolveDatabaseUrl,
   resolveDatabaseSource,
   isPreviewEnv,
+  isPostgresUrl,
   PreviewDatabaseConfigError,
   PREVIEW_PREFIX,
 } from './db-url.js';
@@ -151,6 +152,81 @@ test('local development (no VERCEL_ENV) keeps the existing behaviour', () => {
   assert.equal(resolveDatabaseUrl({ DATABASE_URL: PROD } as never), PROD);
   // Nothing configured returns '' so apply-schema still skips rather than fails.
   assert.equal(resolveDatabaseUrl({} as never), '');
+});
+
+// ─── Scheme validation — the actual cause of the "Invalid URL" failure ───────
+// Vercel returns ENCRYPTED environment variables to the CLI as the literal two
+// characters `""`. That is non-empty, so an emptiness check let it through and
+// the driver then threw an opaque "Invalid URL" far from the real cause.
+
+test('the Vercel encrypted-variable placeholder is rejected as a URL', () => {
+  assert.equal(isPostgresUrl('""'), false, 'the literal "" placeholder must not be accepted');
+  assert.equal(isPostgresUrl("''"), false);
+  assert.equal(isPostgresUrl(''), false);
+  assert.equal(isPostgresUrl('   '), false);
+});
+
+test('non-URL and wrong-scheme values are rejected', () => {
+  for (const bad of [
+    'ep-cool-name-123456-pooler.us-east-2.aws.neon.tech', // bare host
+    'postgres',
+    'https://example.com/db',
+    'mysql://user@host/db',
+    'psql "postgres://user@host/db"',
+    'postgres://', // no host
+    undefined,
+    null,
+    12345,
+  ]) {
+    assert.equal(isPostgresUrl(bad as never), false, `expected ${String(bad)} to be rejected`);
+  }
+});
+
+test('real Postgres URLs are accepted, including Neon query parameters', () => {
+  for (const good of [
+    'postgres://u:p@ep-x-pooler.aws.neon.tech/neondb?sslmode=require',
+    'postgresql://u:p@host/db',
+    'postgres://u:p@host/db?pgbouncer=true&connect_timeout=15',
+  ]) {
+    assert.equal(isPostgresUrl(good), true, `expected ${good} to be accepted`);
+  }
+});
+
+test('FAIL CLOSED: a preview variable holding the "" placeholder throws with a named cause', () => {
+  try {
+    resolveDatabaseSource({
+      VERCEL_ENV: 'preview',
+      ...productionVars,
+      [`${PREVIEW_PREFIX}POSTGRES_PRISMA_URL`]: '""',
+    } as never);
+    assert.fail('expected a throw');
+  } catch (err) {
+    assert.ok(err instanceof PreviewDatabaseConfigError);
+    const message = (err as Error).message;
+    assert.ok(message.includes(`${PREVIEW_PREFIX}POSTGRES_PRISMA_URL`), 'must name the offending key');
+    assert.ok(message.includes('ENCRYPTED'), 'must explain the Vercel placeholder cause');
+    assert.ok(!message.includes(PROD), 'must not leak a connection string');
+  }
+});
+
+test('preview falls back to an unanticipated PREVIEW_DATABASE_* suffix that is a real URL', () => {
+  const source = resolveDatabaseSource({
+    VERCEL_ENV: 'preview',
+    ...productionVars,
+    [`${PREVIEW_PREFIX}POSTGRES_PRISMA_URL`]: '""',
+    [`${PREVIEW_PREFIX}SOME_NEW_SUFFIX`]: PREVIEW,
+  } as never);
+  assert.equal(source.key, `${PREVIEW_PREFIX}SOME_NEW_SUFFIX`);
+  assert.equal(source.url, PREVIEW);
+});
+
+test('preview prefers a pooled URL over an unpooled one', () => {
+  const source = resolveDatabaseSource({
+    VERCEL_ENV: 'preview',
+    [`${PREVIEW_PREFIX}DATABASE_URL_UNPOOLED`]: 'postgres://u@unpooled-host/db',
+    [`${PREVIEW_PREFIX}SOME_POOLED`]: PREVIEW,
+  } as never);
+  assert.equal(source.key, `${PREVIEW_PREFIX}SOME_POOLED`);
 });
 
 // ─── resolveDatabaseSource — the guard the Preview seed script asserts on ─────
