@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   resolveDatabaseUrl,
+  resolveDatabaseSource,
   isPreviewEnv,
   PreviewDatabaseConfigError,
   PREVIEW_PREFIX,
@@ -150,6 +151,31 @@ test('local development (no VERCEL_ENV) keeps the existing behaviour', () => {
   assert.equal(resolveDatabaseUrl({ DATABASE_URL: PROD } as never), PROD);
   // Nothing configured returns '' so apply-schema still skips rather than fails.
   assert.equal(resolveDatabaseUrl({} as never), '');
+});
+
+// ─── resolveDatabaseSource — the guard the Preview seed script asserts on ─────
+
+test('preview reports the prefixed variable NAME it selected', () => {
+  const source = resolveDatabaseSource({
+    VERCEL_ENV: 'preview',
+    ...productionVars,
+    [`${PREVIEW_PREFIX}POSTGRES_PRISMA_URL`]: PREVIEW,
+  } as never);
+  assert.equal(source.key, `${PREVIEW_PREFIX}POSTGRES_PRISMA_URL`);
+  assert.equal(source.url, PREVIEW);
+  assert.ok(source.key.startsWith(PREVIEW_PREFIX), 'seed script guard relies on this prefix');
+});
+
+test('production reports an unprefixed key, which the seed guard rejects', () => {
+  const source = resolveDatabaseSource({ VERCEL_ENV: 'production', ...productionVars } as never);
+  assert.equal(source.key, 'POSTGRES_PRISMA_URL');
+  assert.equal(source.key.startsWith(PREVIEW_PREFIX), false);
+});
+
+test('an unconfigured environment reports an empty key, which the seed guard rejects', () => {
+  const source = resolveDatabaseSource({} as never);
+  assert.deepEqual(source, { key: '', url: '' });
+  assert.equal(source.key.startsWith(PREVIEW_PREFIX), false);
 });
 
 test('only "preview" counts as a preview environment', () => {

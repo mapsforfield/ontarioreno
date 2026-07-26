@@ -16,4 +16,13 @@ export declare function isPreviewEnv(env?: NodeJS.ProcessEnv): boolean;
  */
 export declare function resolveDatabaseUrl(env?: NodeJS.ProcessEnv): string;
 
+/**
+ * Same resolution, but also reports which variable supplied the URL. Callers
+ * that must prove they are not pointed at production assert on `key`.
+ */
+export declare function resolveDatabaseSource(env?: NodeJS.ProcessEnv): {
+  key: string;
+  url: string;
+};
+
 export declare function describeDatabaseSource(env?: NodeJS.ProcessEnv): string;
