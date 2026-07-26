@@ -379,7 +379,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 'no-store');
 
     const appointmentId = String(req.query['appointmentId'] ?? '').trim();
-    const linkAction = String(req.query['action'] ?? '');
+    // NOT `action` — this file is the Vercel dynamic route /api/auth/[action],
+    // so req.query.action is already the path segment ('customer-link-check').
+    // Reusing that name would collide and reject every valid token.
+    const linkAction = String(req.query['linkAction'] ?? '');
     const token = req.query['t'];
 
     if (!isCustomerLinkConfigured()) {

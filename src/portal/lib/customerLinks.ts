@@ -37,7 +37,9 @@ export function useCustomerLinkCheck(
     }
     let alive = true;
     setState({ status: 'checking' });
-    const query = new URLSearchParams({ appointmentId, action, t: token });
+    // `linkAction`, not `action`: /api/auth/[action] is a Vercel dynamic route,
+    // so `action` is already taken by the path segment.
+    const query = new URLSearchParams({ appointmentId, linkAction: action, t: token });
     fetch(`/api/auth/customer-link-check?${query.toString()}`)
       .then(async (res) => {
         if (!alive) return;
