@@ -1,7 +1,8 @@
 import { AlertCircle, CalendarDays, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import ConsultationLinkExpired from '../components/ConsultationLinkExpired';
+import ConsultationLinkExpired, { ConsultationLinkChecking } from '../components/ConsultationLinkExpired';
+import { useCustomerLinkCheck } from '../lib/customerLinks';
 
 type Step = 'choice' | 'reason' | 'success';
 
@@ -17,9 +18,11 @@ const CANCEL_REASONS = [
 export default function ConsultationCancel() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  // Signed token from the emailed link. The server is the real authority; this
-  // check only avoids making someone fill in a form that cannot be submitted.
   const token = searchParams.get('t') ?? '';
+  // The browser cannot verify a token — the signing secret is server-side only.
+  // The presence of `t` proves nothing, so the server checks signature, expiry,
+  // appointment id and action purpose before any control here is rendered.
+  const linkState = useCustomerLinkCheck(id, 'cancel', token);
   const [step, setStep] = useState<Step>('choice');
   const [selectedReason, setSelectedReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
@@ -92,7 +95,10 @@ export default function ConsultationCancel() {
     </div>
   );
 
-  if (!token) {
+  if (linkState.status === 'checking') {
+    return <ConsultationLinkChecking />;
+  }
+  if (linkState.status === 'invalid') {
     return <ConsultationLinkExpired action="cancel" reference={refId} />;
   }
 
@@ -114,7 +120,7 @@ export default function ConsultationCancel() {
           <p className="mt-6 text-sm text-slate-400">
             Changed your mind?{' '}
             <a
-              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(token)}`}
+              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(linkState.siblingToken)}`}
               className="font-semibold text-[#1B3C6C] underline-offset-2 hover:underline"
             >
               Request a reschedule instead
@@ -141,7 +147,7 @@ export default function ConsultationCancel() {
 
             {/* Reschedule option */}
             <a
-              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(token)}`}
+              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(linkState.siblingToken)}`}
               className="flex w-full items-start gap-4 rounded-xl border-2 border-[#1B3C6C] bg-[#f6faff] p-5 transition hover:bg-[#e8f1fb]"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1B3C6C] text-white">

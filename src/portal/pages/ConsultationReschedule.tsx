@@ -2,7 +2,8 @@ import { CalendarDays, CheckCircle2, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { torontoToday } from '../lib/time';
-import ConsultationLinkExpired from '../components/ConsultationLinkExpired';
+import ConsultationLinkExpired, { ConsultationLinkChecking } from '../components/ConsultationLinkExpired';
+import { useCustomerLinkCheck } from '../lib/customerLinks';
 
 /** Generate half-hour time slots from 8:00 AM to 7:00 PM. */
 function buildTimeSlots(): Array<{ label: string; value: string }> {
@@ -32,9 +33,11 @@ type Status = 'idle' | 'loading' | 'success' | 'error';
 export default function ConsultationReschedule() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  // Signed token from the emailed link. The server is the real authority; this
-  // check only avoids making someone fill in a form that cannot be submitted.
   const token = searchParams.get('t') ?? '';
+  // The browser cannot verify a token — the signing secret is server-side only.
+  // The presence of `t` proves nothing, so the server checks signature, expiry,
+  // appointment id and action purpose before any control here is rendered.
+  const linkState = useCustomerLinkCheck(id, 'reschedule', token);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
@@ -90,7 +93,10 @@ export default function ConsultationReschedule() {
     }
   };
 
-  if (!token) {
+  if (linkState.status === 'checking') {
+    return <ConsultationLinkChecking />;
+  }
+  if (linkState.status === 'invalid') {
     return <ConsultationLinkExpired action="reschedule" reference={refId} />;
   }
 
@@ -212,7 +218,7 @@ export default function ConsultationReschedule() {
               {status === 'loading' ? 'Sending…' : 'Request Reschedule'}
             </button>
             <a
-              href={`/portal/consultation/${id}/cancel?t=${encodeURIComponent(token)}`}
+              href={`/portal/consultation/${id}/cancel?t=${encodeURIComponent(linkState.siblingToken)}`}
               className="flex-1 rounded-xl border border-slate-200 px-6 py-3.5 text-center text-base font-bold text-slate-600 transition hover:bg-slate-50"
             >
               Cancel instead

@@ -1,4 +1,68 @@
+import { useEffect, useState } from 'react';
 import type { CustomerActionLinks } from '../data/emailTemplates';
+
+export type CustomerLinkAction = 'reschedule' | 'cancel';
+
+/**
+ * Result of asking the server whether a customer link is genuinely valid.
+ *
+ * 'checking' must render neither the form nor a failure — the browser cannot
+ * verify a token itself (the signing secret is server-side only), so the mere
+ * presence of a `t` parameter proves nothing and must never gate the UI.
+ */
+export type CustomerLinkState =
+  | { status: 'checking' }
+  | { status: 'valid'; siblingToken: string }
+  | { status: 'invalid' };
+
+/**
+ * Server-verified gate for the reschedule/cancel pages.
+ *
+ * The server checks signature, expiry, appointment id AND action purpose before
+ * we render any mutation control. Anything other than an explicit `valid: true`
+ * — including a network failure — is treated as invalid, so the page fails
+ * closed rather than exposing controls on an unverified token.
+ */
+export function useCustomerLinkCheck(
+  appointmentId: string | undefined,
+  action: CustomerLinkAction,
+  token: string
+): CustomerLinkState {
+  const [state, setState] = useState<CustomerLinkState>({ status: 'checking' });
+
+  useEffect(() => {
+    if (!appointmentId || !token) {
+      setState({ status: 'invalid' });
+      return;
+    }
+    let alive = true;
+    setState({ status: 'checking' });
+    const query = new URLSearchParams({ appointmentId, action, t: token });
+    fetch(`/api/auth/customer-link-check?${query.toString()}`)
+      .then(async (res) => {
+        if (!alive) return;
+        if (!res.ok) {
+          setState({ status: 'invalid' });
+          return;
+        }
+        const data = (await res.json()) as { valid?: boolean; siblingToken?: string };
+        if (data?.valid === true) {
+          setState({ status: 'valid', siblingToken: data.siblingToken ?? '' });
+        } else {
+          setState({ status: 'invalid' });
+        }
+      })
+      .catch(() => {
+        // Fail closed — never render mutation controls on an unverified token.
+        if (alive) setState({ status: 'invalid' });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [appointmentId, action, token]);
+
+  return state;
+}
 
 /**
  * Fetch the signed reschedule/cancel URLs for an appointment.

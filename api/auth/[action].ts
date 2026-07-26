@@ -15,7 +15,9 @@ import {
 } from '../../lib/auth.js';
 import {
   buildCustomerActionUrls,
+  isCustomerLinkAction,
   isCustomerLinkConfigured,
+  signCustomerLinkToken,
   verifyCustomerLinkToken,
 } from '../../lib/customer-link.js';
 import { isValidAppointmentTime } from '../../lib/appointment-time.js';
@@ -61,9 +63,11 @@ function fmtDate(d: string): string {
  *   POST /api/auth/add-rep          — admin: create a new rep user
  *   GET  /api/auth/activities       — list recent activities (auth required)
  *   POST /api/auth/activities       — record an activity (auth required)
- *   GET  /api/auth/customer-links   — auth: mint signed customer action URLs
- *   POST /api/auth/customer-request — public, but requires a valid signed token:
- *                                     reschedule/cancel consultation
+ *   GET  /api/auth/customer-links      — auth: mint signed customer action URLs
+ *   GET  /api/auth/customer-link-check — public: validate a token BEFORE the
+ *                                        client renders any mutation UI
+ *   POST /api/auth/customer-request    — public, but requires a valid signed
+ *                                        token for that exact action
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query['action'] as string;
@@ -366,6 +370,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(links);
   }
 
+  // ── /api/auth/customer-link-check ────────────────────────────────────────────
+  // Public. The browser cannot verify a token (the secret is server-side only),
+  // so the reschedule/cancel pages ask here BEFORE rendering any mutation UI.
+  // Presence of a `t` parameter means nothing — only this answer does.
+  if (action === 'customer-link-check') {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+    res.setHeader('Cache-Control', 'no-store');
+
+    const appointmentId = String(req.query['appointmentId'] ?? '').trim();
+    const linkAction = String(req.query['action'] ?? '');
+    const token = req.query['t'];
+
+    if (!isCustomerLinkConfigured()) {
+      console.error('[customer-link-check] CUSTOMER_LINK_SECRET is not configured.');
+      return res.status(503).json({ valid: false, reason: 'not_configured' });
+    }
+    if (!appointmentId || !isCustomerLinkAction(linkAction)) {
+      return res.status(403).json({ valid: false, reason: 'invalid' });
+    }
+
+    const verified = verifyCustomerLinkToken(appointmentId, linkAction, token);
+    if (!verified.ok) {
+      return res.status(403).json({ valid: false, reason: verified.reason });
+    }
+
+    // The appointment must still exist, or there is nothing to act on.
+    const appointment = await prisma.appointment
+      .findUnique({ where: { id: appointmentId }, select: { id: true } })
+      .catch(() => null);
+    if (!appointment) return res.status(404).json({ valid: false, reason: 'not_found' });
+
+    // Hand back a token for the sibling action so the "Cancel instead" /
+    // "Reschedule instead" cross-links keep working. This grants no new
+    // authority: the caller already proved possession of a valid link for this
+    // appointment, and the original email contained both links anyway.
+    const sibling = linkAction === 'reschedule' ? 'cancel' : 'reschedule';
+    return res.status(200).json({
+      valid: true,
+      siblingAction: sibling,
+      siblingToken: signCustomerLinkToken(appointmentId, sibling),
+    });
+  }
+
   // ── /api/auth/customer-request ───────────────────────────────────────────────
   if (action === 'customer-request') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -387,7 +434,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[customer-request] CUSTOMER_LINK_SECRET is not configured — refusing to authorize.');
       return res.status(500).json({ error: 'This link cannot be verified right now. Please contact OntarioReno.' });
     }
-    const verified = verifyCustomerLinkToken(appointmentId.trim(), token);
+    // `type` doubles as the action the token must authorize, so a cancel token
+    // cannot drive a reschedule (or vice versa).
+    const verified = verifyCustomerLinkToken(appointmentId.trim(), type, token);
     if (!verified.ok) {
       return res.status(403).json({
         error: 'This link is no longer valid. Please contact OntarioReno to reschedule or cancel.',

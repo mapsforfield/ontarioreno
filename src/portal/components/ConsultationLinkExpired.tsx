@@ -1,4 +1,22 @@
-import { LinkIcon } from 'lucide-react';
+import { LinkIcon, Loader2 } from 'lucide-react';
+
+/**
+ * Shown while the server verifies the link. Renders no mutation controls —
+ * the browser cannot check a token, so nothing is exposed until the server says
+ * the token is genuinely valid.
+ */
+export function ConsultationLinkChecking() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#f0f4f8] p-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#1B3C6C]" />
+        <p className="mt-4 text-base font-semibold text-slate-600">
+          Checking your link…
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Shown when a customer reschedule/cancel link carries no valid signature.
