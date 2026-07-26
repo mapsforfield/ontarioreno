@@ -9,17 +9,31 @@
 
     <!-- Meta Pixel Code -->
     <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
+      // Customer reschedule/cancel links carry a signed token in the query
+      // string. The Meta Pixel reports the full page URL to Meta as payload
+      // data (the `dl` parameter), which Referrer-Policy cannot suppress
+      // because it is not a Referer header. So the pixel must not load at all
+      // on those two routes.
+      //
+      // Deliberately narrow: it matches ONLY /portal/consultation/<id>/reschedule
+      // and /portal/consultation/<id>/cancel. Every other route — including the
+      // rest of the portal and any other consultation page — is unaffected.
+      // lib/meta-pixel-guard.test.ts reads this literal and asserts its scope.
+      var OR_TOKENISED_ROUTES = /^\/portal\/consultation\/[^/]+\/(?:reschedule|cancel)\/?$/;
 
-      fbq('init', '1555050122256611');
-      fbq('track', 'PageView');
+      if (!OR_TOKENISED_ROUTES.test(window.location.pathname)) {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+
+        fbq('init', '1555050122256611');
+        fbq('track', 'PageView');
+      }
     </script>
 
     <!-- Cloudflare Turnstile -->
