@@ -175,10 +175,35 @@ async function main() {
     });
 
     console.log(`[seed-preview] appointment ready: ${APPOINTMENT_ID}`);
-    console.log(`[seed-preview]   ${appointment.appointmentDate} at ${appointment.appointmentTime} ET, rep ${REP.email}`);
-    console.log('\n[seed-preview] done. Sign in to the Preview portal as');
-    console.log(`  ${ADMIN.email}  (password: the value you passed in PREVIEW_SEED_ADMIN_PASSWORD)`);
-    console.log('then open the appointment and use the portal to mint the customer links.\n');
+
+    // ── Verification: read the rows back so the build log proves they exist ──
+    const users = await prisma.user.findMany({
+      where: { id: { in: [ADMIN.id, REP.id] } },
+      select: { id: true, email: true, role: true, active: true },
+      orderBy: { id: 'asc' },
+    });
+    const appt = await prisma.appointment.findUnique({
+      where: { id: APPOINTMENT_ID },
+      select: {
+        id: true,
+        appointmentDate: true,
+        appointmentTime: true,
+        status: true,
+        assignedRepId: true,
+      },
+    });
+
+    console.log('[seed-preview] VERIFY users:', JSON.stringify(users));
+    console.log('[seed-preview] VERIFY appointment:', JSON.stringify(appt));
+
+    const ok = users.length === 2 && Boolean(appt);
+    if (!ok) {
+      throw new Error(
+        `verification failed — expected 2 users and 1 appointment, found ${users.length} and ${appt ? 1 : 0}`
+      );
+    }
+    console.log('[seed-preview] VERIFIED: 2 synthetic users + 1 synthetic appointment present.');
+    console.log(`[seed-preview] portal login: ${ADMIN.email}`);
   } finally {
     await prisma.$disconnect();
   }
