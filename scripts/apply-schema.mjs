@@ -6,14 +6,28 @@
 // about DDL correctness — a real failed statement fails the build.
 import { neon } from '@neondatabase/serverless';
 import { SCHEMA_STATEMENTS } from '../lib/schema-ddl.generated.js';
+import { resolveDatabaseUrl, describeDatabaseSource, isPreviewEnv } from '../lib/db-url.js';
 
-const url =
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  '';
+// On a Preview deployment this resolves ONLY from PREVIEW_DATABASE_* and throws
+// if none is set — a Preview build must never apply DDL to production, and the
+// unprefixed variables are still scoped to Preview, so silence is not an option.
+let url;
+try {
+  url = resolveDatabaseUrl();
+} catch (err) {
+  console.error(`[apply-schema] ${err?.message ?? err}`);
+  process.exit(1);
+}
+
+console.log(`[apply-schema] database source: ${describeDatabaseSource()}`);
 
 if (!url) {
+  if (isPreviewEnv()) {
+    // Unreachable in practice (resolveDatabaseUrl throws first), but makes the
+    // fail-closed guarantee explicit rather than incidental.
+    console.error('[apply-schema] Preview deployment without a Preview database URL — refusing to continue.');
+    process.exit(1);
+  }
   console.warn('[apply-schema] No database URL in env — skipping (runtime self-heal will reconcile).');
   process.exit(0);
 }
