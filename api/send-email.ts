@@ -1,5 +1,6 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
+import { requireAuth, denyContractor } from '../lib/auth.js';
 
 // Body shape posted by the React frontend. The frontend pre-renders the email
 // using consultationEmails.ts (same text the rep sees in the preview), then
@@ -124,6 +125,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed.' });
   }
+
+  // This endpoint sends from the verified info@ontarioreno.ca identity with
+  // caller-supplied recipients, body and attachments. Unauthenticated, it is an
+  // open relay against our own sending domain. Both callers are portal-internal
+  // and same-origin (src/portal/lib/sendEmail.ts, components/CommissionInvoice.tsx),
+  // so the session cookie is sent automatically.
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (denyContractor(user, res)) return;
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {

@@ -1,4 +1,14 @@
 {
+  "headers": [
+    {
+      "source": "/portal/consultation/:id/reschedule",
+      "headers": [{ "key": "Referrer-Policy", "value": "no-referrer" }]
+    },
+    {
+      "source": "/portal/consultation/:id/cancel",
+      "headers": [{ "key": "Referrer-Policy", "value": "no-referrer" }]
+    }
+  ],
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.png" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

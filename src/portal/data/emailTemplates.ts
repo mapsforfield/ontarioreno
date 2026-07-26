@@ -94,15 +94,17 @@ function refId(id: string): string {
 }
 
 /**
- * Infer the portal base URL at runtime so reschedule/cancel links point to
- * the correct environment (local dev vs. Vercel preview vs. production).
+ * Signed customer action URLs, minted server-side by /api/auth/customer-links.
+ *
+ * These templates deliberately cannot build these URLs themselves: the signing
+ * secret must never reach the browser, and an unsigned link would be a link that
+ * authorizes a booking change on the appointment id alone. When links are not
+ * supplied the action buttons are omitted entirely rather than degraded.
  */
-function baseUrl(): string {
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin;
-  }
-  return 'https://ontarioreno.ca';
-}
+export type CustomerActionLinks = {
+  rescheduleUrl: string;
+  cancelUrl: string;
+};
 
 // ─── Status configuration ─────────────────────────────────────────────────────
 
@@ -403,6 +405,8 @@ export type CustomerEmailInput = {
   contractor?: Contractor;
   rep?: User;
   contractorName: string;
+  /** Signed action URLs. Omit to render the email without action buttons. */
+  customerLinks?: CustomerActionLinks;
 };
 
 /**
@@ -414,11 +418,8 @@ export type CustomerEmailInput = {
  * media-query rules in the shell <style> block.
  */
 export function buildCustomerHtml(input: CustomerEmailInput): string {
-  const { type, appointment, contractor, rep, contractorName } = input;
+  const { type, appointment, contractor, rep, contractorName, customerLinks } = input;
   const cfg = STATUS[type];
-  const origin = baseUrl();
-  const rescheduleUrl = `${origin}/portal/consultation/${appointment.id}/reschedule`;
-  const cancelUrl = `${origin}/portal/consultation/${appointment.id}/cancel`;
 
   const isEvent = isEventAppointment(appointment.appointmentType);
   const apptTypeLabel = APPOINTMENT_TYPE_LABELS[appointment.appointmentType] ?? 'Consultation';
@@ -507,11 +508,12 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
     website ? `<p style="margin:0 0 6px;font-size:13px;font-family:sans-serif;"><a href="${e(websiteHref)}" target="_blank" style="color:#1B3C6C;text-decoration:none;font-weight:600;">${e(websiteDisplay)}</a></p>` : '',
   ].filter(Boolean).join('');
 
-  const actionButtons = cfg.showActions
+  // Rendered only when signed links were supplied — never as unsigned fallbacks.
+  const actionButtons = cfg.showActions && customerLinks
     ? `<div style="margin-top:20px;">
-        <a href="${e(rescheduleUrl)}" target="_blank"
+        <a href="${e(customerLinks.rescheduleUrl)}" target="_blank"
           style="display:block;margin-bottom:8px;padding:11px 16px;background-color:#1B3C6C;color:#ffffff;font-size:13px;font-weight:700;text-align:center;text-decoration:none;border-radius:8px;font-family:sans-serif;">Reschedule</a>
-        <a href="${e(cancelUrl)}" target="_blank"
+        <a href="${e(customerLinks.cancelUrl)}" target="_blank"
           style="display:block;padding:11px 16px;background-color:#f1f5f9;color:#475569;font-size:13px;font-weight:700;text-align:center;text-decoration:none;border-radius:8px;font-family:sans-serif;">Cancel Appointment</a>
        </div>`
     : '';

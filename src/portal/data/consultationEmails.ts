@@ -5,6 +5,7 @@ import {
   buildContractorDispatchHtml,
   isEventAppointment,
   APPOINTMENT_TYPE_LABELS,
+  type CustomerActionLinks,
 } from './emailTemplates';
 import { getCustomerFacingConsultantPhone } from './customerContactRouting';
 
@@ -36,6 +37,12 @@ type ConsultationEmailInput = {
   contractor?: Contractor;
   deal?: Deal;
   rep?: User;
+  /**
+   * Signed reschedule/cancel URLs from /api/auth/customer-links. Omit and the
+   * email is rendered without action links — these templates cannot mint them,
+   * by design, so an unsigned link can never be produced here.
+   */
+  customerLinks?: CustomerActionLinks;
 };
 
 const templateLabels: Record<ConsultationEmailType, string> = {
@@ -128,8 +135,10 @@ function buildCustomerEmail(
       ? `\nCustomer notes:\n${input.appointment.customerNotes}`
       : '',
     '',
-    `Reschedule: /portal/consultation/${input.appointment.id}/reschedule`,
-    `Cancel: /portal/consultation/${input.appointment.id}/cancel`,
+    // Only emitted when signed URLs were supplied. The previous relative paths
+    // authorized a booking change on the appointment id alone.
+    input.customerLinks ? `Reschedule: ${input.customerLinks.rescheduleUrl}` : '',
+    input.customerLinks ? `Cancel: ${input.customerLinks.cancelUrl}` : '',
     customerFooter(input.contractor, input.rep),
   ]
     .filter((line) => line !== '')
@@ -143,6 +152,7 @@ function buildCustomerEmail(
     contractor: input.contractor,
     rep: input.rep,
     contractorName,
+    customerLinks: input.customerLinks,
   });
 
   return {

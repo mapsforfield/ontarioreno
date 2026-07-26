@@ -33,6 +33,8 @@ import {
   generateConsultationEmailPreview,
 } from '../data/consultationEmails';
 import { sendEmail, EmailAttachment } from '../lib/sendEmail';
+import { fetchCustomerLinks } from '../lib/customerLinks';
+import type { CustomerActionLinks } from '../data/emailTemplates';
 import { getRecommendedContractors } from '../data/recommendations';
 import { formatCurrency, formatDealStatus } from '../data/selectors';
 import { usePortalData } from '../data/store';
@@ -666,6 +668,10 @@ export default function PortalAppointments() {
   const [reminderSending, setReminderSending] = useState<string | null>(null);
   const [reminderMessage, setReminderMessage] = useState<{ id: string; text: string } | null>(null);
   const [reminderPreview, setReminderPreview] = useState<{ appointment: Appointment; preview: ConsultationEmailPreview; subjectOverride: string } | null>(null);
+  // Signed customer action URLs for the appointment currently open in the panel.
+  // Minted server-side; null until loaded, in which case previews render without
+  // action buttons rather than with unsigned ones.
+  const [previewCustomerLinks, setPreviewCustomerLinks] = useState<CustomerActionLinks | null>(null);
   // Which today's agenda rows are expanded (desktop compact view)
   const [expandedAgendaRows, setExpandedAgendaRows] = useState<Set<string>>(new Set());
   const [conflictWarning, setConflictWarning] = useState<Appointment | null>(null);
@@ -1069,6 +1075,24 @@ export default function PortalAppointments() {
       recommendedContractorId: form.recommendedContractorId || null,
       status: form.status,
     };
+  // Mint signed customer action URLs for the open appointment so the email
+  // previews show the same links the customer will actually receive.
+  const previewAppointmentId = selectedAppointment?.id ?? '';
+  useEffect(() => {
+    if (!previewAppointmentId) {
+      setPreviewCustomerLinks(null);
+      return;
+    }
+    let alive = true;
+    setPreviewCustomerLinks(null);
+    fetchCustomerLinks(previewAppointmentId).then((links) => {
+      if (alive) setPreviewCustomerLinks(links);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [previewAppointmentId]);
+
   const emailTemplateTypes: ConsultationEmailType[] = [
     'booking_confirmation',
     'reschedule_notice',
@@ -1084,6 +1108,7 @@ export default function PortalAppointments() {
             contractor: linkedContractor,
             deal: linkedDeal,
             rep: assignedRep,
+            customerLinks: previewCustomerLinks ?? undefined,
           })
         )
       : [];
@@ -1362,16 +1387,20 @@ export default function PortalAppointments() {
     closePanel();
   };
 
-  const handleSendReminder = (appointment: Appointment) => {
+  const handleSendReminder = async (appointment: Appointment) => {
     if (!appointment.email) {
       setReminderMessage({ id: appointment.id, text: 'No email address on file for this client.' });
       return;
     }
+    // Signed links are minted server-side. If minting fails the reminder still
+    // goes out, just without action buttons — never with unsigned ones.
+    const customerLinks = await fetchCustomerLinks(appointment.id);
     const preview = generateConsultationEmailPreview('booking_confirmation', {
       appointment,
       contractor: appointment.contractorId ? contractors.find((c) => c.id === appointment.contractorId) : undefined,
       deal: appointment.dealId ? getDeal(appointment.dealId) : undefined,
       rep: appointment.assignedRepId ? users.find((u) => u.id === appointment.assignedRepId) : undefined,
+      customerLinks: customerLinks ?? undefined,
     });
     setReminderPreview({
       appointment,

@@ -6,6 +6,7 @@ import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
+import { parseAppointmentMinutes } from '../../lib/appointment-time.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -539,15 +540,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       include: { assignedRep: true },
     });
 
+    // Malformed appointmentTime values (e.g. a display label like "3:00 PM"
+    // written by an older reschedule path) used to parse to NaN here and drop
+    // out of the window check silently, so those appointments never reminded.
+    // Skip them explicitly and log, so bad rows are visible instead of invisible.
+    const malformedTimes: string[] = [];
     const toRemind = candidates.filter((apt) => {
       if (!apt.appointmentTime) return false;
-      const [ah, am] = apt.appointmentTime.split(':').map(Number);
-      const aptMinutes = ah * 60 + am;
+      const aptMinutes = parseAppointmentMinutes(apt.appointmentTime);
+      if (aptMinutes === null) {
+        malformedTimes.push(apt.id);
+        return false;
+      }
       const triggerMinutes = aptMinutes - (apt.reminderMinutes ?? 30);
       const diff = nowMinutes - triggerMinutes;
       // Fire within a ±3 min window around the trigger time
       return diff >= -1 && diff <= 4;
     });
+    if (malformedTimes.length > 0) {
+      console.error(
+        `[reminder-check] skipped ${malformedTimes.length} appointment(s) with a malformed appointmentTime:`,
+        malformedTimes.join(', ')
+      );
+    }
 
     if (toRemind.length === 0) return res.status(200).json({ ok: true, reminded: 0 });
 

@@ -1,6 +1,7 @@
 import { AlertCircle, CalendarDays, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import ConsultationLinkExpired from '../components/ConsultationLinkExpired';
 
 type Step = 'choice' | 'reason' | 'success';
 
@@ -15,6 +16,10 @@ const CANCEL_REASONS = [
 
 export default function ConsultationCancel() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  // Signed token from the emailed link. The server is the real authority; this
+  // check only avoids making someone fill in a form that cannot be submitted.
+  const token = searchParams.get('t') ?? '';
   const [step, setStep] = useState<Step>('choice');
   const [selectedReason, setSelectedReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
@@ -46,6 +51,7 @@ export default function ConsultationCancel() {
         body: JSON.stringify({
           type: 'cancel',
           appointmentId: id,
+          token,
           reason: effectiveReason,
         }),
       });
@@ -86,6 +92,10 @@ export default function ConsultationCancel() {
     </div>
   );
 
+  if (!token) {
+    return <ConsultationLinkExpired action="cancel" reference={refId} />;
+  }
+
   if (step === 'success') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f0f4f8] p-6">
@@ -104,7 +114,7 @@ export default function ConsultationCancel() {
           <p className="mt-6 text-sm text-slate-400">
             Changed your mind?{' '}
             <a
-              href={`/portal/consultation/${id}/reschedule`}
+              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(token)}`}
               className="font-semibold text-[#1B3C6C] underline-offset-2 hover:underline"
             >
               Request a reschedule instead
@@ -131,7 +141,7 @@ export default function ConsultationCancel() {
 
             {/* Reschedule option */}
             <a
-              href={`/portal/consultation/${id}/reschedule`}
+              href={`/portal/consultation/${id}/reschedule?t=${encodeURIComponent(token)}`}
               className="flex w-full items-start gap-4 rounded-xl border-2 border-[#1B3C6C] bg-[#f6faff] p-5 transition hover:bg-[#e8f1fb]"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1B3C6C] text-white">

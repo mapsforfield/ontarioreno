@@ -2,7 +2,24 @@ import jwt from 'jsonwebtoken';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from './prisma.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+// Fail closed: a missing JWT_SECRET in production used to silently fall back to
+// a well-known literal committed to this repository, which made every portal
+// session forgeable by anyone who had read the source. Refusing to start is the
+// correct behaviour — a 500 is recoverable, a forgeable admin session is not.
+// The dev fallback is retained so local work and tests need no configuration.
+const DEV_JWT_SECRET = 'dev-secret-change-in-production';
+
+function resolveJwtSecret(): string {
+  const configured = process.env.JWT_SECRET;
+  if (typeof configured === 'string' && configured.length > 0) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'JWT_SECRET is not set. Refusing to sign or verify session tokens with the development fallback.'
+    );
+  }
+  return DEV_JWT_SECRET;
+}
+
 const COOKIE_NAME = 'or_token';
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -31,12 +48,15 @@ const PROFILE_USER_SELECT = {
 } as const;
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: MAX_AGE });
+  return jwt.sign(payload, resolveJwtSecret(), { expiresIn: MAX_AGE });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
+  // Resolved outside the try so a missing-secret misconfiguration surfaces as a
+  // 500 rather than being swallowed into an indistinguishable "invalid token".
+  const secret = resolveJwtSecret();
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, secret) as JwtPayload;
   } catch {
     return null;
   }

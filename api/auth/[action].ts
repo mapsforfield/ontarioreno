@@ -13,6 +13,12 @@ import {
   requireAdmin,
   denyContractor,
 } from '../../lib/auth.js';
+import {
+  buildCustomerActionUrls,
+  isCustomerLinkConfigured,
+  verifyCustomerLinkToken,
+} from '../../lib/customer-link.js';
+import { isValidAppointmentTime } from '../../lib/appointment-time.js';
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
 const MAX_FIELD_LENGTH = 2_000;
@@ -25,6 +31,18 @@ const BUSINESS_INBOX = extractAddress(EMAIL_FROM);
 
 function isValidDate(d: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d));
+}
+
+/**
+ * Origin of the current deployment, so minted customer links point at the same
+ * environment that issued them (local dev / preview / production).
+ */
+function requestOrigin(req: VercelRequest): string {
+  const host = (req.headers['x-forwarded-host'] ?? req.headers.host) as string | undefined;
+  if (!host) return 'https://ontarioreno.ca';
+  const proto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]
+    ?? (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  return `${proto}://${host}`;
 }
 
 function fmtDate(d: string): string {
@@ -43,7 +61,9 @@ function fmtDate(d: string): string {
  *   POST /api/auth/add-rep          — admin: create a new rep user
  *   GET  /api/auth/activities       — list recent activities (auth required)
  *   POST /api/auth/activities       — record an activity (auth required)
- *   POST /api/auth/customer-request — public: reschedule/cancel consultation
+ *   GET  /api/auth/customer-links   — auth: mint signed customer action URLs
+ *   POST /api/auth/customer-request — public, but requires a valid signed token:
+ *                                     reschedule/cancel consultation
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query['action'] as string;
@@ -316,6 +336,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed.' });
   }
 
+  // ── /api/auth/customer-links ─────────────────────────────────────────────────
+  // Mints the signed reschedule/cancel URLs for one appointment. Authenticated:
+  // the signing secret must never reach the browser, so the portal asks the
+  // server for links rather than building them itself.
+  if (action === 'customer-links') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    if (denyContractor(user, res)) return;
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+
+    if (!isCustomerLinkConfigured()) {
+      console.error('[customer-links] CUSTOMER_LINK_SECRET is not configured.');
+      return res.status(500).json({ error: 'Customer links are not configured.' });
+    }
+
+    const appointmentId = String(req.query['appointmentId'] ?? '').trim();
+    if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+
+    // Only mint for appointments that actually exist, so a token can never be
+    // produced for an arbitrary attacker-chosen id.
+    const exists = await prisma.appointment
+      .findUnique({ where: { id: appointmentId }, select: { id: true } })
+      .catch(() => null);
+    if (!exists) return res.status(404).json({ error: 'Appointment not found.' });
+
+    const links = buildCustomerActionUrls(requestOrigin(req), appointmentId);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(links);
+  }
+
   // ── /api/auth/customer-request ───────────────────────────────────────────────
   if (action === 'customer-request') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -324,13 +374,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!apiKey) return res.status(500).json({ error: 'Email service is not configured.' });
 
     const body = req.body as Record<string, unknown>;
-    const { type, appointmentId, preferredDate, preferredTime, notes, reason } = body;
+    const { type, appointmentId, preferredDate, preferredTime, notes, reason, token } = body;
 
     if (type !== 'reschedule' && type !== 'cancel') return res.status(400).json({ error: 'Request type must be "reschedule" or "cancel".' });
     if (typeof appointmentId !== 'string' || !appointmentId.trim()) return res.status(400).json({ error: 'Missing appointment ID.' });
+
+    // ── Signed-link authorization ──
+    // Possession of the emailed link — not knowledge of an appointment id — is
+    // what authorizes a mutation. Unsigned legacy links carry no authority and
+    // are rejected here before anything is read or written.
+    if (!isCustomerLinkConfigured()) {
+      console.error('[customer-request] CUSTOMER_LINK_SECRET is not configured — refusing to authorize.');
+      return res.status(500).json({ error: 'This link cannot be verified right now. Please contact OntarioReno.' });
+    }
+    const verified = verifyCustomerLinkToken(appointmentId.trim(), token);
+    if (!verified.ok) {
+      return res.status(403).json({
+        error: 'This link is no longer valid. Please contact OntarioReno to reschedule or cancel.',
+        reason: verified.reason,
+      });
+    }
+
     if (type === 'reschedule') {
       if (typeof preferredDate !== 'string' || !isValidDate(preferredDate)) return res.status(400).json({ error: 'Invalid or missing preferred date.' });
-      if (typeof preferredTime !== 'string' || !preferredTime.trim()) return res.status(400).json({ error: 'Missing preferred time.' });
+      // Must be 24-hour "HH:MM". A display label such as "3:00 PM" written into
+      // Appointment.appointmentTime breaks every downstream parser, including
+      // the reminder cron, which then silently skips the appointment forever.
+      if (!isValidAppointmentTime(preferredTime)) return res.status(400).json({ error: 'Invalid or missing preferred time.' });
     }
     if (notes !== undefined && (typeof notes !== 'string' || notes.length > MAX_FIELD_LENGTH)) return res.status(400).json({ error: 'Notes field exceeds maximum length.' });
     if (reason !== undefined && (typeof reason !== 'string' || (reason as string).length > MAX_FIELD_LENGTH)) return res.status(400).json({ error: 'Reason field exceeds maximum length.' });
@@ -340,22 +410,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       include: { assignedRep: { select: { name: true, email: true } } },
     }).catch(() => null);
 
-    const customerName = appointment?.customerName ?? 'Customer';
-    const repName = appointment?.assignedRep?.name ?? null;
-    const repEmail = appointment?.assignedRep?.email ?? null;
-
-    if (appointment) {
-      const dbUpdate: Record<string, unknown> = {};
-      if (type === 'cancel') {
-        dbUpdate.status = 'cancelled';
-      } else {
-        dbUpdate.status = 'rescheduled';
-        if (typeof preferredDate === 'string') dbUpdate.appointmentDate = preferredDate;
-        if (typeof preferredTime === 'string') dbUpdate.appointmentTime = preferredTime;
-      }
-      await prisma.appointment.update({ where: { id: appointmentId.trim() }, data: dbUpdate }).catch((err: unknown) => {
-        console.error('Failed to update appointment in DB:', err);
+    // A valid token for a deleted appointment must not silently email the team
+    // as though the request were actionable.
+    if (!appointment) {
+      return res.status(404).json({
+        error: 'This consultation is no longer available. Please contact OntarioReno.',
       });
+    }
+
+    const customerName = appointment.customerName ?? 'Customer';
+    const repName = appointment.assignedRep?.name ?? null;
+    const repEmail = appointment.assignedRep?.email ?? null;
+
+    const dbUpdate: Record<string, unknown> = {};
+    if (type === 'cancel') {
+      dbUpdate.status = 'cancelled';
+    } else {
+      dbUpdate.status = 'rescheduled';
+      dbUpdate.appointmentDate = preferredDate;
+      dbUpdate.appointmentTime = preferredTime;
+    }
+    try {
+      await prisma.appointment.update({ where: { id: appointmentId.trim() }, data: dbUpdate });
+    } catch (err) {
+      // Previously swallowed, which told the customer their change was made and
+      // emailed the team as though it had been. Surface it instead.
+      console.error('[customer-request] failed to update appointment:', err);
+      return res.status(500).json({ error: 'We could not update your consultation. Please contact OntarioReno.' });
     }
 
     const ref = appointmentId.trim().replace(/-/g, '').slice(-8).toUpperCase();

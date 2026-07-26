@@ -1,7 +1,8 @@
 import { CalendarDays, CheckCircle2, Clock } from 'lucide-react';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { torontoToday } from '../lib/time';
+import ConsultationLinkExpired from '../components/ConsultationLinkExpired';
 
 /** Generate half-hour time slots from 8:00 AM to 7:00 PM. */
 function buildTimeSlots(): Array<{ label: string; value: string }> {
@@ -30,6 +31,10 @@ type Status = 'idle' | 'loading' | 'success' | 'error';
 
 export default function ConsultationReschedule() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  // Signed token from the emailed link. The server is the real authority; this
+  // check only avoids making someone fill in a form that cannot be submitted.
+  const token = searchParams.get('t') ?? '';
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
@@ -56,6 +61,7 @@ export default function ConsultationReschedule() {
         body: JSON.stringify({
           type: 'reschedule',
           appointmentId: id,
+          token,
           preferredDate: date,
           preferredTime: time,
           notes: notes.trim() || undefined,
@@ -83,6 +89,10 @@ export default function ConsultationReschedule() {
       setStatus('error');
     }
   };
+
+  if (!token) {
+    return <ConsultationLinkExpired action="reschedule" reference={refId} />;
+  }
 
   if (status === 'success') {
     return (
@@ -159,8 +169,11 @@ export default function ConsultationReschedule() {
               className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 focus:border-[#1B3C6C] focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]/20"
             >
               <option value="">Select a time</option>
+              {/* Submit the 24-hour value, not the display label — the API
+                  stores this straight into Appointment.appointmentTime, which
+                  every downstream reader parses as "HH:MM". */}
               {TIME_SLOTS.map((slot) => (
-                <option key={slot.value} value={slot.label}>
+                <option key={slot.value} value={slot.value}>
                   {slot.label}
                 </option>
               ))}
@@ -199,7 +212,7 @@ export default function ConsultationReschedule() {
               {status === 'loading' ? 'Sending…' : 'Request Reschedule'}
             </button>
             <a
-              href={`/portal/consultation/${id}/cancel`}
+              href={`/portal/consultation/${id}/cancel?t=${encodeURIComponent(token)}`}
               className="flex-1 rounded-xl border border-slate-200 px-6 py-3.5 text-center text-base font-bold text-slate-600 transition hover:bg-slate-50"
             >
               Cancel instead
