@@ -8,7 +8,7 @@ import {
   questionsForStep,
 } from './program-config.ts';
 
-const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'yes' };
+const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
 const base = {
   addressState: 'ADDRESS_VERIFIED' as const,
   area: 'HAMILTON' as const,
@@ -20,9 +20,52 @@ test('a fully qualified Hamilton homeowner reaches the calendar', () => {
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
 });
 
-test('an exploratory timeline nurtures rather than books', () => {
+test('"Just exploring" NEVER reaches the calendar, whatever else is perfect', () => {
+  // A passive browser must not hold a 45-minute live consultation slot. This has
+  // to hold even when every other answer is ideal.
   const r = routeConsultation({ ...base, answers: { ...OK, timeline: 'exploring' } });
   assert.equal(r.outcome, 'NURTURE');
+  assert.notEqual(r.outcome, 'DIRECT_CALENDAR');
+  assert.deepEqual(r.reasons, ['EXPLORATORY_TIMELINE']);
+
+  // Also with financing selected — still no slot.
+  const withFinancing = routeConsultation({
+    ...base,
+    answers: { ...OK, timeline: 'exploring', contribution: 'need_financing' },
+  });
+  assert.equal(withFinancing.outcome, 'NURTURE');
+});
+
+test('exploratory leads are offered a guide instead of a slot', () => {
+  assert.ok(HAMILTON_PROGRAM.guideUrl, 'a guide must exist for the nurture path');
+  assert.ok(HAMILTON_PROGRAM.guideLabel);
+});
+
+test('funding wording separates upfront cost from grant payout', () => {
+  const [, upfront, payout] = HAMILTON_PROGRAM.fundingHighlights;
+  assert.match(upfront, /Upfront Funding/);
+  assert.match(upfront, /finance/i, 'must say the homeowner funds construction first');
+  assert.match(payout, /Grant Payout/);
+  assert.match(payout, /\$8,000/, 'first advance amount stated');
+  assert.match(payout, /two advances/i);
+});
+
+test('the funding question offers the three approved options', () => {
+  const q = HAMILTON_PROGRAM.questions.find((x) => x.key === 'contribution');
+  assert.ok(q);
+  assert.match(q!.label, /How do you plan to fund the upfront project costs\?/);
+  assert.deepEqual(q!.options.map((o) => o.value), ['cash_equity', 'need_financing', 'unsure']);
+});
+
+test('the permit terms say we handle permitting', () => {
+  const permitTerm = HAMILTON_PROGRAM.programTerms.find((t) => /building permit is required/.test(t));
+  assert.ok(permitTerm);
+  assert.match(permitTerm!, /We handle the building permit process for you/);
+});
+
+test('consultation mode is configured, so the meeting type is never ambiguous', () => {
+  assert.equal(HAMILTON_PROGRAM.consultationMode, 'in_person');
+  assert.ok(['in_person', 'phone'].includes(SIMCOE_PROGRAM.consultationMode));
 });
 
 test('DECLINE is reachable only from certainty', () => {

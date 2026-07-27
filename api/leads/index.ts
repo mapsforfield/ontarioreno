@@ -749,6 +749,9 @@ function publicProgramPayload(program: ProgramConfig) {
     whyFreeText: program.whyFreeText,
     questions: publicQuestions(program),
     visitMinutes: program.visitMinutes,
+    consultationMode: program.consultationMode,
+    guideUrl: program.guideUrl,
+    guideLabel: program.guideLabel,
   };
 }
 
@@ -1115,7 +1118,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
                 appointmentDate: request.date,
                 appointmentTime: request.time,
                 durationMinutes: request.reservationMinutes,
-                appointmentType: 'home_visit',
+                // Follows the program's consultation mode so the calendar entry
+                // matches what the homeowner was told they were booking.
+                appointmentType:
+                  program.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
                 status: 'scheduled',
                 source: 'manual',
                 location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),

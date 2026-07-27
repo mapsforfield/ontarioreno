@@ -47,6 +47,15 @@ export type ProgramConfig = {
   questions: Question[];
   /** Asked after booking. Never blocks the calendar. */
   prepQuestions: Question[];
+  /**
+   * What the booked consultation actually is. Drives the customer-facing wording
+   * and the Appointment.appointmentType written at booking, so the homeowner is
+   * never unclear about whether someone is coming to the property.
+   */
+  consultationMode: 'in_person' | 'phone';
+  /** Guide offered to exploratory leads instead of a live consultation slot. */
+  guideUrl: string;
+  guideLabel: string;
   officialSourceUrls: string[];
   visitMinutes: number;
   reservationMinutes: number;
@@ -114,14 +123,14 @@ const TIMELINE: Question = {
 // ── Step 3: the money ──
 const CONTRIBUTION: Question = {
   key: 'contribution',
-  label: 'Are you able to cover the remaining project costs?',
-  help: 'The grant covers up to 70%. Financing is available if you need it — this just tells us how to help.',
+  label: 'How do you plan to fund the upfront project costs?',
+  help: 'The grant covers up to 70% via reimbursement advances. Financing is available if you need it.',
   routingRelevant: true,
   step: 3,
   options: [
-    { value: 'yes', label: 'Yes' },
-    { value: 'need_financing', label: "I'd want to look at financing" },
-    { value: 'unsure', label: 'Not sure yet' },
+    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
+    { value: 'need_financing', label: "I'd like to explore financing options" },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
   ],
 };
 
@@ -169,11 +178,18 @@ const PREP_QUESTIONS: Question[] = [
   },
 ];
 
-/** Three short headlines shown inline; the full terms sit behind a disclosure. */
+/**
+ * Three short headlines shown inline; the full terms sit behind a disclosure.
+ *
+ * These deliberately separate UPFRONT cost from GRANT PAYOUT. The grant is a
+ * reimbursement paid in advances, so a homeowner needs capital or financing in
+ * place before construction — saying only "covers up to 70%" reads as money
+ * arriving first, which sets the wrong expectation.
+ */
 const HAMILTON_FUNDING_HIGHLIGHTS = [
   'Covers up to 70% of eligible costs, to a maximum of $40,000 per unit.',
-  'You cover the remaining project costs.',
-  'Paid in two advances — an issued City building permit is required first.',
+  'Upfront Funding: You cover or finance initial construction costs (financing options available).',
+  'Grant Payout: Up to $40,000 paid back in two advances ($8,000 upon permit approval, remaining balance upon final completion).',
 ];
 
 export const HAMILTON_PROGRAM: ProgramConfig = {
@@ -188,7 +204,7 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   programTerms: [
     'Covers up to 70% of eligible costs, to a maximum of $40,000 per eligible unit.',
     'The homeowner is responsible for remaining project costs.',
-    'An issued City of Hamilton building permit is required before applying.',
+    'An issued City of Hamilton building permit is required before applying. (We handle the building permit process for you as part of the project design phase).',
     'The first advance follows application approval and is 20% of the estimated grant, capped at $8,000 per unit, calculated from a contractor’s estimate of eligible costs.',
     'The second advance follows occupancy-permit issuance and is calculated from actual eligible costs incurred.',
     'Both advances together cannot exceed $40,000 per eligible unit.',
@@ -198,6 +214,9 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
+  consultationMode: 'in_person',
+  guideUrl: '/hamilton-grant-guide',
+  guideLabel: 'Hamilton $40,000 Grant Guide',
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
 };
@@ -222,6 +241,9 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   eligibleProjectTypes: [],
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,
+  consultationMode: 'in_person',
+  guideUrl: '',
+  guideLabel: '',
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
 };

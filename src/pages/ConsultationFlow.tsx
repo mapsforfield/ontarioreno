@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
@@ -34,6 +34,9 @@ type Program = {
   whyFreeText: string;
   questions: Question[];
   visitMinutes: number;
+  consultationMode: 'in_person' | 'phone';
+  guideUrl: string;
+  guideLabel: string;
 };
 
 type Outcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
@@ -92,7 +95,6 @@ export default function ConsultationFlow() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [contact, setContact] = useState({ name: '', phone: '', email: '' });
   const [termsOpen, setTermsOpen] = useState(false);
-  const [whyOpen, setWhyOpen] = useState(false);
 
   const [leadRef, setLeadRef] = useState('');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -213,6 +215,20 @@ export default function ConsultationFlow() {
   }
 
   const stepIndex = { q1: 1, q2: 2, q3: 3, contact: 4, calendar: 5, result: 5, closed: 0 }[phase];
+
+  // What the homeowner is actually booking — stated the same way on the calendar
+  // and the confirmation so there is no ambiguity about who goes where.
+  const meeting =
+    program.consultationMode === 'phone'
+      ? {
+          line: `Initial Consultation Call · ${program.visitMinutes} minutes`,
+          detail: 'A specialist will call you at your scheduled time.',
+        }
+      : {
+          line: `In-Person Site Visit · ${program.visitMinutes} minutes`,
+          detail: 'A specialist will visit your property.',
+        };
+
   const debugPanel = debug && reasons.length > 0 && (
     <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-left">
       <p className="text-xs font-black uppercase tracking-wider text-amber-800">Testing mode — routing detail</p>
@@ -236,18 +252,36 @@ export default function ConsultationFlow() {
             </div>
             <p className="text-xl font-black text-slate-900">{fmtDate(booking.date)}</p>
             <p className="text-lg font-bold text-[#1B3C6C]">{fmtTime(booking.time)}</p>
-            <p className="mt-3 text-slate-600">
-              A specialist will visit your property. It takes about {program.visitMinutes} minutes.
-            </p>
+            <p className="mt-2 text-sm font-bold uppercase tracking-wide text-slate-500">{meeting.line}</p>
+            <p className="mt-3 text-slate-600">{meeting.detail}</p>
             <p className="mt-4 text-sm font-semibold text-slate-500">Reference {booking.publicReference}</p>
+          </>
+        ) : outcome === 'NURTURE' ? (
+          // Exploratory leads get the guide, not a 45-minute live slot.
+          <>
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f1fb]">
+              <BookOpen className="h-7 w-7 text-[#1B3C6C]" />
+            </div>
+            <p className="text-slate-600">
+              Since you’re still exploring, here’s the full guide to how the {program.areaLabel} grant
+              works — what qualifies, realistic costs, and the permit process.
+            </p>
+            {program.guideUrl && (
+              <a href={program.guideUrl}
+                className="mt-5 block w-full rounded-xl bg-[#1B3C6C] py-4 text-base font-bold text-white transition hover:bg-[#153158]">
+                Read the {program.guideLabel}
+              </a>
+            )}
+            <p className="mt-4 text-sm text-slate-500">
+              We’ll check in when you’re closer to starting — no pressure, and you can book a
+              consultation any time.
+            </p>
           </>
         ) : (
           <p className="text-slate-600">
             {outcome === 'DECLINE'
               ? 'Based on your answers this program isn’t the right fit. Thanks for your time.'
-              : outcome === 'NURTURE'
-                ? 'Thanks — we’ll follow up when you’re closer to starting.'
-                : 'A specialist will review your details and call you shortly.'}
+              : 'A specialist will review your details and call you shortly.'}
           </p>
         )}
         {debugPanel}
@@ -259,7 +293,7 @@ export default function ConsultationFlow() {
   if (phase === 'calendar') {
     return (
       <Shell title="Pick a time that suits you" step={stepIndex}>
-        <p className="mb-5 text-slate-600">Visits take about {program.visitMinutes} minutes.</p>
+        <p className="mb-5 text-sm font-bold text-[#1B3C6C]">{meeting.line}</p>
         {byDate.length === 0 && <p className="text-slate-600">No times are free right now — we’ll call to arrange one.</p>}
         <div className="space-y-3 text-left">
           {byDate.slice(0, 8).map(([date, times]) => (
@@ -392,14 +426,14 @@ export default function ConsultationFlow() {
             </label>
             <input className={inputCls} type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
           </div>
-          <Disclosure open={whyOpen} onToggle={() => setWhyOpen((v) => !v)} label="Why is the initial review free?">
-            <p>{program.whyFreeText}</p>
-          </Disclosure>
           {error && <ErrorNote>{error}</ErrorNote>}
           <PrimaryButton disabled={busy || !contact.name.trim() || !contact.phone.trim()} type="submit">
             {busy ? 'Checking availability…' : 'See available times'}
           </PrimaryButton>
-          <p className="text-center text-xs text-slate-400">Free, no-obligation review. No account needed.</p>
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            100% Free &amp; No-Obligation. Your information is kept strictly confidential.
+          </p>
         </form>
       )}
       {debugPanel}
