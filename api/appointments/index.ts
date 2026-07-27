@@ -133,12 +133,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET' && req.query['_cron'] === 'scan-grants') {
     return handleGrantScanCron(req, res);
   }
+  // ── Edge caching for the two PUBLIC grant reads ──
+  // These are anonymous marketing reads with no per-user content, but they were
+  // served `max-age=0, must-revalidate`, so every visitor woke the database.
+  // On a usage-billed plan that turns third-party traffic into compute cost, and
+  // the underlying data only changes when Grant Radar runs (daily, via GitHub
+  // Actions) or an admin publishes a page.
+  //
+  // s-maxage caches at Vercel's edge (shared cache) without affecting browsers;
+  // stale-while-revalidate then serves the cached copy instantly while refreshing
+  // in the background, so a visitor never waits on a cold database.
+  // Net effect: the DB is read at most a few times an hour regardless of traffic.
+  const PUBLIC_GRANT_CACHE = 'public, s-maxage=600, stale-while-revalidate=86400';
+
   // Public (unauthenticated) read of a published grant landing page by slug.
   if (req.method === 'GET' && req.query['resource'] === 'grant-page') {
+    res.setHeader('Cache-Control', PUBLIC_GRANT_CACHE);
     return handlePublicGrantPage(req, res);
   }
   // Public JSON for the React /grants hub (curated pages + approved programs).
   if (req.method === 'GET' && req.query['resource'] === 'grants-hub-data') {
+    res.setHeader('Cache-Control', PUBLIC_GRANT_CACHE);
     return handleGrantsHubData(req, res);
   }
   if (req.query['resource'] === 'grants') {
