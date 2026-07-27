@@ -62,6 +62,21 @@ export type ProgramConfig = {
   slotStartTimes: string[];
   leadTimeHours: number;
   bookingHorizonDays: number;
+  /** Hard cap on how many visits one rep can be given on a single date. */
+  maxBookingsPerRepPerDay: number;
+  /**
+   * Bookings the highest-priority rep receives before a lower-priority rep is
+   * considered at all. After this, assignment balances on fewest-booked with
+   * ties broken by priority — which keeps the preferred rep busiest without
+   * leaving the other idle.
+   */
+  primaryRepPrimingBookings: number;
+  /**
+   * A rep's visits on one date must all sit within this radius of each other.
+   * Prevents a schedule that sends someone across the region between two
+   * appointments; when no rep can satisfy it, the slot simply isn't offered.
+   */
+  maxSameDayTravelKm: number;
 };
 
 /**
@@ -71,13 +86,17 @@ export type ProgramConfig = {
  */
 const SHARED_SCHEDULING: Pick<
   ProgramConfig,
-  'visitMinutes' | 'reservationMinutes' | 'slotStartTimes' | 'leadTimeHours' | 'bookingHorizonDays'
+  | 'visitMinutes' | 'reservationMinutes' | 'slotStartTimes' | 'leadTimeHours' | 'bookingHorizonDays'
+  | 'maxBookingsPerRepPerDay' | 'primaryRepPrimingBookings' | 'maxSameDayTravelKm'
 > = {
   visitMinutes: 45,
   reservationMinutes: 120,
   slotStartTimes: ['10:00', '12:00', '14:00', '16:00', '18:00'],
   leadTimeHours: 24,
   bookingHorizonDays: 14,
+  maxBookingsPerRepPerDay: 3,
+  primaryRepPrimingBookings: 2,
+  maxSameDayTravelKm: 10,
 };
 
 // ── Step 1: the property ──

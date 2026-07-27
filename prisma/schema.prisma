@@ -27,6 +27,9 @@ model User {
   /// Public consultation flow may assign bookings to this user. Reps only;
   /// the flag is the lever to exclude one without a code change.
   acceptsPublicBooking Boolean @default(true)
+  /// Assignment order for public bookings — LOWER goes first. Names are never
+  /// hardcoded; ordering is data. Equal values fall back to a stable id sort.
+  bookingPriority      Int     @default(100)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -461,6 +464,10 @@ model Lead {
   /// 'ADDRESS_VERIFIED' | 'ADDRESS_OUTSIDE_SERVICE_AREA' | 'ADDRESS_UNVERIFIED'
   addressState      String?
   resolvedMunicipality String?
+  /// Property coordinates from Google Places, used to keep a rep's same-day
+  /// visits geographically close. Null when the address wasn't verified.
+  latitude          Float?
+  longitude         Float?
   /// Structured qualification answers, keyed to the program's question set.
   answersJson       Json?
   /// 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE'

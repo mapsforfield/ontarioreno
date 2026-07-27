@@ -39,7 +39,11 @@ export type BookingContext = {
   time: string;
   visitMinutes: number;
   consultationMode: 'in_person' | 'phone';
+  /** Business inbox. Always alerted. */
   teamInbox: string;
+  /** Assigned rep's address, alerted alongside the business inbox. */
+  repEmail?: string;
+  repName?: string;
   /** Answers, for the team alert. */
   fundingPlan: string;
   projectScope: string;
@@ -132,6 +136,7 @@ export function emailTeamAlert(c: BookingContext): { subject: string; body: stri
       `Project scope:  ${c.projectScope || 'Not provided'}`,
       `Funding plan:   ${c.fundingPlan || 'Not provided'}`,
       `Booked slot:    ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
+      `Assigned to:    ${c.repName || c.repEmail || 'Unassigned'}`,
       `Reference:      ${c.publicReference}`,
       `Appointment ID: ${c.appointmentId}`,
     ].join('\n'),
@@ -196,11 +201,20 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
     }
   }
 
-  planned.push({
-    channel: 'email', kind: 'team_alert', recipient: c.teamInbox,
-    subject: team.subject, body: team.body, sendAfter: now,
-    idempotencyKey: `${c.appointmentId}:email:team_alert`,
-  });
+  // The business inbox always hears about a booking; the assigned rep gets the
+  // same alert so they aren't relying on someone forwarding it. Separate rows
+  // rather than a CC, so one bouncing address can't suppress the other.
+  const alerted = [c.teamInbox, c.repEmail].filter(
+    (address, index, all): address is string =>
+      Boolean(address) && all.indexOf(address) === index
+  );
+  for (const recipient of alerted) {
+    planned.push({
+      channel: 'email', kind: 'team_alert', recipient,
+      subject: team.subject, body: team.body, sendAfter: now,
+      idempotencyKey: `${c.appointmentId}:email:team_alert:${recipient}`,
+    });
+  }
 
   return planned;
 }

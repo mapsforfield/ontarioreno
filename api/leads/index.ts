@@ -803,6 +803,8 @@ type ResolvedAddress = {
   province: string;
   municipality: string;
   area: SchedulingArea | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 const UNRESOLVED: ResolvedAddress = {
@@ -813,6 +815,8 @@ const UNRESOLVED: ResolvedAddress = {
   province: '',
   municipality: '',
   area: null,
+  latitude: null,
+  longitude: null,
 };
 
 /**
@@ -831,15 +835,20 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       {
         headers: {
           'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'addressComponents,formattedAddress',
+          // `location` gives us coordinates for free on a call we already make —
+          // needed to keep a rep's same-day visits within the travel radius.
+          'X-Goog-FieldMask': 'addressComponents,formattedAddress,location',
         },
       }
     );
     const j = (await r.json()) as {
       formattedAddress?: string;
       addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+      location?: { latitude?: number; longitude?: number };
     };
     const comps = j.addressComponents ?? [];
+    const latitude = typeof j.location?.latitude === 'number' ? j.location.latitude : null;
+    const longitude = typeof j.location?.longitude === 'number' ? j.location.longitude : null;
     const pick = (type: string) => comps.find((c) => (c.types ?? []).includes(type));
 
     const streetNumber = pick('street_number')?.longText ?? '';
@@ -861,7 +870,10 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
     }
     // A missing street number or postal code means we cannot confirm a dwelling.
     if (!streetNumber || !route || !postalCode) {
-      return { ...UNRESOLVED, address, city: municipality, postalCode, province, municipality };
+      return {
+        ...UNRESOLVED, address, city: municipality, postalCode, province, municipality,
+        latitude, longitude,
+      };
     }
 
     const area = areaForMunicipality(municipality);
@@ -875,11 +887,33 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       province,
       municipality,
       area,
+      latitude,
+      longitude,
     };
   } catch {
     return UNRESOLVED;
   }
 }
+
+/** Reps eligible for public booking, in assignment order. Names never appear. */
+const BOOKABLE_REP_QUERY = {
+  where: { role: 'rep', active: true, acceptsPublicBooking: true },
+  select: { id: true, bookingPriority: true },
+  orderBy: [{ bookingPriority: 'asc' as const }, { id: 'asc' as const }],
+};
+
+/** Fields the scheduling rules need from an existing appointment. */
+const SCHEDULING_APPOINTMENT_SELECT = {
+  assignedRepId: true,
+  appointmentDate: true,
+  appointmentTime: true,
+  durationMinutes: true,
+  schedulingArea: true,
+  status: true,
+  latitude: true,
+  longitude: true,
+  city: true,
+};
 
 async function loadPublicFlowLead(leadRef: string) {
   if (!leadRef) return null;
@@ -955,6 +989,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           addressState: resolved.addressState,
           resolvedMunicipality: resolved.municipality,
           answersJson: answers,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
           routingOutcome: routing.outcome,
           routingReasonCodes: routing.reasons,
           needsReview,
@@ -1020,10 +1056,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     if (!program || !program.enabled) return res.status(200).json({ slots: [] });
 
     const nowWall = torontoWallClock();
-    const reps = await prisma.user.findMany({
-      where: { role: 'rep', active: true, acceptsPublicBooking: true },
-      select: { id: true },
-    });
+    const reps = await prisma.user.findMany(BOOKABLE_REP_QUERY);
     const repIds = reps.map((r) => r.id);
     if (repIds.length === 0) return res.status(200).json({ slots: [] });
 
@@ -1046,14 +1079,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           deletedAt: null,
           status: { in: ACTIVE_APPOINTMENT_STATUSES },
         },
-        select: {
-          assignedRepId: true,
-          appointmentDate: true,
-          appointmentTime: true,
-          durationMinutes: true,
-          schedulingArea: true,
-          status: true,
-        },
+        select: SCHEDULING_APPOINTMENT_SELECT,
       }),
       prisma.repDayOff.findMany({
         where: { userId: { in: repIds }, date: { gte: fromDate, lte: toDate } },
@@ -1062,7 +1088,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     ]);
 
     const slots = computeAvailability({
-      repIds,
+      reps,
       appointments: appointments as BookedAppointment[],
       daysOff: new Set(daysOffRows.map((d) => `${d.userId}|${d.date}`)),
       area: lead.schedulingArea as SchedulingArea,
@@ -1070,6 +1096,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       reservationMinutes: program.reservationMinutes,
       leadTimeHours: program.leadTimeHours,
       bookingHorizonDays: program.bookingHorizonDays,
+      maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+      primaryRepPrimingBookings: program.primaryRepPrimingBookings,
+      maxSameDayTravelKm: program.maxSameDayTravelKm,
+      destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
       nowWallToronto: nowWall,
     });
 
@@ -1108,13 +1138,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
               d
             );
           },
-          listBookableRepIds: async () =>
-            (
-              await tx.user.findMany({
-                where: { role: 'rep', active: true, acceptsPublicBooking: true },
-                select: { id: true },
-              })
-            ).map((r) => r.id),
+          listBookableReps: async () => tx.user.findMany(BOOKABLE_REP_QUERY),
           listDaysOff: async (repIds, d) =>
             new Set(
               (
@@ -1132,14 +1156,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
                 deletedAt: null,
                 status: { in: ACTIVE_APPOINTMENT_STATUSES },
               },
-              select: {
-                assignedRepId: true,
-                appointmentDate: true,
-                appointmentTime: true,
-                durationMinutes: true,
-                schedulingArea: true,
-                status: true,
-              },
+              select: SCHEDULING_APPOINTMENT_SELECT,
             })) as BookedAppointment[],
           createAppointment: async ({ repId, publicReference, request }) => {
             // Audit-only identity. Inactive and password-less, so it can never
@@ -1184,6 +1201,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
                 schedulingArea: request.area,
                 bookedVia: 'public_flow',
                 publicReference,
+                // Stored so the next booking on this rep's day can measure the
+                // travel distance without re-geocoding.
+                latitude: request.destination?.latitude ?? null,
+                longitude: request.destination?.longitude ?? null,
                 createdByUserId: SYSTEM_BOOKING_USER_ID,
               },
               select: { id: true },
@@ -1200,6 +1221,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           reservationMinutes: program.reservationMinutes,
           leadTimeHours: program.leadTimeHours,
           bookingHorizonDays: program.bookingHorizonDays,
+          maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+          primaryRepPrimingBookings: program.primaryRepPrimingBookings,
+          maxSameDayTravelKm: program.maxSameDayTravelKm,
+          destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
           nowWallToronto: nowWall,
           programKey: program.key,
           programVersion: program.version,
@@ -1225,6 +1250,15 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           // Confirmations and reminders are written in the SAME transaction as
           // the appointment, so a provider outage can never lose a booking.
           const answers = (lead.answersJson ?? {}) as Record<string, string>;
+          // The assigned rep is alerted alongside the business inbox.
+          const assignedRep = await tx.user
+            .findUnique({
+              where: { id: (await tx.appointment.findUnique({
+                where: { id: booking.appointmentId }, select: { assignedRepId: true },
+              }))?.assignedRepId ?? '' },
+              select: { name: true, email: true },
+            })
+            .catch(() => null);
           const propertyAddress = [lead.address, lead.city].filter(Boolean).join(', ') || lead.address;
           const context: BookingContext = {
             appointmentId: booking.appointmentId,
@@ -1238,6 +1272,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             visitMinutes: program.visitMinutes,
             consultationMode: program.consultationMode,
             teamInbox: teamInbox(),
+            repEmail: assignedRep?.email ?? '',
+            repName: assignedRep?.name ?? '',
             fundingPlan: answers.contribution ?? '',
             projectScope: answers.projectType ?? '',
           };

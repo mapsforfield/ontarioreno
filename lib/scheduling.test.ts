@@ -11,6 +11,8 @@ import {
   repEligibleForArea,
   addWallHours,
   dateRange,
+  haversineKm,
+  withinTravelRadius,
   type BookedAppointment,
 } from './scheduling.ts';
 import { HAMILTON_PROGRAM } from './program-config.ts';
@@ -34,8 +36,13 @@ const appt = (
 });
 
 const DATE = '2026-08-10';
+/** rep-a is the priority rep (lower number goes first). Names never appear. */
+const REPS = [
+  { id: 'rep-a', bookingPriority: 1 },
+  { id: 'rep-b', bookingPriority: 2 },
+];
 const baseInput = {
-  repIds: ['rep-a', 'rep-b'],
+  reps: REPS,
   appointments: [] as BookedAppointment[],
   daysOff: new Set<string>(),
   area: 'HAMILTON' as const,
@@ -43,8 +50,17 @@ const baseInput = {
   reservationMinutes: RESERVE,
   leadTimeHours: HAMILTON_PROGRAM.leadTimeHours,
   bookingHorizonDays: HAMILTON_PROGRAM.bookingHorizonDays,
+  maxBookingsPerRepPerDay: HAMILTON_PROGRAM.maxBookingsPerRepPerDay,
+  primaryRepPrimingBookings: HAMILTON_PROGRAM.primaryRepPrimingBookings,
+  maxSameDayTravelKm: HAMILTON_PROGRAM.maxSameDayTravelKm,
+  destination: null,
   nowWallToronto: '2026-08-01T09:00',
 };
+
+/** Two Hamilton addresses ~1.5 km apart, and one in Barrie ~85 km away. */
+const HAMILTON_A = { latitude: 43.2557, longitude: -79.8711, city: 'Hamilton' };
+const HAMILTON_B = { latitude: 43.2460, longitude: -79.8600, city: 'Hamilton' };
+const BARRIE = { latitude: 44.3894, longitude: -79.6903, city: 'Barrie' };
 
 // ─── Two-hour block geometry ─────────────────────────────────────────────────
 
@@ -170,9 +186,130 @@ test('wall-clock and calendar helpers behave', () => {
 
 // ─── Representative assignment ───────────────────────────────────────────────
 
-test('assignment spreads load and is deterministic', () => {
-  const appointments = [appt('rep-a', DATE, '10:00', 'HAMILTON')];
-  assert.equal(chooseRep(['rep-a', 'rep-b'], appointments, DATE), 'rep-b', 'lighter rep wins');
-  assert.equal(chooseRep(['rep-a', 'rep-b'], [], DATE), 'rep-a', 'stable tiebreak when equal');
-  assert.equal(chooseRep([], [], DATE), null);
+const PRIMING = HAMILTON_PROGRAM.primaryRepPrimingBookings; // 2
+const CAP = HAMILTON_PROGRAM.maxBookingsPerRepPerDay; // 3
+
+/**
+ * Fill an empty day one booking at a time and record who each one goes to.
+ *
+ * Successive homeowners pick different times, so bookings cycle through the
+ * slots rather than all contending for 10:00. (Always taking the earliest free
+ * slot would model one person booking six times, which is not the scenario and
+ * hides the priming rule behind slot collisions.)
+ */
+function simulateDay(repCount = 2) {
+  const reps = REPS.slice(0, repCount);
+  const booked: BookedAppointment[] = [];
+  const order: Array<string | null> = [];
+  // One more attempt than total capacity, so we also observe the day closing.
+  for (let i = 0; i < repCount * CAP + 1; i++) {
+    const input = { ...baseInput, reps, appointments: booked };
+    let picked: string | null = null;
+    // Start at this homeowner's preferred time, falling forward if it's gone.
+    for (let offset = 0; offset < SLOTS.length; offset++) {
+      const time = SLOTS[(i + offset) % SLOTS.length];
+      const candidates = eligibleRepsForSlot(input, DATE, time);
+      picked = chooseRep(candidates, reps, booked, DATE, PRIMING);
+      if (picked) { booked.push(appt(picked, DATE, time, 'HAMILTON')); break; }
+    }
+    order.push(picked);
+    if (!picked) break;
+  }
+  return order;
+}
+
+test('an empty day fills in the exact priority order: A,A,B,B,A,B then closes', () => {
+  // Prime the priority rep to 2, then balance on fewest-booked with ties going
+  // to priority, capped at 3 each.
+  assert.deepEqual(simulateDay(), ['rep-a', 'rep-a', 'rep-b', 'rep-b', 'rep-a', 'rep-b', null]);
+});
+
+test('the daily cap is hard — a rep at capacity is skipped entirely', () => {
+  const full = [
+    appt('rep-a', DATE, '10:00', 'HAMILTON'),
+    appt('rep-a', DATE, '12:00', 'HAMILTON'),
+    appt('rep-a', DATE, '14:00', 'HAMILTON'),
+  ];
+  const input = { ...baseInput, appointments: full };
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '16:00'), ['rep-b'], 'rep-a is done for the day');
+  assert.equal(full.filter((a) => a.assignedRepId === 'rep-a').length, CAP);
+});
+
+test('when every rep is at capacity the day disappears from availability', () => {
+  const appointments: BookedAppointment[] = [];
+  for (const rep of ['rep-a', 'rep-b']) {
+    for (const time of SLOTS.slice(0, CAP)) appointments.push(appt(rep, DATE, time, 'HAMILTON'));
+  }
+  const slots = computeAvailability({ ...baseInput, appointments });
+  assert.equal(slots.some((s) => s.date === DATE), false, 'a fully booked day is not offered');
+  assert.ok(slots.some((s) => s.date === '2026-08-11'), 'other dates unaffected');
+});
+
+test('priority comes from the records, not the order they arrive in', () => {
+  const flipped = [
+    { id: 'rep-a', bookingPriority: 5 },
+    { id: 'rep-b', bookingPriority: 1 },
+  ];
+  assert.equal(chooseRep(['rep-a', 'rep-b'], flipped, [], DATE, PRIMING), 'rep-b');
+});
+
+test('the priming rep is skipped when they are not eligible for the slot', () => {
+  // rep-a on a day off: rep-b takes it despite rep-a being higher priority.
+  const input = { ...baseInput, daysOff: new Set([`rep-a|${DATE}`]) };
+  const candidates = eligibleRepsForSlot(input, DATE, '10:00');
+  assert.deepEqual(candidates, ['rep-b']);
+  assert.equal(chooseRep(candidates, REPS, [], DATE, PRIMING), 'rep-b');
+});
+
+test('no eligible rep yields no assignment', () => {
+  assert.equal(chooseRep([], REPS, [], DATE, PRIMING), null);
+});
+
+// ─── Same-day travel radius ──────────────────────────────────────────────────
+
+test('distance is measured correctly', () => {
+  assert.ok(haversineKm(HAMILTON_A, HAMILTON_B) < 2, 'two Hamilton points are close');
+  assert.ok(haversineKm(HAMILTON_A, BARRIE) > 80, 'Hamilton to Barrie is far');
+});
+
+test('a rep already booked nearby can take another nearby visit', () => {
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A }];
+  assert.equal(withinTravelRadius(HAMILTON_B, day, 10), true);
+});
+
+test('a far-away property is handed to the other rep', () => {
+  const appointments = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A }];
+  const input = { ...baseInput, appointments, destination: BARRIE };
+  // rep-a is anchored in Hamilton; rep-b has a free day so may travel.
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '12:00'), ['rep-b']);
+});
+
+test('when BOTH reps are anchored far away, the slot is not offered', () => {
+  const appointments = [
+    { ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A },
+    { ...appt('rep-b', DATE, '10:00', 'HAMILTON'), ...HAMILTON_B },
+  ];
+  const input = { ...baseInput, appointments, destination: BARRIE };
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '12:00'), []);
+  const slots = computeAvailability(input);
+  assert.equal(slots.some((s) => s.date === DATE), false, 'the whole day drops out');
+});
+
+test('a rep with an empty day can be sent anywhere', () => {
+  assert.equal(withinTravelRadius(BARRIE, [], 10), true);
+});
+
+test('missing coordinates fall back to city, and never block on absent data', () => {
+  const noCoords = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON'), city: 'Hamilton' }];
+  assert.equal(withinTravelRadius({ city: 'Hamilton' }, noCoords, 10), true, 'same city ⇒ near');
+  assert.equal(withinTravelRadius({ city: 'Barrie' }, noCoords, 10), false, 'different city ⇒ far');
+  // Nothing known at all must not make the day unbookable.
+  const unknown = [appt('rep-a', DATE, '10:00', 'HAMILTON')];
+  assert.equal(withinTravelRadius(null, unknown, 10), true);
+  assert.equal(withinTravelRadius({ city: null }, unknown, 10), true);
+});
+
+test('cancelled bookings release both the cap and the travel anchor', () => {
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON', 'cancelled'), ...HAMILTON_A }];
+  assert.equal(withinTravelRadius(BARRIE, day, 10), true, 'a cancelled visit anchors nothing');
 });

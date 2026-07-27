@@ -17,6 +17,10 @@ const request = (overrides: Record<string, unknown> = {}) => ({
   reservationMinutes: HAMILTON_PROGRAM.reservationMinutes,
   leadTimeHours: HAMILTON_PROGRAM.leadTimeHours,
   bookingHorizonDays: HAMILTON_PROGRAM.bookingHorizonDays,
+  maxBookingsPerRepPerDay: HAMILTON_PROGRAM.maxBookingsPerRepPerDay,
+  primaryRepPrimingBookings: HAMILTON_PROGRAM.primaryRepPrimingBookings,
+  maxSameDayTravelKm: HAMILTON_PROGRAM.maxSameDayTravelKm,
+  destination: null,
   nowWallToronto: '2026-08-01T09:00',
   programKey: HAMILTON_PROGRAM.key,
   programVersion: HAMILTON_PROGRAM.version,
@@ -28,12 +32,18 @@ const request = (overrides: Record<string, unknown> = {}) => ({
 });
 
 /** Deps backed by an in-memory calendar, recording the order of operations. */
-function makeDeps(seed: BookedAppointment[] = [], repIds = ['rep-a', 'rep-b']) {
+function makeDeps(
+  seed: BookedAppointment[] = [],
+  reps = [
+    { id: 'rep-a', bookingPriority: 1 },
+    { id: 'rep-b', bookingPriority: 2 },
+  ]
+) {
   const calls: string[] = [];
   const store = [...seed];
   const deps: BookingDeps = {
     lockDate: async () => { calls.push('lock'); },
-    listBookableRepIds: async () => { calls.push('read:reps'); return repIds; },
+    listBookableReps: async () => { calls.push('read:reps'); return reps; },
     listDaysOff: async () => { calls.push('read:daysOff'); return new Set<string>(); },
     listAppointments: async (_ids, d) => {
       calls.push('read:appointments');
@@ -74,7 +84,7 @@ test('ATOMICITY: the date lock is taken before anything is read or written', asy
 test('SIMULTANEOUS BOOKING: the second request for the last slot is refused', async () => {
   // One rep left, both homeowners want 12:00. Serialised by the date lock, the
   // second re-reads inside the lock and finds the slot gone.
-  const { deps, store } = makeDeps([], ['rep-a']);
+  const { deps, store } = makeDeps([], [{ id: 'rep-a', bookingPriority: 1 }]);
   const first = await bookSlot(deps, request());
   const second = await bookSlot(deps, request());
 

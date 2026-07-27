@@ -15,7 +15,9 @@ import {
   chooseRep,
   eligibleRepsForSlot,
   minutesOfDay,
+  type BookableRep,
   type BookedAppointment,
+  type Coordinates,
   type Slot,
 } from './scheduling.js';
 
@@ -31,6 +33,11 @@ export type BookingRequest = {
   reservationMinutes: number;
   leadTimeHours: number;
   bookingHorizonDays: number;
+  maxBookingsPerRepPerDay: number;
+  primaryRepPrimingBookings: number;
+  maxSameDayTravelKm: number;
+  /** Property coordinates, for the same-day travel radius. */
+  destination: Coordinates | null;
   nowWallToronto: string;
   programKey: string;
   programVersion: number;
@@ -50,7 +57,7 @@ export type BookingRequest = {
 export type BookingDeps = {
   /** Transaction-scoped advisory lock on the date. Must be called first. */
   lockDate: (date: string) => Promise<void>;
-  listBookableRepIds: () => Promise<string[]>;
+  listBookableReps: () => Promise<BookableRep[]>;
   listDaysOff: (repIds: string[], date: string) => Promise<Set<string>>;
   listAppointments: (repIds: string[], date: string) => Promise<BookedAppointment[]>;
   createAppointment: (input: {
@@ -105,12 +112,13 @@ export async function bookSlot(
   await deps.lockDate(request.date);
 
   // 2. Re-derive eligibility inside the lock — this is the authoritative read.
-  const repIds = await deps.listBookableRepIds();
+  const reps = await deps.listBookableReps();
+  const repIds = reps.map((rep) => rep.id);
   const daysOff = await deps.listDaysOff(repIds, request.date);
   const appointments = await deps.listAppointments(repIds, request.date);
 
   const availabilityInput = {
-    repIds,
+    reps,
     appointments,
     daysOff,
     area: request.area,
@@ -118,11 +126,21 @@ export async function bookSlot(
     reservationMinutes: request.reservationMinutes,
     leadTimeHours: request.leadTimeHours,
     bookingHorizonDays: request.bookingHorizonDays,
+    maxBookingsPerRepPerDay: request.maxBookingsPerRepPerDay,
+    primaryRepPrimingBookings: request.primaryRepPrimingBookings,
+    maxSameDayTravelKm: request.maxSameDayTravelKm,
+    destination: request.destination,
     nowWallToronto: request.nowWallToronto,
   };
 
   const candidates = eligibleRepsForSlot(availabilityInput, request.date, request.time);
-  const repId = chooseRep(candidates, appointments, request.date);
+  const repId = chooseRep(
+    candidates,
+    reps,
+    appointments,
+    request.date,
+    request.primaryRepPrimingBookings
+  );
 
   if (!repId) {
     // Same-day alternatives only — enough to be useful, nothing about other reps.
