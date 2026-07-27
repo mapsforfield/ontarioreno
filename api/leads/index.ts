@@ -744,6 +744,7 @@ function publicProgramPayload(program: ProgramConfig) {
     areaLabel: program.areaLabel,
     enabled: program.enabled,
     displayAmountLabel: program.displayAmountLabel,
+    fundingHighlights: program.fundingHighlights,
     programTerms: program.programTerms,
     whyFreeText: program.whyFreeText,
     questions: publicQuestions(program),

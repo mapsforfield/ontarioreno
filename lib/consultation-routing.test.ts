@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeConsultation } from './consultation-routing.ts';
-import { HAMILTON_PROGRAM, SIMCOE_PROGRAM, areaForMunicipality } from './program-config.ts';
+import {
+  HAMILTON_PROGRAM,
+  SIMCOE_PROGRAM,
+  areaForMunicipality,
+  questionsForStep,
+} from './program-config.ts';
 
-const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap' };
+const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'yes' };
 const base = {
   addressState: 'ADDRESS_VERIFIED' as const,
   area: 'HAMILTON' as const,
@@ -74,6 +79,44 @@ test('a project type outside the program is reviewed — eligibility is not ours
   const r = routeConsultation({ ...base, answers: { ...OK, projectType: 'pool_house' } });
   assert.equal(r.outcome, 'MANUAL_REVIEW');
   assert.ok(r.reasons.includes('PROJECT_TYPE_NOT_LISTED'));
+});
+
+test('wanting financing books anyway — it is a note, not a barrier', () => {
+  const r = routeConsultation({ ...base, answers: { ...OK, contribution: 'need_financing' } });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('WANTS_FINANCING'), 'flagged for the specialist');
+});
+
+test('an uncertain contribution answer goes to manual review', () => {
+  const r = routeConsultation({ ...base, answers: { ...OK, contribution: 'unsure' } });
+  assert.equal(r.outcome, 'MANUAL_REVIEW');
+  assert.ok(r.reasons.includes('CONTRIBUTION_UNCERTAIN'));
+});
+
+test('the fast-track case reaches the calendar with a single reason', () => {
+  const r = routeConsultation({ ...base, answers: OK });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.deepEqual(r.reasons, ['ELIGIBLE_FOR_BOOKING']);
+});
+
+test('pre-booking questions are exactly four — no seven-dropdown wall', () => {
+  const keys = HAMILTON_PROGRAM.questions.map((q) => q.key);
+  assert.deepEqual(keys, ['ownership', 'projectType', 'timeline', 'contribution']);
+  // The zero-weight property questions moved out of the pre-booking path.
+  const prepKeys = HAMILTON_PROGRAM.prepQuestions.map((q) => q.key);
+  assert.deepEqual(prepKeys, ['basementStatus', 'separateEntrance', 'permitStatus']);
+  for (const k of prepKeys) assert.equal(keys.includes(k), false, `${k} must not block booking`);
+});
+
+test('questions are grouped into three progressive steps', () => {
+  assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 1).map((q) => q.key), ['ownership']);
+  assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 2).map((q) => q.key), ['projectType', 'timeline']);
+  assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 3).map((q) => q.key), ['contribution']);
+});
+
+test('funding is summarised in three lines, with full terms kept separate', () => {
+  assert.equal(HAMILTON_PROGRAM.fundingHighlights.length, 3);
+  assert.equal(HAMILTON_PROGRAM.programTerms.length, 6);
 });
 
 test('property answers carry ZERO routing weight', () => {

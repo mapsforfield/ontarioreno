@@ -22,6 +22,8 @@ export type RoutingReason =
   | 'OWNERSHIP_UNCERTAIN'
   | 'PROJECT_TYPE_UNCERTAIN'
   | 'PROJECT_TYPE_NOT_LISTED'
+  | 'CONTRIBUTION_UNCERTAIN'
+  | 'WANTS_FINANCING'
   | 'EXPLORATORY_TIMELINE'
   | 'ELIGIBLE_FOR_BOOKING';
 
@@ -48,6 +50,7 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   const ownership = answers.ownership ?? '';
   const projectType = answers.projectType ?? '';
   const timeline = answers.timeline ?? '';
+  const contribution = answers.contribution ?? '';
 
   // ── 1. DECLINE — only from certainty ──
   if (ownership === 'no') {
@@ -65,6 +68,9 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   if (area && (!program || !program.enabled)) reasons.push('PROGRAM_NOT_ENABLED');
   if (UNCERTAIN.has(ownership)) reasons.push('OWNERSHIP_UNCERTAIN');
   if (UNCERTAIN.has(projectType)) reasons.push('PROJECT_TYPE_UNCERTAIN');
+  // Only "not sure" needs a person. Wanting to discuss financing is a normal
+  // answer for a program that funds 70% — it must not block the calendar.
+  if (contribution === 'unsure') reasons.push('CONTRIBUTION_UNCERTAIN');
   if (
     program &&
     projectType &&
@@ -82,7 +88,10 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   }
 
   // ── 4. DIRECT_CALENDAR ──
-  return { outcome: 'DIRECT_CALENDAR', reasons: ['ELIGIBLE_FOR_BOOKING'] };
+  // Wanting to discuss financing is recorded for the rep's brief, not a barrier.
+  const booked: RoutingReason[] = ['ELIGIBLE_FOR_BOOKING'];
+  if (contribution === 'need_financing') booked.push('WANTS_FINANCING');
+  return { outcome: 'DIRECT_CALENDAR', reasons: booked };
 }
 
 /** True when the outcome should show the booking calendar. */

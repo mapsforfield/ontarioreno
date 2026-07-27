@@ -18,9 +18,13 @@ export type QuestionOption = { value: string; label: string };
 export type Question = {
   key: string;
   label: string;
+  /** Short clarifier shown under the label. */
+  help?: string;
   options: QuestionOption[];
   /** Only these answers influence routing; everything else is captured for the rep. */
   routingRelevant?: boolean;
+  /** Which screen of the progressive flow this question belongs to. */
+  step: 1 | 2 | 3;
 };
 
 export type ProgramConfig = {
@@ -33,10 +37,16 @@ export type ProgramConfig = {
   areaLabel: string;
   /** The ONLY place an amount is rendered from. Never a literal in a component. */
   displayAmountLabel: string;
+  /** Three short lines shown inline during the flow. */
+  fundingHighlights: string[];
+  /** Full terms, shown only behind a "full details" disclosure. */
   programTerms: string[];
   whyFreeText: string;
   eligibleProjectTypes: string[];
+  /** Asked before booking, grouped by step. */
   questions: Question[];
+  /** Asked after booking. Never blocks the calendar. */
+  prepQuestions: Question[];
   officialSourceUrls: string[];
   visitMinutes: number;
   reservationMinutes: number;
@@ -61,26 +71,30 @@ const SHARED_SCHEDULING: Pick<
   bookingHorizonDays: 14,
 };
 
+// ── Step 1: the property ──
 const OWNERSHIP: Question = {
   key: 'ownership',
   label: 'Do you own this property?',
   routingRelevant: true,
+  step: 1,
   options: [
-    { value: 'yes', label: 'Yes' },
+    { value: 'yes', label: 'Yes, I own it' },
     { value: 'no', label: 'No' },
-    { value: 'unsure', label: "I'm not sure" },
+    { value: 'unsure', label: "It's complicated" },
   ],
 };
 
+// ── Step 2: the project ──
 const PROJECT_TYPE: Question = {
   key: 'projectType',
   label: 'What are you planning?',
   routingRelevant: true,
+  step: 2,
   options: [
-    { value: 'secondary_suite', label: 'Legal secondary suite' },
-    { value: 'garden_suite', label: 'Garden suite / detached unit' },
-    { value: 'laneway_suite', label: 'Laneway suite / detached unit' },
-    { value: 'unsure', label: 'Not sure yet' },
+    { value: 'secondary_suite', label: 'Basement or secondary suite' },
+    { value: 'garden_suite', label: 'Garden suite' },
+    { value: 'laneway_suite', label: 'Laneway suite' },
+    { value: 'unsure', label: 'Still deciding' },
   ],
 };
 
@@ -88,24 +102,43 @@ const TIMELINE: Question = {
   key: 'timeline',
   label: 'When would you like to start?',
   routingRelevant: true,
+  step: 2,
   options: [
     { value: 'asap', label: 'As soon as possible' },
-    { value: '1_3_months', label: '1–3 months' },
-    { value: '3_plus_months', label: '3+ months' },
-    { value: 'exploring', label: 'Just exploring for now' },
+    { value: '1_3_months', label: 'In 1–3 months' },
+    { value: '3_plus_months', label: 'In 3+ months' },
+    { value: 'exploring', label: 'Just exploring' },
+  ],
+};
+
+// ── Step 3: the money ──
+const CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'Are you able to cover the remaining project costs?',
+  help: 'The grant covers up to 70%. Financing is available if you need it — this just tells us how to help.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'yes', label: 'Yes' },
+    { value: 'need_financing', label: "I'd want to look at financing" },
+    { value: 'unsure', label: 'Not sure yet' },
   ],
 };
 
 /**
- * Property questions. Captured for the representative's visit brief and carry
- * ZERO routing weight — we do not assess structure, zoning or eligibility. A
- * homeowner cannot be expected to answer a building-code question, and we must
- * not appear to adjudicate one.
+ * Preparation questions — asked AFTER booking, never before.
+ *
+ * They carry ZERO routing weight (we do not assess structure, zoning or
+ * eligibility), so asking them up front added friction for no decision value.
+ * A homeowner cannot reliably answer a building-code question anyway, and asking
+ * one before showing the calendar implies we are adjudicating it. They belong in
+ * the representative's visit brief.
  */
-const PROPERTY_QUESTIONS: Question[] = [
+const PREP_QUESTIONS: Question[] = [
   {
     key: 'basementStatus',
     label: 'Current basement condition',
+    step: 3,
     options: [
       { value: 'unfinished', label: 'Fully unfinished' },
       { value: 'partial', label: 'Partially finished' },
@@ -116,6 +149,7 @@ const PROPERTY_QUESTIONS: Question[] = [
   {
     key: 'separateEntrance',
     label: 'Is there already a separate entrance?',
+    step: 3,
     options: [
       { value: 'yes', label: 'Yes' },
       { value: 'no', label: 'No' },
@@ -125,6 +159,7 @@ const PROPERTY_QUESTIONS: Question[] = [
   {
     key: 'permitStatus',
     label: 'Building permit status',
+    step: 3,
     options: [
       { value: 'not_applied', label: 'Haven’t applied yet' },
       { value: 'waiting', label: 'Waiting for approval' },
@@ -132,6 +167,13 @@ const PROPERTY_QUESTIONS: Question[] = [
       { value: 'unsure', label: 'Not sure' },
     ],
   },
+];
+
+/** Three short headlines shown inline; the full terms sit behind a disclosure. */
+const HAMILTON_FUNDING_HIGHLIGHTS = [
+  'Covers up to 70% of eligible costs, to a maximum of $40,000 per unit.',
+  'You cover the remaining project costs.',
+  'Paid in two advances — an issued City building permit is required first.',
 ];
 
 export const HAMILTON_PROGRAM: ProgramConfig = {
@@ -142,6 +184,7 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   slug: 'hamilton',
   areaLabel: 'Hamilton',
   displayAmountLabel: 'up to $40,000 per eligible unit',
+  fundingHighlights: HAMILTON_FUNDING_HIGHLIGHTS,
   programTerms: [
     'Covers up to 70% of eligible costs, to a maximum of $40,000 per eligible unit.',
     'The homeowner is responsible for remaining project costs.',
@@ -153,7 +196,8 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   whyFreeText:
     "Contractors don't want to spend days researching grant rules and property eligibility for free, and homeowners don't want to pay upfront just to learn whether a secondary suite is even worth pursuing. We organize the details of your project upfront so it's ready for a builder to evaluate properly. When a project's a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps our review free for you, and you're free to compare or decline any proposal you receive.",
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
-  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, ...PROPERTY_QUESTIONS],
+  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
+  prepQuestions: PREP_QUESTIONS,
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
 };
@@ -172,10 +216,12 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   slug: 'simcoe',
   areaLabel: 'Simcoe County',
   displayAmountLabel: '',
+  fundingHighlights: [],
   programTerms: [],
   whyFreeText: HAMILTON_PROGRAM.whyFreeText,
   eligibleProjectTypes: [],
-  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, ...PROPERTY_QUESTIONS],
+  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
+  prepQuestions: PREP_QUESTIONS,
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
 };
@@ -223,4 +269,9 @@ export function programBySlug(slug: string): ProgramConfig | null {
 /** Public-facing question set, minus anything with no options. */
 export function publicQuestions(program: ProgramConfig): Question[] {
   return program.questions.filter((q) => q.options.length > 0);
+}
+
+/** Questions for one screen of the progressive flow. */
+export function questionsForStep(program: ProgramConfig, step: 1 | 2 | 3): Question[] {
+  return publicQuestions(program).filter((q) => q.step === step);
 }
