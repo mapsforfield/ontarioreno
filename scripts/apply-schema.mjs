@@ -6,12 +6,16 @@
 // about DDL correctness — a real failed statement fails the build.
 import { neon } from '@neondatabase/serverless';
 import { SCHEMA_STATEMENTS } from '../lib/schema-ddl.generated.js';
+import { resolveDatabaseUrl, describeDatabaseSource } from '../lib/db-url.js';
 
-const url =
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  '';
+let url;
+try {
+  url = resolveDatabaseUrl();
+} catch (err) {
+  console.error(`[apply-schema] ${err?.message ?? err}`);
+  process.exit(1);
+}
+console.log(`[apply-schema] database source: ${describeDatabaseSource()}`);
 
 if (!url) {
   console.warn('[apply-schema] No database URL in env — skipping (runtime self-heal will reconcile).');

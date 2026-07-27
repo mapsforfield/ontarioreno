@@ -101,6 +101,7 @@ import PortalTasks from './portal/pages/PortalTasks';
 import PortalLogin from './portal/pages/PortalLogin';
 import ConsultationReschedule from './portal/pages/ConsultationReschedule';
 import ConsultationCancel from './portal/pages/ConsultationCancel';
+import ConsultationFlow from './pages/ConsultationFlow';
 
 export default function App() {
   return (
@@ -109,6 +110,11 @@ export default function App() {
         <Router>
           <ScrollToTop />
           <Routes>
+          {/* Public homeowner qualification + booking flow. Standalone (outside
+              the marketing Layout) so the journey stays focused, and entirely
+              unauthenticated — a homeowner never sees the portal. */}
+          <Route path="/consultation/:slug" element={<ConsultationFlow />} />
+
           {/* Public customer-facing consultation pages — no auth required */}
           <Route
             path="/portal/consultation/:id/reschedule"

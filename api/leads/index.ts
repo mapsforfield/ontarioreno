@@ -2,6 +2,27 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { ensureSchema } from '../../lib/schema.js';
+import {
+  areaForMunicipality,
+  programBySlug,
+  programForArea,
+  publicQuestions,
+  type AddressState,
+  type ProgramConfig,
+  type SchedulingArea,
+} from '../../lib/program-config.js';
+import { routeConsultation } from '../../lib/consultation-routing.js';
+import {
+  computeAvailability,
+  torontoWallClock,
+  type BookedAppointment,
+} from '../../lib/scheduling.js';
+import {
+  bookSlot,
+  SYSTEM_BOOKING_USER_ID,
+  SYSTEM_BOOKING_USER_NAME,
+  type BookingDeps,
+} from '../../lib/public-booking.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -707,8 +728,472 @@ async function handleCollection(
   return res.status(405).json({ error: 'Method not allowed.' });
 }
 
+// ─── Public consultation flow (?flow=…) — UNAUTHENTICATED by design ───────────
+// Meta lead → qualification → routing → calendar → booking. A homeowner never
+// has, and never needs, a portal account. Every decision that matters (address
+// state, scheduling area, program, routing outcome, rep assignment) is made here
+// on the server; the browser only ever submits answers and a chosen time.
+
+const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed', 'rescheduled', 'completed'];
+
+function publicProgramPayload(program: ProgramConfig) {
+  return {
+    key: program.key,
+    version: program.version,
+    slug: program.slug,
+    areaLabel: program.areaLabel,
+    enabled: program.enabled,
+    displayAmountLabel: program.displayAmountLabel,
+    programTerms: program.programTerms,
+    whyFreeText: program.whyFreeText,
+    questions: publicQuestions(program),
+    visitMinutes: program.visitMinutes,
+  };
+}
+
+/** Google Places lookup. Absent key or any failure ⇒ unverified ⇒ manual review. */
+async function placesAutocomplete(input: string) {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey || input.trim().length < 3) return [];
+  try {
+    const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
+      body: JSON.stringify({ input, includedRegionCodes: ['ca'] }),
+    });
+    const j = (await r.json()) as {
+      suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }>;
+    };
+    return (j.suggestions ?? [])
+      .map((s) => ({
+        placeId: s.placePrediction?.placeId ?? '',
+        description: s.placePrediction?.text?.text ?? '',
+      }))
+      .filter((s) => s.placeId && s.description);
+  } catch {
+    return [];
+  }
+}
+
+type ResolvedAddress = {
+  addressState: AddressState;
+  address: string;
+  city: string;
+  postalCode: string;
+  province: string;
+  municipality: string;
+  area: SchedulingArea | null;
+};
+
+const UNRESOLVED: ResolvedAddress = {
+  addressState: 'ADDRESS_UNVERIFIED',
+  address: '',
+  city: '',
+  postalCode: '',
+  province: '',
+  municipality: '',
+  area: null,
+};
+
+/**
+ * Resolve a picked place into a verified address plus a scheduling area.
+ *
+ * A verified address means only that it standardised cleanly and sits in a
+ * municipality we map — never that the property qualifies for anything. Anything
+ * ambiguous returns ADDRESS_UNVERIFIED so routing sends it to a person.
+ */
+async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey || !placeId) return UNRESOLVED;
+  try {
+    const r = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'addressComponents,formattedAddress',
+        },
+      }
+    );
+    const j = (await r.json()) as {
+      formattedAddress?: string;
+      addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+    };
+    const comps = j.addressComponents ?? [];
+    const pick = (type: string) => comps.find((c) => (c.types ?? []).includes(type));
+
+    const streetNumber = pick('street_number')?.longText ?? '';
+    const route = pick('route')?.longText ?? '';
+    const postalCode = pick('postal_code')?.longText ?? '';
+    const province = pick('administrative_area_level_1')?.shortText ?? '';
+    // Hamilton is amalgamated, so Places often returns the community name.
+    const municipality =
+      pick('locality')?.longText ??
+      pick('administrative_area_level_3')?.longText ??
+      pick('postal_town')?.longText ??
+      pick('administrative_area_level_2')?.longText ??
+      '';
+    const address = [streetNumber, route].filter(Boolean).join(' ');
+
+    // Outside Ontario is the one address fact we can decline on with confidence.
+    if (province && province !== 'ON') {
+      return { ...UNRESOLVED, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', province, municipality };
+    }
+    // A missing street number or postal code means we cannot confirm a dwelling.
+    if (!streetNumber || !route || !postalCode) {
+      return { ...UNRESOLVED, address, city: municipality, postalCode, province, municipality };
+    }
+
+    const area = areaForMunicipality(municipality);
+    return {
+      // An unrecognised Ontario municipality stays UNVERIFIED — we may well serve
+      // it (Simcoe is not mapped yet), so it must reach a human, not a decline.
+      addressState: area ? 'ADDRESS_VERIFIED' : 'ADDRESS_UNVERIFIED',
+      address,
+      city: municipality,
+      postalCode,
+      province,
+      municipality,
+      area,
+    };
+  } catch {
+    return UNRESOLVED;
+  }
+}
+
+async function loadPublicFlowLead(leadRef: string) {
+  if (!leadRef) return null;
+  return prisma.lead.findUnique({ where: { id: leadRef } }).catch(() => null);
+}
+
+async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
+  const flow = String(req.query['flow'] ?? '');
+  res.setHeader('Cache-Control', 'no-store');
+
+  // ── Program config for the page ──
+  if (flow === 'program' && req.method === 'GET') {
+    const program = programBySlug(String(req.query['slug'] ?? ''));
+    if (!program) return res.status(404).json({ error: 'Unknown program.' });
+    return res.status(200).json(publicProgramPayload(program));
+  }
+
+  // ── Address autocomplete ──
+  if (flow === 'address_suggest' && req.method === 'GET') {
+    const suggestions = await placesAutocomplete(String(req.query['q'] ?? ''));
+    return res.status(200).json({ suggestions });
+  }
+
+  // ── Submit qualification → route → create Lead ──
+  if (flow === 'submit' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const name = clean(body.name);
+    const phone = clean(body.phone);
+    const email = normEmail(body.email);
+    if (!name || (!phone && !email)) {
+      return res.status(400).json({ error: 'A name and a phone number or email are required.' });
+    }
+
+    const requested = programBySlug(clean(body.programSlug) || 'hamilton');
+    if (!requested) return res.status(404).json({ error: 'Unknown program.' });
+
+    const resolved = await resolvePlace(clean(body.placeId));
+    // The program comes from the resolved address, never from the homeowner.
+    const areaProgram = programForArea(resolved.area);
+    const program = areaProgram ?? requested;
+
+    const answers: Record<string, string> = {};
+    const rawAnswers = (body.answers ?? {}) as Record<string, unknown>;
+    for (const question of program.questions) {
+      answers[question.key] = clean(rawAnswers[question.key]);
+    }
+
+    const routing = routeConsultation({
+      addressState: resolved.addressState,
+      area: resolved.area,
+      program: areaProgram,
+      answers,
+    });
+
+    const needsReview = routing.outcome === 'MANUAL_REVIEW';
+    const lead = await withTables(() =>
+      prisma.lead.create({
+        data: {
+          name,
+          phone,
+          email,
+          address: resolved.address,
+          city: resolved.city,
+          postalCode: resolved.postalCode,
+          projectType: answers.projectType ?? '',
+          source: 'consultation_flow',
+          sourceDetail: clean(body.sourceDetail) || program.slug,
+          status: 'new',
+          assignedRepId: null,
+          programKey: program.key,
+          programVersion: program.version,
+          schedulingArea: resolved.area,
+          addressState: resolved.addressState,
+          resolvedMunicipality: resolved.municipality,
+          answersJson: answers,
+          routingOutcome: routing.outcome,
+          routingReasonCodes: routing.reasons,
+          needsReview,
+          notes: clean(body.notes),
+        },
+        select: { id: true },
+      })
+    );
+
+    return res.status(201).json({
+      leadRef: lead.id,
+      outcome: routing.outcome,
+      reasons: routing.reasons,
+      program: publicProgramPayload(program),
+      offersCalendar: routing.outcome === 'DIRECT_CALENDAR',
+    });
+  }
+
+  // ── Availability ──
+  if (flow === 'availability' && req.method === 'GET') {
+    const lead = await loadPublicFlowLead(String(req.query['leadRef'] ?? ''));
+    if (!lead) return res.status(404).json({ error: 'Session not found.' });
+    if (lead.routingOutcome !== 'DIRECT_CALENDAR' || !lead.schedulingArea) {
+      return res.status(200).json({ slots: [] });
+    }
+    const program = programForArea(lead.schedulingArea as SchedulingArea);
+    if (!program || !program.enabled) return res.status(200).json({ slots: [] });
+
+    const nowWall = torontoWallClock();
+    const reps = await prisma.user.findMany({
+      where: { role: 'rep', active: true, acceptsPublicBooking: true },
+      select: { id: true },
+    });
+    const repIds = reps.map((r) => r.id);
+    if (repIds.length === 0) return res.status(200).json({ slots: [] });
+
+    const fromDate = nowWall.slice(0, 10);
+    const toDate = new Date(
+      Date.UTC(
+        Number(fromDate.slice(0, 4)),
+        Number(fromDate.slice(5, 7)) - 1,
+        Number(fromDate.slice(8, 10)) + program.bookingHorizonDays + 1
+      )
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    const [appointments, daysOffRows] = await Promise.all([
+      prisma.appointment.findMany({
+        where: {
+          assignedRepId: { in: repIds },
+          appointmentDate: { gte: fromDate, lte: toDate },
+          deletedAt: null,
+          status: { in: ACTIVE_APPOINTMENT_STATUSES },
+        },
+        select: {
+          assignedRepId: true,
+          appointmentDate: true,
+          appointmentTime: true,
+          durationMinutes: true,
+          schedulingArea: true,
+          status: true,
+        },
+      }),
+      prisma.repDayOff.findMany({
+        where: { userId: { in: repIds }, date: { gte: fromDate, lte: toDate } },
+        select: { userId: true, date: true },
+      }),
+    ]);
+
+    const slots = computeAvailability({
+      repIds,
+      appointments: appointments as BookedAppointment[],
+      daysOff: new Set(daysOffRows.map((d) => `${d.userId}|${d.date}`)),
+      area: lead.schedulingArea as SchedulingArea,
+      slotStartTimes: program.slotStartTimes,
+      reservationMinutes: program.reservationMinutes,
+      leadTimeHours: program.leadTimeHours,
+      bookingHorizonDays: program.bookingHorizonDays,
+      nowWallToronto: nowWall,
+    });
+
+    // Times only — no representative identity, no counts, no other bookings.
+    return res.status(200).json({ slots, visitMinutes: program.visitMinutes });
+  }
+
+  // ── Book ──
+  if (flow === 'book' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const lead = await loadPublicFlowLead(clean(body.leadRef));
+    if (!lead) return res.status(404).json({ error: 'Session not found.' });
+    if (lead.appointmentId) {
+      return res.status(409).json({ error: 'This request already has a booking.' });
+    }
+    if (lead.routingOutcome !== 'DIRECT_CALENDAR' || !lead.schedulingArea) {
+      return res.status(403).json({ error: 'This request is not eligible for online booking.' });
+    }
+    const program = programForArea(lead.schedulingArea as SchedulingArea);
+    if (!program || !program.enabled) {
+      return res.status(403).json({ error: 'Online booking is not available for this area yet.' });
+    }
+
+    const date = clean(body.date);
+    const time = clean(body.time);
+    const nowWall = torontoWallClock();
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const deps: BookingDeps = {
+          // Serialises every booking for this date. Transaction-scoped, so it is
+          // released on commit and is safe with a pooled connection.
+          lockDate: async (d) => {
+            await tx.$executeRawUnsafe(
+              'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+              d
+            );
+          },
+          listBookableRepIds: async () =>
+            (
+              await tx.user.findMany({
+                where: { role: 'rep', active: true, acceptsPublicBooking: true },
+                select: { id: true },
+              })
+            ).map((r) => r.id),
+          listDaysOff: async (repIds, d) =>
+            new Set(
+              (
+                await tx.repDayOff.findMany({
+                  where: { userId: { in: repIds }, date: d },
+                  select: { userId: true, date: true },
+                })
+              ).map((row) => `${row.userId}|${row.date}`)
+            ),
+          listAppointments: async (repIds, d) =>
+            (await tx.appointment.findMany({
+              where: {
+                assignedRepId: { in: repIds },
+                appointmentDate: d,
+                deletedAt: null,
+                status: { in: ACTIVE_APPOINTMENT_STATUSES },
+              },
+              select: {
+                assignedRepId: true,
+                appointmentDate: true,
+                appointmentTime: true,
+                durationMinutes: true,
+                schedulingArea: true,
+                status: true,
+              },
+            })) as BookedAppointment[],
+          createAppointment: async ({ repId, publicReference, request }) => {
+            // Audit-only identity. Inactive and password-less, so it can never
+            // sign in and never makes the portal part of this journey.
+            await tx.user.upsert({
+              where: { id: SYSTEM_BOOKING_USER_ID },
+              update: {},
+              create: {
+                id: SYSTEM_BOOKING_USER_ID,
+                name: SYSTEM_BOOKING_USER_NAME,
+                email: 'system-public-booking@ontarioreno.internal',
+                role: 'system',
+                avatarInitial: 'S',
+                active: false,
+                acceptsPublicBooking: false,
+              },
+            });
+            const created = await tx.appointment.create({
+              data: {
+                customerName: request.lead.name,
+                phone: request.lead.phone,
+                email: request.lead.email,
+                address: request.lead.address,
+                city: request.lead.city,
+                postalCode: request.lead.postalCode,
+                projectType: request.lead.projectType,
+                assignedRepId: repId,
+                appointmentDate: request.date,
+                appointmentTime: request.time,
+                durationMinutes: request.reservationMinutes,
+                appointmentType: 'home_visit',
+                status: 'scheduled',
+                source: 'manual',
+                location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
+                customerNotes: request.customerNotes ?? '',
+                leadId: request.lead.id,
+                programKey: request.programKey,
+                programVersion: request.programVersion,
+                schedulingArea: request.area,
+                bookedVia: 'public_flow',
+                publicReference,
+                createdByUserId: SYSTEM_BOOKING_USER_ID,
+              },
+              select: { id: true },
+            });
+            return created;
+          },
+        };
+
+        const booking = await bookSlot(deps, {
+          date,
+          time,
+          area: lead.schedulingArea as SchedulingArea,
+          slotStartTimes: program.slotStartTimes,
+          reservationMinutes: program.reservationMinutes,
+          leadTimeHours: program.leadTimeHours,
+          bookingHorizonDays: program.bookingHorizonDays,
+          nowWallToronto: nowWall,
+          programKey: program.key,
+          programVersion: program.version,
+          lead: {
+            id: lead.id,
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            address: lead.address,
+            city: lead.city,
+            postalCode: lead.postalCode,
+            projectType: lead.projectType,
+          },
+          customerNotes: clean(body.notes),
+        });
+
+        if (booking.ok) {
+          await tx.lead.update({
+            where: { id: lead.id },
+            data: { status: 'booked', appointmentId: booking.appointmentId },
+          });
+        }
+        return booking;
+      });
+
+      if (!result.ok) {
+        return res.status(result.code === 'SLOT_UNAVAILABLE' ? 409 : 400).json(result);
+      }
+      await ringDoorbell();
+      return res.status(201).json({
+        publicReference: result.publicReference,
+        date: result.date,
+        time: result.time,
+        durationMinutes: result.durationMinutes,
+        visitMinutes: program.visitMinutes,
+      });
+    } catch (err) {
+      console.error('[flow/book] failed:', err);
+      return res.status(500).json({ error: 'We could not complete the booking. Please try again.' });
+    }
+  }
+
+  return res.status(404).json({ error: 'Unknown flow action.' });
+}
+
 // ─── Router (by query param — robust on Vercel, no catch-all) ─────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Public consultation flow — unauthenticated, handled before requireAuth so a
+  // homeowner never encounters a login.
+  if (req.query['flow'] !== undefined) {
+    return handlePublicFlow(req, res);
+  }
+
   // Intake is unauthenticated (token-gated) — handle before requireAuth.
   if (req.query['intake'] !== undefined) {
     return handleIntake(req, res);

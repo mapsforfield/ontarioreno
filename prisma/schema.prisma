@@ -24,6 +24,9 @@ model User {
   /// For role='contractor' accounts: the Contractor this login is scoped to
   /// (read-only, sees only that contractor's calendar + clients).
   contractorId  String?
+  /// Public consultation flow may assign bookings to this user. Reps only;
+  /// the flag is the lever to exclude one without a code change.
+  acceptsPublicBooking Boolean @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -230,8 +233,20 @@ model Appointment {
   /// stored so we never re-geocode the same address).
   latitude                 Float?
   longitude                Float?
-  /// Set when the consultation was booked from a Lead in the Sales Workspace.
+  /// Set when the consultation was booked from a Lead in the Sales Workspace,
+  /// or by the public consultation flow.
   leadId                   String?
+  /// ─── Public consultation booking ───────────────────────────────────────────
+  /// Program the homeowner qualified under, pinned at booking time.
+  programKey               String?
+  programVersion           Int?
+  /// 'HAMILTON' | 'SIMCOE'. Drives the per-rep, per-date scheduling-area lock:
+  /// all of a rep's appointments on one date must share one area.
+  schedulingArea           String?
+  /// 'portal' | 'public_flow' — how this appointment was created.
+  bookedVia                String   @default("portal")
+  /// Short reference shown to the homeowner. Public bookings only.
+  publicReference          String?  @unique
   externalCalendarId       String?
   externalEventId          String?
   syncedAt                 String?
@@ -438,6 +453,21 @@ model Lead {
   lastContactedAt   DateTime?
   attemptCount      Int       @default(0)
   notes             String    @default("")
+  // ─── Public consultation flow ───────────────────────────────────────────────
+  /// Program resolved from the verified address, never chosen by the homeowner.
+  programKey        String?
+  programVersion    Int?
+  schedulingArea    String?
+  /// 'ADDRESS_VERIFIED' | 'ADDRESS_OUTSIDE_SERVICE_AREA' | 'ADDRESS_UNVERIFIED'
+  addressState      String?
+  resolvedMunicipality String?
+  /// Structured qualification answers, keyed to the program's question set.
+  answersJson       Json?
+  /// 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE'
+  routingOutcome    String?
+  routingReasonCodes String[]
+  /// True when the flow could not decide and a person must look.
+  needsReview       Boolean   @default(false)
   // Promotion links — Lead points at canonical records, never duplicates them
   clientId          String?
   dealId            String?
