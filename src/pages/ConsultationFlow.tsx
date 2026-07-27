@@ -398,7 +398,13 @@ export default function ConsultationFlow() {
               </li>
             ))}
           </ul>
-          <Disclosure open={termsOpen} onToggle={() => setTermsOpen((v) => !v)} label="Full program terms">
+          <Disclosure
+            open={termsOpen}
+            onToggle={() => setTermsOpen((v) => !v)}
+            label="Full program terms"
+            id="full-program-terms"
+            scrollOnMobile
+          >
             <ul className="space-y-1.5">{program.programTerms.map((t) => <li key={t}>• {t}</li>)}</ul>
           </Disclosure>
           {stepQuestions(3).map((q) => (
@@ -466,14 +472,51 @@ function Choice({ question, value, onPick }: { question: Question; value?: strin
   );
 }
 
-function Disclosure({ open, onToggle, label, children }: { open: boolean; onToggle: () => void; label: string; children: React.ReactNode }) {
+function Disclosure({
+  open,
+  onToggle,
+  label,
+  id,
+  scrollOnMobile,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  id?: string;
+  /**
+   * Cap the panel and scroll it internally on phones. Without this, expanding a
+   * long panel pushes the question and the Continue button below the fold, which
+   * reads as a dead end. Tailwind is mobile-first, so the cap applies below the
+   * `md` breakpoint (768px) and is removed at and above it.
+   */
+  scrollOnMobile?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-xl border border-slate-200">
-      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-700">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={id}
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-700"
+      >
         {label}
         <ChevronDown className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="px-4 pb-4 text-sm leading-relaxed text-slate-600">{children}</div>}
+      {open && (
+        <div
+          id={id}
+          className={`px-4 pb-4 text-sm leading-relaxed text-slate-600 ${
+            scrollOnMobile
+              ? 'scroll-subtle max-h-[190px] overflow-y-auto md:max-h-none md:overflow-visible'
+              : ''
+          }`}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }

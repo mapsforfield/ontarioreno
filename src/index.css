@@ -93,6 +93,37 @@
   background: linear-gradient(to right, #60a5fa, #2563eb);
 }
 
+/* SUBTLE SCROLLBAR
+   Used where a disclosure panel scrolls internally instead of pushing the
+   primary action below the fold (e.g. the consultation flow's full program
+   terms on mobile). Deliberately low-contrast so it reads as a hint that more
+   content exists, not as a control competing with the CTA. */
+
+.scroll-subtle {
+  scrollbar-width: thin;                        /* Firefox */
+  scrollbar-color: rgb(203 213 225) transparent; /* thumb, track */
+  overscroll-behavior: contain;                 /* don't chain to the page */
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-subtle::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-subtle::-webkit-scrollbar-track {
+  background: rgb(241 245 249);
+  border-radius: 9999px;
+}
+
+.scroll-subtle::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225);
+  border-radius: 9999px;
+}
+
+.scroll-subtle::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184);
+}
+
 /* Toast entrance animation */
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
