@@ -3,15 +3,33 @@
 // the browser.
 
 /**
- * Master switch for the yellow "TESTING MODE — ROUTING DETAIL" banner.
+ * Hard kill switch for the routing-detail panel.
  *
- * FALSE in production traffic. When false the panel is hidden on every step
- * regardless of host or query string — there is deliberately no `?debug=1`
- * override, because a debug affordance a stranger can turn on is not off.
- *
- * Flip to true, redeploy to a preview, and the routing reasons come back.
+ * Set to false and the panel is gone everywhere, no exceptions. Left true so the
+ * host rule below applies: hidden on the live domain, visible while testing.
  */
-export const ENABLE_TESTING_MODE = false;
+export const TESTING_MODE_MASTER = true;
+
+/** Hosts that count as live production traffic. */
+const PRODUCTION_HOST = /(^|\.)ontarioreno\.ca$/i;
+
+/**
+ * Whether to show the routing-detail panel.
+ *
+ * Off for live production traffic — a customer must never see internal routing
+ * codes. On everywhere else (preview deployments, local), because that is where
+ * the flow is tested and a manual-review result is useless without knowing which
+ * answer caused it.
+ *
+ * An earlier version of this was a flat `false`, which correctly hid the panel in
+ * production and also blinded testing on preview. The environment, not a single
+ * boolean, is what should decide.
+ */
+export function testingModeEnabled(hostname?: string | null): boolean {
+  if (!TESTING_MODE_MASTER) return false;
+  if (!hostname) return false;
+  return !PRODUCTION_HOST.test(hostname);
+}
 
 /**
  * Real outbound messages are sent from production only.

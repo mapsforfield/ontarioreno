@@ -13,7 +13,7 @@ import {
   type BookingContext,
 } from './notifications.ts';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, torontoToUtc } from './calendar-links.ts';
-import { ENABLE_TESTING_MODE, deliveryEnabled } from './app-config.ts';
+import { TESTING_MODE_MASTER, deliveryEnabled, testingModeEnabled } from './app-config.ts';
 
 const future = () => {
   const d = new Date(Date.now() + 10 * 24 * 60 * 60_000);
@@ -173,8 +173,21 @@ test('the .ics is well formed and escapes commas per RFC 5545', () => {
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
-test('testing mode is OFF for production traffic', () => {
-  assert.equal(ENABLE_TESTING_MODE, false);
+test('testing mode is OFF on the live domain and ON while testing', () => {
+  // Customers must never see routing codes; testers must never be left guessing
+  // why a submission routed the way it did.
+  for (const host of ['ontarioreno.ca', 'www.ontarioreno.ca', 'OntarioReno.ca']) {
+    assert.equal(testingModeEnabled(host), false, `${host} is live traffic`);
+  }
+  for (const host of ['ontarioreno-abc123-mapsforfields-projects.vercel.app', 'localhost', '127.0.0.1']) {
+    assert.equal(testingModeEnabled(host), true, `${host} is a testing host`);
+  }
+  assert.equal(testingModeEnabled(null), false, 'no host known ⇒ assume live');
+  assert.equal(testingModeEnabled(undefined), false);
+});
+
+test('the master switch is the single place to kill the panel outright', () => {
+  assert.equal(TESTING_MODE_MASTER, true, 'the host rule is the active control');
 });
 
 test('real delivery happens in production only', () => {

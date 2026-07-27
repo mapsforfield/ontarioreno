@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
-import { ENABLE_TESTING_MODE } from '../../lib/app-config';
+import { testingModeEnabled } from '../../lib/app-config';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../lib/calendar-links';
 
 // Public homeowner journey — progressive, one decision per screen.
@@ -78,9 +78,13 @@ function fmtTime(t: string) {
 export default function ConsultationFlow() {
   const slug = useParams<{ slug: string }>().slug ?? 'hamilton';
 
-  // Single global switch (lib/app-config.ts). Deliberately NOT overridable by a
-  // query string — a debug panel a visitor can enable is not actually off.
-  const debug = ENABLE_TESTING_MODE;
+  // Hidden on the live domain, visible on previews and locally — see
+  // lib/app-config.ts. Not query-string overridable, so a visitor on the real
+  // site can never switch it on.
+  const debug = useMemo(
+    () => testingModeEnabled(typeof window === 'undefined' ? null : window.location.hostname),
+    []
+  );
 
   const [program, setProgram] = useState<Program | null>(null);
   const [phase, setPhase] = useState<Phase>('q1');
@@ -156,6 +160,9 @@ export default function ConsultationFlow() {
       setLeadRef(j.leadRef);
       setOutcome(j.outcome);
       setReasons(j.reasons ?? []);
+      // Always recorded, panel or no panel — so a routing result can be diagnosed
+      // from devtools even on the live site, where the panel is hidden.
+      console.info('[consultation] routing', { outcome: j.outcome, reasons: j.reasons });
       if (j.offersCalendar) {
         const av = await (await fetch(`/api/leads?flow=availability&leadRef=${encodeURIComponent(j.leadRef)}`)).json();
         setSlots(av.slots ?? []);
@@ -385,11 +392,18 @@ export default function ConsultationFlow() {
             </label>
             <input className={inputCls} value={addressText} autoComplete="off" placeholder="Start typing, then pick your address"
               onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); }} />
-            {placeId && (
+            {placeId ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                 <Check className="h-3.5 w-3.5" /> Address confirmed
               </p>
-            )}
+            ) : addressText.trim().length > 2 ? (
+              // Said here, at the point of failure, rather than four steps later
+              // as an unexplained "a specialist will call you".
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                Pick your address from the list so we can check availability in your area.
+                Otherwise we’ll need to call you to confirm it.
+              </p>
+            ) : null}
             {suggestions.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
                 {suggestions.map((s) => (
