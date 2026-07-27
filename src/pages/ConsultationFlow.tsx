@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
 import { testingModeEnabled } from '../../lib/app-config';
@@ -79,6 +79,24 @@ function fmtTime(t: string) {
 
 export default function ConsultationFlow() {
   const slug = useParams<{ slug: string }>().slug ?? 'hamilton';
+  const [searchParams] = useSearchParams();
+
+  /**
+   * Where this homeowner came from, for attribution — `?src=sms`, or the usual
+   * utm_* / fbclid an ad platform appends. Captured on first paint so it
+   * survives the multi-step flow, and recorded on the lead.
+   */
+  const trafficSource = useMemo(() => {
+    const src = searchParams.get('src');
+    if (src) return src.slice(0, 60);
+    const utm = searchParams.get('utm_source');
+    const medium = searchParams.get('utm_medium');
+    if (utm) return [utm, medium].filter(Boolean).join('/').slice(0, 60);
+    if (searchParams.get('fbclid')) return 'meta';
+    return '';
+    // Read once — later steps must not lose it if the URL is cleaned up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Hidden on the live domain, visible on previews and locally — see
   // lib/app-config.ts. Not query-string overridable, so a visitor on the real
@@ -153,6 +171,7 @@ export default function ConsultationFlow() {
           phone: finalContact.phone,
           email: finalContact.email,
           placeId,
+          sourceDetail: trafficSource,
           notes: !placeId && addressText.trim() ? `Typed address (not confirmed): ${addressText.trim()}` : '',
           answers,
         }),

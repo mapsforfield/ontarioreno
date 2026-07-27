@@ -1001,9 +1001,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           routingOutcome: routing.outcome,
           routingReasonCodes: routing.reasons,
           needsReview,
-          // Tag the nurture pipeline on the lead itself so the CRM can filter it
-          // without needing to understand routing internals.
-          sourceDetail: isNurture ? NURTURE_TAG : (clean(body.sourceDetail) || program.slug),
+          // sourceDetail carries ATTRIBUTION (sms / meta / utm), not the routing
+          // tag — routingOutcome already makes nurture leads queryable, so
+          // overwriting this would have thrown away where the lead came from.
+          sourceDetail: clean(body.sourceDetail) || program.slug,
           notes: [clean(body.notes), isNurture ? `CRM tag: ${NURTURE_TAG}` : '']
             .filter(Boolean)
             .join('\n'),
