@@ -6,6 +6,7 @@ import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
+import { drainOutbox } from '../../lib/notification-drain.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -167,6 +168,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Daily schema reconcile (folded into an existing cron so we don't exceed the
     // Hobby plan's cron limit). Belt-and-suspenders behind the deploy-time apply.
     await ensureSchema();
+
+    // Public-booking reminders are scheduled at booking time; this delivers what
+    // is due. Folded in here for the same cron-limit reason. Best-effort — a
+    // failed drain must not take down the morning brief.
+    let notificationsDrained: unknown = null;
+    try {
+      notificationsDrained = await drainOutbox(prisma as never, 100);
+    } catch (err) {
+      console.error('[morning-brief] notification drain failed:', err);
+    }
+    void notificationsDrained;
 
     // (Grant Radar's discovery + daily scan now run on the GitHub Actions worker,
     // which has no Vercel timeout/cron limits — so nothing grant-related runs here.)

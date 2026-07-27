@@ -528,6 +528,42 @@ model Task {
   user User @relation(fields: [userId], references: [id])
 }
 
+// ─── Notification outbox ──────────────────────────────────────────────────────
+// Booking confirmations and reminders are written in the SAME transaction as the
+// appointment, then delivered after commit. That way a delivery failure can never
+// lose a booking, and a retry can never double-book. Rows are the audit trail:
+// what we intended to send, when, and what actually happened.
+
+model NotificationOutbox {
+  id             String   @id @default(cuid())
+  appointmentId  String?
+  leadId         String?
+  /// 'sms' | 'email'
+  channel        String
+  /// 'booking_confirmation' | 'reminder_24h' | 'reminder_day_of' | 'team_alert' | 'nurture_guide'
+  kind           String
+  recipient      String   @default("")
+  subject        String   @default("")
+  body           String   @default("")
+  /// 'pending' | 'sent' | 'failed' | 'suppressed' | 'blocked'
+  state          String   @default("pending")
+  /// Why a message was not delivered — e.g. non-production environment, or a
+  /// channel with no configured provider. Distinguishes "chose not to" from "broke".
+  stateReason    String   @default("")
+  attempts       Int      @default(0)
+  lastError      String   @default("")
+  /// Earliest send time, ISO. Reminders are scheduled at booking time.
+  sendAfter      String
+  sentAt         String?
+  /// Dedupe key so a retried drain never sends twice.
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([state, sendAfter])
+  @@index([appointmentId])
+}
+
 // ─── Grant Radar (admin-only government-program monitoring) ───────────────────
 // Discovers + watches official government pages for renovation / ADU / basement
 // incentive programs (e.g. Hamilton's HAF-funded ADU grant) and surfaces new or

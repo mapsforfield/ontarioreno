@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
+import { ENABLE_TESTING_MODE } from '../../lib/app-config';
+import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../lib/calendar-links';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
@@ -75,14 +77,10 @@ function fmtTime(t: string) {
 
 export default function ConsultationFlow() {
   const slug = useParams<{ slug: string }>().slug ?? 'hamilton';
-  const [searchParams] = useSearchParams();
 
-  // Testing mode: explicit ?debug=1, or any non-production host (previews, local).
-  const debug = useMemo(() => {
-    if (searchParams.get('debug') === '1') return true;
-    if (typeof window === 'undefined') return false;
-    return !/(^|\.)ontarioreno\.ca$/.test(window.location.hostname);
-  }, [searchParams]);
+  // Single global switch (lib/app-config.ts). Deliberately NOT overridable by a
+  // query string — a debug panel a visitor can enable is not actually off.
+  const debug = ENABLE_TESTING_MODE;
 
   const [program, setProgram] = useState<Program | null>(null);
   const [phase, setPhase] = useState<Phase>('q1');
@@ -101,7 +99,9 @@ export default function ConsultationFlow() {
   const [reasons, setReasons] = useState<string[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [chosen, setChosen] = useState<Slot | null>(null);
-  const [booking, setBooking] = useState<{ publicReference: string; date: string; time: string } | null>(null);
+  const [booking, setBooking] = useState<
+    { publicReference: string; date: string; time: string; propertyAddress?: string } | null
+  >(null);
 
   const timer = useRef<number | undefined>(undefined);
   const skip = useRef(false);
@@ -244,7 +244,13 @@ export default function ConsultationFlow() {
   // ── Result: booked, or a non-calendar outcome ──
   if (phase === 'result') {
     return (
-      <Shell title={booking ? 'Your visit is booked' : 'Thanks — we have your details'}>
+      <Shell
+        title={
+          booking ? 'Your visit is booked'
+            : outcome === 'NURTURE' ? 'Info package sent'
+              : 'Thanks — we have your details'
+        }
+      >
         {booking ? (
           <>
             <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
@@ -255,6 +261,36 @@ export default function ConsultationFlow() {
             <p className="mt-2 text-sm font-bold uppercase tracking-wide text-slate-500">{meeting.line}</p>
             <p className="mt-3 text-slate-600">{meeting.detail}</p>
             <p className="mt-4 text-sm font-semibold text-slate-500">Reference {booking.publicReference}</p>
+
+            <AddToCalendar
+              event={{
+                title: `OntarioReno - ${program.areaLabel} ADU Site Visit`,
+                location: booking.propertyAddress || addressText,
+                description: `${program.visitMinutes}-minute ${
+                  program.consultationMode === 'phone' ? 'consultation call' : 'in-person'
+                } ADU grant & property assessment with an OntarioReno specialist. Reference: ${booking.publicReference}`,
+                date: booking.date,
+                time: booking.time,
+                durationMinutes: program.visitMinutes,
+              }}
+              uid={booking.publicReference}
+            />
+
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/70 p-5 text-left">
+              <p className="mb-3 text-sm font-black text-slate-800">What happens next?</p>
+              <ul className="space-y-3">
+                {[
+                  ['Confirmation Sent:', 'Check your SMS & email for booking details.'],
+                  ['Zoning Review:', 'Our team will perform a preliminary property assessment prior to arrival.'],
+                  ['Site Visit:', `A specialist will arrive at ${booking.propertyAddress || addressText} at the scheduled time.`],
+                ].map(([bold, rest]) => (
+                  <li key={bold} className="flex gap-2.5 text-sm leading-relaxed text-slate-600">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <span><span className="font-bold text-slate-800">{bold}</span> {rest}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </>
         ) : outcome === 'NURTURE' ? (
           // Exploratory leads get the guide, not a 45-minute live slot.
@@ -263,8 +299,8 @@ export default function ConsultationFlow() {
               <BookOpen className="h-7 w-7 text-[#1B3C6C]" />
             </div>
             <p className="text-slate-600">
-              Since you’re still exploring, here’s the full guide to how the {program.areaLabel} grant
-              works — what qualifies, realistic costs, and the permit process.
+              We’ve sent the {program.areaLabel} grant guide to your email — what qualifies,
+              realistic costs, and how the permit process works.
             </p>
             {program.guideUrl && (
               <a href={program.guideUrl}
@@ -448,6 +484,51 @@ export default function ConsultationFlow() {
 }
 
 // ─── Presentational pieces ────────────────────────────────────────────────────
+
+function AddToCalendar({ event, uid }: { event: CalendarEvent; uid: string }) {
+  const [open, setOpen] = useState(false);
+
+  const downloadIcs = () => {
+    // Apple Calendar and desktop Outlook both consume .ics; a blob download
+    // avoids needing any server round-trip for the file.
+    const blob = new Blob([buildIcs(event, uid)], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ontarioreno-${uid}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setOpen(false);
+  };
+
+  const item = 'block w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-[#f6faff]';
+
+  return (
+    <div className="relative mt-5">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#1B3C6C] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#f2f7ff]">
+        <CalendarDays className="h-4 w-4" /> Add to Calendar
+        <ChevronDown className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-lg">
+          <a className={item} href={googleCalendarUrl(event)} target="_blank" rel="noopener noreferrer"
+            onClick={() => setOpen(false)}>
+            Google Calendar
+          </a>
+          <button type="button" className={item} onClick={downloadIcs}>Apple Calendar (.ics)</button>
+          <a className={item} href={outlookCalendarUrl(event)} target="_blank" rel="noopener noreferrer"
+            onClick={() => setOpen(false)}>
+            Outlook (web)
+          </a>
+          <button type="button" className={item} onClick={downloadIcs}>Download .ics</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Choice({ question, value, onPick }: { question: Question; value?: string; onPick: (v: string) => void }) {
   return (

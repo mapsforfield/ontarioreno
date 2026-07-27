@@ -25,6 +25,7 @@ export type RoutingReason =
   | 'CONTRIBUTION_UNCERTAIN'
   | 'WANTS_FINANCING'
   | 'EXPLORATORY_TIMELINE'
+  | 'TIMELINE_BEYOND_BOOKING_WINDOW'
   | 'ELIGIBLE_FOR_BOOKING';
 
 export type RoutingInput = {
@@ -83,8 +84,14 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   if (reasons.length > 0) return { outcome: 'MANUAL_REVIEW', reasons };
 
   // ── 3. NURTURE — qualified but not ready ──
-  if (timeline === 'exploring') {
-    return { outcome: 'NURTURE', reasons: ['EXPLORATORY_TIMELINE'] };
+  // A 45-minute in-person slot is the scarcest thing we have. Someone who is
+  // browsing, or who is a quarter away from starting, gets the guide and a
+  // follow-up instead — the visit is far more useful nearer the decision.
+  if (timeline === 'exploring' || timeline === '3_plus_months') {
+    return {
+      outcome: 'NURTURE',
+      reasons: [timeline === 'exploring' ? 'EXPLORATORY_TIMELINE' : 'TIMELINE_BEYOND_BOOKING_WINDOW'],
+    };
   }
 
   // ── 4. DIRECT_CALENDAR ──

@@ -23,6 +23,8 @@ import {
   SYSTEM_BOOKING_USER_NAME,
   type BookingDeps,
 } from '../../lib/public-booking.js';
+import { planBookingNotifications, type BookingContext } from '../../lib/notifications.js';
+import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -736,6 +738,20 @@ async function handleCollection(
 
 const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed', 'rescheduled', 'completed'];
 
+/** CRM tag applied to leads that bypass the calendar. */
+const NURTURE_TAG = 'Hamilton ADU - Nurture Pipeline';
+
+function teamInbox(): string {
+  const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
+  const match = from.match(/<([^\s@>]+@[^\s@>]+\.[^\s@>]+)>/);
+  return match ? match[1] : from.trim();
+}
+
+/** Deliver whatever is due, via the shared drain (lib/notification-drain.ts). */
+async function drainOutbox(limit = 25) {
+  return drainSharedOutbox(prisma as never, limit);
+}
+
 function publicProgramPayload(program: ProgramConfig) {
   return {
     key: program.key,
@@ -919,6 +935,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     });
 
     const needsReview = routing.outcome === 'MANUAL_REVIEW';
+    const isNurture = routing.outcome === 'NURTURE';
     const lead = await withTables(() =>
       prisma.lead.create({
         data: {
@@ -930,7 +947,6 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           postalCode: resolved.postalCode,
           projectType: answers.projectType ?? '',
           source: 'consultation_flow',
-          sourceDetail: clean(body.sourceDetail) || program.slug,
           status: 'new',
           assignedRepId: null,
           programKey: program.key,
@@ -942,11 +958,47 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           routingOutcome: routing.outcome,
           routingReasonCodes: routing.reasons,
           needsReview,
-          notes: clean(body.notes),
+          // Tag the nurture pipeline on the lead itself so the CRM can filter it
+          // without needing to understand routing internals.
+          sourceDetail: isNurture ? NURTURE_TAG : (clean(body.sourceDetail) || program.slug),
+          notes: [clean(body.notes), isNurture ? `CRM tag: ${NURTURE_TAG}` : '']
+            .filter(Boolean)
+            .join('\n'),
         },
         select: { id: true },
       })
     );
+
+    // Nurture leads get the guide by email instead of a live consultation slot.
+    if (isNurture && email && program.guideUrl) {
+      await prisma.notificationOutbox
+        .create({
+          data: {
+            leadId: lead.id,
+            channel: 'email',
+            kind: 'nurture_guide',
+            recipient: email,
+            subject: `Your ${program.guideLabel}`,
+            body: [
+              `Hi ${name},`,
+              '',
+              `Here's the full guide to how the ${program.areaLabel} grant works — what qualifies,`,
+              'realistic costs, and the permit process.',
+              '',
+              `https://ontarioreno.ca${program.guideUrl}`,
+              '',
+              'When you\'re closer to starting, we can book a site visit and go through your',
+              'property specifically. No rush, and no obligation.',
+              '',
+              'OntarioReno',
+            ].join('\n'),
+            sendAfter: new Date().toISOString(),
+            idempotencyKey: `${lead.id}:email:nurture_guide`,
+          },
+        })
+        .catch(() => {});
+      await drainOutbox().catch(() => null);
+    }
 
     return res.status(201).json({
       leadRef: lead.id,
@@ -1169,6 +1221,40 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             where: { id: lead.id },
             data: { status: 'booked', appointmentId: booking.appointmentId },
           });
+
+          // Confirmations and reminders are written in the SAME transaction as
+          // the appointment, so a provider outage can never lose a booking.
+          const answers = (lead.answersJson ?? {}) as Record<string, string>;
+          const propertyAddress = [lead.address, lead.city].filter(Boolean).join(', ') || lead.address;
+          const context: BookingContext = {
+            appointmentId: booking.appointmentId,
+            publicReference: booking.publicReference,
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            propertyAddress,
+            date: booking.date,
+            time: booking.time,
+            visitMinutes: program.visitMinutes,
+            consultationMode: program.consultationMode,
+            teamInbox: teamInbox(),
+            fundingPlan: answers.contribution ?? '',
+            projectScope: answers.projectType ?? '',
+          };
+          await tx.notificationOutbox.createMany({
+            data: planBookingNotifications(context).map((n) => ({
+              appointmentId: booking.appointmentId,
+              leadId: lead.id,
+              channel: n.channel,
+              kind: n.kind,
+              recipient: n.recipient,
+              subject: n.subject,
+              body: n.body,
+              sendAfter: n.sendAfter,
+              idempotencyKey: n.idempotencyKey,
+            })),
+            skipDuplicates: true,
+          });
         }
         return booking;
       });
@@ -1177,17 +1263,35 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
         return res.status(result.code === 'SLOT_UNAVAILABLE' ? 409 : 400).json(result);
       }
       await ringDoorbell();
+      // Fire the immediate messages now rather than waiting for a scheduled run,
+      // so the confirmation lands while the homeowner is still on the page.
+      // Best-effort: the booking is already committed and must not be undone.
+      const delivery = await drainOutbox().catch(() => null);
       return res.status(201).json({
         publicReference: result.publicReference,
         date: result.date,
         time: result.time,
         durationMinutes: result.durationMinutes,
         visitMinutes: program.visitMinutes,
+        propertyAddress: [lead.address, lead.city].filter(Boolean).join(', '),
+        notifications: delivery,
       });
     } catch (err) {
       console.error('[flow/book] failed:', err);
       return res.status(500).json({ error: 'We could not complete the booking. Please try again.' });
     }
+  }
+
+  // ── Reminder drain (cron-authenticated, not public) ──
+  // Reminders are scheduled at booking time; this delivers whatever is due.
+  // Vercel crons run against Production only, so preview never sends.
+  if (flow === 'drain') {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+    const summary = await drainOutbox(100).catch((err) => ({ error: String(err) }));
+    return res.status(200).json({ ok: true, ...summary });
   }
 
   return res.status(404).json({ error: 'Unknown flow action.' });
