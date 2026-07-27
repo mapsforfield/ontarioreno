@@ -124,8 +124,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // full history would grow unbounded and be re-serialized on every
           // refetch (the pipeline board + activity feed don't use this at all).
           activity: { orderBy: { createdAt: 'desc' }, take: 30 },
-          proposals: { orderBy: { sentAt: 'desc' } },
-          dispatches: { orderBy: { createdAt: 'desc' } },
+          // proposalBody is a full HTML email — the templates run tens of KB
+          // each — and nothing reads it back from loaded state; the only three
+          // references in the app are writes. Fetching it on every portal load
+          // was the single largest source of Neon network transfer, since that
+          // quota measures what the DATABASE sends, not what we send the browser.
+          // Capped as well, so a deal with a long proposal history can't quietly
+          // grow the payload again.
+          proposals: {
+            orderBy: { sentAt: 'desc' },
+            take: 20,
+            select: {
+              id: true,
+              contractorId: true,
+              dealId: true,
+              templateType: true,
+              proposalSubject: true,
+              sentAt: true,
+              sentByUserId: true,
+              createdAt: true,
+            },
+          },
+          dispatches: { orderBy: { createdAt: 'desc' }, take: 20 },
         },
       })
     );
