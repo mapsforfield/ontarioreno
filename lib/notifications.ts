@@ -112,7 +112,7 @@ export function emailBookingConfirmation(c: BookingContext): { subject: string; 
       `Reference: ${c.publicReference}`,
       '',
       'What happens next',
-      '  1. Confirmation sent — this email, plus a text message.',
+      '  1. Confirmation sent — this email.',
       '  2. Zoning review — we run a preliminary property assessment before we arrive.',
       `  3. Site visit — a specialist arrives at ${c.propertyAddress} at the scheduled time.`,
       '',

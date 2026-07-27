@@ -39,6 +39,8 @@ type Program = {
   consultationMode: 'in_person' | 'phone';
   guideUrl: string;
   guideLabel: string;
+  /** False until a Twilio adapter is configured — copy adapts rather than lying. */
+  smsEnabled: boolean;
 };
 
 type Outcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
@@ -287,7 +289,9 @@ export default function ConsultationFlow() {
               <p className="mb-3 text-sm font-black text-slate-800">What happens next?</p>
               <ul className="space-y-3">
                 {[
-                  ['Confirmation Sent:', 'Check your SMS & email for booking details.'],
+                  ['Confirmation Sent:', program.smsEnabled
+                    ? 'Check your SMS & email for booking details.'
+                    : 'Check your email for booking details.'],
                   ['Zoning Review:', 'Our team will perform a preliminary property assessment prior to arrival.'],
                   ['Site Visit:', `A specialist will arrive at ${booking.propertyAddress || addressText} at the scheduled time.`],
                 ].map(([bold, rest]) => (

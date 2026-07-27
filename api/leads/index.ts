@@ -23,7 +23,11 @@ import {
   SYSTEM_BOOKING_USER_NAME,
   type BookingDeps,
 } from '../../lib/public-booking.js';
-import { planBookingNotifications, type BookingContext } from '../../lib/notifications.js';
+import {
+  planBookingNotifications,
+  smsProviderConfigured,
+  type BookingContext,
+} from '../../lib/notifications.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
@@ -768,6 +772,9 @@ function publicProgramPayload(program: ProgramConfig) {
     consultationMode: program.consultationMode,
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
+    // Told to the client so confirmation copy can't promise a text we cannot
+    // send. Flips on by itself the moment a Twilio adapter is configured.
+    smsEnabled: smsProviderConfigured(),
   };
 }
 
