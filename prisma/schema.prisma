@@ -552,6 +552,9 @@ model NotificationOutbox {
   recipient      String   @default("")
   subject        String   @default("")
   body           String   @default("")
+  /// Rendered HTML for email rows. Stored because delivery is deferred, so the
+  /// message must survive until the drain runs. Empty for SMS.
+  html           String   @default("")
   /// 'pending' | 'sent' | 'failed' | 'suppressed' | 'blocked'
   state          String   @default("pending")
   /// Why a message was not delivered — e.g. non-production environment, or a

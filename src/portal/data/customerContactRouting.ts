@@ -1,4 +1,4 @@
-import type { Contractor, User } from './types';
+import type { Contractor, User } from './types.js';
 
 const DAVID_GALAXY_PERA_PHONE = '4374293510';
 const DAVID_RENOCHEFS_PHONE = '4374520636';

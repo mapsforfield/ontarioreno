@@ -12,8 +12,8 @@
  * API keys. It runs in the browser inside the portal React app.
  */
 
-import type { Appointment, Contractor, ContractorDispatch, Deal, User } from './types';
-import { getCustomerFacingConsultantPhone } from './customerContactRouting';
+import type { Appointment, Contractor, ContractorDispatch, Deal, User } from './types.js';
+import { getCustomerFacingConsultantPhone } from './customerContactRouting.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,10 +98,11 @@ function refId(id: string): string {
  * the correct environment (local dev vs. Vercel preview vs. production).
  */
 function baseUrl(): string {
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin;
-  }
-  return 'https://ontarioreno.ca';
+  // Read through globalThis so this module stays environment-agnostic: the
+  // public booking flow renders the same template server-side, where `window`
+  // is undefined and the DOM lib isn't loaded.
+  const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
+  return origin ?? 'https://ontarioreno.ca';
 }
 
 // ─── Status configuration ─────────────────────────────────────────────────────
@@ -403,6 +404,15 @@ export type CustomerEmailInput = {
   contractor?: Contractor;
   rep?: User;
   contractorName: string;
+  /**
+   * Override the status default for the Reschedule / Cancel buttons.
+   *
+   * Those links authorize on the appointment id alone, so anyone who guesses a
+   * cuid can cancel a stranger's visit. Public bookings therefore render the
+   * template without them and tell the homeowner to reply instead. Set this
+   * back to true once the links are signed.
+   */
+  showActions?: boolean;
 };
 
 /**
@@ -416,6 +426,7 @@ export type CustomerEmailInput = {
 export function buildCustomerHtml(input: CustomerEmailInput): string {
   const { type, appointment, contractor, rep, contractorName } = input;
   const cfg = STATUS[type];
+  const showActions = input.showActions ?? cfg.showActions;
   const origin = baseUrl();
   const rescheduleUrl = `${origin}/portal/consultation/${appointment.id}/reschedule`;
   const cancelUrl = `${origin}/portal/consultation/${appointment.id}/cancel`;
@@ -442,6 +453,12 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
       ? textRow('Event', e(eventTitle))
       : textRow('Project', e(appointment.projectType || 'Renovation Consultation')),
     rep?.name ? textRow('Provider', e(rep.name)) : '',
+    // Where we're going. Matters most for a public booking, where the homeowner
+    // picked the address from a suggestion list and should get a chance to
+    // notice if the wrong one was resolved.
+    !isEvent && appointment.address?.trim()
+      ? textRow('Address', e([appointment.address, appointment.city].filter(Boolean).join(', ')))
+      : '',
     textRow('Contractor', e(contractorName)),
     textRow('Booking ID', e(refId(appointment.id))),
   ].filter(Boolean).join('\n');
@@ -507,7 +524,7 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
     website ? `<p style="margin:0 0 6px;font-size:13px;font-family:sans-serif;"><a href="${e(websiteHref)}" target="_blank" style="color:#1B3C6C;text-decoration:none;font-weight:600;">${e(websiteDisplay)}</a></p>` : '',
   ].filter(Boolean).join('');
 
-  const actionButtons = cfg.showActions
+  const actionButtons = showActions
     ? `<div style="margin-top:20px;">
         <a href="${e(rescheduleUrl)}" target="_blank"
           style="display:block;margin-bottom:8px;padding:11px 16px;background-color:#1B3C6C;color:#ffffff;font-size:13px;font-weight:700;text-align:center;text-decoration:none;border-radius:8px;font-family:sans-serif;">Reschedule</a>

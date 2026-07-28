@@ -7,6 +7,12 @@
 // which makes "what will this homeowner receive, and when" answerable from one
 // table.
 
+// The portal's customer email template is a pure string builder — no fetch, no
+// env vars, no browser APIs beyond a guarded window check — so the public flow
+// reuses it rather than maintaining a second look for the same brand.
+import { buildCustomerHtml } from '../src/portal/data/emailTemplates.js';
+import type { Appointment } from '../src/portal/data/types.js';
+
 export type NotificationChannel = 'sms' | 'email';
 
 export type NotificationKind =
@@ -22,6 +28,8 @@ export type PlannedNotification = {
   recipient: string;
   subject: string;
   body: string;
+  /** Branded HTML for customer email; empty means send plain text only. */
+  html?: string;
   /** ISO instant; the drain only picks up rows whose time has passed. */
   sendAfter: string;
   idempotencyKey: string;
@@ -93,6 +101,37 @@ export function smsReminder24h(c: BookingContext): string {
 
 export function smsReminderDayOf(c: BookingContext): string {
   return `Hi ${c.name}, our specialist is looking forward to visiting ${c.propertyAddress} today at ${friendlyTime(c.time)} for your ADU assessment. See you soon!`;
+}
+
+/**
+ * Branded confirmation HTML, using the same template the portal sends.
+ *
+ * Action buttons are suppressed: they link to /portal/consultation/:id/... which
+ * authorizes on the appointment id alone, so emailing them to the public would
+ * let anyone who guesses a cuid cancel a stranger's visit. The plain-text body
+ * tells the homeowner to reply instead. Re-enable once those links are signed.
+ */
+export function emailBookingConfirmationHtml(c: BookingContext): string {
+  const appointment = {
+    id: c.appointmentId,
+    customerName: c.name,
+    phone: c.phone,
+    email: c.email,
+    address: c.propertyAddress,
+    appointmentDate: c.date,
+    appointmentTime: c.time,
+    appointmentType: c.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
+    projectType: c.projectScope,
+    customerNotes: '',
+    title: null,
+  } as unknown as Appointment;
+
+  return buildCustomerHtml({
+    type: 'booking_confirmation',
+    appointment,
+    contractorName: 'OntarioReno',
+    showActions: false,
+  });
 }
 
 export function emailBookingConfirmation(c: BookingContext): { subject: string; body: string } {
@@ -168,7 +207,8 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
   if (c.email) {
     planned.push({
       channel: 'email', kind: 'booking_confirmation', recipient: c.email,
-      subject: email.subject, body: email.body, sendAfter: now,
+      subject: email.subject, body: email.body, html: emailBookingConfirmationHtml(c),
+      sendAfter: now,
       idempotencyKey: `${c.appointmentId}:email:booking_confirmation`,
     });
   }
@@ -245,7 +285,8 @@ export async function deliverEmail(
   to: string,
   subject: string,
   body: string,
-  env = process.env
+  env = process.env,
+  html?: string
 ): Promise<DeliveryOutcome> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) return { state: 'blocked', reason: 'no_email_provider' };
@@ -255,7 +296,10 @@ export async function deliverEmail(
       from: env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>',
       to,
       subject,
+      // Plain text always accompanies the HTML, so clients that block or can't
+      // render it still show a usable message.
       text: body,
+      ...(html ? { html } : {}),
     });
     if (error) return { state: 'failed', reason: error.message ?? 'send_failed' };
     return { state: 'sent', reason: '' };

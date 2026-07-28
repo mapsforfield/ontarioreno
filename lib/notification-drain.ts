@@ -23,6 +23,7 @@ export type OutboxStore = {
         recipient: string;
         subject: string;
         body: string;
+        html?: string;
         attempts: number;
       }>
     >;
@@ -72,7 +73,7 @@ export async function drainOutbox(
       reason = 'no_sms_provider_pending_twilio_inspection';
       summary.blocked++;
     } else if (row.channel === 'email') {
-      const outcome = await deliverEmail(row.recipient, row.subject, row.body, env);
+      const outcome = await deliverEmail(row.recipient, row.subject, row.body, env, row.html);
       state = outcome.state;
       reason = outcome.reason;
       if (outcome.state === 'sent') summary.sent++;

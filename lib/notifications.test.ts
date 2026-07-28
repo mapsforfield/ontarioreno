@@ -119,6 +119,45 @@ test('a homeowner with no phone still gets email, and no SMS is planned', () => 
   assert.ok(planned.some((p) => p.kind === 'team_alert'), 'the team is told regardless');
 });
 
+test('the confirmation uses the branded portal template', () => {
+  const planned = planBookingNotifications(ctx());
+  const confirmation = planned.find(
+    (p) => p.kind === 'booking_confirmation' && p.channel === 'email'
+  )!;
+  assert.ok(confirmation.html, 'HTML must be generated');
+  // Same template the portal sends, not a second look for the same brand.
+  assert.match(confirmation.html!, /<!DOCTYPE html|<table/i);
+  assert.ok(confirmation.html!.includes('OntarioReno'));
+  assert.ok(confirmation.html!.includes('Appointment Confirmed'));
+  // Plain text still accompanies it for clients that block HTML.
+  assert.ok(confirmation.body.includes('Your consultation is confirmed.'));
+});
+
+test('the confirmation email never carries the unsigned cancel links', () => {
+  // /portal/consultation/:id/... authorizes on the appointment id alone, so
+  // emailing it publicly would let anyone guessing a cuid cancel a visit.
+  const html = planBookingNotifications(ctx()).find(
+    (p) => p.kind === 'booking_confirmation' && p.channel === 'email'
+  )!.html!;
+  assert.equal(/\/portal\/consultation\//.test(html), false, 'no portal action links');
+  assert.equal(/Reschedule<\/a>|Cancel Appointment/.test(html), false, 'no action buttons');
+});
+
+test('the branded HTML shows the visit details a homeowner needs', () => {
+  const html = planBookingNotifications(ctx({ date: '2026-08-10' })).find(
+    (p) => p.kind === 'booking_confirmation' && p.channel === 'email'
+  )!.html!;
+  assert.ok(html.includes('100 King St W, Hamilton') || html.includes('Hamilton'), 'address shown');
+  assert.ok(html.includes('Jane'), 'greeting by name');
+  assert.ok(html.includes('2:00 PM'), 'time shown');
+});
+
+test('SMS rows carry no HTML', () => {
+  for (const sms of planBookingNotifications(ctx()).filter((p) => p.channel === 'sms')) {
+    assert.ok(!sms.html, `${sms.kind} must not carry HTML`);
+  }
+});
+
 test('the team alert carries every field the team needs to act', () => {
   const alert = planBookingNotifications(ctx()).find((p) => p.kind === 'team_alert')!;
   for (const needle of ['Jane', '9055550199', 'jane@example.test', '100 King St W', 'cash_equity', 'secondary_suite', 'OR-ABCD2345']) {
