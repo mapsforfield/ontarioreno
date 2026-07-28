@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
 import { prisma } from '../../lib/prisma.js';
 import { withSchema } from '../../lib/schema.js';
+import { parseNoteTemplates } from '../../lib/note-templates.js';
 import {
   signToken,
   setAuthCookie,
@@ -135,27 +136,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    const DEFAULT_TEMPLATES = [
-      {
-        id: 'hamilton-grant',
-        label: 'Hamilton Grant',
-        body:
-          'Pre-qualified through OntarioReno for the Hamilton Secondary Suite Grant (up to $40K).\n\n' +
-          'This visit is to confirm eligibility and provide an accurate scope and estimate.',
-      },
-    ];
-
+    // Defaults live in lib/note-templates.ts so the public booking flow applies
+    // the same text a rep would insert here, and neither can drift.
     if (req.method === 'GET') {
       const row = await withSchema(() => prisma.setting.findUnique({ where: { key: 'note_templates' } }));
-      let value: Array<{ id: string; label: string; body: string }> = DEFAULT_TEMPLATES;
-      if (row?.value) {
-        try {
-          const parsed = JSON.parse(row.value);
-          if (Array.isArray(parsed)) value = parsed;
-        } catch { /* keep default */ }
-      }
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json(value);
+      return res.status(200).json(parseNoteTemplates(row?.value));
     }
 
     if (req.method === 'POST') {

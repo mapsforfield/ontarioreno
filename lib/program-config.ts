@@ -53,6 +53,15 @@ export type ProgramConfig = {
    * never unclear about whether someone is coming to the property.
    */
   consultationMode: 'in_person' | 'phone';
+  /**
+   * What the booked Appointment's projectType reads as. The homeowner's specific
+   * choice (secondary suite / garden / laneway) is a raw enum value and belongs
+   * in the rep's brief, not in a customer-facing field — this is the label the
+   * calendar and confirmation email should show.
+   */
+  appointmentProjectTypeLabel: string;
+  /** Customer Notes template applied automatically, by id (Setting.note_templates). */
+  noteTemplateId: string;
   /** Guide offered to exploratory leads instead of a live consultation slot. */
   guideUrl: string;
   guideLabel: string;
@@ -234,6 +243,8 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'ADU Grant Consultation',
+  noteTemplateId: 'hamilton-grant',
   guideUrl: '/hamilton-grant-guide',
   guideLabel: 'Hamilton $40,000 Grant Guide',
   officialSourceUrls: [],
@@ -261,6 +272,8 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'ADU Grant Consultation',
+  noteTemplateId: '',
   guideUrl: '',
   guideLabel: '',
   officialSourceUrls: [],

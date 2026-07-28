@@ -29,6 +29,7 @@ import {
   type BookingContext,
 } from '../../lib/notifications.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
+import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -1135,6 +1136,31 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     const time = clean(body.time);
     const nowWall = torontoWallClock();
 
+    // The same Customer Notes template a rep would insert by hand, read from the
+    // admin-editable setting so the two never drift.
+    const noteTemplates = parseNoteTemplates(
+      (await prisma.setting.findUnique({ where: { key: 'note_templates' } }).catch(() => null))?.value
+    );
+    const templateBody = program.noteTemplateId
+      ? findNoteTemplate(noteTemplates, program.noteTemplateId)?.body ?? ''
+      : '';
+
+    // The rep's brief: the homeowner's own answers, in plain words rather than
+    // the raw enum values the form submits.
+    const leadAnswers = (lead.answersJson ?? {}) as Record<string, string>;
+    const answerLabel = (key: string) => {
+      const question = program.questions.find((q) => q.key === key);
+      return question?.options.find((o) => o.value === leadAnswers[key])?.label ?? '';
+    };
+    const internalBrief = [
+      'Booked through the public Hamilton grant flow.',
+      answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
+      answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
+      answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
+      answerLabel('ownership') ? `Ownership: ${answerLabel('ownership')}` : '',
+      lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
+    ].filter(Boolean).join('\n');
+
     try {
       const result = await prisma.$transaction(async (tx) => {
         const deps: BookingDeps = {
@@ -1190,7 +1216,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
                 address: request.lead.address,
                 city: request.lead.city,
                 postalCode: request.lead.postalCode,
-                projectType: request.lead.projectType,
+                // A readable label, not the raw form value.
+                projectType: program.appointmentProjectTypeLabel,
                 assignedRepId: repId,
                 appointmentDate: request.date,
                 appointmentTime: request.time,
@@ -1202,7 +1229,11 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
                 status: 'scheduled',
                 source: 'manual',
                 location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
+                // Same template a rep inserts when booking from the portal.
                 customerNotes: request.customerNotes ?? '',
+                // The homeowner's answers, so the rep arrives briefed.
+                internalNotes: internalBrief,
+                notes: internalBrief,
                 leadId: request.lead.id,
                 programKey: request.programKey,
                 programVersion: request.programVersion,
@@ -1246,7 +1277,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             postalCode: lead.postalCode,
             projectType: lead.projectType,
           },
-          customerNotes: clean(body.notes),
+          customerNotes: templateBody,
         });
 
         if (booking.ok) {

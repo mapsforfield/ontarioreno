@@ -7,6 +7,7 @@ import {
   areaForMunicipality,
   questionsForStep,
 } from './program-config.ts';
+import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
 const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
 const base = {
@@ -61,6 +62,30 @@ test('the permit terms say we handle permitting', () => {
   const permitTerm = HAMILTON_PROGRAM.programTerms.find((t) => /building permit is required/.test(t));
   assert.ok(permitTerm);
   assert.match(permitTerm!, /We handle the building permit process for you/);
+});
+
+test('the appointment reads as a readable label, not a raw form value', () => {
+  assert.equal(HAMILTON_PROGRAM.appointmentProjectTypeLabel, 'ADU Grant Consultation');
+  // The raw enum values stay in the answer set for the rep's brief.
+  const projectType = HAMILTON_PROGRAM.questions.find((q) => q.key === 'projectType')!;
+  assert.ok(projectType.options.some((o) => o.value === 'secondary_suite'));
+});
+
+test('the Hamilton note template is applied automatically, from the shared source', () => {
+  assert.equal(HAMILTON_PROGRAM.noteTemplateId, 'hamilton-grant');
+  const template = findNoteTemplate(DEFAULT_NOTE_TEMPLATES, HAMILTON_PROGRAM.noteTemplateId);
+  assert.ok(template, 'the referenced template must exist');
+  assert.equal(template!.label, 'Hamilton Grant');
+  assert.match(template!.body, /Pre-qualified through OntarioReno/);
+});
+
+test('note templates survive an absent or corrupt setting', () => {
+  assert.deepEqual(parseNoteTemplates(null), DEFAULT_NOTE_TEMPLATES);
+  assert.deepEqual(parseNoteTemplates('not json'), DEFAULT_NOTE_TEMPLATES);
+  assert.deepEqual(parseNoteTemplates('{"not":"an array"}'), DEFAULT_NOTE_TEMPLATES);
+  // An admin edit is honoured over the default.
+  const edited = [{ id: 'hamilton-grant', label: 'Hamilton Grant', body: 'Edited copy.' }];
+  assert.equal(parseNoteTemplates(JSON.stringify(edited))[0].body, 'Edited copy.');
 });
 
 test('consultation mode is configured, so the meeting type is never ambiguous', () => {
