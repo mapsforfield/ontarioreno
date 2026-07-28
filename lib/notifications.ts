@@ -303,18 +303,96 @@ export type DeliveryOutcome = {
 };
 
 /**
- * SMS has no configured provider in this repository.
+ * Whether SMS can be delivered from here.
  *
- * OntarioReno already runs Twilio through Google Apps Script outside this repo.
- * Standing instruction: do not stand up a competing sender before that setup —
- * sender number, consent records, opt-out list, webhook — has been inspected.
- * Two systems texting the same people from different numbers, with different
- * suppression lists, is worse than one system that waits. So the message is
- * composed, scheduled and recorded here, and parked as `blocked` until an adapter
- * is wired to the existing account.
+ * OntarioReno already runs Twilio through Google Apps Script outside this repo,
+ * which sends the initial response to a new lead. This adapter deliberately
+ * uses the *same* Twilio account and sender number rather than standing up a
+ * second one: two systems texting the same people from different numbers, with
+ * different opt-out lists, is worse than one. The two do not overlap — Apps
+ * Script handles first contact, this handles booking confirmations and
+ * reminders — so a homeowner never gets the same message twice.
+ *
+ * With no credentials configured the messages are still composed, scheduled
+ * and recorded; they park as `blocked` rather than being lost.
  */
 export function smsProviderConfigured(env = process.env): boolean {
   return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER);
+}
+
+/**
+ * Normalise to E.164, which is the only format Twilio accepts.
+ *
+ * Homeowners type phone numbers as they please — "(905) 555-0199",
+ * "905-555-0199", "1 905 555 0199". Returns null when the input cannot be
+ * trusted to be a North American number, so a malformed number is recorded as
+ * a failure rather than silently sent somewhere unintended.
+ */
+export function toE164(raw: string): string | null {
+  const digits = (raw ?? '').replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  // Already international and plausible — pass it through untouched.
+  if (raw.trim().startsWith('+') && digits.length >= 8 && digits.length <= 15) {
+    return `+${digits}`;
+  }
+  return null;
+}
+
+/**
+ * Send one SMS through Twilio's REST API.
+ *
+ * Called directly rather than through the Twilio SDK: one form-encoded POST is
+ * the whole integration, and the SDK is a large dependency for a serverless
+ * bundle that is already close to its limits.
+ */
+export async function deliverSms(
+  to: string,
+  body: string,
+  env = process.env
+): Promise<DeliveryOutcome> {
+  const accountSid = env.TWILIO_ACCOUNT_SID;
+  const authToken = env.TWILIO_AUTH_TOKEN;
+  const from = env.TWILIO_FROM_NUMBER;
+  if (!accountSid || !authToken || !from) {
+    return { state: 'blocked', reason: 'no_sms_provider' };
+  }
+
+  const destination = toE164(to);
+  if (!destination) return { state: 'failed', reason: `unusable_phone_number:${to}` };
+
+  try {
+    const r = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          // Twilio uses HTTP basic auth: account SID as user, token as password.
+          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ To: destination, From: from, Body: body }).toString(),
+      }
+    );
+
+    const payload = (await r.json().catch(() => ({}))) as {
+      sid?: string;
+      message?: string;
+      code?: number;
+    };
+
+    if (!r.ok) {
+      // Twilio's own error text is far more useful than the status alone —
+      // unverified number, opted-out recipient, bad sender — so keep it.
+      return {
+        state: 'failed',
+        reason: `twilio_${r.status}${payload.code ? `_${payload.code}` : ''}:${payload.message ?? 'send_failed'}`,
+      };
+    }
+    return { state: 'sent', reason: payload.sid ?? '' };
+  } catch (err) {
+    return { state: 'failed', reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function deliverEmail(

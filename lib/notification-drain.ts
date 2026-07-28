@@ -2,7 +2,7 @@
 // Takes its Prisma client as an argument so both API functions can call it
 // without importing each other, and so tests can drive it with a fake.
 
-import { deliverEmail, smsProviderConfigured } from './notifications.js';
+import { deliverEmail, deliverSms, smsProviderConfigured } from './notifications.js';
 import { deliveryEnabled } from './app-config.js';
 
 export type DrainSummary = {
@@ -82,11 +82,18 @@ export async function drainOutbox(
       reason = `non_production_env:${env.VERCEL_ENV ?? 'local'}`;
       summary.suppressed++;
     } else if (row.channel === 'sms' && !smsProviderConfigured(env)) {
-      // Composed, scheduled and recorded — parked until an adapter is wired to
-      // the existing Twilio account rather than standing up a second sender.
+      // Composed, scheduled and recorded — parked rather than lost, so turning
+      // on credentials is all that stands between here and delivery.
       state = 'blocked';
-      reason = 'no_sms_provider_pending_twilio_inspection';
+      reason = 'no_sms_provider';
       summary.blocked++;
+    } else if (row.channel === 'sms') {
+      const outcome = await deliverSms(row.recipient, row.body, env);
+      state = outcome.state;
+      reason = outcome.reason;
+      if (outcome.state === 'sent') summary.sent++;
+      else if (outcome.state === 'blocked') summary.blocked++;
+      else summary.failed++;
     } else if (row.channel === 'email') {
       const outcome = await deliverEmail(row.recipient, row.subject, row.body, env, row.html);
       state = outcome.state;

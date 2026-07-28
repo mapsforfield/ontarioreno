@@ -71,6 +71,18 @@ test('a message with no expiry is never stale', async () => {
   assert.equal(summary.stale, 0);
 });
 
+test('an SMS row is no longer treated as an unsupported channel', async () => {
+  const { prisma, updates } = store([row({ expiresAt: '' })]);
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  // Before the Twilio adapter existed this fell through to the final else and
+  // was recorded as unsupported. With no credentials it must park as blocked,
+  // ready to send, not be discarded as undeliverable.
+  assert.equal(updates[0]!.stateReason, 'no_sms_provider');
+  assert.equal(summary.blocked, 1);
+});
+
 test('expiry beats environment suppression so counts stay honest', async () => {
   const expired = new Date(Date.now() - 60 * 60_000).toISOString();
   const { prisma, updates } = store([row({ expiresAt: expired })]);

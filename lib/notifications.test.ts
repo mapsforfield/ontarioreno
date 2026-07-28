@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dayOfReminderAt,
+  deliverSms,
+  toE164,
   friendlyDate,
   friendlyTime,
   planBookingNotifications,
@@ -193,6 +195,36 @@ test('the team alert keeps the specific choice, in words', () => {
   const alert = planBookingNotifications(ctx()).find((p) => p.kind === 'team_alert')!;
   assert.ok(alert.body.includes('Basement or secondary suite'), 'the rep sees what they picked');
   assert.ok(alert.body.includes('Cash / Savings / Existing Home Equity'));
+});
+
+test('phone numbers are normalised to what Twilio accepts', () => {
+  // Whatever a homeowner types into the form has to become E.164.
+  assert.equal(toE164('(905) 555-0199'), '+19055550199');
+  assert.equal(toE164('905-555-0199'), '+19055550199');
+  assert.equal(toE164('9055550199'), '+19055550199');
+  assert.equal(toE164('1 905 555 0199'), '+19055550199');
+  assert.equal(toE164('+1 905 555 0199'), '+19055550199');
+});
+
+test('an unusable phone number is rejected rather than guessed at', () => {
+  // Guessing would mean texting a stranger.
+  assert.equal(toE164('555-0199'), null);
+  assert.equal(toE164(''), null);
+  assert.equal(toE164('not a phone number'), null);
+});
+
+test('SMS is blocked, not attempted, when Twilio is not configured', async () => {
+  const outcome = await deliverSms('9055550199', 'Hi', {} as NodeJS.ProcessEnv);
+  assert.equal(outcome.state, 'blocked');
+  assert.equal(outcome.reason, 'no_sms_provider');
+});
+
+test('a malformed number fails without calling Twilio', async () => {
+  const outcome = await deliverSms('123', 'Hi', {
+    TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 't', TWILIO_FROM_NUMBER: '+15550001111',
+  } as NodeJS.ProcessEnv);
+  assert.equal(outcome.state, 'failed');
+  assert.match(outcome.reason, /unusable_phone_number/);
 });
 
 test('SMS rows carry no HTML', () => {
