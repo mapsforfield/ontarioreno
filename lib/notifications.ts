@@ -34,6 +34,15 @@ export type PlannedNotification = {
   html?: string;
   /** ISO instant; the drain only picks up rows whose time has passed. */
   sendAfter: string;
+  /**
+   * Point after which this message is no longer true and must not be sent.
+   *
+   * Reminders are the only messages that expire, and they expire because their
+   * wording is relative: a "tomorrow" reminder delivered on the day of the
+   * visit is actively misleading. Empty means the message stays valid however
+   * late it goes out — a confirmation is still worth sending.
+   */
+  expiresAt: string;
   idempotencyKey: string;
 };
 
@@ -230,14 +239,14 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
       subject: emailBookingConfirmation(c).subject,
       body: confirmation.body,
       html: confirmation.html,
-      sendAfter: now,
+      sendAfter: now, expiresAt: '',
       idempotencyKey: `${c.appointmentId}:email:booking_confirmation`,
     });
   }
   if (c.phone) {
     planned.push({
       channel: 'sms', kind: 'booking_confirmation', recipient: c.phone,
-      subject: '', body: smsBookingConfirmation(c), sendAfter: now,
+      subject: '', body: smsBookingConfirmation(c), sendAfter: now, expiresAt: '',
       idempotencyKey: `${c.appointmentId}:sms:booking_confirmation`,
     });
 
@@ -249,6 +258,9 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
       planned.push({
         channel: 'sms', kind: 'reminder_24h', recipient: c.phone,
         subject: '', body: smsReminder24h(c), sendAfter: reminderAt.toISOString(),
+        // This message says "tomorrow". Once the appointment day has begun it
+        // is a lie, and the day-of reminder covers the same visit anyway.
+        expiresAt: torontoInstant(c.date, '00:00').toISOString(),
         idempotencyKey: `${c.appointmentId}:sms:reminder_24h`,
       });
     }
@@ -258,6 +270,8 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
       planned.push({
         channel: 'sms', kind: 'reminder_day_of', recipient: c.phone,
         subject: '', body: smsReminderDayOf(c), sendAfter: dayOf.toISOString(),
+        // A reminder that arrives after the rep is on the doorstep is noise.
+        expiresAt: start.toISOString(),
         idempotencyKey: `${c.appointmentId}:sms:reminder_day_of`,
       });
     }
@@ -273,7 +287,7 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
   for (const recipient of alerted) {
     planned.push({
       channel: 'email', kind: 'team_alert', recipient,
-      subject: team.subject, body: team.body, sendAfter: now,
+      subject: team.subject, body: team.body, sendAfter: now, expiresAt: '',
       idempotencyKey: `${c.appointmentId}:email:team_alert:${recipient}`,
     });
   }

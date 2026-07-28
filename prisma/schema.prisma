@@ -564,6 +564,11 @@ model NotificationOutbox {
   lastError      String   @default("")
   /// Earliest send time, ISO. Reminders are scheduled at booking time.
   sendAfter      String
+  /// Point after which the message is no longer true and must be dropped rather
+  /// than sent, ISO. Empty for messages that never go stale. Reminders use it
+  /// because their wording is relative — "tomorrow" is wrong once the day
+  /// arrives — and the drain cannot run continuously.
+  expiresAt      String   @default("")
   sentAt         String?
   /// Dedupe key so a retried drain never sends twice.
   idempotencyKey String   @unique

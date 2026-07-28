@@ -1421,6 +1421,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
               body: n.body,
               html: n.html ?? '',
               sendAfter: n.sendAfter,
+              expiresAt: n.expiresAt,
               idempotencyKey: n.idempotencyKey,
             })),
             skipDuplicates: true,

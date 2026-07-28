@@ -11,6 +11,8 @@ export type DrainSummary = {
   suppressed: number;
   blocked: number;
   failed: number;
+  /** Rows dropped because their message had stopped being true. */
+  stale: number;
 };
 
 /** Minimal surface of the Prisma client this needs. */
@@ -25,6 +27,7 @@ export type OutboxStore = {
         body: string;
         html?: string;
         attempts: number;
+        expiresAt?: string;
       }>
     >;
     update: (args: unknown) => Promise<unknown>;
@@ -46,7 +49,9 @@ export async function drainOutbox(
 ): Promise<DrainSummary> {
   const canDeliver = deliveryEnabled(env);
   const now = new Date().toISOString();
-  const summary: DrainSummary = { considered: 0, sent: 0, suppressed: 0, blocked: 0, failed: 0 };
+  const summary: DrainSummary = {
+    considered: 0, sent: 0, suppressed: 0, blocked: 0, failed: 0, stale: 0,
+  };
 
   const due = await prisma.notificationOutbox
     .findMany({
@@ -62,7 +67,17 @@ export async function drainOutbox(
     let state: string;
     let reason: string;
 
-    if (!canDeliver) {
+    // Checked before anything else: a message whose wording has expired must
+    // not go out even in an environment that would otherwise deliver it. The
+    // drain cannot run continuously — the platform's cron granularity is daily
+    // — so a reminder can and will be picked up hours after it was due. Sending
+    // it then would tell a homeowner their visit is "tomorrow" on the morning
+    // it is actually happening.
+    if (row.expiresAt && row.expiresAt <= now) {
+      state = 'suppressed';
+      reason = 'stale_message_window_passed';
+      summary.stale++;
+    } else if (!canDeliver) {
       state = 'suppressed';
       reason = `non_production_env:${env.VERCEL_ENV ?? 'local'}`;
       summary.suppressed++;

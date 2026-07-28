@@ -104,6 +104,22 @@ test('reminders are scheduled relative to the slot, not the booking moment', () 
   const start = torontoInstant(date, '14:00').getTime();
   const r24 = planned.find((p) => p.kind === 'reminder_24h')!;
   assert.equal(new Date(r24.sendAfter).getTime(), start - 24 * 60 * 60_000);
+  // "Tomorrow" stops being true once the appointment day begins, so the row
+  // must carry an expiry the drain can act on rather than sending it late.
+  assert.ok(r24.expiresAt);
+  assert.ok(new Date(r24.expiresAt).getTime() <= start);
+  assert.ok(new Date(r24.expiresAt).getTime() > new Date(r24.sendAfter).getTime());
+
+  const dayOf = planned.find((p) => p.kind === 'reminder_day_of')!;
+  // A day-of reminder is noise once the rep is on the doorstep.
+  assert.equal(new Date(dayOf.expiresAt).getTime(), start);
+
+  // Confirmations and team alerts stay true however late they go out.
+  for (const kind of ['booking_confirmation', 'team_alert']) {
+    for (const row of planned.filter((p) => p.kind === kind)) {
+      assert.equal(row.expiresAt, '');
+    }
+  }
 });
 
 test('day-of reminder lands at 08:00 local, or earlier for an early slot', () => {
