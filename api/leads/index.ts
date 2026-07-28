@@ -1317,6 +1317,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             fundingPlan: answerLabel('contribution') || answers.contribution || '',
             projectScope: answerLabel('projectType') || answers.projectType || '',
             projectTypeLabel: program.appointmentProjectTypeLabel,
+            customerNotes: templateBody,
           };
           await tx.notificationOutbox.createMany({
             data: planBookingNotifications(context).map((n) => ({

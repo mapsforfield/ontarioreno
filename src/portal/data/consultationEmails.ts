@@ -1,12 +1,13 @@
-import { Appointment, Contractor, ContractorDispatch, Deal, User } from './types';
+import { Appointment, Contractor, ContractorDispatch, Deal, User } from './types.js';
 import {
+  baseUrl,
   buildCustomerHtml,
   buildRepAssignmentHtml,
   buildContractorDispatchHtml,
   isEventAppointment,
   APPOINTMENT_TYPE_LABELS,
-} from './emailTemplates';
-import { getCustomerFacingConsultantPhone } from './customerContactRouting';
+} from './emailTemplates.js';
+import { getCustomerFacingConsultantPhone } from './customerContactRouting.js';
 
 export type ConsultationEmailType =
   | 'booking_confirmation'
@@ -128,8 +129,10 @@ function buildCustomerEmail(
       ? `\nCustomer notes:\n${input.appointment.customerNotes}`
       : '',
     '',
-    `Reschedule: /portal/consultation/${input.appointment.id}/reschedule`,
-    `Cancel: /portal/consultation/${input.appointment.id}/cancel`,
+    // Absolute — a relative path is not clickable in any mail client, so the
+    // plain-text fallback was handing customers a dead link.
+    `Reschedule: ${baseUrl()}/portal/consultation/${input.appointment.id}/reschedule`,
+    `Cancel: ${baseUrl()}/portal/consultation/${input.appointment.id}/cancel`,
     customerFooter(input.contractor, input.rep),
   ]
     .filter((line) => line !== '')

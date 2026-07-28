@@ -97,7 +97,7 @@ function refId(id: string): string {
  * Infer the portal base URL at runtime so reschedule/cancel links point to
  * the correct environment (local dev vs. Vercel preview vs. production).
  */
-function baseUrl(): string {
+export function baseUrl(): string {
   // Read through globalThis so this module stays environment-agnostic: the
   // public booking flow renders the same template server-side, where `window`
   // is undefined and the DOM lib isn't loaded.

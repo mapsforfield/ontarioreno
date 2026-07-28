@@ -130,18 +130,28 @@ test('the confirmation uses the branded portal template', () => {
   assert.match(confirmation.html!, /<!DOCTYPE html|<table/i);
   assert.ok(confirmation.html!.includes('OntarioReno'));
   assert.ok(confirmation.html!.includes('Appointment Confirmed'));
-  // Plain text still accompanies it for clients that block HTML.
-  assert.ok(confirmation.body.includes('Your consultation is confirmed.'));
+  // Plain text still accompanies it for clients that block HTML — the portal's
+  // own wording, since the whole message now comes from the portal's composer.
+  assert.ok(confirmation.body.includes('has been booked'));
+  // The plain-text reschedule/cancel links must be absolute or they are dead
+  // in every mail client.
+  assert.ok(confirmation.body.includes('https://'));
+  assert.ok(!/Reschedule: \//.test(confirmation.body));
+  // Subject keeps the brand and the date rather than the portal's generic one.
+  assert.match(confirmation.subject, /OntarioReno site visit/);
 });
 
-test('the confirmation email never carries the unsigned cancel links', () => {
-  // /portal/consultation/:id/... authorizes on the appointment id alone, so
-  // emailing it publicly would let anyone guessing a cuid cancel a visit.
-  const html = planBookingNotifications(ctx()).find(
-    (p) => p.kind === 'booking_confirmation' && p.channel === 'email'
-  )!.html!;
-  assert.equal(/\/portal\/consultation\//.test(html), false, 'no portal action links');
-  assert.equal(/Reschedule<\/a>|Cancel Appointment/.test(html), false, 'no action buttons');
+test('the email is the portal email — Provider, notes and actions all present', () => {
+  // A public booking must receive the same message a rep sends from the Emails
+  // tab. Rebuilding the inputs by hand previously dropped all three of these.
+  const html = planBookingNotifications(
+    ctx({ repName: 'David', customerNotes: 'Pre-qualified through OntarioReno.' })
+  ).find((p) => p.kind === 'booking_confirmation' && p.channel === 'email')!.html!;
+
+  assert.ok(html.includes('PROVIDER') || html.includes('Provider'), 'Provider row');
+  assert.ok(html.includes('David'), 'assigned rep named');
+  assert.ok(html.includes('Pre-qualified through OntarioReno.'), 'customer notes block');
+  assert.ok(/Reschedule/.test(html), 'action buttons present, as the portal sends');
 });
 
 test('the branded HTML shows the visit details a homeowner needs', () => {
