@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
+import {
+  clientIp,
+  createRateLimiter,
+  createSpendCap,
+  createTtlCache,
+  type RateLimitRule,
+} from '../../lib/rate-limit.js';
 import { ensureSchema } from '../../lib/schema.js';
 import {
   areaForMunicipality,
@@ -779,25 +786,52 @@ function publicProgramPayload(program: ProgramConfig) {
   };
 }
 
+type PlaceSuggestion = { placeId: string; description: string };
+
+/**
+ * Ceiling on billable autocomplete calls per instance per day.
+ *
+ * Sized well above real demand — a homeowner spends roughly a dozen calls
+ * entering an address — so it is invisible in normal operation and only bites
+ * during abuse.
+ */
+const PLACES_DAILY_CALL_CAP = 2000;
+const placesSpendCap = createSpendCap(PLACES_DAILY_CALL_CAP);
+const placesCache = createTtlCache<PlaceSuggestion[]>(5 * 60_000, 500);
+
 /** Google Places lookup. Absent key or any failure ⇒ unverified ⇒ manual review. */
-async function placesAutocomplete(input: string) {
+async function placesAutocomplete(input: string): Promise<PlaceSuggestion[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey || input.trim().length < 3) return [];
+  const query = input.trim();
+  // An overlong query is not a real address; refusing it before the network
+  // call keeps a padded-input loop from being billable.
+  if (!apiKey || query.length < 3 || query.length > 120) return [];
+
+  const cacheKey = query.toLowerCase();
+  const cached = placesCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Budget exhausted: degrade to no suggestions. The homeowner can still type
+  // the address, which routes to manual review rather than blocking the form.
+  if (!placesSpendCap.tryConsume()) return [];
+
   try {
     const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
-      body: JSON.stringify({ input, includedRegionCodes: ['ca'] }),
+      body: JSON.stringify({ input: query, includedRegionCodes: ['ca'] }),
     });
     const j = (await r.json()) as {
       suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }>;
     };
-    return (j.suggestions ?? [])
+    const suggestions = (j.suggestions ?? [])
       .map((s) => ({
         placeId: s.placePrediction?.placeId ?? '',
         description: s.placePrediction?.text?.text ?? '',
       }))
       .filter((s) => s.placeId && s.description);
+    placesCache.set(cacheKey, suggestions);
+    return suggestions;
   } catch {
     return [];
   }
@@ -928,9 +962,43 @@ async function loadPublicFlowLead(leadRef: string) {
   return prisma.lead.findUnique({ where: { id: leadRef } }).catch(() => null);
 }
 
+/**
+ * Per-IP budgets for the unauthenticated flows.
+ *
+ * Set well above what the form actually needs, because the cost of throttling a
+ * real homeowner mid-booking is far higher than the cost of letting an abuser
+ * make a few extra requests. Entering an address is roughly a dozen suggest
+ * calls, so sixty in ten minutes covers retyping and correction with room to
+ * spare. Writes are much tighter: nobody legitimately books ten visits an hour.
+ */
+const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
+  program: { limit: 120, windowMs: 10 * 60_000 },
+  address_suggest: { limit: 60, windowMs: 10 * 60_000 },
+  availability: { limit: 120, windowMs: 10 * 60_000 },
+  submit: { limit: 10, windowMs: 60 * 60_000 },
+  book: { limit: 10, windowMs: 60 * 60_000 },
+};
+
+const publicLimiter = createRateLimiter();
+
 async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
   const flow = String(req.query['flow'] ?? '');
   res.setHeader('Cache-Control', 'no-store');
+
+  // Throttle before doing any work — the point is to avoid the database read
+  // and the billable Places call, not merely to refuse afterwards. `drain` is
+  // absent from the table deliberately: it carries its own secret and is
+  // called by infrastructure, not by the public.
+  const rule = PUBLIC_RATE_RULES[flow];
+  if (rule) {
+    const verdict = publicLimiter.check(`${flow}|${clientIp(req.headers)}`, rule);
+    if (!verdict.allowed) {
+      res.setHeader('Retry-After', String(verdict.retryAfterSeconds));
+      return res
+        .status(429)
+        .json({ error: 'Too many requests. Please wait a moment and try again.' });
+    }
+  }
 
   // ── Program config for the page ──
   if (flow === 'program' && req.method === 'GET') {
