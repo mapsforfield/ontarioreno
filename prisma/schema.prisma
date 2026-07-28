@@ -574,6 +574,28 @@ model NotificationOutbox {
   @@index([appointmentId])
 }
 
+// ─── Metered third-party spend ────────────────────────────────────────────────
+// A shared daily counter for calls we are billed for, principally Google Places
+// autocomplete on the public consultation form.
+//
+// This has to live in the database rather than in process memory. Vercel spreads
+// even back-to-back requests across many instances — 25 sequential requests were
+// observed hitting 14 distinct ones — so an in-memory ceiling is really that
+// ceiling multiplied by the instance count, which is close to no ceiling at all.
+//
+// One row per API per UTC day, incremented atomically. Only genuinely billable
+// calls touch it: cache hits and rejected inputs never reach here, so this adds
+// a fraction of a request's worth of database traffic, not one per keystroke.
+
+model ApiSpendCounter {
+  /// "<api>:<YYYY-MM-DD>", e.g. "places_autocomplete:2026-07-27".
+  id        String   @id
+  /// Billable calls made against this API today.
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ─── Grant Radar (admin-only government-program monitoring) ───────────────────
 // Discovers + watches official government pages for renovation / ADU / basement
 // incentive programs (e.g. Hamilton's HAF-funded ADU grant) and surfaces new or

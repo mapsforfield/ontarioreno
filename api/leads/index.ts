@@ -4,7 +4,7 @@ import { requireAuth, denyContractor } from '../../lib/auth.js';
 import {
   clientIp,
   createRateLimiter,
-  createSpendCap,
+  createSharedSpendCap,
   createTtlCache,
   type RateLimitRule,
 } from '../../lib/rate-limit.js';
@@ -796,8 +796,31 @@ type PlaceSuggestion = { placeId: string; description: string };
  * during abuse.
  */
 const PLACES_DAILY_CALL_CAP = 2000;
-const placesSpendCap = createSpendCap(PLACES_DAILY_CALL_CAP);
 const placesCache = createTtlCache<PlaceSuggestion[]>(5 * 60_000, 500);
+
+/**
+ * Add one to today's counter and return the new total, in a single statement.
+ *
+ * `ON CONFLICT ... DO UPDATE` makes this atomic without a transaction or an
+ * advisory lock, so concurrent instances cannot lose an increment to a
+ * read-modify-write race.
+ */
+async function incrementSpendCounter(key: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ count: number }>>`
+    INSERT INTO "ApiSpendCounter" ("id", "count", "createdAt", "updatedAt")
+    VALUES (${key}, 1, NOW(), NOW())
+    ON CONFLICT ("id") DO UPDATE
+      SET "count" = "ApiSpendCounter"."count" + 1, "updatedAt" = NOW()
+    RETURNING "count"
+  `;
+  return rows[0]?.count ?? 0;
+}
+
+const placesSpendCap = createSharedSpendCap({
+  api: 'places_autocomplete',
+  dailyLimit: PLACES_DAILY_CALL_CAP,
+  increment: incrementSpendCounter,
+});
 
 /** Google Places lookup. Absent key or any failure ⇒ unverified ⇒ manual review. */
 async function placesAutocomplete(input: string): Promise<PlaceSuggestion[]> {
@@ -813,7 +836,7 @@ async function placesAutocomplete(input: string): Promise<PlaceSuggestion[]> {
 
   // Budget exhausted: degrade to no suggestions. The homeowner can still type
   // the address, which routes to manual review rather than blocking the form.
-  if (!placesSpendCap.tryConsume()) return [];
+  if (!(await placesSpendCap.tryConsume())) return [];
 
   try {
     const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {

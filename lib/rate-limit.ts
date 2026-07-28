@@ -161,6 +161,66 @@ export function createSpendCap(
   };
 }
 
+export type SharedSpendCap = {
+  /** Resolves true when the call may proceed. */
+  tryConsume(): Promise<boolean>;
+};
+
+export type SharedSpendCapOptions = {
+  /** Identifies the metered API; combined with the UTC date to key the counter. */
+  api: string;
+  dailyLimit: number;
+  /**
+   * Atomically add one to the counter for `key` and return the new total.
+   * Injected so the policy here can be tested without a database.
+   */
+  increment: (key: string) => Promise<number>;
+  now?: () => number;
+};
+
+/**
+ * A daily ceiling on a metered API, counted in shared storage.
+ *
+ * Unlike `createSpendCap`, this one actually holds across instances, which is
+ * the only way a ceiling means anything on a platform that fans requests out
+ * over many lambdas.
+ *
+ * Two behaviours are deliberate:
+ *
+ *  - Once an instance learns the budget is gone, it remembers that for the rest
+ *    of the UTC day and stops querying. During a flood that caps the database
+ *    traffic at roughly one write per instance rather than one per request, so
+ *    defending against a Google bill cannot itself run up a Neon bill.
+ *
+ *  - If the counter cannot be reached, the call is allowed. Failing closed
+ *    would mean a database blip silently degrades every address lookup to
+ *    manual review, which is a far more likely event than an attack and a much
+ *    worse outcome. The exposure while the database is down is bounded by the
+ *    quota configured on Google's side, which is the authoritative limit.
+ */
+export function createSharedSpendCap(options: SharedSpendCapOptions): SharedSpendCap {
+  const now = options.now ?? Date.now;
+  let exhaustedForDay = '';
+
+  return {
+    async tryConsume() {
+      const day = new Date(now()).toISOString().slice(0, 10);
+      if (exhaustedForDay === day) return false;
+
+      try {
+        const total = await options.increment(`${options.api}:${day}`);
+        if (total > options.dailyLimit) {
+          exhaustedForDay = day;
+          return false;
+        }
+        return true;
+      } catch {
+        return true;
+      }
+    },
+  };
+}
+
 export type TtlCache<T> = {
   get(key: string): T | undefined;
   set(key: string, value: T): void;

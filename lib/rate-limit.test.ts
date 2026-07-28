@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   clientIp,
   createRateLimiter,
+  createSharedSpendCap,
   createSpendCap,
   createTtlCache,
 } from './rate-limit.js';
@@ -107,6 +108,90 @@ test('the spend cap rolls over to a new day', () => {
 
   c.advance(2 * 60 * 60_000); // into 2026-08-11 UTC
   assert.equal(cap.tryConsume(), true);
+});
+
+test('the shared cap refuses once the shared total passes the limit', async () => {
+  const c = clock();
+  let total = 0;
+  const cap = createSharedSpendCap({
+    api: 'places',
+    dailyLimit: 2,
+    increment: async () => (total += 1),
+    now: c.now,
+  });
+
+  assert.equal(await cap.tryConsume(), true);
+  assert.equal(await cap.tryConsume(), true);
+  assert.equal(await cap.tryConsume(), false);
+});
+
+test('a second instance sees spend from the first', async () => {
+  const c = clock();
+  let shared = 0;
+  const increment = async () => (shared += 1);
+  const instanceA = createSharedSpendCap({ api: 'places', dailyLimit: 2, increment, now: c.now });
+  const instanceB = createSharedSpendCap({ api: 'places', dailyLimit: 2, increment, now: c.now });
+
+  assert.equal(await instanceA.tryConsume(), true);
+  assert.equal(await instanceB.tryConsume(), true);
+  // The budget is global — B is refused because of A's spend, which is the
+  // whole point of moving the counter out of process memory.
+  assert.equal(await instanceB.tryConsume(), false);
+  assert.equal(await instanceA.tryConsume(), false);
+});
+
+test('an exhausted instance stops querying the counter', async () => {
+  const c = clock();
+  let calls = 0;
+  const cap = createSharedSpendCap({
+    api: 'places',
+    dailyLimit: 1,
+    increment: async () => (calls += 1),
+    now: c.now,
+  });
+
+  await cap.tryConsume();
+  await cap.tryConsume(); // refused, and the day is now known to be exhausted
+  const afterRefusal = calls;
+
+  for (let i = 0; i < 20; i += 1) assert.equal(await cap.tryConsume(), false);
+  // Defending the Google bill must not run up a database bill.
+  assert.equal(calls, afterRefusal);
+});
+
+test('an exhausted instance recovers on the next day', async () => {
+  const c = clock(Date.parse('2026-08-10T23:00:00Z'));
+  const perDay = new Map<string, number>();
+  const cap = createSharedSpendCap({
+    api: 'places',
+    dailyLimit: 1,
+    increment: async (key) => {
+      const next = (perDay.get(key) ?? 0) + 1;
+      perDay.set(key, next);
+      return next;
+    },
+    now: c.now,
+  });
+
+  assert.equal(await cap.tryConsume(), true);
+  assert.equal(await cap.tryConsume(), false);
+
+  c.advance(2 * 60 * 60_000); // into the next UTC day
+  assert.equal(await cap.tryConsume(), true);
+});
+
+test('an unreachable counter allows the call rather than blocking lookups', async () => {
+  const cap = createSharedSpendCap({
+    api: 'places',
+    dailyLimit: 1,
+    increment: async () => {
+      throw new Error('database unreachable');
+    },
+  });
+
+  // A database blip is far likelier than an attack; degrading every address
+  // lookup to manual review would be the worse failure.
+  assert.equal(await cap.tryConsume(), true);
 });
 
 test('identical lookups are served from cache until they expire', () => {
