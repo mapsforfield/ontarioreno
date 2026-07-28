@@ -32,8 +32,9 @@ const ctx = (over: Partial<BookingContext> = {}): BookingContext => ({
   visitMinutes: 45,
   consultationMode: 'in_person',
   teamInbox: 'info@ontarioreno.ca',
-  fundingPlan: 'cash_equity',
-  projectScope: 'secondary_suite',
+  fundingPlan: 'Cash / Savings / Existing Home Equity',
+  projectScope: 'Basement or secondary suite',
+  projectTypeLabel: 'ADU Grant Consultation',
   ...over,
 });
 
@@ -152,6 +153,22 @@ test('the branded HTML shows the visit details a homeowner needs', () => {
   assert.ok(html.includes('2:00 PM'), 'time shown');
 });
 
+test('the email shows the readable project label, never the raw form value', () => {
+  // The appointment row and the confirmation email must agree; an earlier version
+  // labelled the appointment correctly while the email still said "secondary_suite".
+  const html = planBookingNotifications(ctx()).find(
+    (p) => p.kind === 'booking_confirmation' && p.channel === 'email'
+  )!.html!;
+  assert.ok(html.includes('ADU Grant Consultation'), 'label shown');
+  assert.equal(/secondary_suite|garden_suite|laneway_suite/.test(html), false, 'no raw values');
+});
+
+test('the team alert keeps the specific choice, in words', () => {
+  const alert = planBookingNotifications(ctx()).find((p) => p.kind === 'team_alert')!;
+  assert.ok(alert.body.includes('Basement or secondary suite'), 'the rep sees what they picked');
+  assert.ok(alert.body.includes('Cash / Savings / Existing Home Equity'));
+});
+
 test('SMS rows carry no HTML', () => {
   for (const sms of planBookingNotifications(ctx()).filter((p) => p.channel === 'sms')) {
     assert.ok(!sms.html, `${sms.kind} must not carry HTML`);
@@ -160,7 +177,10 @@ test('SMS rows carry no HTML', () => {
 
 test('the team alert carries every field the team needs to act', () => {
   const alert = planBookingNotifications(ctx()).find((p) => p.kind === 'team_alert')!;
-  for (const needle of ['Jane', '9055550199', 'jane@example.test', '100 King St W', 'cash_equity', 'secondary_suite', 'OR-ABCD2345']) {
+  for (const needle of [
+    'Jane', '9055550199', 'jane@example.test', '100 King St W',
+    'Cash / Savings / Existing Home Equity', 'Basement or secondary suite', 'OR-ABCD2345',
+  ]) {
     assert.ok(alert.body.includes(needle), `team alert must include ${needle}`);
   }
 });

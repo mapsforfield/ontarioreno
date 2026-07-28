@@ -52,9 +52,15 @@ export type BookingContext = {
   /** Assigned rep's address, alerted alongside the business inbox. */
   repEmail?: string;
   repName?: string;
-  /** Answers, for the team alert. */
+  /** Answers, for the team alert — the homeowner's specific choice. */
   fundingPlan: string;
   projectScope: string;
+  /**
+   * Customer-facing project label ("ADU Grant Consultation"), matching what the
+   * appointment records. Distinct from projectScope, which is the homeowner's
+   * specific selection and is only useful internally.
+   */
+  projectTypeLabel?: string;
 };
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
@@ -121,7 +127,8 @@ export function emailBookingConfirmationHtml(c: BookingContext): string {
     appointmentDate: c.date,
     appointmentTime: c.time,
     appointmentType: c.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
-    projectType: c.projectScope,
+    // The readable label, not the raw form value — must match the appointment.
+    projectType: c.projectTypeLabel || c.projectScope,
     customerNotes: '',
     title: null,
   } as unknown as Appointment;

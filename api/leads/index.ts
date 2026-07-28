@@ -1313,8 +1313,10 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             teamInbox: teamInbox(),
             repEmail: assignedRep?.email ?? '',
             repName: assignedRep?.name ?? '',
-            fundingPlan: answers.contribution ?? '',
-            projectScope: answers.projectType ?? '',
+            // Readable answers for the team alert; the label for the customer.
+            fundingPlan: answerLabel('contribution') || answers.contribution || '',
+            projectScope: answerLabel('projectType') || answers.projectType || '',
+            projectTypeLabel: program.appointmentProjectTypeLabel,
           };
           await tx.notificationOutbox.createMany({
             data: planBookingNotifications(context).map((n) => ({
