@@ -23,6 +23,7 @@ import { usePortalAuth } from '../auth';
 
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
+import FinanceTab from '../components/FinanceTab';
 import { showToast } from '../lib/toast';
 import { torontoToday, localDateKey } from '../lib/time';
 
@@ -654,7 +655,7 @@ export default function PortalAppointments() {
   const [trashedAppointments, setTrashedAppointments] = useState<Appointment[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [notesModal, setNotesModal] = useState<string | null>(null);
-  const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'>('prep');
+  const [panelTab, setPanelTab] = useState<'prep' | 'details' | 'outcome' | 'dispatch' | 'emails' | 'finance'>('prep');
   // Client search/autofill for new consultation form
   const [clientSearch, setClientSearch] = useState('');
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
@@ -722,7 +723,7 @@ export default function PortalAppointments() {
         openAppointment(apt); // resets to the Prep tab…
         const tab = state?.panelTab;
         if (tab && ['prep', 'details', 'outcome', 'dispatch', 'emails'].includes(tab) && !isEventType(apt.appointmentType)) {
-          setPanelTab(tab as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails'); // …then jump to the relevant one
+          setPanelTab(tab as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails' | 'finance'); // …then jump to the relevant one
         }
       }
     }
@@ -3564,6 +3565,9 @@ export default function PortalAppointments() {
                     ...(isEventType(form.appointmentType)
                       ? []
                       : [{ id: 'outcome', label: 'Outcome', badge: selectedAppointment && !selectedAppointment.outcomeSubmitted && selectedAppointment.status === 'completed' ? '!' : null as string | null }]),
+                    ...(isEventType(form.appointmentType)
+                      ? []
+                      : [{ id: 'finance', label: 'Finance', badge: null as string | null }]),
                     { id: 'dispatch', label: 'Dispatch', badge: selectedDispatches.length > 0 ? String(selectedDispatches.length) : null as string | null },
                     { id: 'emails',   label: 'Emails',   badge: emailPreviews.length > 0 ? String(emailPreviews.length) : null as string | null },
                   ]
@@ -3571,7 +3575,7 @@ export default function PortalAppointments() {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setPanelTab(tab.id as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails')}
+                    onClick={() => setPanelTab(tab.id as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails' | 'finance')}
                     className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-3 text-sm font-bold transition ${
                       panelTab === tab.id
                         ? 'text-[#1B3C6C] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#1B3C6C] after:content-[""]'
@@ -4367,6 +4371,19 @@ export default function PortalAppointments() {
                     )}
                   </div>
                 </section>
+              )}
+              {/* ══ TAB: FINANCE (send-in application) ═══════════════════════ */}
+              {selectedAppointment && panelTab === 'finance' && (
+                <FinanceTab
+                  appointmentId={selectedAppointment.id}
+                  prefill={{
+                    firstName: (form.customerName || '').trim().split(/\s+/)[0] ?? '',
+                    lastName: (form.customerName || '').trim().split(/\s+/).slice(1).join(' '),
+                    phone: form.phone,
+                    email: form.email,
+                    address: form.address,
+                  }}
+                />
               )}
               {/* ══ TAB: EMAILS ══════════════════════════════════════════════ */}
               {selectedAppointment && panelTab === 'emails' && (

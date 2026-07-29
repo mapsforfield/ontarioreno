@@ -27,6 +27,7 @@ import {
   ClientVideo,
   CommissionInvoiceRecord,
   ConsultationStage,
+  FinancePayload,
   Household,
   Interaction,
   CallOutcome,
@@ -161,6 +162,10 @@ type PortalDataContextValue = PortalDataState & {
   deleteClientVideo: (id: string) => Promise<void>;
   updateClientMedia: (id: string, label: string) => Promise<void>;
   sendClientMedia: (id: string, to: string, note: string) => Promise<{ ok: boolean; error?: string }>;
+  getFinance: (appointmentId: string) => Promise<{ payload: FinancePayload | null; urls: Record<string, string> }>;
+  saveFinance: (appointmentId: string, payload: FinancePayload) => Promise<Record<string, string>>;
+  financeUpload: (appointmentId: string, kind: string, file: File, onProgress?: (pct: number) => void) => Promise<{ key: string; url: string } | null>;
+  sendFinance: (appointmentId: string, method: 'email' | 'whatsapp', recipient: string) => Promise<{ ok: boolean; waUrl?: string; error?: string }>;
   refetch: () => void;
   assignContractorToDeal: (
     dealId: string,
@@ -523,11 +528,17 @@ function sortLeadQueue(leads: Lead[]): Lead[] {
     });
 }
 
+// Value commission is calculated on: the job value minus any promotional finance
+// fee (e.g. a 2% fee on a $100k job → commissions are figured on $98k).
+export function commissionableValue(deal: Pick<Deal, 'estimatedJobValue' | 'financeFeePercent'>): number {
+  const fee = Math.max(0, Math.min(Number(deal.financeFeePercent) || 0, 100));
+  return Math.round(deal.estimatedJobValue * (1 - fee / 100));
+}
+
 function createCommissionForDeal(deal: Deal, defaultRate = loadDefaultCommissionRate()): Commission {
-  const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
-  const adminTotalEstimatedCommission = Math.round(
-    deal.estimatedJobValue * defaultRate
-  );
+  const base = commissionableValue(deal);
+  const repEstimatedCommission = Math.round(base * 0.05);
+  const adminTotalEstimatedCommission = Math.round(base * defaultRate);
 
   return {
     id: createId('commission'),
@@ -565,10 +576,9 @@ function syncCommissionWithDeal(commission: Commission, deal: Deal) {
     };
   }
 
-  const repEstimatedCommission = Math.round(deal.estimatedJobValue * 0.05);
-  const adminTotalEstimatedCommission = Math.round(
-    deal.estimatedJobValue * commission.adminTotalCommissionRate
-  );
+  const base = commissionableValue(deal);
+  const repEstimatedCommission = Math.round(base * 0.05);
+  const adminTotalEstimatedCommission = Math.round(base * commission.adminTotalCommissionRate);
 
   return {
     ...commission,
@@ -1892,6 +1902,52 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         await apiCall('/api/appointments', { method: 'POST', body: JSON.stringify({ _action: 'client_video_update', id, label }) });
       },
 
+      getFinance: async (appointmentId) => {
+        const r = await apiCall<{ payload: FinancePayload | null; urls: Record<string, string> }>(
+          `/api/appointments?_resource=finance&appointmentId=${encodeURIComponent(appointmentId)}`,
+        );
+        return r ?? { payload: null, urls: {} };
+      },
+
+      saveFinance: async (appointmentId, payload) => {
+        const r = await apiCall<{ ok: boolean; urls: Record<string, string> }>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'finance_save', appointmentId, payload }),
+        });
+        return r?.urls ?? {};
+      },
+
+      financeUpload: async (appointmentId, kind, file, onProgress) => {
+        const contentType = file.type || 'application/octet-stream';
+        const presign = await apiCall<{ uploadUrl: string; key: string; url: string }>('/api/appointments', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'finance_presign', appointmentId, kind, fileName: file.name, contentType, sizeBytes: file.size }),
+        });
+        if (!presign?.uploadUrl) return null;
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', presign.uploadUrl);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.send(file);
+        });
+        return { key: presign.key, url: presign.url };
+      },
+
+      sendFinance: async (appointmentId, method, recipient) => {
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _action: 'finance_send', appointmentId, method, recipient }),
+        });
+        if (res.ok) return (await res.json()) as { ok: boolean; waUrl?: string };
+        const msg = await res.json().catch(() => null);
+        return { ok: false, error: (msg && msg.error) || `Failed (${res.status})` };
+      },
+
       sendClientMedia: async (id, to, note) => {
         const res = await fetch('/api/appointments', {
           method: 'POST',
@@ -1923,8 +1979,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             lockedRate !== null && deal
               ? current.commissions.map((c) => {
                   if (c.dealId !== dealId) return c;
-                  const repEst = Math.round(deal.estimatedJobValue * 0.05);
-                  const totalEst = Math.round(deal.estimatedJobValue * lockedRate);
+                  const feeBase = commissionableValue(deal);
+                  const repEst = Math.round(feeBase * 0.05);
+                  const totalEst = Math.round(feeBase * lockedRate);
                   return {
                     ...c,
                     adminTotalCommissionRate: lockedRate,
@@ -2304,7 +2361,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           );
           const repName = relatedRep?.name ?? 'rep';
           const repEstimatedCommission = relatedDeal
-            ? Math.round(relatedDeal.estimatedJobValue * 0.05)
+            ? Math.round(commissionableValue(relatedDeal) * 0.05)
             : existingCommission?.repEstimatedCommission ?? 0;
           const nextPaidAmount = (() => {
             if (!existingCommission) return 0;
@@ -2365,13 +2422,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               const repEst = customPayout
                 ? Math.round(updates.repEstimatedCommission ?? commission.repEstimatedCommission)
                 : deal
-                  ? Math.round(deal.estimatedJobValue * 0.05)
+                  ? Math.round(commissionableValue(deal) * 0.05)
                   : commission.repEstimatedCommission;
               const adminTotalEstimatedCommission = customPayout
                 ? Math.round(updates.adminTotalEstimatedCommission ?? commission.adminTotalEstimatedCommission)
                 : updates.adminTotalEstimatedCommission ??
                   (deal
-                    ? Math.round(deal.estimatedJobValue * adminTotalCommissionRate)
+                    ? Math.round(commissionableValue(deal) * adminTotalCommissionRate)
                     : commission.adminTotalEstimatedCommission);
               const requestedPaid =
                 updates.repPaidCommission ?? commission.repPaidCommission;

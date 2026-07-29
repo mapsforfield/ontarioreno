@@ -312,6 +312,25 @@ export default function CommissionInvoice({
   const [previewUrl, setPreviewUrl] = useState('');
 
   const rate = Math.round((contractor?.commissionRate ?? 0.085) * 10000) / 100;
+  // A promotional finance fee is absorbed off the top: commission is charged on
+  // (sales price − fee), so we seed a documented credit for the commission on
+  // the fee portion. −(feeAmount × rate) = commission dropped on that scope.
+  const financeFeePct = Math.max(0, Math.min(Number(deal.financeFeePercent) || 0, 100));
+  const seedAdjustments: Adjustment[] =
+    financeFeePct > 0
+      ? [
+          {
+            id: 'finance-fee',
+            description: `Finance fee (${financeFeePct}%)`,
+            relatedJob: deal.projectType || deal.homeownerName,
+            kind: 'credit',
+            mode: 'percent',
+            base: Math.round(deal.estimatedJobValue * (financeFeePct / 100)),
+            rate,
+            amount: 0,
+          },
+        ]
+      : [];
   const [data, setData] = useState<InvoiceData>({
     invoiceNumber: '…',
     fromLegalName: '9664327 CANADA INC.',
@@ -332,7 +351,7 @@ export default function CommissionInvoice({
     transitNumber: '11812',
     accountNumber: '5064635',
     showPayment: true,
-    adjustments: [],
+    adjustments: seedAdjustments,
   });
   const [saveProfileDefault, setSaveProfileDefault] = useState(false);
 

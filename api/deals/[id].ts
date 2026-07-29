@@ -34,24 +34,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
     try {
-      const deal = await prisma.deal.update({
-        where: { id },
-        data: safeData,
-        include: {
-          activity: { orderBy: { createdAt: 'desc' } },
-          proposals: { orderBy: { sentAt: 'desc' } },
-          dispatches: { orderBy: { createdAt: 'desc' } },
-        },
-      });
+      const includeRels = {
+        activity: { orderBy: { createdAt: 'desc' as const } },
+        proposals: { orderBy: { sentAt: 'desc' as const } },
+        dispatches: { orderBy: { createdAt: 'desc' as const } },
+      };
+      let deal;
+      try {
+        deal = await prisma.deal.update({ where: { id }, data: safeData, include: includeRels });
+      } catch {
+        // Self-healing: the financeFeePercent column may not exist yet on older databases.
+        await prisma.$executeRawUnsafe('ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "financeFeePercent" DOUBLE PRECISION');
+        deal = await prisma.deal.update({ where: { id }, data: safeData, include: includeRels });
+      }
 
       // ── Keep the commission record in sync (creates it if missing —
       // some early deals were created before commissions were automatic) ──
       const jobValueChanged = safeData.estimatedJobValue !== undefined;
       const contractorChanged = safeData.assignedContractorId !== undefined;
-      if (jobValueChanged || contractorChanged) {
+      const feeChanged = safeData.financeFeePercent !== undefined;
+      if (jobValueChanged || contractorChanged || feeChanged) {
         try {
           const commission = await prisma.commission.findUnique({ where: { dealId: id } });
-          const jobValue = deal.estimatedJobValue;
+          const feePct = Math.max(0, Math.min(Number(deal.financeFeePercent) || 0, 100));
+          const jobValue = Math.round(deal.estimatedJobValue * (1 - feePct / 100));
           const repEst = Math.round(jobValue * 0.05);
           // The contractor's negotiated rate locks in at assignment time.
           // Won deals are frozen — reassignment never rewrites a closed payout.

@@ -10,7 +10,7 @@ import {
 import { useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
-import { usePortalData } from '../data/store';
+import { commissionableValue, usePortalData } from '../data/store';
 import { Appointment, Commission, Deal, ProposalHistory, User } from '../data/types';
 
 type DateRange = 'all_time' | 'this_month' | 'last_30_days';
@@ -48,7 +48,7 @@ function isInDateRange(value: string | undefined, range: DateRange) {
 
 function calculateRepEstimatedCommission(deal: Deal) {
   if (deal.status === 'lost') return 0;
-  return Math.round(deal.estimatedJobValue * 0.05);
+  return Math.round(commissionableValue(deal) * 0.05);
 }
 
 function isoDate(date: Date) {

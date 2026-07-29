@@ -18,6 +18,28 @@ const CREATE_CLIENT_VIDEO_TABLE =
   '"uploadedByUserId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024; // 250 MB per clip
+const MAX_FINANCE_BYTES = 25 * 1024 * 1024; // 25 MB per finance doc/photo
+
+// Self-healing table for the per-consultation Finance send-in application.
+// The whole questionnaire (plus R2 file keys) lives in one JSON payload.
+const CREATE_FINANCE_TABLE =
+  'CREATE TABLE IF NOT EXISTS "FinanceApplication" (' +
+  '"id" TEXT PRIMARY KEY, "appointmentId" TEXT UNIQUE NOT NULL, ' +
+  '"payload" TEXT NOT NULL DEFAULT \'{}\', "updatedByUserId" TEXT, ' +
+  '"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, ' +
+  '"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)';
+
+// Collect every R2 key referenced in a finance payload and hand back fresh
+// signed view URLs so the browser can render the DL photo & documents.
+function financeFileUrls(payload: unknown): Record<string, string> {
+  const urls: Record<string, string> = {};
+  if (!payload || typeof payload !== 'object') return urls;
+  const p = payload as { dlPhotoKey?: string; documents?: Array<{ key?: string }> };
+  const add = (k?: string) => { if (k && !urls[k]) urls[k] = presignGetUrl(k); };
+  add(p.dlPhotoKey);
+  (p.documents ?? []).forEach((d) => add(d?.key));
+  return urls;
+}
 
 // Runs the one-time event-city cleanup at most once per warm instance.
 let eventCityBackfillDone = false;
@@ -759,9 +781,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const city = (get('locality') ?? get('postal_town') ?? get('sublocality') ?? get('administrative_area_level_2'))?.longText ?? '';
         const postalCode = get('postal_code')?.longText ?? '';
         const address = [streetNum, route].filter(Boolean).join(' ') || (j.formattedAddress?.split(',')[0] ?? '');
-        return res.status(200).json({ address, city, postalCode });
+        // Google's own one-line address (minus the country) — used by single-field
+        // forms so they don't have to recompose from components that Google may
+        // omit (e.g. postal code missing on some route-level results).
+        const formatted = (j.formattedAddress ?? '').replace(/,\s*(Canada|CA)\s*$/i, '').trim();
+        return res.status(200).json({ address, city, postalCode, formatted });
       } catch {
         return res.status(500).json({ error: 'Lookup failed.' });
+      }
+    }
+
+    // ── Finance send-in application for a consultation ──
+    if (req.query['_resource'] === 'finance') {
+      const appointmentId = String(req.query['appointmentId'] ?? '');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      try {
+        const rows = (await prisma.$queryRawUnsafe(
+          'SELECT payload FROM "FinanceApplication" WHERE "appointmentId" = $1',
+          appointmentId,
+        )) as Array<{ payload: string }>;
+        const payload = rows[0]?.payload ? JSON.parse(rows[0].payload) : null;
+        return res.status(200).json({ payload, urls: financeFileUrls(payload) });
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_FINANCE_TABLE);
+        return res.status(200).json({ payload: null, urls: {} });
       }
     }
 
@@ -972,6 +1015,117 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       return res.status(200).json({ results });
+    }
+
+    // ── Finance: save the whole application payload (upsert per consultation) ──
+    if (data._action === 'finance_save') {
+      const appointmentId = String(data.appointmentId ?? '');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      const payload = JSON.stringify(data.payload ?? {});
+      const upsert = () =>
+        prisma.$executeRawUnsafe(
+          'INSERT INTO "FinanceApplication" (id, "appointmentId", payload, "updatedByUserId", "updatedAt") ' +
+          'VALUES ($1,$2,$3,$4, CURRENT_TIMESTAMP) ' +
+          'ON CONFLICT ("appointmentId") DO UPDATE SET payload = EXCLUDED.payload, "updatedByUserId" = EXCLUDED."updatedByUserId", "updatedAt" = CURRENT_TIMESTAMP',
+          randomUUID(), appointmentId, payload, user.id,
+        );
+      try {
+        await upsert();
+      } catch {
+        await prisma.$executeRawUnsafe(CREATE_FINANCE_TABLE);
+        await upsert();
+      }
+      return res.status(200).json({ ok: true, urls: financeFileUrls(data.payload) });
+    }
+
+    // ── Finance: send the application to a contractor (email or WhatsApp) ──
+    if (data._action === 'finance_send') {
+      const appointmentId = String(data.appointmentId ?? '');
+      const method = String(data.method ?? 'email');
+      const recipient = String(data.recipient ?? '').trim();
+      if (!appointmentId || !recipient) return res.status(400).json({ error: 'Missing recipient.' });
+
+      let payload: {
+        firstName?: string; middleName?: string; lastName?: string; birthday?: string; phone?: string;
+        email?: string; address?: string; incomeWithTaxes?: string; otherIncome?: string; employer?: string;
+        employmentPosition?: string; employerAddress?: string; status?: string; dlPhotoKey?: string;
+        mailingSameAsInstall?: boolean; mailingAddress?: string;
+        documents?: Array<{ label?: string; key?: string }>;
+      } | null = null;
+      try {
+        const rows = (await prisma.$queryRawUnsafe('SELECT payload FROM "FinanceApplication" WHERE "appointmentId" = $1', appointmentId)) as Array<{ payload: string }>;
+        payload = rows[0]?.payload ? JSON.parse(rows[0].payload) : null;
+      } catch { /* no application yet */ }
+      if (!payload) return res.status(400).json({ error: 'Save the finance info first.' });
+
+      const full = [payload.firstName, payload.middleName, payload.lastName].filter(Boolean).join(' ') || 'Applicant';
+      const lines = [
+        `Finance application — ${full}`,
+        '',
+        `Name: ${full}`,
+        payload.birthday ? `DOB: ${payload.birthday}` : '',
+        payload.phone ? `Phone: ${payload.phone}` : '',
+        payload.email ? `Email: ${payload.email}` : '',
+        payload.address ? `Install address: ${payload.address}` : '',
+        payload.mailingSameAsInstall === false
+          ? `Mailing address: ${payload.mailingAddress || '(not provided)'}`
+          : (payload.address ? 'Mailing address: same as install address' : ''),
+        payload.incomeWithTaxes ? `Income (incl. taxes): ${payload.incomeWithTaxes}` : '',
+        payload.otherIncome ? `Other income: ${payload.otherIncome}` : '',
+        payload.employer ? `Employer: ${payload.employer}` : '',
+        payload.employmentPosition ? `Position: ${payload.employmentPosition}` : '',
+        payload.employerAddress ? `Employer address: ${payload.employerAddress}` : '',
+      ].filter(Boolean);
+      const fileLines: string[] = [];
+      if (payload.dlPhotoKey) fileLines.push(`Driver's licence (front): ${presignGetUrl(payload.dlPhotoKey, 7 * 24 * 3600)}`);
+      (payload.documents ?? []).filter((d) => d.key).forEach((d) => fileLines.push(`${d.label ?? 'Document'}: ${presignGetUrl(d.key as string, 7 * 24 * 3600)}`));
+      if (fileLines.length) lines.push('', 'Files (links valid 7 days):', ...fileLines);
+      const message = lines.join('\n');
+
+      if (method === 'whatsapp') {
+        let digits = recipient.replace(/\D/g, '');
+        if (digits.length === 10) digits = `1${digits}`; // add Canadian country code
+        return res.status(200).json({ ok: true, waUrl: `https://wa.me/${digits}?text=${encodeURIComponent(message)}` });
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return res.status(400).json({ error: 'Invalid email.' });
+      const apiKey = process.env.RESEND_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: 'Email service is not configured.' });
+      try {
+        const resend = new Resend(apiKey);
+        const { error } = await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>',
+          to: recipient,
+          replyTo: user.email || undefined,
+          subject: `Finance application — ${full}`,
+          text: `${message}\n\nSent by ${user.name || 'OntarioReno'} via OntarioReno`,
+        });
+        if (error) return res.status(502).json({ error: error.message ?? 'Failed to send.' });
+      } catch {
+        return res.status(500).json({ error: 'Failed to send the email.' });
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Finance: presigned upload for the DL photo or a supporting document ──
+    if (data._action === 'finance_presign') {
+      if (!isR2Configured()) return res.status(503).json({ error: 'File storage is not configured.' });
+      const appointmentId = String(data.appointmentId ?? '');
+      const kind = String(data.kind ?? 'doc');
+      const contentType = String(data.contentType ?? '');
+      const sizeBytes = Number(data.sizeBytes ?? 0);
+      const fileName = String(data.fileName ?? 'file');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      if (!contentType.startsWith('image/') && contentType !== 'application/pdf') {
+        return res.status(400).json({ error: 'Only images or PDFs are allowed.' });
+      }
+      if (sizeBytes <= 0 || sizeBytes > MAX_FINANCE_BYTES) {
+        return res.status(400).json({ error: `File must be between 0 and ${Math.round(MAX_FINANCE_BYTES / 1024 / 1024)} MB.` });
+      }
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
+      const rand = Math.random().toString(36).slice(2, 10);
+      const key = `finance/${appointmentId}/${kind}-${Date.now()}-${rand}-${safeName}`;
+      return res.status(200).json({ uploadUrl: presignPutUrl(key), key, url: presignGetUrl(key) });
     }
 
     // ── Client video: step 1, hand the browser a presigned upload URL ──

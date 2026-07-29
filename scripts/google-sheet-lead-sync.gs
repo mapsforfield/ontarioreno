@@ -12,7 +12,7 @@
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const CONFIG = {
-  SHEET_NAME: 'Parsed Leads',                       // the tab to read
+  SHEET_NAME: 'Sheet1',                             // the tab to read
   API_URL: 'https://ontarioreno.ca/api/leads?intake=1',
   TOKEN: 'PASTE_THE_SAME_SECRET_AS_LEAD_INTAKE_TOKEN_HERE',
   SYNCED_HEADER: 'Synced',                          // a column the script manages
@@ -20,18 +20,20 @@ const CONFIG = {
   MAX_PER_RUN: 200,                                 // safety cap per execution
 };
 
-// Header → payload field. Matched case-insensitively, ignoring non-letters.
-// Anything NOT listed here (and non-empty) is sent as a "website intake answer".
+// Core lead fields ← sheet columns (matched by header, case/underscore-insensitive).
 const FIELD_MAP = {
-  name: ['name', 'fullname', 'firstandlastname'],
+  name: ['fullname', 'name', 'firstandlastname'],
   email: ['email', 'emailaddress'],
   phone: ['phone', 'phonenumber', 'mobile'],
-  address: ['address', 'streetaddress', 'propertyaddress'],
-  city: ['city', 'town'],
-  budget: ['budget'],
-  projectType: ['planning', 'projecttype', 'project'],
-  sourceDetail: ['leadsource', 'source'],
-  submittedAt: ['timestamp', 'submitted', 'submissiondate', 'date'],
+  address: ['streetaddress', 'address', 'propertyaddress'],
+  submittedAt: ['createdtime', 'timestamp', 'submitted', 'submissiondate', 'date'],
+};
+
+// ONLY these extra columns are captured as qualifying "answers" on the lead —
+// every other column on the sheet (Meta ad ids, campaign, platform, etc.) is
+// ignored. "Label shown on the lead": [matching header aliases].
+const ANSWER_MAP = {
+  'Hamilton homeowner?': ['areyouahamiltonhomeowner'],
 };
 
 function normHeader(h) {
@@ -72,15 +74,15 @@ function syncNewLeads() {
     const phone = get('phone');
     if (!name && !email && !phone) continue;         // blank row — skip silently
 
-    // Everything not mapped to a core field becomes a qualifying "answer".
-    const mappedCols = new Set(Object.values(fieldCol));
-    mappedCols.add(syncedIdx);
+    // Capture ONLY the allow-listed question columns (ANSWER_MAP) as answers;
+    // ignore every other sheet column (Meta ad metadata).
     const extraAnswers = {};
-    for (let c = 0; c < headers.length; c++) {
-      if (mappedCols.has(c)) continue;
-      const key = String(headers[c] || '').trim();
-      const val = String(row[c] || '').trim();
-      if (key && val) extraAnswers[key] = val;
+    for (const [label, aliases] of Object.entries(ANSWER_MAP)) {
+      const idx = headers.findIndex((h) => aliases.includes(normHeader(h)));
+      if (idx >= 0) {
+        const val = String(row[idx] || '').trim();
+        if (val) extraAnswers[label] = val;
+      }
     }
 
     const payload = {
@@ -123,4 +125,29 @@ function setUp() {
   });
   ScriptApp.newTrigger('syncNewLeads').timeBased().everyMinutes(5).create();
   syncNewLeads(); // first pass now
+}
+
+/**
+ * OPTIONAL — run this ONCE *before* setUp if you only want NEW rows from now on.
+ * It stamps every existing row as already-synced so your current backlog is NOT
+ * pushed into the Call Flow. Skip it if you DO want your whole list imported.
+ */
+function markAllSyncedWithoutSending() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+  const headers = values[0];
+  let syncedIdx = headers.findIndex((h) => normHeader(h) === normHeader(CONFIG.SYNCED_HEADER));
+  if (syncedIdx < 0) {
+    syncedIdx = headers.length;
+    sheet.getRange(1, syncedIdx + 1).setValue(CONFIG.SYNCED_HEADER);
+  }
+  const now = new Date();
+  let marked = 0;
+  for (let r = 1; r < values.length; r++) {
+    if (!values[r][syncedIdx]) { sheet.getRange(r + 1, syncedIdx + 1).setValue(now); marked++; }
+  }
+  console.log('Marked ' + marked + ' existing row(s) as already-synced.');
 }

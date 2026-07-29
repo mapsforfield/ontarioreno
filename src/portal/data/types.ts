@@ -246,6 +246,8 @@ export type Deal = {
   postalCode: string;
   projectType: string;
   estimatedJobValue: number;
+  /** Promotional finance fee (%) deducted from the job value before commission. */
+  financeFeePercent?: number;
   financingRequired: boolean;
   assignedRepId: string;
   assignedContractorId: string | null;
@@ -301,6 +303,37 @@ export type CommissionInvoiceRecord = {
   createdAt: string;
   /** Full JSON snapshot of the invoice data, used to re-render the exact PDF. */
   snapshot?: string | null;
+};
+
+export type FinanceDocument = {
+  type: string;
+  label: string;
+  note?: string;
+  requested: boolean;
+  key?: string;
+  fileName?: string;
+};
+
+export type FinancePayload = {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  birthday: string; // YYYY-MM-DD
+  phone: string;
+  address: string;
+  mailingSameAsInstall?: boolean; // mailing address = install (home) address
+  mailingAddress?: string; // used only when mailingSameAsInstall is false
+  email: string;
+  incomeWithTaxes: string;
+  otherIncome: string;
+  employer: string;
+  employmentPosition: string;
+  employerAddress: string;
+  dlPhotoKey?: string;
+  dlPhotoName?: string;
+  status: 'draft' | 'submitted' | 'approved' | 'declined';
+  documents: FinanceDocument[];
+  notes?: string;
 };
 
 export type ClientVideo = {

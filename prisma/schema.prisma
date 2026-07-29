@@ -103,6 +103,7 @@ model Deal {
   postalCode           String   @default("")
   projectType          String
   estimatedJobValue    Float    @default(0)
+  financeFeePercent    Float?
   financingRequired    Boolean  @default(false)
   assignedRepId        String
   assignedContractorId String?

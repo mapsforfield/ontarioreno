@@ -294,7 +294,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
     const jobValue = data.estimatedJobValue ?? 0;
-    const repEst = Math.round(jobValue * 0.05);
+    const feePct = Math.max(0, Math.min(Number(data.financeFeePercent) || 0, 100));
+    const commissionBase = Math.round(jobValue * (1 - feePct / 100));
+    const repEst = Math.round(commissionBase * 0.05);
     // Total rate comes from the assigned contractor's negotiated rate;
     // falls back to 10% until a contractor is assigned
     let totalRate = 0.1;
@@ -307,7 +309,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .catch(() => null);
       if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
     }
-    const adminTotalEst = Math.round(jobValue * totalRate);
+    const adminTotalEst = Math.round(commissionBase * totalRate);
 
     const dealData = {
       clientId: data.clientId ?? null,
@@ -319,6 +321,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       postalCode: data.postalCode ?? '',
       projectType: data.projectType,
       estimatedJobValue: jobValue,
+      financeFeePercent: feePct > 0 ? feePct : null,
       financingRequired: data.financingRequired ?? false,
       assignedRepId: data.assignedRepId ?? user.id,
       assignedContractorId: data.assignedContractorId ?? null,
@@ -332,6 +335,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       // Self-healing: the clientId column may not exist yet on older databases.
       await prisma.$executeRawUnsafe('ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "clientId" TEXT');
+      await prisma.$executeRawUnsafe('ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "financeFeePercent" DOUBLE PRECISION');
       deal = await prisma.deal.create({ data: dealData, include: { activity: true, proposals: true, dispatches: true } });
     }
 
