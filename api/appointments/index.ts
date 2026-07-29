@@ -34,10 +34,16 @@ const CREATE_FINANCE_TABLE =
 function financeFileUrls(payload: unknown): Record<string, string> {
   const urls: Record<string, string> = {};
   if (!payload || typeof payload !== 'object') return urls;
-  const p = payload as { dlPhotoKey?: string; documents?: Array<{ key?: string }> };
+  const p = payload as {
+    dlPhotoKey?: string;
+    documents?: Array<{ key?: string; files?: Array<{ key?: string }> }>;
+  };
   const add = (k?: string) => { if (k && !urls[k]) urls[k] = presignGetUrl(k); };
   add(p.dlPhotoKey);
-  (p.documents ?? []).forEach((d) => add(d?.key));
+  (p.documents ?? []).forEach((d) => {
+    add(d?.key); // legacy single-file rows
+    (d?.files ?? []).forEach((f) => add(f?.key));
+  });
   return urls;
 }
 
@@ -1078,7 +1084,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ].filter(Boolean);
       const fileLines: string[] = [];
       if (payload.dlPhotoKey) fileLines.push(`Driver's licence (front): ${presignGetUrl(payload.dlPhotoKey, 7 * 24 * 3600)}`);
-      (payload.documents ?? []).filter((d) => d.key).forEach((d) => fileLines.push(`${d.label ?? 'Document'}: ${presignGetUrl(d.key as string, 7 * 24 * 3600)}`));
+      // A section can hold several files (e.g. 6 months of statements), so emit
+      // one link per file and number them when there's more than one.
+      (payload.documents ?? []).forEach((d) => {
+        const label = d.label ?? 'Document';
+        const files = (d.files ?? []).filter((f) => f?.key);
+        // Fall back to the legacy single-key shape for older saved payloads.
+        const keys = files.length
+          ? files.map((f) => ({ key: f.key as string, name: f.fileName }))
+          : (d.key ? [{ key: d.key, name: d.fileName }] : []);
+        keys.forEach((f, i) => {
+          const suffix = keys.length > 1 ? ` (${i + 1}/${keys.length}${f.name ? ` — ${f.name}` : ''})` : '';
+          fileLines.push(`${label}${suffix}: ${presignGetUrl(f.key, 7 * 24 * 3600)}`);
+        });
+      });
       if (fileLines.length) lines.push('', 'Files (links valid 7 days):', ...fileLines);
       const message = lines.join('\n');
 

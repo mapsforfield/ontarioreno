@@ -305,11 +305,22 @@ export type CommissionInvoiceRecord = {
   snapshot?: string | null;
 };
 
+export type FinanceFile = {
+  key: string;
+  fileName: string;
+};
+
 export type FinanceDocument = {
   type: string;
   label: string;
   note?: string;
   requested: boolean;
+  /** Every file attached to this row — a section can hold many (e.g. 6 months
+   *  of statements). Read/written through the helpers in FinanceTab. */
+  files?: FinanceFile[];
+  /** Legacy single-file fields, written before a section could hold more than
+   *  one. Still read so payloads saved back then keep rendering; new uploads
+   *  only ever append to `files`. */
   key?: string;
   fileName?: string;
 };

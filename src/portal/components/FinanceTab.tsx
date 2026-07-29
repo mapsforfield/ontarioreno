@@ -1,8 +1,8 @@
-import { Check, FileText, Loader2, Mail, MessageCircle, Save, Send, Upload } from 'lucide-react';
+import { Check, FileText, Loader2, Mail, MessageCircle, Save, Send, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
-import type { FinanceDocument, FinancePayload } from '../data/types';
+import type { FinanceDocument, FinanceFile, FinancePayload } from '../data/types';
 import AddressAutocomplete from './AddressAutocomplete';
 
 const DEFAULT_DOCS: FinanceDocument[] = [
@@ -46,10 +46,26 @@ function blankPayload(prefill: Prefill): FinancePayload {
   };
 }
 
-// Keep any saved doc rows, add any new default ones we don't have yet.
+// Every file on a doc row, reading the legacy single-file fields as well so
+// payloads saved before sections could hold multiple files still render.
+function filesOf(d: FinanceDocument): FinanceFile[] {
+  if (d.files?.length) return d.files;
+  if (d.key) return [{ key: d.key, fileName: d.fileName || 'File' }];
+  return [];
+}
+
+// Keep any saved doc rows, add any new default ones we don't have yet, and fold
+// the legacy key/fileName pair into `files` so the rest of the component only
+// deals with one shape.
 function mergeDocs(saved: FinanceDocument[] | undefined): FinanceDocument[] {
   const byType = new Map((saved ?? []).map((d) => [d.type, d]));
-  return DEFAULT_DOCS.map((d) => ({ ...d, ...(byType.get(d.type) ?? {}) }));
+  return DEFAULT_DOCS.map((d) => {
+    const merged = { ...d, ...(byType.get(d.type) ?? {}) };
+    const files = filesOf(merged);
+    // Drop the legacy fields once folded in, so there's a single source of truth.
+    const { key: _key, fileName: _fileName, ...rest } = merged;
+    return { ...rest, files };
+  });
 }
 
 export default function FinanceTab({ appointmentId, prefill }: { appointmentId: string; prefill: Prefill }) {
@@ -85,7 +101,14 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
   const set = <K extends keyof FinancePayload>(key: K, value: FinancePayload[K]) =>
     setForm((cur) => ({ ...cur, [key]: value }));
 
+  // Always-current view of the form, so async handlers that fire several times
+  // in a row (multi-file upload) build on each other instead of on the state
+  // captured when the handler was created.
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
   const persist = async (next: FinancePayload) => {
+    formRef.current = next;
     setForm(next);
     const u = await saveFinance(appointmentId, next);
     setUrls((cur) => ({ ...cur, ...u }));
@@ -119,20 +142,50 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
     }
   };
 
-  const uploadDoc = async (docType: string, file: File) => {
+  const removeDl = async () => {
+    // Only the reference is dropped; the object stays in R2. Rows can share a
+    // key, and an un-deletable mistake is a worse failure than an orphan file.
+    const { dlPhotoKey: _k, dlPhotoName: _n, ...rest } = formRef.current;
+    await persist(rest);
+    showToast({ variant: 'success', message: 'Licence photo removed' });
+  };
+
+  // Uploads run one after another and each appends to the row, so the payload
+  // is read from formRef rather than the render-time `form` — otherwise every
+  // file in a multi-select would overwrite the previous one's result.
+  const uploadDocs = async (docType: string, files: File[]) => {
+    if (!files.length) return;
     setUploadingSlot(docType);
+    let failed = 0;
     try {
-      const r = await financeUpload(appointmentId, 'doc', file);
-      if (r) {
+      for (const file of files) {
+        const r = await financeUpload(appointmentId, 'doc', file).catch(() => null);
+        if (!r) { failed++; continue; }
         setUrls((cur) => ({ ...cur, [r.key]: r.url }));
-        const documents = form.documents.map((d) => (d.type === docType ? { ...d, key: r.key, fileName: file.name, requested: true } : d));
-        await persist({ ...form, documents });
+        const documents = formRef.current.documents.map((d) =>
+          d.type === docType
+            ? { ...d, files: [...filesOf(d), { key: r.key, fileName: file.name }], requested: true }
+            : d
+        );
+        await persist({ ...formRef.current, documents });
       }
-    } catch {
-      showToast({ variant: 'error', message: 'Upload failed. Try again.' });
+      if (failed) {
+        showToast({
+          variant: 'error',
+          message: failed === files.length ? 'Upload failed. Try again.' : `${failed} of ${files.length} files failed to upload.`,
+        });
+      }
     } finally {
       setUploadingSlot(null);
     }
+  };
+
+  const removeDocFile = async (docType: string, key: string) => {
+    const documents = formRef.current.documents.map((d) =>
+      d.type === docType ? { ...d, files: filesOf(d).filter((f) => f.key !== key) } : d
+    );
+    await persist({ ...formRef.current, documents });
+    showToast({ variant: 'success', message: 'File removed' });
   };
 
   const toggleDoc = (docType: string, requested: boolean) => {
@@ -277,6 +330,15 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
             {uploadingSlot === 'dl' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
             {form.dlPhotoKey ? 'Replace photo' : 'Upload photo'}
           </button>
+          {form.dlPhotoKey && (
+            <button
+              type="button"
+              onClick={removeDl}
+              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+            >
+              <X className="h-3.5 w-3.5" /> Remove
+            </button>
+          )}
           <input ref={dlRef} type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadDl(f); }} />
         </div>
       </section>
@@ -300,10 +362,31 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-slate-900">{d.label}</p>
                   {d.note && <p className="text-xs font-semibold text-slate-400">{d.note}</p>}
-                  {d.key && urls[d.key] && (
-                    <a href={urls[d.key]} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-[#1B3C6C] hover:underline">
-                      <FileText className="h-3.5 w-3.5" /> {d.fileName || 'View file'}
-                    </a>
+                  {filesOf(d).length > 0 && (
+                    <ul className="mt-1 space-y-1">
+                      {filesOf(d).map((f) => (
+                        <li key={f.key} className="flex items-center gap-2">
+                          {urls[f.key] ? (
+                            <a href={urls[f.key]} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 text-xs font-bold text-[#1B3C6C] hover:underline">
+                              <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{f.fileName || 'View file'}</span>
+                            </a>
+                          ) : (
+                            <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-bold text-slate-400">
+                              <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{f.fileName || 'File'}</span>
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeDocFile(d.type, f.key)}
+                            className="shrink-0 rounded p-0.5 text-slate-300 transition hover:bg-red-50 hover:text-red-600"
+                            aria-label={`Remove ${f.fileName || 'file'}`}
+                            title="Remove this file"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
                 <button
@@ -313,14 +396,15 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-[0.5rem] border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {uploadingSlot === d.type ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  {d.key ? 'Replace' : 'Attach'}
+                  {filesOf(d).length ? 'Add more' : 'Attach'}
                 </button>
                 <input
                   ref={(el) => { docRefs.current[d.type] = el; }}
                   type="file"
                   accept="image/*,application/pdf"
+                  multiple
                   className="sr-only"
-                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadDoc(d.type, f); }}
+                  onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; void uploadDocs(d.type, fs); }}
                 />
               </div>
             ))}
