@@ -424,14 +424,17 @@ export type Interaction = {
   leadId: string;
   userId: string | null;
   channel: InteractionChannel;
-  direction: InteractionDirection;
   outcome: CallOutcome | null;
-  subject: string | null;
   body: string;
-  durationSeconds: number | null;
   occurredAt: string;
+  // Stored on the row but NOT returned by the leads list — see interactionSelect
+  // in api/leads/index.ts. Optional so nothing reads them off list state by
+  // accident; fetch the row directly if a screen ever needs them.
+  direction?: InteractionDirection;
+  subject?: string | null;
+  durationSeconds?: number | null;
   metadata?: Record<string, unknown> | null;
-  createdAt: string;
+  createdAt?: string;
 };
 
 export type Lead = {

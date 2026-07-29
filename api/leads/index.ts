@@ -110,7 +110,32 @@ const normPhone = (v: unknown) => String(v ?? '').replace(/\D/g, '');
 const normEmail = (v: unknown) => String(v ?? '').trim().toLowerCase();
 const clean = (v: unknown) => String(v ?? '').trim();
 
-const leadInclude = { interactions: { orderBy: { occurredAt: 'desc' } as const } };
+// Interactions ride along on every lead in the list, and the portal reloads all
+// 15 datasets on every doorbell ping — so anything selected here is paid for
+// over and over. Only the fields the UI actually reads are shipped: the timeline
+// (channel/outcome/body/occurredAt), the rep-performance aggregate (userId +
+// occurredAt window), and badReason (channel/outcome).
+//
+// Deliberately excluded: `metadata` (Quo call/message extras — a JSON blob no
+// screen reads), `subject`, `durationSeconds`, `direction`, `createdAt`. Same
+// waste as the proposalBody fix: pure payload on the hottest path.
+//
+// NOT capped by count on purpose. Rep performance aggregates interactions over a
+// user-selectable time window, so dropping the oldest rows would silently
+// under-report calls on longer windows.
+const interactionSelect = {
+  id: true,
+  leadId: true,
+  userId: true,
+  channel: true,
+  outcome: true,
+  body: true,
+  occurredAt: true,
+} as const;
+
+const leadInclude = {
+  interactions: { orderBy: { occurredAt: 'desc' } as const, select: interactionSelect },
+};
 
 /** Map a call outcome to the lead status it should drive. */
 function statusForOutcome(outcome: string): string | null {

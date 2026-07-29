@@ -686,6 +686,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const hasFetched = useRef(false);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRefetchAt = useRef(0);
   const hiddenAt = useRef<number | null>(null);
 
   // Realtime is the primary freshness mechanism. The visibility fallback is
@@ -770,9 +771,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
   // Debounced background refresh — collapses a burst of pings/focus events
   // into a single refetch a beat later.
+  //
+  // The 600ms debounce only collapses pings that land near-simultaneously. A
+  // steady stream — a rep working a call list, a bulk import, several open tabs
+  // — clears the timer each time and still reloads all 15 datasets once per
+  // write. MIN_REFETCH_GAP_MS puts a floor under that: at most one full reload
+  // per window, with the last ping in the window still honoured (trailing), so
+  // nothing is dropped, only deferred. Worst case the portal is this many
+  // seconds behind another user's edit, which the 600ms debounce and the
+  // 5-minute hidden-tab threshold already imply is acceptable.
+  const MIN_REFETCH_GAP_MS = 20 * 1000;
+
   const scheduleRefetch = useCallback(() => {
     if (refetchTimer.current) clearTimeout(refetchTimer.current);
-    refetchTimer.current = setTimeout(() => { loadData(true); }, 600);
+    const sinceLast = Date.now() - lastRefetchAt.current;
+    const delay = Math.max(600, MIN_REFETCH_GAP_MS - sinceLast);
+    refetchTimer.current = setTimeout(() => {
+      lastRefetchAt.current = Date.now();
+      loadData(true);
+    }, delay);
   }, [loadData]);
 
   // Initial load on mount.
