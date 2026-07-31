@@ -143,9 +143,19 @@ const out = `${banner}export const SCHEMA_STATEMENTS = ${JSON.stringify(statemen
 const dts = `${banner}export const SCHEMA_STATEMENTS: string[];\n`;
 
 // In --check mode, fail if either committed file is stale (CI / pre-deploy guard).
+//
+// Compared with line endings normalised. The generator emits \n, but a Windows
+// checkout with core.autocrlf=true rewrites the committed file to \r\n on disk,
+// which made a byte-exact comparison report a perfectly current file as STALE
+// and blocked `npm run build` on every Windows machine. What this guard is
+// actually asking — does the committed DDL still match schema.prisma — has
+// nothing to do with how the file is stored, so the check should not either.
+// .gitattributes pins these files to LF as well; this makes the check correct
+// regardless of git configuration.
 if (process.argv.includes('--check')) {
-  const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
-  if (read(outPath) !== out || read(dtsPath) !== dts) {
+  const eol = (s) => s.replace(/\r\n/g, '\n');
+  const read = (p) => { try { return eol(readFileSync(p, 'utf8')); } catch { return ''; } };
+  if (read(outPath) !== eol(out) || read(dtsPath) !== eol(dts)) {
     console.error('[generate-schema-ddl] STALE: generated schema files are out of date. Run: npm run schema:gen');
     process.exit(1);
   }
