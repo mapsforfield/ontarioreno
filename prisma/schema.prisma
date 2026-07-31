@@ -474,6 +474,13 @@ model Lead {
   /// 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE'
   routingOutcome    String?
   routingReasonCodes String[]
+  /// WHY the address ended up in the state it did — see lib/address-resolution.ts.
+  /// Routing ignores it; it exists so a manual review caused by OUR provider
+  /// being down (PROVIDER_NOT_CONFIGURED / _QUOTA_EXHAUSTED / _ERROR) can be told
+  /// apart from one caused by the address itself. Empty on every lead submitted
+  /// before this column existed — those are unknown, not clean, and no backfill
+  /// can recover a cause that was never computed.
+  addressResolutionCause String @default("")
   /// True when the flow could not decide and a person must look.
   needsReview       Boolean   @default(false)
   // Promotion links — Lead points at canonical records, never duplicates them
@@ -548,7 +555,11 @@ model NotificationOutbox {
   leadId         String?
   /// 'sms' | 'email'
   channel        String
-  /// 'booking_confirmation' | 'reminder_24h' | 'reminder_day_of' | 'team_alert' | 'nurture_guide'
+  /// 'booking_confirmation' | 'reminder_24h' | 'reminder_day_of' | 'team_alert' |
+  /// 'nurture_guide' | 'lead_alert' | 'address_provider_alert'
+  /// 'team_alert' fires on booking and is keyed to an appointment; 'lead_alert'
+  /// fires on submission and is keyed to the lead, so non-booking outcomes are
+  /// announced too.
   kind           String
   recipient      String   @default("")
   subject        String   @default("")

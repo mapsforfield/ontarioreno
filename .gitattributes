@@ -1,0 +1,8 @@
+# Generated files are byte-compared against freshly generated output by
+# `npm run schema:check`, which gates `npm run build`. The generator emits \n,
+# so a Windows checkout with core.autocrlf=true would rewrite them to \r\n on
+# disk and the guard would report a current file as STALE — blocking the build
+# on Windows while passing in CI. Pinning them to LF keeps the bytes on disk
+# identical to the bytes the generator writes, on every platform.
+lib/schema-ddl.generated.js   text eol=lf
+lib/schema-ddl.generated.d.ts text eol=lf
