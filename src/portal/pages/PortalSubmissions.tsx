@@ -21,7 +21,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  RotateCcw,
   Search,
   Trash2,
   X,
@@ -110,7 +109,7 @@ const FILTERS: Array<{ key: OutcomeFilter; label: string }> = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortalSubmissions() {
-  const { fetchSubmissions, markSubmissionContacted, trashLeads, restoreLeads } = usePortalData();
+  const { fetchSubmissions, markSubmissionContacted, purgeLeads } = usePortalData();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [appointments, setAppointments] = useState<SubmissionAppointment[]>([]);
@@ -121,6 +120,7 @@ export default function PortalSubmissions() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,55 +200,28 @@ export default function PortalSubmissions() {
     });
   };
 
-  const selectedLeads = visible.filter((l) => selectedIds.has(l.id));
-  const selectedLiveIds = selectedLeads.filter((l) => !l.deletedAt).map((l) => l.id);
-  const selectedTrashedIds = selectedLeads.filter((l) => l.deletedAt).map((l) => l.id);
-
-  const applyTrashed = (ids: string[], trashed: boolean) => {
-    const at = trashed ? new Date().toISOString() : null;
-    setLeads((current) =>
-      current.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: at } : l))
-    );
-  };
-
-  const handleTrash = async () => {
-    const ids = [...selectedLiveIds];
+  // Permanent. The rows are removed from the screen immediately and the
+  // deletion is irreversible, so it is gated behind an explicit confirm rather
+  // than an Undo toast — there is nothing to undo once it has run.
+  const handleDelete = async () => {
+    const ids = [...selectedIds];
     if (ids.length === 0) return;
-    applyTrashed(ids, true);
+    const removed = leads.filter((l) => ids.includes(l.id));
+    setLeads((current) => current.filter((l) => !ids.includes(l.id)));
     setSelectedIds(new Set());
-    const ok = await trashLeads(ids);
+    setConfirmDelete(false);
+    if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+    const ok = await purgeLeads(ids);
     if (!ok) {
-      applyTrashed(ids, false);
-      showToast({ message: 'Could not move to trash. Please try again.', variant: 'error' });
+      // Put them back rather than leaving the screen claiming a delete that
+      // never happened.
+      setLeads((current) =>
+        [...current, ...removed].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+      );
+      showToast({ message: 'Could not delete. Please try again.', variant: 'error' });
       return;
     }
-    // Reversible, so an Undo is more useful than a confirmation prompt in the
-    // way — and the rows are still on screen, flagged, either way.
-    showToast({
-      message: `${ids.length} submission${ids.length === 1 ? '' : 's'} moved to trash.`,
-      description: 'Still listed here, flagged. Nothing was permanently deleted.',
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          applyTrashed(ids, false);
-          restoreLeads(ids);
-        },
-      },
-    });
-  };
-
-  const handleRestore = async () => {
-    const ids = [...selectedTrashedIds];
-    if (ids.length === 0) return;
-    applyTrashed(ids, false);
-    setSelectedIds(new Set());
-    const ok = await restoreLeads(ids);
-    if (!ok) {
-      applyTrashed(ids, true);
-      showToast({ message: 'Could not restore. Please try again.', variant: 'error' });
-      return;
-    }
-    showToast({ message: `${ids.length} submission${ids.length === 1 ? '' : 's'} restored.` });
+    showToast({ message: `${ids.length} submission${ids.length === 1 ? '' : 's'} deleted.` });
   };
 
   const applyContacted = async (lead: Lead, contacted: boolean, note: string) => {
@@ -349,26 +322,14 @@ export default function PortalSubmissions() {
           <span className="text-sm font-black text-[#1B3C6C]">
             {selectedIds.size} selected
           </span>
-          {selectedLiveIds.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleTrash}
-              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Move {selectedLiveIds.length} to trash
-            </button>
-          ) : null}
-          {selectedTrashedIds.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleRestore}
-              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Restore {selectedTrashedIds.length}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete {selectedIds.size} permanently
+          </button>
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
@@ -376,9 +337,6 @@ export default function PortalSubmissions() {
           >
             Clear selection
           </button>
-          <span className="ml-auto text-xs font-semibold text-slate-500">
-            Trashing is reversible — rows stay listed here, flagged.
-          </span>
         </div>
       ) : null}
 
@@ -544,6 +502,42 @@ export default function PortalSubmissions() {
           </div>
         )}
       </section>
+
+      {confirmDelete ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[0.5rem] bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black tracking-[-0.02em] text-slate-950">
+                  Delete {selectedIds.size} submission{selectedIds.size === 1 ? '' : 's'}?
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  This cannot be undone. The submission and its full history are removed for good.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="rounded-[0.5rem] border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="rounded-[0.5rem] bg-red-600 px-4 py-2.5 text-sm font-black text-white hover:bg-red-700"
+              >
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {selected ? (
         <SubmissionDrawer
