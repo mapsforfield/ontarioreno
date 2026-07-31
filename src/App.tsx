@@ -97,6 +97,7 @@ import ContractorCalendar from './portal/pages/ContractorCalendar';
 import ContractorClients from './portal/pages/ContractorClients';
 import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalClients from './portal/pages/PortalClients';
+import PortalSubmissions from './portal/pages/PortalSubmissions';
 import PortalTasks from './portal/pages/PortalTasks';
 import PortalLogin from './portal/pages/PortalLogin';
 import ConsultationReschedule from './portal/pages/ConsultationReschedule';
@@ -148,6 +149,7 @@ export default function App() {
               <Route element={<PortalGuard adminOnly />}>
                 <Route path="admin" element={<PortalAdmin />} />
                 <Route path="grants" element={<PortalGrants />} />
+                <Route path="submissions" element={<PortalSubmissions />} />
               </Route>
             </Route>
           </Route>

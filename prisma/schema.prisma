@@ -483,6 +483,14 @@ model Lead {
   addressResolutionCause String @default("")
   /// True when the flow could not decide and a person must look.
   needsReview       Boolean   @default(false)
+  /// Submissions-log worklist state. Deliberately NOT `status` / `lastContactedAt`
+  /// / `attemptCount`: those are moved automatically by statusForOutcome when an
+  /// interaction is logged, which would let the worklist mark itself worked
+  /// without anyone deciding to. These three move only on an explicit click, and
+  /// null submissionContactedAt is the single definition of "unworked".
+  submissionContactedAt   DateTime?
+  submissionContactedById String?
+  submissionOutcomeNote   String   @default("")
   // Promotion links — Lead points at canonical records, never duplicates them
   clientId          String?
   dealId            String?

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   HandCoins,
+  Inbox,
   ListTodo,
   Plus,
   Trophy,
@@ -15,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
+import { countUnworkedSubmissions } from '../data/submissions';
 import { ConsultationStage } from '../data/types';
 import { torontoToday } from '../lib/time';
 import EarningPotentialCard from '../components/EarningPotentialCard';
@@ -61,6 +63,7 @@ export default function PortalDashboard() {
     deals,
     getVisibleAppointmentsForUser,
     getVisibleDealsForUser,
+    leads,
     tasks,
     addTask,
     updateTask,
@@ -87,6 +90,10 @@ export default function PortalDashboard() {
     : 0;
   const pipelineValue = currentUser ? calculatePipelineValueForUser(currentUser) : 0;
   const wonDeals = currentUser ? calculateVisibleWonDeals(currentUser) : 0;
+  // Consultation submissions still awaiting first contact. Costs no extra
+  // request: admins are not rep-scoped, so `leads` already holds them.
+  // Definition is shared with the log's own filter — see data/submissions.ts.
+  const unworkedSubmissions = countUnworkedSubmissions(leads);
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
   const financingRequiredDeals = visibleDeals.filter(
     (deal) => deal.financingRequired
@@ -187,6 +194,20 @@ export default function PortalDashboard() {
   };
 
   const summaryCards = [
+    // Admin-only, matching the page it links to. Amber whenever the backlog is
+    // non-zero — this is a queue with people waiting in it, not a statistic.
+    ...(currentUser?.role === 'admin'
+      ? [
+          {
+            label: 'Needs First Contact',
+            value: String(unworkedSubmissions),
+            detail: unworkedSubmissions > 0 ? 'Consultation submissions' : 'All caught up',
+            icon: Inbox,
+            href: '/portal/submissions',
+            alert: unworkedSubmissions > 0,
+          },
+        ]
+      : []),
     {
       label: 'Active Contractors',
       value: String(activeContractors),
@@ -294,7 +315,11 @@ export default function PortalDashboard() {
           <Link
             key={card.label}
             to={card.href}
-            className="flex flex-col rounded-[0.5rem] border border-white bg-white p-4 shadow-sm transition hover:border-slate-200 hover:shadow-md sm:p-5"
+            className={`flex flex-col rounded-[0.5rem] border p-4 shadow-sm transition hover:shadow-md sm:p-5 ${
+              'alert' in card && card.alert
+                ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
+                : 'border-white bg-white hover:border-slate-200'
+            }`}
           >
             {/* Label + icon share the top row; the value sits on its own line
                 below so a large amount can never collide with the icon. */}
@@ -302,11 +327,21 @@ export default function PortalDashboard() {
               <p className="min-h-[2rem] text-xs font-semibold leading-snug text-slate-500 sm:min-h-[2.5rem] sm:text-sm">
                 {card.label}
               </p>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.5rem] bg-[#e8f1fb] text-[#1B3C6C] sm:h-11 sm:w-11">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.5rem] sm:h-11 sm:w-11 ${
+                  'alert' in card && card.alert
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-[#e8f1fb] text-[#1B3C6C]'
+                }`}
+              >
                 <card.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
             </div>
-            <p className="mt-1 text-2xl font-black tracking-[-0.02em] sm:text-3xl">
+            <p
+              className={`mt-1 text-2xl font-black tracking-[-0.02em] sm:text-3xl ${
+                'alert' in card && card.alert ? 'text-amber-700' : ''
+              }`}
+            >
               {card.value}
             </p>
             <p className="mt-auto pt-3 text-xs font-medium text-slate-500 sm:pt-4 sm:text-sm">

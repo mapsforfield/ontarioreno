@@ -477,6 +477,51 @@ export type Lead = {
   updatedAt: string;
   /** Embedded by the API on list/queue fetches. */
   interactions: Interaction[];
+
+  // ── Consultation-flow capture ──
+  // Written by the public flow (api/leads/index.ts, ?flow=submit). Already on
+  // the wire everywhere — leadInclude uses `include`, not `select` — so these
+  // were only ever missing from the type. Optional because leads from other
+  // sources (manual, meta, import) never carry them.
+  programKey?: string | null;
+  programVersion?: number | null;
+  schedulingArea?: string | null;
+  addressState?: AddressState | null;
+  resolvedMunicipality?: string | null;
+  answersJson?: Record<string, string> | null;
+  routingOutcome?: RoutingOutcome | null;
+  routingReasonCodes?: string[];
+  /** '' on every lead submitted before the column existed — unknown, not clean. */
+  addressResolutionCause?: string;
+  needsReview?: boolean;
+
+  // ── Submissions-log worklist ──
+  /** null = unworked. Moves only on an explicit click. */
+  submissionContactedAt?: string | null;
+  submissionContactedById?: string | null;
+  submissionOutcomeNote?: string;
+};
+
+export type RoutingOutcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
+
+export type AddressState =
+  | 'ADDRESS_VERIFIED'
+  | 'ADDRESS_UNVERIFIED'
+  | 'ADDRESS_OUTSIDE_SERVICE_AREA';
+
+/** Booking status for a submission, fetched alongside the submissions log. */
+export type SubmissionAppointment = {
+  id: string;
+  status: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  publicReference: string | null;
+  deletedAt?: string | null;
+};
+
+export type SubmissionsPayload = {
+  leads: Lead[];
+  appointments: SubmissionAppointment[];
 };
 
 /** One row of a pasted/uploaded lead import (admin). */

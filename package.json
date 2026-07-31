@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test lib/*.test.ts",
+    "test": "tsx --test lib/*.test.ts src/portal/data/*.test.ts",
     "sitemap": "node generate-sitemap.js",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
