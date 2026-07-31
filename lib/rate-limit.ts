@@ -164,6 +164,16 @@ export function createSpendCap(
 export type SharedSpendCap = {
   /** Resolves true when the call may proceed. */
   tryConsume(): Promise<boolean>;
+  /**
+   * True when this instance has already been refused for today, without
+   * spending a call to find out.
+   *
+   * Read-only and best-effort: it reflects what THIS instance has observed, so
+   * it can be false on a fresh instance whose budget is in fact gone. That is
+   * acceptable for its only purpose — explaining, after the fact, why an
+   * address arrived unresolved — and it must never be used to gate a call.
+   */
+  exhaustedToday(): boolean;
 };
 
 export type SharedSpendCapOptions = {
@@ -203,6 +213,9 @@ export function createSharedSpendCap(options: SharedSpendCapOptions): SharedSpen
   let exhaustedForDay = '';
 
   return {
+    exhaustedToday() {
+      return exhaustedForDay === new Date(now()).toISOString().slice(0, 10);
+    },
     async tryConsume() {
       const day = new Date(now()).toISOString().slice(0, 10);
       if (exhaustedForDay === day) return false;

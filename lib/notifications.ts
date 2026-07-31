@@ -22,7 +22,14 @@ export type NotificationKind =
   | 'reminder_24h'
   | 'reminder_day_of'
   | 'team_alert'
-  | 'nurture_guide';
+  | 'nurture_guide'
+  // Fires on SUBMISSION, for every routing outcome. `team_alert` is keyed to an
+  // appointment and so could only ever announce a booking — which meant every
+  // manual-review, nurture and decline lead was captured silently.
+  | 'lead_alert'
+  // The address provider failed or ran out of budget, so leads are being sent
+  // to manual review by our own degradation rather than by their addresses.
+  | 'address_provider_alert';
 
 export type PlannedNotification = {
   channel: NotificationChannel;
@@ -207,6 +214,155 @@ export function emailTeamAlert(c: BookingContext): { subject: string; body: stri
       `Appointment ID: ${c.appointmentId}`,
     ].join('\n'),
   };
+}
+
+// ─── Submission alerts ────────────────────────────────────────────────────────
+
+export type SubmissionContext = {
+  leadId: string;
+  name: string;
+  phone: string;
+  email: string;
+  /** Best address we have — often partial, and sometimes empty. */
+  propertyAddress: string;
+  municipality: string;
+  /** Routing outcome and reason codes, verbatim. Not re-derived here. */
+  outcome: string;
+  reasons: string[];
+  /** Readable answer labels where we have them, raw values otherwise. */
+  projectScope: string;
+  fundingPlan: string;
+  timeline: string;
+  ownership: string;
+  programLabel: string;
+  addressState: string;
+  /** AddressResolutionCause, as a string — see lib/address-resolution.ts. */
+  addressCause: string;
+  /** Human sentence for that cause, so the alert explains itself. */
+  addressCauseDetail: string;
+  /** True when the cause was our provider failing, not the address. */
+  providerDegraded: boolean;
+  /** Business inbox. Always alerted. */
+  teamInbox: string;
+};
+
+/**
+ * Lead in one line, so the outcome is legible from a phone notification without
+ * opening anything.
+ */
+export function leadAlertSubject(c: SubmissionContext): string {
+  const label: Record<string, string> = {
+    DIRECT_CALENDAR: 'ready to book',
+    MANUAL_REVIEW: 'NEEDS REVIEW',
+    NURTURE: 'nurture',
+    DECLINE: 'declined',
+  };
+  const where = c.municipality || c.propertyAddress || 'address unverified';
+  return `New consultation lead (${label[c.outcome] ?? c.outcome}) — ${c.name}, ${where}`;
+}
+
+export function emailLeadAlert(c: SubmissionContext): { subject: string; body: string } {
+  const lines = [
+    'A homeowner completed the public consultation form.',
+    '',
+    `Outcome:        ${c.outcome}`,
+    `Reasons:        ${c.reasons.length ? c.reasons.join(', ') : 'None recorded'}`,
+    '',
+    `Name:           ${c.name}`,
+    `Phone:          ${c.phone || 'Not provided'}`,
+    `Email:          ${c.email || 'Not provided'}`,
+    `Property:       ${c.propertyAddress || 'Not resolved'}`,
+    `Municipality:   ${c.municipality || 'Not resolved'}`,
+    `Program:        ${c.programLabel}`,
+    '',
+    `Project scope:  ${c.projectScope || 'Not provided'}`,
+    `Timeline:       ${c.timeline || 'Not provided'}`,
+    `Funding plan:   ${c.fundingPlan || 'Not provided'}`,
+    `Ownership:      ${c.ownership || 'Not provided'}`,
+    '',
+    `Address state:  ${c.addressState} (${c.addressCause})`,
+    `                ${c.addressCauseDetail}`,
+    `Lead ID:        ${c.leadId}`,
+  ];
+
+  if (c.outcome === 'DIRECT_CALENDAR') {
+    // Qualifying and booking are separate events. This lead was shown the
+    // calendar; nothing yet says they picked a slot.
+    lines.push('', 'This lead was offered the calendar. A separate booking alert follows only if they chose a time.');
+  }
+  if (c.providerDegraded) {
+    lines.push(
+      '',
+      '⚠ This lead reached manual review because OUR address provider failed, not',
+      '  because of the address itself. See the address provider alert.',
+    );
+  }
+  lines.push('', 'This lead is unassigned and waiting in admin triage.');
+
+  return { subject: leadAlertSubject(c), body: lines.join('\n') };
+}
+
+export function emailAddressProviderAlert(c: SubmissionContext): { subject: string; body: string } {
+  return {
+    subject: `⚠ Address verification is degraded — ${c.addressCause}`,
+    body: [
+      'Consultation submissions are being routed to manual review because the',
+      'address provider is not working, not because the addresses are bad.',
+      '',
+      `Cause:      ${c.addressCause}`,
+      `What it is: ${c.addressCauseDetail}`,
+      '',
+      'Until this is fixed, every submission — including homeowners whose address',
+      'is perfectly good and who would otherwise have been shown the calendar —',
+      'lands in manual review and nobody is offered a booking slot.',
+      '',
+      `First lead affected today: ${c.leadId} (${c.name})`,
+      '',
+      'This alert is sent at most once per cause per day, so it will not repeat',
+      'for every affected lead. It will fire again tomorrow if still unresolved.',
+    ].join('\n'),
+  };
+}
+
+/**
+ * Everything a submission should announce, whatever it routed to.
+ *
+ * Unlike the booking planner this is keyed on the LEAD, so it does not need —
+ * and must not wait for — an appointment to exist.
+ */
+export function planSubmissionNotifications(
+  c: SubmissionContext,
+  now: Date = new Date()
+): PlannedNotification[] {
+  const at = now.toISOString();
+  const planned: PlannedNotification[] = [];
+  if (!c.teamInbox) return planned;
+
+  const alert = emailLeadAlert(c);
+  planned.push({
+    channel: 'email', kind: 'lead_alert', recipient: c.teamInbox,
+    subject: alert.subject, body: alert.body,
+    // Never expires: a lead is worth hearing about late.
+    sendAfter: at, expiresAt: '',
+    idempotencyKey: `${c.leadId}:email:lead_alert:${c.teamInbox}`,
+  });
+
+  if (c.providerDegraded) {
+    const outage = emailAddressProviderAlert(c);
+    planned.push({
+      channel: 'email', kind: 'address_provider_alert', recipient: c.teamInbox,
+      subject: outage.subject, body: outage.body,
+      sendAfter: at, expiresAt: '',
+      // Keyed to the cause and the DAY, not the lead. A dead API key affects
+      // every submission; one row per lead would bury the inbox in identical
+      // mail and teach everyone to ignore it. The unique constraint on
+      // idempotencyKey collapses the rest into this one, and a still-broken
+      // provider re-alerts tomorrow.
+      idempotencyKey: `address_provider_alert:${c.addressCause}:${at.slice(0, 10)}`,
+    });
+  }
+
+  return planned;
 }
 
 // ─── Scheduling ───────────────────────────────────────────────────────────────

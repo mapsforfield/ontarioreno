@@ -32,9 +32,16 @@ import {
 } from '../../lib/public-booking.js';
 import {
   planBookingNotifications,
+  planSubmissionNotifications,
   smsProviderConfigured,
   type BookingContext,
+  type SubmissionContext,
 } from '../../lib/notifications.js';
+import {
+  describeCause,
+  isProviderDegradation,
+  type AddressResolutionCause,
+} from '../../lib/address-resolution.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 
@@ -895,6 +902,12 @@ type ResolvedAddress = {
   area: SchedulingArea | null;
   latitude: number | null;
   longitude: number | null;
+  /**
+   * WHY this address ended up in the state it did. Routing ignores it entirely
+   * — it exists so an unverified address caused by our own provider being down
+   * can be told apart from one caused by the address.
+   */
+  cause: AddressResolutionCause;
 };
 
 const UNRESOLVED: ResolvedAddress = {
@@ -907,6 +920,7 @@ const UNRESOLVED: ResolvedAddress = {
   area: null,
   latitude: null,
   longitude: null,
+  cause: 'PROVIDER_ERROR',
 };
 
 /**
@@ -918,7 +932,16 @@ const UNRESOLVED: ResolvedAddress = {
  */
 async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey || !placeId) return UNRESOLVED;
+  if (!apiKey) return { ...UNRESOLVED, cause: 'PROVIDER_NOT_CONFIGURED' };
+  if (!placeId) {
+    // No suggestion was picked. Usually the homeowner typed the address — but
+    // if the autocomplete budget is spent there were no suggestions TO pick,
+    // and the missing placeId is our fault rather than theirs.
+    return {
+      ...UNRESOLVED,
+      cause: placesSpendCap.exhaustedToday() ? 'PROVIDER_QUOTA_EXHAUSTED' : 'NO_PLACE_SELECTED',
+    };
+  }
   try {
     const r = await fetch(
       `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
@@ -956,13 +979,17 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
 
     // Outside Ontario is the one address fact we can decline on with confidence.
     if (province && province !== 'ON') {
-      return { ...UNRESOLVED, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', province, municipality };
+      return {
+        ...UNRESOLVED, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', province, municipality,
+        cause: 'OUTSIDE_ONTARIO',
+      };
     }
     // A missing street number or postal code means we cannot confirm a dwelling.
     if (!streetNumber || !route || !postalCode) {
       return {
         ...UNRESOLVED, address, city: municipality, postalCode, province, municipality,
         latitude, longitude,
+        cause: 'INCOMPLETE_ADDRESS',
       };
     }
 
@@ -979,9 +1006,11 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       area,
       latitude,
       longitude,
+      cause: area ? 'RESOLVED' : 'MUNICIPALITY_UNMAPPED',
     };
-  } catch {
-    return UNRESOLVED;
+  } catch (err) {
+    console.error('[flow/submit] address resolution failed:', err);
+    return { ...UNRESOLVED, cause: 'PROVIDER_ERROR' };
   }
 }
 
@@ -1158,8 +1187,87 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           },
         })
         .catch(() => {});
-      await drainOutbox().catch(() => null);
     }
+
+    // ── Announce the submission ──
+    // Every outcome, not just the ones that reach a calendar. Keyed to the lead,
+    // so no appointment is required for the team to hear about it.
+    const providerDegraded = isProviderDegradation(resolved.cause);
+    const submitAnswerLabel = (key: string) => {
+      const question = program.questions.find((q) => q.key === key);
+      return question?.options.find((o) => o.value === answers[key])?.label ?? answers[key] ?? '';
+    };
+
+    // One structured line per submission, so the share of manual-review leads
+    // caused by our own degradation is greppable without querying anything.
+    console.log(
+      '[flow/submit]',
+      JSON.stringify({
+        leadId: lead.id,
+        outcome: routing.outcome,
+        reasons: routing.reasons,
+        addressState: resolved.addressState,
+        addressCause: resolved.cause,
+        providerDegraded,
+        municipality: resolved.municipality || null,
+      })
+    );
+    if (providerDegraded) {
+      console.error(
+        `[flow/submit] address provider degraded (${resolved.cause}): ${describeCause(resolved.cause)}`
+      );
+    }
+
+    const submission: SubmissionContext = {
+      leadId: lead.id,
+      name,
+      phone,
+      email,
+      propertyAddress: [resolved.address, resolved.city].filter(Boolean).join(', '),
+      municipality: resolved.municipality,
+      outcome: routing.outcome,
+      reasons: routing.reasons,
+      projectScope: submitAnswerLabel('projectType'),
+      fundingPlan: submitAnswerLabel('contribution'),
+      timeline: submitAnswerLabel('timeline'),
+      ownership: submitAnswerLabel('ownership'),
+      programLabel: program.areaLabel,
+      addressState: resolved.addressState,
+      addressCause: resolved.cause,
+      addressCauseDetail: describeCause(resolved.cause),
+      providerDegraded,
+      teamInbox: teamInbox(),
+    };
+
+    // Best-effort throughout: the lead is already committed and a notification
+    // problem must never turn a captured submission into a 500.
+    await prisma.notificationOutbox
+      .createMany({
+        data: planSubmissionNotifications(submission).map((n) => ({
+          leadId: lead.id,
+          channel: n.channel,
+          kind: n.kind,
+          recipient: n.recipient,
+          subject: n.subject,
+          body: n.body,
+          html: n.html ?? '',
+          sendAfter: n.sendAfter,
+          expiresAt: n.expiresAt,
+          idempotencyKey: n.idempotencyKey,
+        })),
+        // The provider alert is keyed per cause per day and will collide by
+        // design on the second affected lead.
+        skipDuplicates: true,
+      })
+      .catch((err) => {
+        console.error('[flow/submit] could not queue submission alerts:', err);
+      });
+
+    // Send now rather than waiting for the daily cron — a lead nobody hears
+    // about for a day is most of the bug we are fixing.
+    await drainOutbox().catch(() => null);
+    // Wake every open portal so the lead appears in triage without a reload.
+    await ringDoorbell();
 
     return res.status(201).json({
       leadRef: lead.id,
