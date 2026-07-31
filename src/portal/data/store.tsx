@@ -250,6 +250,9 @@ type PortalDataContextValue = PortalDataState & {
     contacted: boolean,
     note: string
   ) => Promise<Lead | null>;
+  /** Bulk soft-delete / restore. Reversible — never a hard delete. */
+  trashLeads: (ids: string[]) => Promise<boolean>;
+  restoreLeads: (ids: string[]) => Promise<boolean>;
   getLeadQueue: (user: User) => Lead[];
   getUnassignedLeads: () => Lead[];
   getInteractionsForLead: (leadId: string) => Interaction[];
@@ -3553,6 +3556,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }));
         }
         return saved;
+      },
+
+      trashLeads: async (ids) => {
+        const now = new Date().toISOString();
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: now } : l)),
+        }));
+        const result = await apiCall<{ ok: boolean }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'trash_leads', ids }),
+        });
+        return Boolean(result?.ok);
+      },
+
+      restoreLeads: async (ids) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: null } : l)),
+        }));
+        const result = await apiCall<{ ok: boolean }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'restore_leads', ids }),
+        });
+        return Boolean(result?.ok);
       },
 
       getLeadQueue,

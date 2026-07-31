@@ -818,6 +818,23 @@ async function handleCollection(
       });
     }
 
+    // Bulk soft-delete / restore for the submissions log. Reversible on
+    // purpose: `delete_leads` above is a hard delete and these rows are the
+    // only record we hold of these homeowners. Sets deletedAt, so the log keeps
+    // showing them flagged rather than losing them.
+    if (action === 'trash_leads' || action === 'restore_leads') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const ids = Array.isArray(data.ids) ? data.ids.map((value) => clean(value)).filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'No lead ids provided.' });
+      return await withTables(async () => {
+        const result = await prisma.lead.updateMany({
+          where: { id: { in: ids } },
+          data: { deletedAt: action === 'trash_leads' ? new Date() : null },
+        });
+        return res.status(200).json({ ok: true, count: result.count, ids });
+      });
+    }
+
     if (action === 'schedule_callback') {
       const leadId = String(data.leadId ?? '');
       const callbackAt = data.callbackAt ? new Date(String(data.callbackAt)) : null;
