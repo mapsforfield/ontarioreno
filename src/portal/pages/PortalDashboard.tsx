@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { usePortalData } from '../data/store';
+import { countUnworkedSubmissions } from '../data/submissions';
 import { ConsultationStage } from '../data/types';
 import { torontoToday } from '../lib/time';
 import EarningPotentialCard from '../components/EarningPotentialCard';
@@ -89,13 +90,10 @@ export default function PortalDashboard() {
     : 0;
   const pipelineValue = currentUser ? calculatePipelineValueForUser(currentUser) : 0;
   const wonDeals = currentUser ? calculateVisibleWonDeals(currentUser) : 0;
-  // Unworked consultation submissions. Costs no extra request: admins are not
-  // rep-scoped, so `leads` already holds every non-deleted consultation_flow
-  // lead. Trashed rows are excluded from the COUNT (they aren't outstanding
-  // work) but remain visible on the log itself, which hides nothing.
-  const unworkedSubmissions = leads.filter(
-    (lead) => lead.source === 'consultation_flow' && !lead.submissionContactedAt && !lead.deletedAt
-  ).length;
+  // Consultation submissions still awaiting first contact. Costs no extra
+  // request: admins are not rep-scoped, so `leads` already holds them.
+  // Definition is shared with the log's own filter — see data/submissions.ts.
+  const unworkedSubmissions = countUnworkedSubmissions(leads);
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
   const financingRequiredDeals = visibleDeals.filter(
     (deal) => deal.financingRequired
@@ -201,9 +199,9 @@ export default function PortalDashboard() {
     ...(currentUser?.role === 'admin'
       ? [
           {
-            label: 'Unworked Submissions',
+            label: 'Needs First Contact',
             value: String(unworkedSubmissions),
-            detail: unworkedSubmissions > 0 ? 'Awaiting first contact' : 'All caught up',
+            detail: unworkedSubmissions > 0 ? 'Consultation submissions' : 'All caught up',
             icon: Inbox,
             href: '/portal/submissions',
             alert: unworkedSubmissions > 0,

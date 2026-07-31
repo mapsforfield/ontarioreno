@@ -28,6 +28,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
+import { countUnworkedSubmissions, isUnworkedSubmission } from '../data/submissions';
 import { programByKey, readableAnswers } from '../../../lib/program-config';
 import type { Lead, RoutingOutcome, SubmissionAppointment } from '../data/types';
 
@@ -150,16 +151,15 @@ export default function PortalSubmissions() {
     [appointments]
   );
 
-  const unworkedCount = useMemo(
-    () => leads.filter((l) => !l.submissionContactedAt && !l.deletedAt).length,
-    [leads]
-  );
+  const unworkedCount = useMemo(() => countUnworkedSubmissions(leads), [leads]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter((lead) => {
       if (outcomeFilter !== 'ALL' && lead.routingOutcome !== outcomeFilter) return false;
-      if (unworkedOnly && lead.submissionContactedAt) return false;
+      // Same predicate as the dashboard badge, so the number you clicked and
+      // the rows you land on always agree.
+      if (unworkedOnly && !isUnworkedSubmission(lead)) return false;
       if (!q) return true;
       return [lead.name, lead.phone, lead.email, lead.address, lead.city, lead.resolvedMunicipality]
         .filter(Boolean)
@@ -210,7 +210,11 @@ export default function PortalSubmissions() {
       {/* Stats */}
       <div className="flex flex-wrap gap-2">
         <Stat label="Total" value={String(leads.length)} />
-        <Stat label="Unworked" value={String(unworkedCount)} tone={unworkedCount > 0 ? 'warn' : undefined} />
+        <Stat
+          label="Needs contact"
+          value={String(unworkedCount)}
+          tone={unworkedCount > 0 ? 'warn' : undefined}
+        />
         <Stat label="Showing" value={String(visible.length)} />
       </div>
 
@@ -244,7 +248,7 @@ export default function PortalSubmissions() {
               : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
           }`}
         >
-          Unworked only
+          Needs contact only
         </button>
         <div className="relative ml-auto min-w-[14rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -367,13 +371,19 @@ export default function PortalSubmissions() {
                         )}
                       </td>
                       <td className="px-4 py-3">
+                        {/* Three states, matching the badge exactly: explicitly
+                            marked, handled by booking, or genuinely waiting. */}
                         {lead.submissionContactedAt ? (
                           <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Contacted
                           </span>
+                        ) : lead.appointmentId ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                            <CalendarCheck className="h-3.5 w-3.5" /> Booked
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
-                            <Circle className="h-3.5 w-3.5" /> Unworked
+                            <Circle className="h-3.5 w-3.5" /> Needs contact
                           </span>
                         )}
                       </td>
