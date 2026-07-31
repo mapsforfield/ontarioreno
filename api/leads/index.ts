@@ -1146,6 +1146,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           longitude: resolved.longitude,
           routingOutcome: routing.outcome,
           routingReasonCodes: routing.reasons,
+          addressResolutionCause: resolved.cause,
           needsReview,
           // sourceDetail carries ATTRIBUTION (sms / meta / utm), not the routing
           // tag — routingOutcome already makes nurture leads queryable, so
