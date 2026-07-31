@@ -35,6 +35,7 @@ import {
   Lead,
   LeadImportResult,
   LeadImportRow,
+  SubmissionsPayload,
   NoteTemplate,
   ProposalHistory,
   RepDayOff,
@@ -242,6 +243,13 @@ type PortalDataContextValue = PortalDataState & {
   restoreLead: (leadId: string) => Promise<void>;
   purgeLead: (leadId: string) => Promise<void>;
   fetchTrashedLeads: () => Promise<Lead[]>;
+  /** Submissions log — on-demand, deliberately outside the doorbell reload. */
+  fetchSubmissions: () => Promise<SubmissionsPayload | null>;
+  markSubmissionContacted: (
+    leadId: string,
+    contacted: boolean,
+    note: string
+  ) => Promise<Lead | null>;
   getLeadQueue: (user: User) => Lead[];
   getUnassignedLeads: () => Lead[];
   getInteractionsForLead: (leadId: string) => Interaction[];
@@ -3501,6 +3509,50 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       fetchTrashedLeads: async () => {
         const trashed = await apiCall<Lead[]>('/api/leads?_resource=trash');
         return (trashed ?? []).map((l) => ({ ...l, interactions: l.interactions ?? [] }));
+      },
+
+      // Returns null on failure rather than an empty payload: "the request
+      // failed" and "there are no submissions" must not look the same on a
+      // screen whose whole purpose is showing you everything.
+      fetchSubmissions: async () => {
+        const payload = await apiCall<SubmissionsPayload>('/api/leads?_resource=submissions');
+        if (!payload) return null;
+        return {
+          leads: (payload.leads ?? []).map((l) => ({ ...l, interactions: l.interactions ?? [] })),
+          appointments: payload.appointments ?? [],
+        };
+      },
+
+      markSubmissionContacted: async (leadId, contacted, note) => {
+        // Optimistic, then reconcile with the server row — same shape as
+        // updateLead. Keeps the dashboard badge responsive to the click.
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) =>
+            l.id === leadId
+              ? {
+                  ...l,
+                  submissionContactedAt: contacted
+                    ? l.submissionContactedAt ?? new Date().toISOString()
+                    : null,
+                  submissionOutcomeNote: note,
+                }
+              : l
+          ),
+        }));
+        const saved = await apiCall<Lead>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'mark_submission_contacted', leadId, contacted, note }),
+        });
+        if (saved) {
+          setState((current) => ({
+            ...current,
+            leads: current.leads.map((l) =>
+              l.id === leadId ? { ...saved, interactions: saved.interactions ?? [] } : l
+            ),
+          }));
+        }
+        return saved;
       },
 
       getLeadQueue,

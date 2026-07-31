@@ -512,6 +512,46 @@ async function handleCollection(
       return res.status(200).json(leads);
     }
 
+    // ── Submissions log ──
+    // Every consultation-flow lead ever, with NO other predicate: no deletedAt
+    // filter, no status filter, no assignedRepId scope. The default list scopes
+    // reps to their own assignments and these are created unassigned, and the
+    // unassigned list drops anything with a terminal status — so a submission
+    // that booked was visible nowhere. Nothing here may hide a row; filtering is
+    // the client's job and is view-state only.
+    //
+    // Deliberately NOT part of the 15-dataset doorbell reload — that path is
+    // paid for on every ping (see interactionSelect above). Fetched on mount.
+    if (req.query['_resource'] === 'submissions') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      return await withTables(async () => {
+        const leads = await prisma.lead.findMany({
+          where: { source: 'consultation_flow' },
+          orderBy: { submittedAt: 'desc' },
+          include: leadInclude,
+        });
+        // appointmentId carries no Prisma relation, so booking status needs its
+        // own read. Scoped to the ids we actually have.
+        const appointmentIds = leads
+          .map((lead) => lead.appointmentId)
+          .filter((id): id is string => Boolean(id));
+        const appointments = appointmentIds.length
+          ? await prisma.appointment.findMany({
+              where: { id: { in: appointmentIds } },
+              select: {
+                id: true,
+                status: true,
+                appointmentDate: true,
+                appointmentTime: true,
+                publicReference: true,
+                deletedAt: true,
+              },
+            })
+          : [];
+        return res.status(200).json({ leads, appointments });
+      });
+    }
+
     if (req.query['_resource'] === 'trash') {
       const where = {
         deletedAt: { not: null },
@@ -711,6 +751,70 @@ async function handleCollection(
           : await prisma.lead.findUnique({ where: { id: leadId }, include: leadInclude });
 
         return res.status(201).json({ interaction, lead: updatedLead });
+      });
+    }
+
+    // Submissions-log worklist. Sets ONLY the three submission* columns, and
+    // never calls statusForOutcome — a worklist that quietly moved lead.status
+    // would be deciding things on the operator's behalf, which is the failure
+    // mode this whole screen exists to correct.
+    if (action === 'mark_submission_contacted') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const leadId = clean(data.leadId);
+      if (!leadId) return res.status(400).json({ error: 'Missing leadId.' });
+      return await withTables(async () => {
+        const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+        if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+
+        const note = clean(data.note);
+        // Absent `contacted` means "just save the note", so editing a note never
+        // silently flips the worked state.
+        const contacted =
+          typeof data.contacted === 'boolean' ? data.contacted : lead.submissionContactedAt != null;
+        const wasContacted = lead.submissionContactedAt != null;
+
+        const updated = await prisma.lead.update({
+          where: { id: leadId },
+          data: {
+            // Un-marking clears the timestamp: a misclick must be reversible.
+            submissionContactedAt: contacted ? lead.submissionContactedAt ?? new Date() : null,
+            submissionContactedById: contacted ? lead.submissionContactedById ?? user.id : null,
+            submissionOutcomeNote: note,
+          },
+          include: leadInclude,
+        });
+
+        // Mirror into the interaction timeline so the activity is visible from
+        // the rest of the portal, not only from this page. 'note' channel, so
+        // it cannot bump attemptCount or lastContactedAt.
+        if (contacted !== wasContacted || note !== clean(lead.submissionOutcomeNote)) {
+          await prisma.interaction
+            .create({
+              data: {
+                leadId,
+                userId: user.id,
+                channel: 'note',
+                direction: 'internal',
+                body: [
+                  contacted !== wasContacted
+                    ? contacted
+                      ? 'Marked contacted in the submissions log.'
+                      : 'Marked back to unworked in the submissions log.'
+                    : 'Submissions log note updated.',
+                  note,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              },
+            })
+            .catch(() => {});
+        }
+
+        const withInteractions = await prisma.lead.findUnique({
+          where: { id: leadId },
+          include: leadInclude,
+        });
+        return res.status(200).json(withInteractions ?? updated);
       });
     }
 

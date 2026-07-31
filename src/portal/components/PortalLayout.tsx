@@ -9,6 +9,7 @@ import {
   CreditCard,
   Gauge,
   HandCoins,
+  Inbox,
   LineChart,
   AlertTriangle,
   ListTodo,
@@ -66,6 +67,7 @@ const navItems: NavItem[] = [
   { label: 'Financing', href: '/portal/financing', icon: CreditCard, feature: 'financing' },
   { label: 'Performance', href: '/portal/performance', icon: LineChart, feature: 'analytics' },
   { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, feature: 'workspace' },
+  { label: 'Submissions', href: '/portal/submissions', icon: Inbox, adminOnly: true },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
 ];
 

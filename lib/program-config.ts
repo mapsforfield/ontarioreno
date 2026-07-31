@@ -320,6 +320,85 @@ export function programBySlug(slug: string): ProgramConfig | null {
   return PROGRAMS.find((p) => p.slug === slug) ?? null;
 }
 
+/** The program a stored lead was captured under, by its persisted programKey. */
+export function programByKey(key: string | null | undefined): ProgramConfig | null {
+  if (!key) return null;
+  return PROGRAMS.find((p) => p.key === key) ?? null;
+}
+
+/**
+ * Turn a stored answer value into the words the homeowner actually saw.
+ *
+ * Searches prepQuestions as well as questions: the booking branch's local
+ * version looked only at `questions`, so the three prep keys (basementStatus,
+ * separateEntrance, permitStatus) rendered blank wherever they appeared.
+ *
+ * Falls back to the raw value rather than to '' — an unrecognised value is
+ * still information, and silently blanking it hides the fact that a lead was
+ * captured under a question set that has since changed.
+ */
+export function answerLabel(
+  program: ProgramConfig | null,
+  key: string,
+  value: string | null | undefined
+): string {
+  const raw = (value ?? '').trim();
+  if (!raw) return '';
+  if (!program) return raw;
+  const question = [...program.questions, ...program.prepQuestions].find((q) => q.key === key);
+  return question?.options.find((o) => o.value === raw)?.label ?? raw;
+}
+
+export type ReadableAnswer = {
+  key: string;
+  /** The question as it was asked, or the bare key if we no longer ask it. */
+  questionLabel: string;
+  /** Raw stored value, kept so the UI can show what was actually recorded. */
+  value: string;
+  /** Human label, or '' when the homeowner left it blank. */
+  valueLabel: string;
+};
+
+/**
+ * Every stored answer, in the program's own question order.
+ *
+ * The submit branch writes every key in the question set even when blank, so
+ * empty values are normal and are reported as such rather than dropped —
+ * "not answered" is a different fact from "not asked".
+ *
+ * Keys present in the data but absent from the program (captured under an older
+ * version, whose config we do not retain) are appended at the end rather than
+ * discarded, labelled by their bare key.
+ */
+export function readableAnswers(
+  program: ProgramConfig | null,
+  answers: Record<string, unknown> | null | undefined
+): ReadableAnswer[] {
+  const stored = (answers ?? {}) as Record<string, unknown>;
+  const out: ReadableAnswer[] = [];
+  const seen = new Set<string>();
+
+  for (const question of [...(program?.questions ?? []), ...(program?.prepQuestions ?? [])]) {
+    if (!(question.key in stored)) continue;
+    seen.add(question.key);
+    const value = String(stored[question.key] ?? '').trim();
+    out.push({
+      key: question.key,
+      questionLabel: question.label,
+      value,
+      valueLabel: answerLabel(program, question.key, value),
+    });
+  }
+
+  for (const [key, rawValue] of Object.entries(stored)) {
+    if (seen.has(key)) continue;
+    const value = String(rawValue ?? '').trim();
+    out.push({ key, questionLabel: key, value, valueLabel: value });
+  }
+
+  return out;
+}
+
 /** Public-facing question set, minus anything with no options. */
 export function publicQuestions(program: ProgramConfig): Question[] {
   return program.questions.filter((q) => q.options.length > 0);
