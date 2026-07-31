@@ -21,6 +21,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -109,7 +110,7 @@ const FILTERS: Array<{ key: OutcomeFilter; label: string }> = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortalSubmissions() {
-  const { fetchSubmissions, markSubmissionContacted } = usePortalData();
+  const { fetchSubmissions, markSubmissionContacted, trashLeads, restoreLeads } = usePortalData();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [appointments, setAppointments] = useState<SubmissionAppointment[]>([]);
@@ -119,6 +120,7 @@ export default function PortalSubmissions() {
   const [unworkedOnly, setUnworkedOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +170,86 @@ export default function PortalSubmissions() {
   }, [leads, outcomeFilter, unworkedOnly, query]);
 
   const selected = selectedId ? leads.find((l) => l.id === selectedId) ?? null : null;
+
+  // Selection is pruned to what is currently visible whenever the filters
+  // change. Without this, narrowing the view would leave rows selected that you
+  // can no longer see — and then "Move to trash" would act on them. You can
+  // only ever act on rows in front of you.
+  useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.size === 0) return current;
+      const visibleIds = new Set(visible.map((l) => l.id));
+      const next = new Set([...current].filter((id) => visibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [visible]);
+
+  const allVisibleSelected = visible.length > 0 && visible.every((l) => selectedIds.has(l.id));
+  const someVisibleSelected = visible.some((l) => selectedIds.has(l.id));
+
+  const toggleAllVisible = () => {
+    setSelectedIds(allVisibleSelected ? new Set() : new Set(visible.map((l) => l.id)));
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedLeads = visible.filter((l) => selectedIds.has(l.id));
+  const selectedLiveIds = selectedLeads.filter((l) => !l.deletedAt).map((l) => l.id);
+  const selectedTrashedIds = selectedLeads.filter((l) => l.deletedAt).map((l) => l.id);
+
+  const applyTrashed = (ids: string[], trashed: boolean) => {
+    const at = trashed ? new Date().toISOString() : null;
+    setLeads((current) =>
+      current.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: at } : l))
+    );
+  };
+
+  const handleTrash = async () => {
+    const ids = [...selectedLiveIds];
+    if (ids.length === 0) return;
+    applyTrashed(ids, true);
+    setSelectedIds(new Set());
+    const ok = await trashLeads(ids);
+    if (!ok) {
+      applyTrashed(ids, false);
+      showToast({ message: 'Could not move to trash. Please try again.', variant: 'error' });
+      return;
+    }
+    // Reversible, so an Undo is more useful than a confirmation prompt in the
+    // way — and the rows are still on screen, flagged, either way.
+    showToast({
+      message: `${ids.length} submission${ids.length === 1 ? '' : 's'} moved to trash.`,
+      description: 'Still listed here, flagged. Nothing was permanently deleted.',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          applyTrashed(ids, false);
+          restoreLeads(ids);
+        },
+      },
+    });
+  };
+
+  const handleRestore = async () => {
+    const ids = [...selectedTrashedIds];
+    if (ids.length === 0) return;
+    applyTrashed(ids, false);
+    setSelectedIds(new Set());
+    const ok = await restoreLeads(ids);
+    if (!ok) {
+      applyTrashed(ids, true);
+      showToast({ message: 'Could not restore. Please try again.', variant: 'error' });
+      return;
+    }
+    showToast({ message: `${ids.length} submission${ids.length === 1 ? '' : 's'} restored.` });
+  };
 
   const applyContacted = async (lead: Lead, contacted: boolean, note: string) => {
     setLeads((current) =>
@@ -261,6 +343,45 @@ export default function PortalSubmissions() {
         </div>
       </div>
 
+      {/* Bulk actions — only present when something is selected */}
+      {selectedIds.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-[0.5rem] border border-[#1B3C6C]/20 bg-[#f2f7fd] px-4 py-3">
+          <span className="text-sm font-black text-[#1B3C6C]">
+            {selectedIds.size} selected
+          </span>
+          {selectedLiveIds.length > 0 ? (
+            <button
+              type="button"
+              onClick={handleTrash}
+              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Move {selectedLiveIds.length} to trash
+            </button>
+          ) : null}
+          {selectedTrashedIds.length > 0 ? (
+            <button
+              type="button"
+              onClick={handleRestore}
+              className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Restore {selectedTrashedIds.length}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs font-bold text-slate-500 underline"
+          >
+            Clear selection
+          </button>
+          <span className="ml-auto text-xs font-semibold text-slate-500">
+            Trashing is reversible — rows stay listed here, flagged.
+          </span>
+        </div>
+      ) : null}
+
       {/* Table */}
       <section className="rounded-[0.5rem] border border-white bg-white shadow-sm">
         {isLoading ? (
@@ -288,6 +409,20 @@ export default function PortalSubmissions() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
                 <tr>
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible submissions"
+                      checked={allVisibleSelected}
+                      // Partial selection reads as a dash, so "some" never
+                      // looks like "all" right before a bulk action.
+                      ref={(el) => {
+                        if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                      }}
+                      onChange={toggleAllVisible}
+                      className="h-4 w-4 cursor-pointer accent-[#1B3C6C]"
+                    />
+                  </th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Contact</th>
@@ -310,8 +445,19 @@ export default function PortalSubmissions() {
                     <tr
                       key={lead.id}
                       onClick={() => setSelectedId(lead.id)}
-                      className="cursor-pointer border-b border-slate-50 hover:bg-slate-50/60"
+                      className={`cursor-pointer border-b border-slate-50 hover:bg-slate-50/60 ${
+                        selectedIds.has(lead.id) ? 'bg-[#f2f7fd]' : ''
+                      } ${lead.deletedAt ? 'opacity-60' : ''}`}
                     >
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${lead.name}`}
+                          checked={selectedIds.has(lead.id)}
+                          onChange={() => toggleOne(lead.id)}
+                          className="h-4 w-4 cursor-pointer accent-[#1B3C6C]"
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                         {formatDate(lead.submittedAt)}
                       </td>
