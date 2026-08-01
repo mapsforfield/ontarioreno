@@ -20,15 +20,6 @@
       fbq('init', '1336538964865204');
       fbq('track', 'PageView');
     </script>
-    <noscript
-      ><img
-        height="1"
-        width="1"
-        style="display: none"
-        src="https://www.facebook.com/tr?id=1336538964865204&ev=PageView&noscript=1"
-        alt=""
-    /></noscript>
-
     <!-- Cloudflare Turnstile -->
     <script
       src="https://challenges.cloudflare.com/turnstile/v0/api.js"
@@ -80,6 +71,18 @@
   </head>
 
   <body>
+    <!-- Meta Pixel fallback for clients without JavaScript. Belongs in the body:
+         a noscript in the head may only contain link, style and meta. -->
+    <noscript>
+      <img
+        height="1"
+        width="1"
+        style="display: none"
+        src="https://www.facebook.com/tr?id=1336538964865204&ev=PageView&noscript=1"
+        alt=""
+      />
+    </noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
