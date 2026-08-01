@@ -1,9 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
+import { trackPageView } from '../lib/pixel';
 
 export default function ScrollToTop() {
   const { pathname, hash } = useLocation();
   const navigationType = useNavigationType();
+  const firstRender = useRef(true);
+
+  // Meta Pixel counts one PageView on hard load (index.html). In a SPA every
+  // route change after that is silent, so it is reported here instead.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    trackPageView();
+  }, [pathname]);
 
   useEffect(() => {
     if (hash) {
