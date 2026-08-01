@@ -44,6 +44,7 @@ import {
 } from '../../lib/address-resolution.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
+import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -1160,6 +1161,25 @@ async function loadPublicFlowLead(leadRef: string) {
 }
 
 /**
+ * Meta's `_fbp` / `_fbc` cookies, which carry the click that brought the
+ * homeowner here. Read from the request rather than trusted from the body:
+ * they are first-party cookies on this domain, so the header is authoritative.
+ */
+function metaCookies(req: VercelRequest): { fbp?: string; fbc?: string } {
+  const raw = req.headers.cookie ?? '';
+  const read = (key: string) => {
+    const hit = raw.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${key}=`));
+    return hit ? decodeURIComponent(hit.slice(key.length + 1)) : undefined;
+  };
+  return { fbp: read('_fbp'), fbc: read('_fbc') };
+}
+
+function userAgent(req: VercelRequest): string | undefined {
+  const ua = req.headers['user-agent'];
+  return Array.isArray(ua) ? ua[0] : ua;
+}
+
+/**
  * Per-IP budgets for the unauthenticated flows.
  *
  * Set well above what the form actually needs, because the cost of throttling a
@@ -1383,6 +1403,38 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       .catch((err) => {
         console.error('[flow/submit] could not queue submission alerts:', err);
       });
+
+    // Server-side copy of the pixel's Lead event. Deduplicated against the
+    // browser by eventId, and reported with the contact details as submitted,
+    // which is the strongest match signal available. Best-effort like the
+    // notifications above — ad reporting must never fail a captured lead.
+    {
+      const { firstName, lastName } = splitName(name);
+      const cookies = metaCookies(req);
+      await sendMetaEvent({
+        eventName: 'Lead',
+        eventId: clean(body.eventId) || lead.id,
+        eventSourceUrl: clean(body.pageUrl) || undefined,
+        userData: {
+          email,
+          phone,
+          firstName,
+          lastName,
+          city: resolved.city,
+          state: 'Ontario',
+          country: 'ca',
+          clientIp: clientIp(req.headers),
+          clientUserAgent: userAgent(req),
+          fbp: cookies.fbp,
+          fbc: cookies.fbc,
+        },
+        customData: {
+          content_name: program.slug,
+          content_category: 'consultation',
+          status: routing.outcome,
+        },
+      });
+    }
 
     // Send now rather than waiting for the daily cron — a lead nobody hears
     // about for a day is most of the bug we are fixing.
@@ -1692,6 +1744,32 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       // so the confirmation lands while the homeowner is still on the page.
       // Best-effort: the booking is already committed and must not be undone.
       const delivery = await drainOutbox().catch(() => null);
+
+      // The booked-visit counterpart to the Lead event above.
+      {
+        const { firstName, lastName } = splitName(lead.name);
+        const cookies = metaCookies(req);
+        await sendMetaEvent({
+          eventName: 'Schedule',
+          eventId: clean(body.eventId) || `${lead.id}-schedule`,
+          eventSourceUrl: clean(body.pageUrl) || undefined,
+          userData: {
+            email: lead.email,
+            phone: lead.phone,
+            firstName,
+            lastName,
+            city: lead.city,
+            state: 'Ontario',
+            country: 'ca',
+            clientIp: clientIp(req.headers),
+            clientUserAgent: userAgent(req),
+            fbp: cookies.fbp,
+            fbc: cookies.fbc,
+          },
+          customData: { content_name: program.slug, content_category: 'consultation' },
+        });
+      }
+
       return res.status(201).json({
         publicReference: result.publicReference,
         date: result.date,

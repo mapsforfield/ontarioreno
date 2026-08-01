@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
 import { testingModeEnabled } from '../../lib/app-config';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../lib/calendar-links';
+import { newEventId, trackCustom, trackEvent } from '../lib/pixel';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
@@ -136,6 +137,9 @@ export default function ConsultationFlow() {
       .then((p: Program) => {
         setProgram(p);
         if (!p.enabled) setPhase('closed');
+        // Top of the funnel for this landing page. Custom rather than standard
+        // so it can seed a retargeting audience without polluting Lead volume.
+        if (p.enabled) trackCustom('ConsultationStart', { slug: p.slug });
       })
       .catch(() => setError('This page is unavailable right now.'));
   }, [slug]);
@@ -161,11 +165,16 @@ export default function ConsultationFlow() {
     if (!program) return;
     setBusy(true);
     setError('');
+    // One id for both copies of this conversion — sent to the server, and
+    // passed to the pixel below. See lib/meta-capi.ts.
+    const eventId = newEventId();
     try {
       const r = await fetch('/api/leads?flow=submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          eventId,
+          pageUrl: window.location.href,
           programSlug: program.slug,
           name: finalContact.name,
           phone: finalContact.phone,
@@ -184,6 +193,15 @@ export default function ConsultationFlow() {
       // Always recorded, panel or no panel — so a routing result can be diagnosed
       // from devtools even on the live site, where the panel is hidden.
       console.info('[consultation] routing', { outcome: j.outcome, reasons: j.reasons });
+      // The ad's conversion event: the homeowner is now a lead. Fired once the
+      // server accepted the submission, so Meta never optimises toward a form
+      // post that failed. The outcome is passed through so a campaign can be
+      // read against qualified vs unqualified traffic.
+      trackEvent(
+        'Lead',
+        { content_name: program.slug, content_category: 'consultation', status: j.outcome },
+        eventId
+      );
       if (j.offersCalendar) {
         const av = await (await fetch(`/api/leads?flow=availability&leadRef=${encodeURIComponent(j.leadRef)}`)).json();
         setSlots(av.slots ?? []);
@@ -202,11 +220,18 @@ export default function ConsultationFlow() {
     if (!chosen || busy) return;
     setBusy(true);
     setError('');
+    const eventId = newEventId();
     try {
       const r = await fetch('/api/leads?flow=book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadRef, date: chosen.date, time: chosen.time }),
+        body: JSON.stringify({
+          leadRef,
+          date: chosen.date,
+          time: chosen.time,
+          eventId,
+          pageUrl: window.location.href,
+        }),
       });
       const j = await r.json();
       if (r.status === 409 && j?.code === 'SLOT_UNAVAILABLE') {
@@ -218,6 +243,13 @@ export default function ConsultationFlow() {
       if (!r.ok) throw new Error(j?.error ?? 'We could not complete the booking.');
       setBooking(j);
       setPhase('result');
+      // Stronger than Lead — a booked consultation. Useful as the optimisation
+      // event once the pixel has enough volume to learn on it.
+      trackEvent(
+        'Schedule',
+        { content_name: program?.slug ?? '', content_category: 'consultation' },
+        eventId
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'We could not complete the booking.');
     } finally {
