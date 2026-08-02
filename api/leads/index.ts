@@ -885,6 +885,40 @@ async function handleCollection(
     // believe they deleted. Interactions cascade via their FK; Appointment and
     // NotificationOutbox carry leadId as a plain column with no constraint, so
     // their history survives the lead being removed.
+    /**
+     * Move submissions to the Deleted tab.
+     *
+     * Deleting used to remove the row outright, which meant a misclick on the
+     * wrong checkbox destroyed a lead with no way back. Recoverable by default
+     * now; `purge_leads` still exists for when a row genuinely has to go, and is
+     * reachable only from inside the Deleted view.
+     */
+    if (action === 'trash_leads') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const ids = Array.isArray(data.ids) ? data.ids.map((value) => clean(value)).filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'No lead ids provided.' });
+      return await withTables(async () => {
+        const result = await prisma.lead.updateMany({
+          where: { id: { in: ids } },
+          data: { deletedAt: new Date() },
+        });
+        return res.status(200).json({ ok: true, trashed: result.count, ids });
+      });
+    }
+
+    if (action === 'restore_leads') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const ids = Array.isArray(data.ids) ? data.ids.map((value) => clean(value)).filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'No lead ids provided.' });
+      return await withTables(async () => {
+        const result = await prisma.lead.updateMany({
+          where: { id: { in: ids } },
+          data: { deletedAt: null },
+        });
+        return res.status(200).json({ ok: true, restored: result.count, ids });
+      });
+    }
+
     if (action === 'purge_leads') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       const ids = Array.isArray(data.ids) ? data.ids.map((value) => clean(value)).filter(Boolean) : [];
