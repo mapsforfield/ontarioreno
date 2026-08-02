@@ -265,6 +265,10 @@ type PortalDataContextValue = PortalDataState & {
     time: string,
     notify: boolean
   ) => Promise<{ publicReference: string; date: string; time: string } | null>;
+  /** Recoverable — moves submissions into the Deleted view. */
+  trashLeads: (ids: string[]) => Promise<boolean>;
+  /** Brings them back out of it. */
+  restoreLeads: (ids: string[]) => Promise<boolean>;
   /** Permanent, irreversible. Interactions cascade. */
   purgeLeads: (ids: string[]) => Promise<boolean>;
   getLeadQueue: (user: User) => Lead[];
@@ -3588,6 +3592,32 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }
         );
         return result ?? null;
+      },
+
+      trashLeads: async (ids) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) =>
+            ids.includes(l.id) ? { ...l, deletedAt: new Date().toISOString() } : l
+          ),
+        }));
+        const result = await apiCall<{ ok: boolean }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'trash_leads', ids }),
+        });
+        return Boolean(result?.ok);
+      },
+
+      restoreLeads: async (ids) => {
+        setState((current) => ({
+          ...current,
+          leads: current.leads.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: null } : l)),
+        }));
+        const result = await apiCall<{ ok: boolean }>('/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'restore_leads', ids }),
+        });
+        return Boolean(result?.ok);
       },
 
       purgeLeads: async (ids) => {

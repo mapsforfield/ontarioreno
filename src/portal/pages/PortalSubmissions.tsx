@@ -4,11 +4,15 @@
 // nurture, decline and abandoned-calendar leads were captured in silence and
 // appeared on no screen.
 //
-// The governing rule here is that NOTHING is hidden. There is no archive, no
-// auto-hide, no "resolved" state that removes a row. Filters are view-state
-// only and always return to the complete set. A trashed or already-booked
-// submission still appears, flagged — those are precisely the rows the other
-// lead endpoints drop.
+// The governing rule here is that nothing is hidden WITHOUT BEING ASKED FOR.
+// There is no archive, no auto-hide, no "resolved" state that removes a row,
+// and an already-booked submission still appears, flagged — those are precisely
+// the rows the other lead endpoints drop.
+//
+// Deleted submissions are the single exception, and only since deleting stopped
+// being permanent: they sit in their own counted tab rather than mixed into the
+// working list. Nothing is destroyed to get them there, and the tab is always
+// one click away, so the complete set remains reachable.
 
 import {
   AlertTriangle,
@@ -126,7 +130,8 @@ const FILTERS: Array<{ key: OutcomeFilter; label: string }> = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortalSubmissions() {
-  const { fetchSubmissions, markSubmissionContacted, purgeLeads } = usePortalData();
+  const { fetchSubmissions, markSubmissionContacted, trashLeads, restoreLeads, purgeLeads } =
+    usePortalData();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [appointments, setAppointments] = useState<SubmissionAppointment[]>([]);
@@ -138,6 +143,9 @@ export default function PortalSubmissions() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  /** The Deleted view is a separate mode, not an outcome filter. */
+  const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +183,10 @@ export default function PortalSubmissions() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter((lead) => {
+      // Deleted rows live in their own view. This is the one place the log
+      // hides something, and only because the alternative — deleted leads mixed
+      // into the working list — is what makes a delete feel unsafe to use.
+      if (Boolean(lead.deletedAt) !== showDeleted) return false;
       if (outcomeFilter !== 'ALL' && lead.routingOutcome !== outcomeFilter) return false;
       // Same predicate as the dashboard badge, so the number you clicked and
       // the rows you land on always agree.
@@ -184,7 +196,9 @@ export default function PortalSubmissions() {
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q));
     });
-  }, [leads, outcomeFilter, unworkedOnly, query]);
+  }, [leads, outcomeFilter, unworkedOnly, query, showDeleted]);
+
+  const deletedCount = useMemo(() => leads.filter((l) => l.deletedAt).length, [leads]);
 
   const selected = selectedId ? leads.find((l) => l.id === selectedId) ?? null : null;
 
@@ -217,28 +231,71 @@ export default function PortalSubmissions() {
     });
   };
 
-  // Permanent. The rows are removed from the screen immediately and the
-  // deletion is irreversible, so it is gated behind an explicit confirm rather
-  // than an Undo toast — there is nothing to undo once it has run.
+  // Recoverable. Deleting used to erase the row, so a misclick on the wrong
+  // checkbox destroyed a lead with nothing to restore from. It now moves to the
+  // Deleted view, where it can be brought back or removed for good.
   const handleDelete = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setLeads((current) =>
+      current.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: new Date().toISOString() } : l))
+    );
+    setSelectedIds(new Set());
+    setConfirmDelete(false);
+    if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+    const ok = await trashLeads(ids);
+    if (!ok) {
+      setLeads((current) =>
+        current.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: null } : l))
+      );
+      showToast({ message: 'Could not delete. Please try again.', variant: 'error' });
+      return;
+    }
+    showToast({
+      message: `${ids.length} submission${ids.length === 1 ? '' : 's'} moved to Deleted.`,
+    });
+  };
+
+  const handleRestore = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setLeads((current) => current.map((l) => (ids.includes(l.id) ? { ...l, deletedAt: null } : l)));
+    setSelectedIds(new Set());
+    const ok = await restoreLeads(ids);
+    if (!ok) {
+      setLeads((current) =>
+        current.map((l) =>
+          ids.includes(l.id) ? { ...l, deletedAt: new Date().toISOString() } : l
+        )
+      );
+      showToast({ message: 'Could not restore. Please try again.', variant: 'error' });
+      return;
+    }
+    showToast({ message: `${ids.length} submission${ids.length === 1 ? '' : 's'} restored.` });
+  };
+
+  // The only irreversible path left, and it is reachable only from inside the
+  // Deleted view — so nothing can be destroyed without first being deleted and
+  // then deliberately sought out.
+  const handlePurge = async () => {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
     const removed = leads.filter((l) => ids.includes(l.id));
     setLeads((current) => current.filter((l) => !ids.includes(l.id)));
     setSelectedIds(new Set());
-    setConfirmDelete(false);
+    setConfirmPurge(false);
     if (selectedId && ids.includes(selectedId)) setSelectedId(null);
     const ok = await purgeLeads(ids);
     if (!ok) {
-      // Put them back rather than leaving the screen claiming a delete that
-      // never happened.
       setLeads((current) =>
         [...current, ...removed].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
       );
       showToast({ message: 'Could not delete. Please try again.', variant: 'error' });
       return;
     }
-    showToast({ message: `${ids.length} submission${ids.length === 1 ? '' : 's'} deleted.` });
+    showToast({
+      message: `${ids.length} submission${ids.length === 1 ? '' : 's'} permanently deleted.`,
+    });
   };
 
   const applyContacted = async (lead: Lead, contacted: boolean, note: string) => {
@@ -281,7 +338,9 @@ export default function PortalSubmissions() {
 
       {/* Stats */}
       <div className="flex flex-wrap gap-2">
-        <Stat label="Total" value={String(leads.length)} />
+        {/* Excludes deleted, which have their own counted tab — a Total that
+            disagreed with the All tab beside it would just read as a bug. */}
+        <Stat label="Total" value={String(leads.length - deletedCount)} />
         <Stat
           label="Needs contact"
           value={String(unworkedCount)}
@@ -293,14 +352,20 @@ export default function PortalSubmissions() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {
-          const active = outcomeFilter === f.key;
+          const active = !showDeleted && outcomeFilter === f.key;
+          // Counts describe the view you are in, so the number on a tab always
+          // matches the rows it shows.
+          const pool = leads.filter((l) => Boolean(l.deletedAt) === showDeleted);
           const count =
-            f.key === 'ALL' ? leads.length : leads.filter((l) => l.routingOutcome === f.key).length;
+            f.key === 'ALL' ? pool.length : pool.filter((l) => l.routingOutcome === f.key).length;
           return (
             <button
               key={f.key}
               type="button"
-              onClick={() => setOutcomeFilter(f.key)}
+              onClick={() => {
+                setShowDeleted(false);
+                setOutcomeFilter(f.key);
+              }}
               className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                 active
                   ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
@@ -322,6 +387,24 @@ export default function PortalSubmissions() {
         >
           Needs contact only
         </button>
+        {/* Deleted submissions, kept rather than erased so a wrong checkbox is
+            a nuisance instead of a loss. */}
+        <button
+          type="button"
+          onClick={() => {
+            setShowDeleted((v) => !v);
+            setSelectedIds(new Set());
+            setSelectedId(null);
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+            showDeleted
+              ? 'border-slate-800 bg-slate-800 text-white'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+          }`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Deleted ({deletedCount})
+        </button>
         <div className="relative ml-auto min-w-[14rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -339,14 +422,37 @@ export default function PortalSubmissions() {
           <span className="text-sm font-black text-[#1B3C6C]">
             {selectedIds.size} selected
           </span>
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-700"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete {selectedIds.size} permanently
-          </button>
+          {/* Restore is the primary action in the Deleted view; permanent
+              removal is available there but never the obvious button. */}
+          {showDeleted ? (
+            <>
+              <button
+                type="button"
+                onClick={handleRestore}
+                className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-xs font-black text-white hover:opacity-90"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Restore {selectedIds.size}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(true)}
+                className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-red-200 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete permanently
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete {selectedIds.size}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
@@ -520,6 +626,44 @@ export default function PortalSubmissions() {
         )}
       </section>
 
+      {confirmPurge ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[0.5rem] bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black tracking-[-0.02em] text-slate-950">
+                  Permanently delete {selectedIds.size} submission
+                  {selectedIds.size === 1 ? '' : 's'}?
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  This cannot be undone. The submission and its full history are removed for good,
+                  and cannot be restored afterwards.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(false)}
+                className="rounded-[0.5rem] border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePurge}
+                className="rounded-[0.5rem] bg-red-600 px-4 py-2.5 text-sm font-black text-white hover:bg-red-700"
+              >
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {confirmDelete ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[0.5rem] bg-white p-5 shadow-2xl">
@@ -532,7 +676,7 @@ export default function PortalSubmissions() {
                   Delete {selectedIds.size} submission{selectedIds.size === 1 ? '' : 's'}?
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-600">
-                  This cannot be undone. The submission and its full history are removed for good.
+                  They move to the Deleted tab, where you can restore them.
                 </p>
               </div>
             </div>
@@ -547,9 +691,9 @@ export default function PortalSubmissions() {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="rounded-[0.5rem] bg-red-600 px-4 py-2.5 text-sm font-black text-white hover:bg-red-700"
+                className="rounded-[0.5rem] bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-800"
               >
-                Delete permanently
+                Move to Deleted
               </button>
             </div>
           </div>
