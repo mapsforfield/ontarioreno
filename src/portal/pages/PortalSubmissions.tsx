@@ -81,6 +81,22 @@ function NotRecorded() {
   return <span className="italic text-slate-400">not recorded</span>;
 }
 
+/**
+ * Slot date and time, written the way the homeowner sees them in the booking
+ * flow. A rep reading a time aloud on a call should not have to convert it.
+ */
+function slotDate(d: string) {
+  return new Date(`${d}T12:00:00`).toLocaleDateString('en-CA', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+function slotTime(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
 function humanCause(cause: string) {
   return cause
     .toLowerCase()
@@ -615,8 +631,8 @@ function SubmissionDrawer({
     }
     showToast({
       message: notify
-        ? `Booked ${result.date} at ${result.time}. Confirmation sent.`
-        : `Booked ${result.date} at ${result.time}. Nothing was sent to the homeowner.`,
+        ? `Booked ${slotDate(result.date)} at ${slotTime(result.time)}. Confirmation sent.`
+        : `Booked ${slotDate(result.date)} at ${slotTime(result.time)}. Nothing was sent to the homeowner.`,
       variant: 'success',
     });
     onClose();
@@ -771,7 +787,7 @@ function SubmissionDrawer({
                       }, {})
                     ).map(([date, times]) => (
                       <div key={date}>
-                        <p className="mb-1.5 text-xs font-black text-slate-700">{date}</p>
+                        <p className="mb-1.5 text-xs font-black text-slate-700">{slotDate(date)}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {times.map((time) => {
                             const on = picked?.date === date && picked?.time === time;
@@ -786,7 +802,7 @@ function SubmissionDrawer({
                                     : 'border-slate-200 text-slate-600 hover:border-[#1B3C6C]'
                                 }`}
                               >
-                                {time}
+                                {slotTime(time)}
                               </button>
                             );
                           })}
@@ -817,7 +833,7 @@ function SubmissionDrawer({
                     {booking
                       ? 'Booking…'
                       : picked
-                        ? `Book ${picked.date} at ${picked.time}`
+                        ? `Book ${slotDate(picked.date)} at ${slotTime(picked.time)}`
                         : 'Pick a time'}
                   </button>
                 </div>
