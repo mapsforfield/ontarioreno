@@ -21,6 +21,51 @@ test('a fully qualified Hamilton homeowner reaches the calendar', () => {
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
 });
 
+test('an address resolved from typed text still reaches the calendar', () => {
+  // The regression this exists to prevent, taken from a real submission: a
+  // Stoney Creek homeowner who owned the property, wanted a secondary suite,
+  // was ready to start and was paying cash — routed to manual review purely
+  // because she typed her address instead of tapping the dropdown suggestion.
+  //
+  // Once the server has matched that text to exactly one real address, the
+  // result is the same address a tap would have produced. It must book.
+  const r = routeConsultation({
+    ...base,
+    addressState: 'ADDRESS_INFERRED',
+    area: areaForMunicipality('Stoney Creek'),
+    answers: OK,
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(!r.reasons.includes('ADDRESS_UNVERIFIED'));
+  assert.ok(!r.reasons.includes('MUNICIPALITY_UNRECOGNISED'));
+});
+
+test('an inferred address does not rescue an otherwise unqualified lead', () => {
+  // Softening the address must not soften anything else: the address is one
+  // input, and every other guard has to keep firing exactly as before.
+  const notOwner = routeConsultation({
+    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, ownership: 'no' },
+  });
+  assert.equal(notOwner.outcome, 'DECLINE');
+
+  const exploring = routeConsultation({
+    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, timeline: 'exploring' },
+  });
+  assert.equal(exploring.outcome, 'NURTURE');
+
+  const unsureFunding = routeConsultation({
+    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, contribution: 'unsure' },
+  });
+  assert.equal(unsureFunding.outcome, 'MANUAL_REVIEW');
+});
+
+test('a typed address that stayed unresolved still goes to a person', () => {
+  // Ambiguous or unmatched text never becomes INFERRED, so this is the floor
+  // the change is built on: nothing uncertain gained a route to the calendar.
+  const r = routeConsultation({ ...base, addressState: 'ADDRESS_UNVERIFIED', area: null, answers: OK });
+  assert.equal(r.outcome, 'MANUAL_REVIEW');
+});
+
 test('"Just exploring" NEVER reaches the calendar, whatever else is perfect', () => {
   // A passive browser must not hold a 45-minute live consultation slot. This has
   // to hold even when every other answer is ideal.

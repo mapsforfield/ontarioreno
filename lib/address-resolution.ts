@@ -18,6 +18,17 @@
 export type AddressResolutionCause =
   /** Standardised cleanly into a municipality we map. */
   | 'RESOLVED'
+  /**
+   * No suggestion was picked, but the text the homeowner typed matched exactly
+   * one real address, which then standardised cleanly. Weaker evidence than a
+   * picked suggestion — nobody chose this from a list — but strong enough to
+   * schedule on, because a single unambiguous match is not an ambiguity.
+   */
+  | 'RESOLVED_FROM_TYPED_TEXT'
+  /** Typed text matched several real addresses; picking one for them would guess. */
+  | 'TYPED_TEXT_AMBIGUOUS'
+  /** Typed text matched no real address at all. */
+  | 'TYPED_TEXT_NO_MATCH'
   /** Confidently outside Ontario — the one address fact we decline on. */
   | 'OUTSIDE_ONTARIO'
   /** Resolved, but missing a street number, route or postal code. */
@@ -56,6 +67,12 @@ export function describeCause(cause: AddressResolutionCause): string {
   switch (cause) {
     case 'RESOLVED':
       return 'Address resolved normally.';
+    case 'RESOLVED_FROM_TYPED_TEXT':
+      return 'No suggestion was picked, but the typed address matched exactly one real address and resolved cleanly. Worth an eye before the visit — it was never chosen from a list.';
+    case 'TYPED_TEXT_AMBIGUOUS':
+      return 'No suggestion was picked, and the typed address matched more than one real address, so none could be chosen without guessing.';
+    case 'TYPED_TEXT_NO_MATCH':
+      return 'No suggestion was picked, and the typed address matched no real address.';
     case 'OUTSIDE_ONTARIO':
       return 'Address resolved to a province outside Ontario.';
     case 'INCOMPLETE_ADDRESS':

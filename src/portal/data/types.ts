@@ -504,8 +504,11 @@ export type Lead = {
 
 export type RoutingOutcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
 
+/** Mirrors AddressState in lib/program-config.ts — keep the two in step. */
 export type AddressState =
   | 'ADDRESS_VERIFIED'
+  /** Resolved from typed text that matched exactly one real address. */
+  | 'ADDRESS_INFERRED'
   | 'ADDRESS_UNVERIFIED'
   | 'ADDRESS_OUTSIDE_SERVICE_AREA';
 

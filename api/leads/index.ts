@@ -1013,8 +1013,50 @@ async function placesAutocomplete(input: string): Promise<PlaceSuggestion[]> {
   }
 }
 
+/**
+ * Google Places text search, used only as the fallback for a homeowner who
+ * typed an address instead of picking one.
+ *
+ * Capped at two results on purpose: we never need to rank candidates, only to
+ * learn whether there is exactly one. A second result is enough to prove
+ * ambiguity, and asking for more would bill us for information we discard.
+ */
+async function placesTextSearch(input: string): Promise<string[]> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const query = input.trim();
+  if (!apiKey || query.length < 6 || query.length > 120) return [];
+  if (!(await placesSpendCap.tryConsume())) return [];
+
+  const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id',
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      // Text Search takes ONE region code as a string. `includedRegionCodes`
+      // is the autocomplete spelling; sending it here is a 400, and a 400 that
+      // gets read as "no results" is indistinguishable from a bad address —
+      // the exact confusion this whole change exists to remove.
+      regionCode: 'CA',
+      maxResultCount: 2,
+    }),
+  });
+  if (!r.ok) {
+    // Thrown, not swallowed, so the caller records PROVIDER_ERROR and this
+    // shows up as our outage rather than as the homeowner's bad address.
+    throw new Error(`places:searchText ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  }
+  const j = (await r.json()) as { places?: Array<{ id?: string }> };
+  return (j.places ?? []).map((p) => p.id ?? '').filter(Boolean);
+}
+
 type ResolvedAddress = {
   addressState: AddressState;
+  /** The place this resolved from. Empty whenever nothing resolved. */
+  placeId: string;
   address: string;
   city: string;
   postalCode: string;
@@ -1033,6 +1075,7 @@ type ResolvedAddress = {
 
 const UNRESOLVED: ResolvedAddress = {
   addressState: 'ADDRESS_UNVERIFIED',
+  placeId: '',
   address: '',
   city: '',
   postalCode: '',
@@ -1101,14 +1144,14 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
     // Outside Ontario is the one address fact we can decline on with confidence.
     if (province && province !== 'ON') {
       return {
-        ...UNRESOLVED, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', province, municipality,
+        ...UNRESOLVED, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', placeId, province, municipality,
         cause: 'OUTSIDE_ONTARIO',
       };
     }
     // A missing street number or postal code means we cannot confirm a dwelling.
     if (!streetNumber || !route || !postalCode) {
       return {
-        ...UNRESOLVED, address, city: municipality, postalCode, province, municipality,
+        ...UNRESOLVED, placeId, address, city: municipality, postalCode, province, municipality,
         latitude, longitude,
         cause: 'INCOMPLETE_ADDRESS',
       };
@@ -1119,6 +1162,7 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       // An unrecognised Ontario municipality stays UNVERIFIED — we may well serve
       // it (Simcoe is not mapped yet), so it must reach a human, not a decline.
       addressState: area ? 'ADDRESS_VERIFIED' : 'ADDRESS_UNVERIFIED',
+      placeId,
       address,
       city: municipality,
       postalCode,
@@ -1133,6 +1177,62 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
     console.error('[flow/submit] address resolution failed:', err);
     return { ...UNRESOLVED, cause: 'PROVIDER_ERROR' };
   }
+}
+
+/**
+ * Resolve an address the homeowner TYPED but never picked from the dropdown.
+ *
+ * Tapping a suggestion is still the primary path and is untouched. This exists
+ * because the tap was load-bearing and invisible: a homeowner who typed a
+ * complete, correct address and pressed Continue was routed to manual review
+ * for a UI convention they had no way to know about. That is our failure being
+ * charged to them, and it costs real bookings.
+ *
+ * The rule is unchanged in spirit — ambiguity goes to a person. What changes is
+ * what counts as ambiguity. Exactly one match is not ambiguous, so it resolves
+ * and schedules. Zero matches or two matches stay unverified, exactly as today.
+ * We never pick a "best" candidate; guessing an address someone will be driven
+ * to is precisely the thing worth refusing.
+ */
+async function resolveTypedAddress(typed: string): Promise<ResolvedAddress> {
+  const text = typed.trim();
+  if (!text) return { ...UNRESOLVED, cause: 'NO_PLACE_SELECTED' };
+
+  let candidates: string[];
+  try {
+    candidates = await placesTextSearch(text);
+  } catch (err) {
+    console.error('[flow] typed-address search failed:', err);
+    return { ...UNRESOLVED, cause: 'PROVIDER_ERROR' };
+  }
+
+  if (candidates.length === 0) return { ...UNRESOLVED, cause: 'TYPED_TEXT_NO_MATCH' };
+  if (candidates.length > 1) return { ...UNRESOLVED, cause: 'TYPED_TEXT_AMBIGUOUS' };
+
+  const resolved = await resolvePlace(candidates[0]);
+  // Only a clean resolution is softened into INFERRED. Outside-Ontario stays a
+  // decline, and incomplete or unmapped stay unverified — arriving here by a
+  // weaker route must never make an address look STRONGER than the same address
+  // would have looked had it been tapped.
+  if (resolved.addressState !== 'ADDRESS_VERIFIED') return resolved;
+  return { ...resolved, addressState: 'ADDRESS_INFERRED', cause: 'RESOLVED_FROM_TYPED_TEXT' };
+}
+
+/**
+ * The single entry point for turning what the homeowner gave us into an address.
+ * A picked suggestion always wins; typed text is consulted only in its absence.
+ */
+async function resolveAddress(placeId: string, typed: string): Promise<ResolvedAddress> {
+  if (!process.env.GOOGLE_PLACES_API_KEY) {
+    return { ...UNRESOLVED, cause: 'PROVIDER_NOT_CONFIGURED' };
+  }
+  if (placeId) return resolvePlace(placeId);
+  // No suggestions could have been shown, so there was nothing to pick and the
+  // typed text cannot be checked either. Ours to fix, not theirs.
+  if (placesSpendCap.exhaustedToday()) {
+    return { ...UNRESOLVED, cause: 'PROVIDER_QUOTA_EXHAUSTED' };
+  }
+  return resolveTypedAddress(typed);
 }
 
 /** Reps eligible for public booking, in assignment order. Names never appear. */
@@ -1191,6 +1291,10 @@ function userAgent(req: VercelRequest): string | undefined {
 const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
   program: { limit: 120, windowMs: 10 * 60_000 },
   address_suggest: { limit: 60, windowMs: 10 * 60_000 },
+  // One call per attempt to leave step 1, not per keystroke, so this is tight
+  // compared with suggest while still absorbing a homeowner who corrects a typo
+  // several times over.
+  address_resolve: { limit: 15, windowMs: 10 * 60_000 },
   availability: { limit: 120, windowMs: 10 * 60_000 },
   submit: { limit: 10, windowMs: 60 * 60_000 },
   book: { limit: 10, windowMs: 60 * 60_000 },
@@ -1230,6 +1334,25 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ suggestions });
   }
 
+  // ── Typed address → the one place it can mean, for the homeowner to confirm ──
+  // Asked when someone leaves step 1 without having picked a suggestion. Returns
+  // a candidate only when the text is unambiguous; silence means "carry on", not
+  // "stop", because a homeowner must never be trapped on the address step.
+  if (flow === 'address_resolve' && req.method === 'GET') {
+    const resolved = await resolveTypedAddress(String(req.query['q'] ?? ''));
+    if (resolved.addressState !== 'ADDRESS_INFERRED') {
+      return res.status(200).json({ candidate: null });
+    }
+    return res.status(200).json({
+      candidate: {
+        placeId: resolved.placeId,
+        description: [resolved.address, resolved.city, resolved.province, resolved.postalCode]
+          .filter(Boolean)
+          .join(', '),
+      },
+    });
+  }
+
   // ── Submit qualification → route → create Lead ──
   if (flow === 'submit' && req.method === 'POST') {
     const body = (req.body ?? {}) as Record<string, unknown>;
@@ -1243,7 +1366,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     const requested = programBySlug(clean(body.programSlug) || 'hamilton');
     if (!requested) return res.status(404).json({ error: 'Unknown program.' });
 
-    const resolved = await resolvePlace(clean(body.placeId));
+    const resolved = await resolveAddress(clean(body.placeId), clean(body.addressText));
     // The program comes from the resolved address, never from the homeowner.
     const areaProgram = programForArea(resolved.area);
     const program = areaProgram ?? requested;

@@ -62,6 +62,12 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   }
 
   // ── 2. MANUAL_REVIEW — every form of doubt ──
+  // ADDRESS_INFERRED is deliberately absent: it means the typed text matched
+  // exactly ONE real address, which the server then standardised the same way it
+  // standardises a picked suggestion. A single unambiguous match is not doubt,
+  // and treating it as doubt is what sent qualified homeowners to a queue for
+  // the sole offence of not knowing they had to tap the dropdown. Anything less
+  // certain than a unique match never reaches this function as INFERRED.
   if (addressState === 'ADDRESS_UNVERIFIED') reasons.push('ADDRESS_UNVERIFIED');
   if (!area) reasons.push('MUNICIPALITY_UNRECOGNISED');
   // A recognised area whose program is not live yet (Simcoe at launch) must be

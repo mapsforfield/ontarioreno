@@ -10,6 +10,13 @@ export type SchedulingArea = 'HAMILTON' | 'SIMCOE';
 /** Server-assigned. Never chosen by the homeowner. */
 export type AddressState =
   | 'ADDRESS_VERIFIED'
+  /**
+   * Resolved from typed text rather than a picked suggestion, and matched
+   * exactly one real address. Schedulable — a unique match is not an ambiguity
+   * — but recorded separately from ADDRESS_VERIFIED so the softer path stays
+   * auditable, and so a rep can eyeball it before driving out.
+   */
+  | 'ADDRESS_INFERRED'
   | 'ADDRESS_OUTSIDE_SERVICE_AREA'
   | 'ADDRESS_UNVERIFIED';
 
