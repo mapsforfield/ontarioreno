@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { CheckCircle, Home, ShieldCheck, FileText } from "lucide-react";
+import { ArrowRight, CalendarCheck, CheckCircle, Home, ShieldCheck, FileText } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 
@@ -48,10 +48,21 @@ export default function HamiltonSecondarySuiteGrant() {
                             <span>Designed for rental-ready units</span>
                         </div>
 
-                        <div className="mt-8 flex flex-wrap gap-4">
+                        {/* Booking leads: the only path here that ends in a
+                            confirmed appointment rather than a queue. */}
+                        <div className="mt-8 flex flex-wrap items-center gap-4">
+                            <a
+                                href="/consultation/hamilton?src=secondary-suite-hero"
+                                className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
+                            >
+                                <CalendarCheck className="h-5 w-5" />
+                                Book your in-home visit
+                                <ArrowRight className="h-5 w-5" />
+                            </a>
+
                             <a
                                 href="#eligibility-form"
-                                className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
+                                className="rounded-xl border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
                             >
                                 Check If My Home Qualifies
                             </a>
@@ -63,6 +74,10 @@ export default function HamiltonSecondarySuiteGrant() {
                                 See Basement Grant Breakdown
                             </a>
                         </div>
+
+                        <p className="mt-4 text-sm font-semibold text-slate-400">
+                            Pick a time that works — no waiting for a callback.
+                        </p>
                     </div>
                 </div>
             </section>
