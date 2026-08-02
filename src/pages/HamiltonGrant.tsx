@@ -1,6 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import {
   ArrowRight,
+  CalendarCheck,
   Calculator,
   CheckCircle2,
   FileText,
@@ -83,16 +84,33 @@ export default function HamiltonGrant() {
                 ))}
               </div>
 
+              {/* Booking leads. It is the only path here that ends in a
+                  confirmed appointment rather than a queue, so it takes the
+                  solid fill; the other two stay reachable but quieter. */}
               <div className="mt-1.5 space-y-2.5">
                 <a
-                  href="#eligibility-form"
+                  href="/consultation/hamilton?src=grant-guide-hero"
                   className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <CalendarCheck className="h-5 w-5 shrink-0" />
+                    <span>Book your in-home visit</span>
+                  </span>
+                  <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
+                </a>
+                <p className="px-1 text-[0.82rem] font-semibold text-slate-400">
+                  Pick a time that works — no waiting for a callback.
+                </p>
+
+                <a
+                  href="#eligibility-form"
+                  className="flex w-full items-center rounded-2xl border border-white/18 bg-white/6 px-5 py-4 text-[1.02rem] font-semibold text-white/95 backdrop-blur-sm transition hover:bg-white/10"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <FileText className="h-5 w-5 shrink-0" />
                     <span>Check If I Qualify</span>
                   </span>
-                  <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
+                  <ArrowRight className="ml-auto h-5 w-5 shrink-0 text-white/70" />
                 </a>
 
                 <a
@@ -168,10 +186,21 @@ export default function HamiltonGrant() {
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
               If you're planning to finish your basement into a legal rental unit, this is everything you need to know before getting started.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            {/* Booking leads here too. It is the only one of the three that
+                ends in a confirmed appointment instead of a queue. */}
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <a
+                href="/consultation/hamilton?src=grant-guide-hero"
+                className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
+              >
+                <CalendarCheck className="h-5 w-5" />
+                Book your in-home visit
+                <ArrowRight className="h-5 w-5" />
+              </a>
+
               <a
                 href="#eligibility-form"
-                className="rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
+                className="rounded-xl border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
               >
                 Check If I Qualify
               </a>
@@ -183,6 +212,10 @@ export default function HamiltonGrant() {
                 See My Estimated Grant
               </a>
             </div>
+
+            <p className="mt-4 text-sm font-semibold text-slate-400">
+              Pick a time that works — no waiting for a callback.
+            </p>
           </div>
         </div>
       </section>
