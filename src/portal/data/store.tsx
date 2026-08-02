@@ -250,6 +250,21 @@ type PortalDataContextValue = PortalDataState & {
     contacted: boolean,
     note: string
   ) => Promise<Lead | null>;
+  /** Free slots for one lead, computed the same way the homeowner's calendar is. */
+  fetchLeadSlots: (
+    leadId: string
+  ) => Promise<{ slots: Array<{ date: string; time: string }>; visitMinutes: number }>;
+  /**
+   * Book a visit for a lead from the portal. `notify` sends the homeowner the
+   * usual confirmation; it defaults to off at the call site because the rep is
+   * normally on the phone with them already.
+   */
+  bookLeadVisit: (
+    leadId: string,
+    date: string,
+    time: string,
+    notify: boolean
+  ) => Promise<{ publicReference: string; date: string; time: string } | null>;
   /** Permanent, irreversible. Interactions cascade. */
   purgeLeads: (ids: string[]) => Promise<boolean>;
   getLeadQueue: (user: User) => Lead[];
@@ -3555,6 +3570,24 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }));
         }
         return saved;
+      },
+
+      fetchLeadSlots: async (leadId) => {
+        const payload = await apiCall<{ slots: Array<{ date: string; time: string }>; visitMinutes: number }>(
+          `/api/leads?_resource=lead_slots&leadId=${encodeURIComponent(leadId)}`
+        );
+        return { slots: payload?.slots ?? [], visitMinutes: payload?.visitMinutes ?? 0 };
+      },
+
+      bookLeadVisit: async (leadId, date, time, notify) => {
+        const result = await apiCall<{ publicReference: string; date: string; time: string }>(
+          '/api/leads',
+          {
+            method: 'POST',
+            body: JSON.stringify({ _action: 'book_lead', leadId, date, time, notify }),
+          }
+        );
+        return result ?? null;
       },
 
       purgeLeads: async (ids) => {
