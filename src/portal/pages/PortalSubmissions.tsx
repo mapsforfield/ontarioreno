@@ -584,6 +584,44 @@ function SubmissionDrawer({
   const [isSaving, setIsSaving] = useState(false);
   const contacted = Boolean(lead.submissionContactedAt);
 
+  const { fetchLeadSlots, bookLeadVisit } = usePortalData();
+  const [slots, setSlots] = useState<Array<{ date: string; time: string }> | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [picked, setPicked] = useState<{ date: string; time: string } | null>(null);
+  const [notify, setNotify] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const alreadyBooked = Boolean(lead.appointmentId || appointment);
+
+  const loadSlots = async () => {
+    setLoadingSlots(true);
+    const payload = await fetchLeadSlots(lead.id);
+    setSlots(payload.slots);
+    setLoadingSlots(false);
+  };
+
+  const confirmBooking = async () => {
+    if (!picked) return;
+    setBooking(true);
+    const result = await bookLeadVisit(lead.id, picked.date, picked.time, notify);
+    setBooking(false);
+    if (!result) {
+      showToast({
+        message: 'That time is no longer free. Reload the times and try again.',
+        variant: 'error',
+      });
+      setPicked(null);
+      await loadSlots();
+      return;
+    }
+    showToast({
+      message: notify
+        ? `Booked ${result.date} at ${result.time}. Confirmation sent.`
+        : `Booked ${result.date} at ${result.time}. Nothing was sent to the homeowner.`,
+      variant: 'success',
+    });
+    onClose();
+  };
+
   useEffect(() => {
     setNote(lead.submissionOutcomeNote ?? '');
   }, [lead.id, lead.submissionOutcomeNote]);
@@ -699,6 +737,93 @@ function SubmissionDrawer({
                 : 'None booked'}
             </Field>
           </Section>
+
+          {/* Book on their behalf.
+              Offered for ANY unbooked lead, not just the ones routing cleared:
+              the manual-review and nurture leads are precisely the ones a rep
+              has since phoned and learned more about than a dropdown could say.
+              The times come from the same availability the homeowner would have
+              seen, so a booking made here cannot double-book a rep. */}
+          {!alreadyBooked ? (
+            <Section title="Book a visit">
+              {slots === null ? (
+                <div className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={loadSlots}
+                    disabled={loadingSlots}
+                    className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {loadingSlots ? 'Loading times…' : 'Show available times'}
+                  </button>
+                </div>
+              ) : slots.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-slate-500">
+                  No times are free in the booking window — check rep availability under Admin.
+                </p>
+              ) : (
+                <div className="space-y-3 px-4 py-3">
+                  <div className="max-h-60 space-y-3 overflow-y-auto">
+                    {Object.entries(
+                      slots.reduce<Record<string, string[]>>((acc, s) => {
+                        (acc[s.date] ??= []).push(s.time);
+                        return acc;
+                      }, {})
+                    ).map(([date, times]) => (
+                      <div key={date}>
+                        <p className="mb-1.5 text-xs font-black text-slate-700">{date}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {times.map((time) => {
+                            const on = picked?.date === date && picked?.time === time;
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                onClick={() => setPicked({ date, time })}
+                                className={`rounded-[0.4rem] border px-2.5 py-1.5 text-xs font-bold transition ${
+                                  on
+                                    ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
+                                    : 'border-slate-200 text-slate-600 hover:border-[#1B3C6C]'
+                                }`}
+                              >
+                                {time}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Off by default: the rep is normally mid-call, and a text
+                      the homeowner did not ask for costs money and may say
+                      something the rep has not said yet. */}
+                  <label className="flex items-start gap-2 text-xs font-semibold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={notify}
+                      onChange={(e) => setNotify(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    Send the homeowner the usual confirmation text and email
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={confirmBooking}
+                    disabled={!picked || booking}
+                    className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+                  >
+                    {booking
+                      ? 'Booking…'
+                      : picked
+                        ? `Book ${picked.date} at ${picked.time}`
+                        : 'Pick a time'}
+                  </button>
+                </div>
+              )}
+            </Section>
+          ) : null}
 
           <Section title="Answers">
             {answers.length === 0 ? (

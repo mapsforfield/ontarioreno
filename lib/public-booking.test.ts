@@ -169,8 +169,34 @@ test('no public flow handler calls requireAuth', () => {
 
 test('public bookings are attributed to the inactive system identity', () => {
   assert.equal(SYSTEM_BOOKING_USER_ID, 'system-public-booking');
-  assert.ok(leadsApi.includes('createdByUserId: SYSTEM_BOOKING_USER_ID'));
+  // The booking helper is shared with the portal, where a real rep is the
+  // author — so attribution is now a fallback rather than a constant. The
+  // system identity must remain what it falls back TO.
+  assert.ok(leadsApi.includes('createdByUserId: createdByUserId ?? SYSTEM_BOOKING_USER_ID'));
   // Seeded inactive and password-less, so it can never sign in.
   assert.ok(/id: SYSTEM_BOOKING_USER_ID[\s\S]{0,400}active: false/.test(leadsApi));
   assert.equal(/SYSTEM_BOOKING_USER_ID[\s\S]{0,400}passwordHash/.test(leadsApi), false);
+});
+
+test('the public flow never attributes a booking to a signed-in user', () => {
+  // The homeowner's own booking must stay anonymous even though the helper it
+  // now shares can accept an author. Passing a user id from the public handler
+  // would put a rep's name on a booking they did not make.
+  const start = leadsApi.indexOf("if (flow === 'book' && req.method === 'POST')");
+  const end = leadsApi.indexOf("if (flow === 'drain')");
+  assert.ok(start > -1 && end > start);
+  const publicBookHandler = leadsApi.slice(start, end);
+  assert.equal(/createdByUserId/.test(publicBookHandler), false);
+  assert.ok(publicBookHandler.includes("bookedVia: 'public_flow'"));
+});
+
+test('booking from the portal is admin-only and silent unless asked', () => {
+  const start = leadsApi.indexOf("if (action === 'book_lead')");
+  assert.ok(start > -1);
+  const handler = leadsApi.slice(start, start + 1800);
+  // An unauthenticated caller must never reach a rep's calendar.
+  assert.ok(handler.includes("user.role !== 'admin'"));
+  // Notifying is opt-in: absent or false must not text the homeowner.
+  assert.ok(handler.includes('notify: data.notify === true'));
+  assert.ok(handler.includes("bookedVia: 'portal_admin'"));
 });

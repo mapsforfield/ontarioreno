@@ -523,6 +523,17 @@ async function handleCollection(
     //
     // Deliberately NOT part of the 15-dataset doorbell reload — that path is
     // paid for on every ping (see interactionSelect above). Fetched on mount.
+    // Free slots for one lead, so a rep on the phone can offer the same times
+    // the homeowner would have seen. Admin-only, like the log it is read from.
+    if (req.query['_resource'] === 'lead_slots') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const lead = await withTables(() =>
+        prisma.lead.findUnique({ where: { id: String(req.query['leadId'] ?? '') } })
+      );
+      if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+      return res.status(200).json(await availableSlotsForLead(lead));
+    }
+
     if (req.query['_resource'] === 'submissions') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       return await withTables(async () => {
@@ -577,6 +588,55 @@ async function handleCollection(
   if (req.method === 'POST') {
     const data = (req.body ?? {}) as Record<string, unknown>;
     const action = data._action as string | undefined;
+
+    /**
+     * Book a visit for a lead from the portal.
+     *
+     * Unlike the public flow this does NOT require DIRECT_CALENDAR: the whole
+     * point is the leads routing sent to a person — an unverified address, an
+     * unsure answer, a nurture timeline — where the rep has since spoken to the
+     * homeowner and knows more than the form could. Judgement made on a phone
+     * call is better evidence than an answer to a dropdown.
+     *
+     * Notifications are opt-in. The rep is usually mid-conversation, and a text
+     * the homeowner did not ask for costs money and may say something the rep
+     * has not said yet.
+     */
+    if (action === 'book_lead') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const lead = await withTables(() =>
+        prisma.lead.findUnique({ where: { id: clean(data.leadId) } })
+      );
+      if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+      if (lead.appointmentId) {
+        return res.status(409).json({ error: 'This lead already has a booking.' });
+      }
+
+      try {
+        const result = await bookVisitForLead({
+          lead,
+          date: clean(data.date),
+          time: clean(data.time),
+          notify: data.notify === true,
+          bookedVia: 'portal_admin',
+          createdByUserId: user.id,
+        });
+        if (!result.ok) return res.status(result.status).json(result.payload);
+
+        // Only drains when something was queued, so the silent path stays silent.
+        if (data.notify === true) await drainOutbox().catch(() => null);
+
+        return res.status(201).json({
+          publicReference: result.publicReference,
+          date: result.date,
+          time: result.time,
+          notified: data.notify === true,
+        });
+      } catch (err) {
+        console.error('[book_lead] failed:', err);
+        return res.status(500).json({ error: 'Could not complete the booking.' });
+      }
+    }
 
     if (action === 'import_leads') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
@@ -1260,6 +1320,353 @@ async function loadPublicFlowLead(leadRef: string) {
   return prisma.lead.findUnique({ where: { id: leadRef } }).catch(() => null);
 }
 
+type FlowLead = NonNullable<Awaited<ReturnType<typeof loadPublicFlowLead>>>;
+
+/**
+ * Free slots for this lead's area, honouring the rep day limits, days off and
+ * the same-day travel ceiling.
+ *
+ * Shared by the homeowner's calendar and the portal's, for the same reason the
+ * booking itself is shared: a rep offered a time in one place and not the other
+ * is a rep who ends up double-booked.
+ */
+async function availableSlotsForLead(lead: FlowLead) {
+  const empty = { slots: [] as ReturnType<typeof computeAvailability>, visitMinutes: 0 };
+  if (!lead.schedulingArea) return empty;
+  const program = programForArea(lead.schedulingArea as SchedulingArea);
+  if (!program || !program.enabled) return empty;
+
+  const nowWall = torontoWallClock();
+  const reps = await prisma.user.findMany(BOOKABLE_REP_QUERY);
+  const repIds = reps.map((r) => r.id);
+  if (repIds.length === 0) return empty;
+
+  const fromDate = nowWall.slice(0, 10);
+  const toDate = new Date(
+    Date.UTC(
+      Number(fromDate.slice(0, 4)),
+      Number(fromDate.slice(5, 7)) - 1,
+      Number(fromDate.slice(8, 10)) + program.bookingHorizonDays + 1
+    )
+  )
+    .toISOString()
+    .slice(0, 10);
+
+  const [appointments, daysOffRows] = await Promise.all([
+    prisma.appointment.findMany({
+      where: {
+        assignedRepId: { in: repIds },
+        appointmentDate: { gte: fromDate, lte: toDate },
+        deletedAt: null,
+        status: { in: ACTIVE_APPOINTMENT_STATUSES },
+      },
+      select: SCHEDULING_APPOINTMENT_SELECT,
+    }),
+    prisma.repDayOff.findMany({
+      where: { userId: { in: repIds }, date: { gte: fromDate, lte: toDate } },
+      select: { userId: true, date: true },
+    }),
+  ]);
+
+  const slots = computeAvailability({
+    reps,
+    appointments: appointments as BookedAppointment[],
+    daysOff: new Set(daysOffRows.map((d) => `${d.userId}|${d.date}`)),
+    area: lead.schedulingArea as SchedulingArea,
+    slotStartTimes: program.slotStartTimes,
+    reservationMinutes: program.reservationMinutes,
+    leadTimeHours: program.leadTimeHours,
+    bookingHorizonDays: program.bookingHorizonDays,
+    maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+    primaryRepPrimingBookings: program.primaryRepPrimingBookings,
+    maxSameDayTravelKm: program.maxSameDayTravelKm,
+    destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
+    nowWallToronto: nowWall,
+  });
+
+  return { slots, visitMinutes: program.visitMinutes };
+}
+
+export type LeadBookingResult =
+  | {
+      ok: true;
+      publicReference: string;
+      date: string;
+      time: string;
+      durationMinutes: number;
+      visitMinutes: number;
+      propertyAddress: string;
+      program: ProgramConfig;
+    }
+  | { ok: false; status: number; payload: Record<string, unknown> };
+
+/**
+ * Place a lead into a slot.
+ *
+ * Shared deliberately by the homeowner's own booking and by a rep booking on
+ * their behalf from the portal, because the part that must not be duplicated is
+ * the conflict handling: the date lock, the rep's day limits, the travel
+ * ceiling. A second implementation would drift from this one, and the way that
+ * failure shows up is two homeowners promised the same rep at the same hour.
+ *
+ * `notify` is the one real difference. A homeowner booking themselves has just
+ * asked for a confirmation. A rep booking during a phone call is already
+ * speaking to them, and an unexpected text costs money and says something the
+ * rep may not have said yet — so the caller decides, and the portal defaults it
+ * off.
+ */
+async function bookVisitForLead(params: {
+  lead: FlowLead;
+  date: string;
+  time: string;
+  notify: boolean;
+  bookedVia: string;
+  createdByUserId?: string;
+}): Promise<LeadBookingResult> {
+  const { lead, date, time, notify, bookedVia, createdByUserId } = params;
+
+  if (!lead.schedulingArea) {
+    return { ok: false, status: 400, payload: { error: 'This lead has no scheduling area.' } };
+  }
+  const program = programForArea(lead.schedulingArea as SchedulingArea);
+  if (!program || !program.enabled) {
+    return {
+      ok: false,
+      status: 403,
+      payload: { error: 'Online booking is not available for this area yet.' },
+    };
+  }
+
+  const nowWall = torontoWallClock();
+
+  // The same Customer Notes template a rep would insert by hand, read from the
+  // admin-editable setting so the two never drift.
+  const noteTemplates = parseNoteTemplates(
+    (await prisma.setting.findUnique({ where: { key: 'note_templates' } }).catch(() => null))?.value
+  );
+  const templateBody = program.noteTemplateId
+    ? findNoteTemplate(noteTemplates, program.noteTemplateId)?.body ?? ''
+    : '';
+
+  // The rep's brief: the homeowner's own answers, in plain words rather than
+  // the raw enum values the form submits.
+  const leadAnswers = (lead.answersJson ?? {}) as Record<string, string>;
+  const answerLabel = (key: string) => {
+    const question = program.questions.find((q) => q.key === key);
+    return question?.options.find((o) => o.value === leadAnswers[key])?.label ?? '';
+  };
+  const internalBrief = [
+    bookedVia === 'public_flow'
+      ? 'Booked through the public Hamilton grant flow.'
+      : 'Booked from the portal on the homeowner’s behalf.',
+    answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
+    answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
+    answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
+    answerLabel('ownership') ? `Ownership: ${answerLabel('ownership')}` : '',
+    lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
+  ].filter(Boolean).join('\n');
+
+  const result = await prisma.$transaction(async (tx) => {
+    const deps: BookingDeps = {
+      // Serialises every booking for this date. Transaction-scoped, so it is
+      // released on commit and is safe with a pooled connection.
+      lockDate: async (d) => {
+        await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', d);
+      },
+      listBookableReps: async () => tx.user.findMany(BOOKABLE_REP_QUERY),
+      listDaysOff: async (repIds, d) =>
+        new Set(
+          (
+            await tx.repDayOff.findMany({
+              where: { userId: { in: repIds }, date: d },
+              select: { userId: true, date: true },
+            })
+          ).map((row) => `${row.userId}|${row.date}`)
+        ),
+      listAppointments: async (repIds, d) =>
+        (await tx.appointment.findMany({
+          where: {
+            assignedRepId: { in: repIds },
+            appointmentDate: d,
+            deletedAt: null,
+            status: { in: ACTIVE_APPOINTMENT_STATUSES },
+          },
+          select: SCHEDULING_APPOINTMENT_SELECT,
+        })) as BookedAppointment[],
+      createAppointment: async ({ repId, publicReference, request }) => {
+        // Audit-only identity. Inactive and password-less, so it can never
+        // sign in and never makes the portal part of this journey.
+        await tx.user.upsert({
+          where: { id: SYSTEM_BOOKING_USER_ID },
+          update: {},
+          create: {
+            id: SYSTEM_BOOKING_USER_ID,
+            name: SYSTEM_BOOKING_USER_NAME,
+            email: 'system-public-booking@ontarioreno.internal',
+            role: 'system',
+            avatarInitial: 'S',
+            active: false,
+            acceptsPublicBooking: false,
+          },
+        });
+        const created = await tx.appointment.create({
+          data: {
+            customerName: request.lead.name,
+            phone: request.lead.phone,
+            email: request.lead.email,
+            address: request.lead.address,
+            city: request.lead.city,
+            postalCode: request.lead.postalCode,
+            // A readable label, not the raw form value.
+            projectType: program.appointmentProjectTypeLabel,
+            assignedRepId: repId,
+            appointmentDate: request.date,
+            appointmentTime: request.time,
+            durationMinutes: request.reservationMinutes,
+            // Follows the program's consultation mode so the calendar entry
+            // matches what the homeowner was told they were booking.
+            appointmentType:
+              program.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
+            status: 'scheduled',
+            source: 'manual',
+            location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
+            // Same template a rep inserts when booking from the portal.
+            customerNotes: request.customerNotes ?? '',
+            // The homeowner's answers, so the rep arrives briefed.
+            internalNotes: internalBrief,
+            notes: internalBrief,
+            leadId: request.lead.id,
+            programKey: request.programKey,
+            programVersion: request.programVersion,
+            schedulingArea: request.area,
+            bookedVia,
+            publicReference,
+            // Stored so the next booking on this rep's day can measure the
+            // travel distance without re-geocoding.
+            latitude: request.destination?.latitude ?? null,
+            longitude: request.destination?.longitude ?? null,
+            createdByUserId: createdByUserId ?? SYSTEM_BOOKING_USER_ID,
+          },
+          select: { id: true },
+        });
+        return created;
+      },
+    };
+
+    const booking = await bookSlot(deps, {
+      date,
+      time,
+      area: lead.schedulingArea as SchedulingArea,
+      slotStartTimes: program.slotStartTimes,
+      reservationMinutes: program.reservationMinutes,
+      leadTimeHours: program.leadTimeHours,
+      bookingHorizonDays: program.bookingHorizonDays,
+      maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+      primaryRepPrimingBookings: program.primaryRepPrimingBookings,
+      maxSameDayTravelKm: program.maxSameDayTravelKm,
+      destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
+      nowWallToronto: nowWall,
+      programKey: program.key,
+      programVersion: program.version,
+      lead: {
+        id: lead.id,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        address: lead.address,
+        city: lead.city,
+        postalCode: lead.postalCode,
+        projectType: lead.projectType,
+      },
+      customerNotes: templateBody,
+    });
+
+    if (booking.ok) {
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: { status: 'booked', appointmentId: booking.appointmentId },
+      });
+
+      if (notify) {
+        // Confirmations and reminders are written in the SAME transaction as
+        // the appointment, so a provider outage can never lose a booking.
+        const answers = (lead.answersJson ?? {}) as Record<string, string>;
+        // The assigned rep is alerted alongside the business inbox.
+        const assignedRep = await tx.user
+          .findUnique({
+            where: {
+              id: (
+                await tx.appointment.findUnique({
+                  where: { id: booking.appointmentId },
+                  select: { assignedRepId: true },
+                })
+              )?.assignedRepId ?? '',
+            },
+            select: { name: true, email: true },
+          })
+          .catch(() => null);
+        const propertyAddress = [lead.address, lead.city].filter(Boolean).join(', ') || lead.address;
+        const context: BookingContext = {
+          appointmentId: booking.appointmentId,
+          publicReference: booking.publicReference,
+          name: lead.name,
+          phone: lead.phone,
+          email: lead.email,
+          propertyAddress,
+          date: booking.date,
+          time: booking.time,
+          visitMinutes: program.visitMinutes,
+          consultationMode: program.consultationMode,
+          teamInbox: teamInbox(),
+          repEmail: assignedRep?.email ?? '',
+          repName: assignedRep?.name ?? '',
+          // Readable answers for the team alert; the label for the customer.
+          fundingPlan: answerLabel('contribution') || answers.contribution || '',
+          projectScope: answerLabel('projectType') || answers.projectType || '',
+          projectTypeLabel: program.appointmentProjectTypeLabel,
+          customerNotes: templateBody,
+        };
+        await tx.notificationOutbox.createMany({
+          data: planBookingNotifications(context).map((n) => ({
+            appointmentId: booking.appointmentId,
+            leadId: lead.id,
+            channel: n.channel,
+            kind: n.kind,
+            recipient: n.recipient,
+            subject: n.subject,
+            body: n.body,
+            html: n.html ?? '',
+            sendAfter: n.sendAfter,
+            expiresAt: n.expiresAt,
+            idempotencyKey: n.idempotencyKey,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+    return booking;
+  });
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: result.code === 'SLOT_UNAVAILABLE' ? 409 : 400,
+      payload: result as unknown as Record<string, unknown>,
+    };
+  }
+
+  return {
+    ok: true,
+    publicReference: result.publicReference,
+    date: result.date,
+    time: result.time,
+    durationMinutes: result.durationMinutes,
+    visitMinutes: program.visitMinutes,
+    propertyAddress: [lead.address, lead.city].filter(Boolean).join(', '),
+    program,
+  };
+}
+
 /**
  * Meta's `_fbp` / `_fbc` cookies, which carry the click that brought the
  * homeowner here. Read from the request rather than trusted from the body:
@@ -1581,59 +1988,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     if (lead.routingOutcome !== 'DIRECT_CALENDAR' || !lead.schedulingArea) {
       return res.status(200).json({ slots: [] });
     }
-    const program = programForArea(lead.schedulingArea as SchedulingArea);
-    if (!program || !program.enabled) return res.status(200).json({ slots: [] });
-
-    const nowWall = torontoWallClock();
-    const reps = await prisma.user.findMany(BOOKABLE_REP_QUERY);
-    const repIds = reps.map((r) => r.id);
-    if (repIds.length === 0) return res.status(200).json({ slots: [] });
-
-    const fromDate = nowWall.slice(0, 10);
-    const toDate = new Date(
-      Date.UTC(
-        Number(fromDate.slice(0, 4)),
-        Number(fromDate.slice(5, 7)) - 1,
-        Number(fromDate.slice(8, 10)) + program.bookingHorizonDays + 1
-      )
-    )
-      .toISOString()
-      .slice(0, 10);
-
-    const [appointments, daysOffRows] = await Promise.all([
-      prisma.appointment.findMany({
-        where: {
-          assignedRepId: { in: repIds },
-          appointmentDate: { gte: fromDate, lte: toDate },
-          deletedAt: null,
-          status: { in: ACTIVE_APPOINTMENT_STATUSES },
-        },
-        select: SCHEDULING_APPOINTMENT_SELECT,
-      }),
-      prisma.repDayOff.findMany({
-        where: { userId: { in: repIds }, date: { gte: fromDate, lte: toDate } },
-        select: { userId: true, date: true },
-      }),
-    ]);
-
-    const slots = computeAvailability({
-      reps,
-      appointments: appointments as BookedAppointment[],
-      daysOff: new Set(daysOffRows.map((d) => `${d.userId}|${d.date}`)),
-      area: lead.schedulingArea as SchedulingArea,
-      slotStartTimes: program.slotStartTimes,
-      reservationMinutes: program.reservationMinutes,
-      leadTimeHours: program.leadTimeHours,
-      bookingHorizonDays: program.bookingHorizonDays,
-      maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
-      primaryRepPrimingBookings: program.primaryRepPrimingBookings,
-      maxSameDayTravelKm: program.maxSameDayTravelKm,
-      destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
-      nowWallToronto: nowWall,
-    });
-
     // Times only — no representative identity, no counts, no other bookings.
-    return res.status(200).json({ slots, visitMinutes: program.visitMinutes });
+    return res.status(200).json(await availableSlotsForLead(lead));
   }
 
   // ── Book ──
@@ -1647,221 +2003,19 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     if (lead.routingOutcome !== 'DIRECT_CALENDAR' || !lead.schedulingArea) {
       return res.status(403).json({ error: 'This request is not eligible for online booking.' });
     }
-    const program = programForArea(lead.schedulingArea as SchedulingArea);
-    if (!program || !program.enabled) {
-      return res.status(403).json({ error: 'Online booking is not available for this area yet.' });
-    }
-
-    const date = clean(body.date);
-    const time = clean(body.time);
-    const nowWall = torontoWallClock();
-
-    // The same Customer Notes template a rep would insert by hand, read from the
-    // admin-editable setting so the two never drift.
-    const noteTemplates = parseNoteTemplates(
-      (await prisma.setting.findUnique({ where: { key: 'note_templates' } }).catch(() => null))?.value
-    );
-    const templateBody = program.noteTemplateId
-      ? findNoteTemplate(noteTemplates, program.noteTemplateId)?.body ?? ''
-      : '';
-
-    // The rep's brief: the homeowner's own answers, in plain words rather than
-    // the raw enum values the form submits.
-    const leadAnswers = (lead.answersJson ?? {}) as Record<string, string>;
-    const answerLabel = (key: string) => {
-      const question = program.questions.find((q) => q.key === key);
-      return question?.options.find((o) => o.value === leadAnswers[key])?.label ?? '';
-    };
-    const internalBrief = [
-      'Booked through the public Hamilton grant flow.',
-      answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
-      answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
-      answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
-      answerLabel('ownership') ? `Ownership: ${answerLabel('ownership')}` : '',
-      lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
-    ].filter(Boolean).join('\n');
 
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        const deps: BookingDeps = {
-          // Serialises every booking for this date. Transaction-scoped, so it is
-          // released on commit and is safe with a pooled connection.
-          lockDate: async (d) => {
-            await tx.$executeRawUnsafe(
-              'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-              d
-            );
-          },
-          listBookableReps: async () => tx.user.findMany(BOOKABLE_REP_QUERY),
-          listDaysOff: async (repIds, d) =>
-            new Set(
-              (
-                await tx.repDayOff.findMany({
-                  where: { userId: { in: repIds }, date: d },
-                  select: { userId: true, date: true },
-                })
-              ).map((row) => `${row.userId}|${row.date}`)
-            ),
-          listAppointments: async (repIds, d) =>
-            (await tx.appointment.findMany({
-              where: {
-                assignedRepId: { in: repIds },
-                appointmentDate: d,
-                deletedAt: null,
-                status: { in: ACTIVE_APPOINTMENT_STATUSES },
-              },
-              select: SCHEDULING_APPOINTMENT_SELECT,
-            })) as BookedAppointment[],
-          createAppointment: async ({ repId, publicReference, request }) => {
-            // Audit-only identity. Inactive and password-less, so it can never
-            // sign in and never makes the portal part of this journey.
-            await tx.user.upsert({
-              where: { id: SYSTEM_BOOKING_USER_ID },
-              update: {},
-              create: {
-                id: SYSTEM_BOOKING_USER_ID,
-                name: SYSTEM_BOOKING_USER_NAME,
-                email: 'system-public-booking@ontarioreno.internal',
-                role: 'system',
-                avatarInitial: 'S',
-                active: false,
-                acceptsPublicBooking: false,
-              },
-            });
-            const created = await tx.appointment.create({
-              data: {
-                customerName: request.lead.name,
-                phone: request.lead.phone,
-                email: request.lead.email,
-                address: request.lead.address,
-                city: request.lead.city,
-                postalCode: request.lead.postalCode,
-                // A readable label, not the raw form value.
-                projectType: program.appointmentProjectTypeLabel,
-                assignedRepId: repId,
-                appointmentDate: request.date,
-                appointmentTime: request.time,
-                durationMinutes: request.reservationMinutes,
-                // Follows the program's consultation mode so the calendar entry
-                // matches what the homeowner was told they were booking.
-                appointmentType:
-                  program.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
-                status: 'scheduled',
-                source: 'manual',
-                location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
-                // Same template a rep inserts when booking from the portal.
-                customerNotes: request.customerNotes ?? '',
-                // The homeowner's answers, so the rep arrives briefed.
-                internalNotes: internalBrief,
-                notes: internalBrief,
-                leadId: request.lead.id,
-                programKey: request.programKey,
-                programVersion: request.programVersion,
-                schedulingArea: request.area,
-                bookedVia: 'public_flow',
-                publicReference,
-                // Stored so the next booking on this rep's day can measure the
-                // travel distance without re-geocoding.
-                latitude: request.destination?.latitude ?? null,
-                longitude: request.destination?.longitude ?? null,
-                createdByUserId: SYSTEM_BOOKING_USER_ID,
-              },
-              select: { id: true },
-            });
-            return created;
-          },
-        };
-
-        const booking = await bookSlot(deps, {
-          date,
-          time,
-          area: lead.schedulingArea as SchedulingArea,
-          slotStartTimes: program.slotStartTimes,
-          reservationMinutes: program.reservationMinutes,
-          leadTimeHours: program.leadTimeHours,
-          bookingHorizonDays: program.bookingHorizonDays,
-          maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
-          primaryRepPrimingBookings: program.primaryRepPrimingBookings,
-          maxSameDayTravelKm: program.maxSameDayTravelKm,
-          destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
-          nowWallToronto: nowWall,
-          programKey: program.key,
-          programVersion: program.version,
-          lead: {
-            id: lead.id,
-            name: lead.name,
-            phone: lead.phone,
-            email: lead.email,
-            address: lead.address,
-            city: lead.city,
-            postalCode: lead.postalCode,
-            projectType: lead.projectType,
-          },
-          customerNotes: templateBody,
-        });
-
-        if (booking.ok) {
-          await tx.lead.update({
-            where: { id: lead.id },
-            data: { status: 'booked', appointmentId: booking.appointmentId },
-          });
-
-          // Confirmations and reminders are written in the SAME transaction as
-          // the appointment, so a provider outage can never lose a booking.
-          const answers = (lead.answersJson ?? {}) as Record<string, string>;
-          // The assigned rep is alerted alongside the business inbox.
-          const assignedRep = await tx.user
-            .findUnique({
-              where: { id: (await tx.appointment.findUnique({
-                where: { id: booking.appointmentId }, select: { assignedRepId: true },
-              }))?.assignedRepId ?? '' },
-              select: { name: true, email: true },
-            })
-            .catch(() => null);
-          const propertyAddress = [lead.address, lead.city].filter(Boolean).join(', ') || lead.address;
-          const context: BookingContext = {
-            appointmentId: booking.appointmentId,
-            publicReference: booking.publicReference,
-            name: lead.name,
-            phone: lead.phone,
-            email: lead.email,
-            propertyAddress,
-            date: booking.date,
-            time: booking.time,
-            visitMinutes: program.visitMinutes,
-            consultationMode: program.consultationMode,
-            teamInbox: teamInbox(),
-            repEmail: assignedRep?.email ?? '',
-            repName: assignedRep?.name ?? '',
-            // Readable answers for the team alert; the label for the customer.
-            fundingPlan: answerLabel('contribution') || answers.contribution || '',
-            projectScope: answerLabel('projectType') || answers.projectType || '',
-            projectTypeLabel: program.appointmentProjectTypeLabel,
-            customerNotes: templateBody,
-          };
-          await tx.notificationOutbox.createMany({
-            data: planBookingNotifications(context).map((n) => ({
-              appointmentId: booking.appointmentId,
-              leadId: lead.id,
-              channel: n.channel,
-              kind: n.kind,
-              recipient: n.recipient,
-              subject: n.subject,
-              body: n.body,
-              html: n.html ?? '',
-              sendAfter: n.sendAfter,
-              expiresAt: n.expiresAt,
-              idempotencyKey: n.idempotencyKey,
-            })),
-            skipDuplicates: true,
-          });
-        }
-        return booking;
+      const result = await bookVisitForLead({
+        lead,
+        date: clean(body.date),
+        time: clean(body.time),
+        // The homeowner is on the page waiting for this confirmation.
+        notify: true,
+        bookedVia: 'public_flow',
       });
 
-      if (!result.ok) {
-        return res.status(result.code === 'SLOT_UNAVAILABLE' ? 409 : 400).json(result);
-      }
+      if (!result.ok) return res.status(result.status).json(result.payload);
+
       await ringDoorbell();
       // Fire the immediate messages now rather than waiting for a scheduled run,
       // so the confirmation lands while the homeowner is still on the page.
@@ -1889,7 +2043,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
             fbp: cookies.fbp,
             fbc: cookies.fbc,
           },
-          customData: { content_name: program.slug, content_category: 'consultation' },
+          customData: { content_name: result.program.slug, content_category: 'consultation' },
         });
       }
 
@@ -1898,8 +2052,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
         date: result.date,
         time: result.time,
         durationMinutes: result.durationMinutes,
-        visitMinutes: program.visitMinutes,
-        propertyAddress: [lead.address, lead.city].filter(Boolean).join(', '),
+        visitMinutes: result.visitMinutes,
+        propertyAddress: result.propertyAddress,
         notifications: delivery,
       });
     } catch (err) {
