@@ -1036,10 +1036,19 @@ async function placesTextSearch(input: string): Promise<string[]> {
     },
     body: JSON.stringify({
       textQuery: query,
-      includedRegionCodes: ['ca'],
+      // Text Search takes ONE region code as a string. `includedRegionCodes`
+      // is the autocomplete spelling; sending it here is a 400, and a 400 that
+      // gets read as "no results" is indistinguishable from a bad address —
+      // the exact confusion this whole change exists to remove.
+      regionCode: 'CA',
       maxResultCount: 2,
     }),
   });
+  if (!r.ok) {
+    // Thrown, not swallowed, so the caller records PROVIDER_ERROR and this
+    // shows up as our outage rather than as the homeowner's bad address.
+    throw new Error(`places:searchText ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  }
   const j = (await r.json()) as { places?: Array<{ id?: string }> };
   return (j.places ?? []).map((p) => p.id ?? '').filter(Boolean);
 }
