@@ -178,6 +178,9 @@ export default function ConsultationFlow() {
     if (placeId || candidate) { setPhase('q2'); return; }
     const q = addressText.trim();
     if (!q) return;
+    // The list has done its job once they have moved on; leaving it open floats
+    // it over the ownership choices and the confirmation card below.
+    setSuggestions([]);
     setCheckingAddress(true);
     try {
       const r = await fetch(`/api/leads?flow=address_resolve&q=${encodeURIComponent(q)}`);
@@ -483,7 +486,10 @@ export default function ConsultationFlow() {
               <MapPin className="mr-1 inline h-4 w-4 text-[#1B3C6C]" /> Property address
             </label>
             <input className={inputCls} value={addressText} autoComplete="off" placeholder="Start typing, then pick your address"
-              onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); setCandidate(null); }} />
+              onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); setCandidate(null); }}
+              // Suggestions are chosen on mousedown, which fires before blur, so
+              // dismissing here cannot steal a pick the homeowner was making.
+              onBlur={() => setSuggestions([])} />
             {placeId ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                 <Check className="h-3.5 w-3.5" /> Address confirmed
