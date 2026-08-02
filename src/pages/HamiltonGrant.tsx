@@ -247,6 +247,64 @@ export default function HamiltonGrant() {
         </div>
       </section>
 
+      {/* BOOK A VISIT — primary path
+          The form below routes to a callback. This routes to a calendar the
+          homeowner books themselves, and lands the lead in the portal with an
+          address we have actually verified. It sits ABOVE the form and carries
+          the page's primary styling on purpose: two equally weighted choices
+          would just split the traffic and teach us nothing.
+          `?src=` is recorded on the lead, so this button's contribution is
+          measurable against the form rather than a matter of opinion. */}
+      <section className="bg-slate-900 text-white">
+        <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
+            <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-xl">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-400">
+                  Fastest way to get answers
+                </p>
+                <h2 className="mt-3 text-3xl font-extrabold leading-tight md:text-4xl">
+                  Book your in-home visit
+                </h2>
+                <p className="mt-4 text-lg leading-8 text-slate-300">
+                  Pick a time that works. No waiting for a callback. A specialist
+                  comes to you, reviews the space, and walks you through what your
+                  project would actually qualify for.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-slate-300">
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> 45 minutes
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Free
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> No obligation
+                  </span>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <a
+                  href="/consultation/hamilton?src=grant-guide"
+                  className="inline-flex items-center gap-2.5 rounded-2xl bg-yellow-400 px-8 py-5 text-lg font-extrabold text-slate-950 shadow-[0_18px_34px_rgba(2,12,27,0.4)] transition hover:opacity-95"
+                >
+                  See available times
+                  <ArrowRight className="h-5 w-5" />
+                </a>
+                <p className="mt-3 text-center text-sm text-slate-400">
+                  Takes about a minute
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-sm font-semibold text-slate-400">
+            Prefer a phone call instead? Use the eligibility form below.
+          </p>
+        </div>
+      </section>
+
       {/* FORM */}
       <HamiltonGrantForm />
 
