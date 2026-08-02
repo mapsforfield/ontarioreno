@@ -115,6 +115,11 @@ export default function ConsultationFlow() {
   const [addressText, setAddressText] = useState('');
   const [placeId, setPlaceId] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ placeId: string; description: string }>>([]);
+  // The one address the typed text could mean, offered for a yes/no when no
+  // suggestion was picked. Tapping the dropdown remains the primary path; this
+  // only catches the homeowner who did not realise the tap was required.
+  const [candidate, setCandidate] = useState<{ placeId: string; description: string } | null>(null);
+  const [checkingAddress, setCheckingAddress] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [contact, setContact] = useState({ name: '', phone: '', email: '' });
   const [termsOpen, setTermsOpen] = useState(false);
@@ -158,6 +163,34 @@ export default function ConsultationFlow() {
     return () => window.clearTimeout(timer.current);
   }, [addressText]);
 
+  /**
+   * Leaving step 1. If they picked a suggestion this is a plain advance.
+   *
+   * If they only typed, we ask the server what that text can mean and, when it
+   * means exactly one address, show it for confirmation — a yes/no is something
+   * anyone can do, whereas knowing that an unmentioned dropdown tap decides
+   * whether you get a calendar is not. Anything else advances untouched and
+   * lands in manual review exactly as before: the homeowner is never trapped on
+   * this step, and a slow or failed lookup can only cost us the improvement, not
+   * the submission.
+   */
+  const continueFromStep1 = async () => {
+    if (placeId || candidate) { setPhase('q2'); return; }
+    const q = addressText.trim();
+    if (!q) return;
+    setCheckingAddress(true);
+    try {
+      const r = await fetch(`/api/leads?flow=address_resolve&q=${encodeURIComponent(q)}`);
+      const found = (await r.json())?.candidate ?? null;
+      if (found?.placeId) return setCandidate(found);
+    } catch {
+      // Deliberately silent: this is an upgrade path, not a gate.
+    } finally {
+      setCheckingAddress(false);
+    }
+    setPhase('q2');
+  };
+
   const stepQuestions = (step: 1 | 2 | 3) => (program?.questions ?? []).filter((q) => q.step === step);
   const answered = (step: 1 | 2 | 3) => stepQuestions(step).every((q) => answers[q.key]);
 
@@ -180,6 +213,10 @@ export default function ConsultationFlow() {
           phone: finalContact.phone,
           email: finalContact.email,
           placeId,
+          // Sent so the server can make the same single-match attempt even if
+          // the confirmation step never ran — a dropped request or a homeowner
+          // who skipped past it must not silently cost the booking.
+          addressText: addressText.trim(),
           sourceDetail: trafficSource,
           notes: !placeId && addressText.trim() ? `Typed address (not confirmed): ${addressText.trim()}` : '',
           answers,
@@ -446,7 +483,7 @@ export default function ConsultationFlow() {
               <MapPin className="mr-1 inline h-4 w-4 text-[#1B3C6C]" /> Property address
             </label>
             <input className={inputCls} value={addressText} autoComplete="off" placeholder="Start typing, then pick your address"
-              onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); }} />
+              onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); setCandidate(null); }} />
             {placeId ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                 <Check className="h-3.5 w-3.5" /> Address confirmed
@@ -456,7 +493,7 @@ export default function ConsultationFlow() {
               // as an unexplained "a specialist will call you".
               <p className="mt-2 text-xs font-semibold text-amber-700">
                 Pick your address from the list so we can check availability in your area.
-                Otherwise we’ll need to call you to confirm it.
+                If you don’t, we’ll try to confirm it for you on the next step.
               </p>
             ) : null}
             {suggestions.length > 0 && (
@@ -474,7 +511,33 @@ export default function ConsultationFlow() {
           {stepQuestions(1).map((q) => (
             <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
           ))}
-          <PrimaryButton disabled={!addressText.trim() || !answered(1)} onClick={() => setPhase('q2')}>Continue</PrimaryButton>
+          {candidate && (
+            <div className="rounded-xl border border-[#1B3C6C]/25 bg-[#f6faff] p-4">
+              <p className="text-sm font-semibold text-slate-700">Just to confirm — is this your property?</p>
+              <p className="mt-1 text-base font-bold text-[#1B3C6C]">{candidate.description}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button"
+                  onClick={() => {
+                    skip.current = true;
+                    setAddressText(candidate.description);
+                    setPlaceId(candidate.placeId);
+                    setCandidate(null);
+                    setSuggestions([]);
+                    setPhase('q2');
+                  }}
+                  className="rounded-lg bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#16325a]">
+                  Yes, that’s it
+                </button>
+                <button type="button" onClick={() => setCandidate(null)}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                  Let me fix it
+                </button>
+              </div>
+            </div>
+          )}
+          <PrimaryButton disabled={!addressText.trim() || !answered(1) || checkingAddress} onClick={continueFromStep1}>
+            {checkingAddress ? 'Checking address…' : 'Continue'}
+          </PrimaryButton>
         </div>
       )}
 

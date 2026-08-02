@@ -64,6 +64,7 @@ const OUTCOME_STYLE: Record<string, string> = {
 
 const ADDRESS_STATE_LABEL: Record<string, string> = {
   ADDRESS_VERIFIED: 'Verified',
+  ADDRESS_INFERRED: 'Confirmed from typed text',
   ADDRESS_UNVERIFIED: 'Unverified',
   ADDRESS_OUTSIDE_SERVICE_AREA: 'Outside Ontario',
 };
@@ -637,6 +638,14 @@ function SubmissionDrawer({
             </div>
           ) : null}
 
+          {lead.addressState === 'ADDRESS_INFERRED' ? (
+            <div className="rounded-[0.5rem] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+              <MapPin className="mr-1 inline h-4 w-4" />
+              This homeowner typed their address rather than picking it from the list. It matched
+              exactly one real address, so they were booked — worth a glance before the visit.
+            </div>
+          ) : null}
+
           <Section title="Contact">
             <Field label="Phone" icon={Phone}>{lead.phone || <NotRecorded />}</Field>
             <Field label="Email" icon={Mail}>{lead.email || <NotRecorded />}</Field>
@@ -649,6 +658,18 @@ function SubmissionDrawer({
               {cause ? humanCause(cause) : <NotRecorded />}
             </Field>
           </Section>
+
+          {/* What they typed, when nothing resolved from it. Held on the lead all
+              along but never rendered, so a submission with no usable address
+              looked like a homeowner who gave us nothing — when in fact they had
+              often typed the address in full. */}
+          {lead.notes ? (
+            <Section title="Submitted notes">
+              <p className="whitespace-pre-wrap px-4 py-3 text-sm font-semibold text-slate-700">
+                {lead.notes}
+              </p>
+            </Section>
+          ) : null}
 
           <Section title="Routing">
             <Field label="Outcome">
