@@ -11,6 +11,7 @@ import {
   FileText,
   MapPin,
   MoreHorizontal,
+  MessageSquare,
   MessageSquarePlus,
   Phone,
   PhoneCall,
@@ -25,6 +26,13 @@ import {
   X,
 } from 'lucide-react';
 import { usePortalAuth } from '../auth';
+import {
+  DEFAULT_SMS_TEMPLATE_ID,
+  SMS_TEMPLATES,
+  leadFirstName,
+  smsHref,
+  smsTemplateById,
+} from '../data/smsTemplates';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
 import { cn } from '../../lib/utils';
@@ -71,6 +79,8 @@ const toneClasses: Record<Tone, string> = {
   bad: 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
   warn: 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100',
 };
+
+const SMS_TEMPLATE_STORAGE_KEY = 'portal.callflow.smsTemplate';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function telHref(phone: string) {
@@ -298,12 +308,21 @@ function CustomerCard({
 
   const [callNote, setCallNote] = useState('');
   const [copied, setCopied] = useState(false);
+  const [smsCopied, setSmsCopied] = useState(false);
   const [showCallback, setShowCallback] = useState(false);
   const [cbDate, setCbDate] = useState('');
   const [cbTime, setCbTime] = useState('10:00');
   const [showMoreOutcomes, setShowMoreOutcomes] = useState(false);
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState('');
+  // Remembered across leads (and reloads) so a texting run only picks once.
+  const [smsTemplateId, setSmsTemplateId] = useState(() => {
+    try {
+      return localStorage.getItem(SMS_TEMPLATE_STORAGE_KEY) ?? DEFAULT_SMS_TEMPLATE_ID;
+    } catch {
+      return DEFAULT_SMS_TEMPLATE_ID;
+    }
+  });
 
   useEffect(() => {
     setCallNote('');
@@ -316,6 +335,8 @@ function CustomerCard({
   }, [lead.id]);
 
   const tel = telHref(lead.phone);
+  const smsBody = smsTemplateById(smsTemplateId).build({ firstName: leadFirstName(lead.name) });
+  const sms = smsHref(lead.phone, smsBody);
   const callbackDue =
     lead.callbackAt && new Date(lead.callbackAt).getTime() <= Date.now()
       ? fmtDateTime(lead.callbackAt)
@@ -373,6 +394,31 @@ function CustomerCard({
     } catch {
       showToast({ message: 'Could not copy', variant: 'error' });
     }
+  };
+
+  const copySms = async () => {
+    try {
+      await navigator.clipboard.writeText(smsBody);
+      setSmsCopied(true);
+      setTimeout(() => setSmsCopied(false), 1500);
+    } catch {
+      showToast({ message: 'Could not copy', variant: 'error' });
+    }
+  };
+
+  const handleTemplateChange = (id: string) => {
+    setSmsTemplateId(id);
+    try {
+      localStorage.setItem(SMS_TEMPLATE_STORAGE_KEY, id);
+    } catch {
+      /* private browsing — the picker still works for this session */
+    }
+  };
+
+  // Quo gets the message through the sms: link; we also drop it on the clipboard
+  // so a paste recovers it if the handler ignores the body parameter.
+  const handleTextClick = () => {
+    void navigator.clipboard?.writeText(smsBody).catch(() => {});
   };
 
   const detail = (label: string, value: string, className = '') =>
@@ -486,6 +532,42 @@ function CustomerCard({
             </span>
           )}
           </div>
+
+          {sms && (
+            <div className="mt-3 rounded-[0.8rem] border border-[#d8e5f4] bg-white p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={sms}
+                  onClick={handleTextClick}
+                  className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-[0.7rem] border border-[#1B3C6C] px-4 py-3 text-base font-black text-[#1B3C6C] transition hover:bg-[#eef4fb]"
+                >
+                  <MessageSquare className="h-5 w-5" /> Text
+                </a>
+                {SMS_TEMPLATES.length > 1 && (
+                  <select
+                    value={smsTemplateId}
+                    onChange={(e) => handleTemplateChange(e.target.value)}
+                    aria-label="Text template"
+                    className="min-h-11 rounded-[0.7rem] border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700"
+                  >
+                    {SMS_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={copySms}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {smsCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  {smsCopied ? 'Copied' : 'Copy text'}
+                </button>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-relaxed text-slate-500">
+                {smsBody}
+              </p>
+            </div>
+          )}
         </div>
 
         <details className="mt-4 rounded-[0.8rem] border border-slate-200 bg-white">
