@@ -13,7 +13,9 @@ import {
   MoreHorizontal,
   MessageSquare,
   MessageSquarePlus,
+  Pencil,
   Phone,
+  Plus,
   PhoneCall,
   SkipForward,
   Sparkles,
@@ -27,11 +29,14 @@ import {
 } from 'lucide-react';
 import { usePortalAuth } from '../auth';
 import {
-  DEFAULT_SMS_TEMPLATE_ID,
-  SMS_TEMPLATES,
-  leadFirstName,
-  smsHref,
-  smsTemplateById,
+  BUILT_IN_TEMPLATES,
+  TEMPLATE_PLACEHOLDERS,
+  loadTemplates,
+  newTemplateId,
+  quoMessageHref,
+  renderTemplate,
+  saveTemplates,
+  type SmsTemplate,
 } from '../data/smsTemplates';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
@@ -315,12 +320,14 @@ function CustomerCard({
   const [showMoreOutcomes, setShowMoreOutcomes] = useState(false);
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<SmsTemplate[]>(() => loadTemplates());
   // Remembered across leads (and reloads) so a texting run only picks once.
   const [smsTemplateId, setSmsTemplateId] = useState(() => {
     try {
-      return localStorage.getItem(SMS_TEMPLATE_STORAGE_KEY) ?? DEFAULT_SMS_TEMPLATE_ID;
+      return localStorage.getItem(SMS_TEMPLATE_STORAGE_KEY) ?? '';
     } catch {
-      return DEFAULT_SMS_TEMPLATE_ID;
+      return '';
     }
   });
 
@@ -335,8 +342,9 @@ function CustomerCard({
   }, [lead.id]);
 
   const tel = telHref(lead.phone);
-  const smsBody = smsTemplateById(smsTemplateId).build({ firstName: leadFirstName(lead.name) });
-  const sms = smsHref(lead.phone, smsBody);
+  const activeTemplate = templates.find((t) => t.id === smsTemplateId) ?? templates[0];
+  const smsBody = activeTemplate ? renderTemplate(activeTemplate.body, lead.name) : '';
+  const smsHref = activeTemplate ? quoMessageHref(lead.phone, smsBody) : null;
   const callbackDue =
     lead.callbackAt && new Date(lead.callbackAt).getTime() <= Date.now()
       ? fmtDateTime(lead.callbackAt)
@@ -415,10 +423,17 @@ function CustomerCard({
     }
   };
 
-  // Quo gets the message through the sms: link; we also drop it on the clipboard
-  // so a paste recovers it if the handler ignores the body parameter.
+  // Quo gets the message through its openphone://message deep link; the body also
+  // goes to the clipboard so a paste recovers it if the app opens the thread empty.
   const handleTextClick = () => {
     void navigator.clipboard?.writeText(smsBody).catch(() => {});
+  };
+
+  const handleTemplatesSave = (next: SmsTemplate[]) => {
+    setTemplates(next);
+    saveTemplates(next);
+    if (!next.some((t) => t.id === smsTemplateId)) handleTemplateChange(next[0]?.id ?? '');
+    setShowTemplates(false);
   };
 
   const detail = (label: string, value: string, className = '') =>
@@ -521,7 +536,7 @@ function CustomerCard({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           {tel ? (
             <a href={tel} className="flex w-full items-center justify-center gap-3 rounded-[0.85rem] bg-[#1B3C6C] px-5 py-5 text-xl font-black text-white shadow-sm transition hover:bg-[#153158]">
               <PhoneCall className="h-6 w-6" /> Call now
@@ -531,41 +546,49 @@ function CustomerCard({
               <Phone className="h-5 w-5" /> No phone number
             </span>
           )}
+          {smsHref ? (
+            <a
+              href={smsHref}
+              onClick={handleTextClick}
+              title={smsBody}
+              className="flex w-full items-center justify-center gap-2.5 rounded-[0.85rem] border-2 border-[#1B3C6C] bg-white px-5 py-5 text-xl font-black text-[#1B3C6C] transition hover:bg-[#eef4fb]"
+            >
+              <MessageSquare className="h-6 w-6" /> Text
+            </a>
+          ) : (
+            <span className="flex w-full items-center justify-center gap-2.5 rounded-[0.85rem] border border-slate-200 px-5 py-5 text-xl font-black text-slate-400">
+              <MessageSquare className="h-5 w-5" /> Text
+            </span>
+          )}
           </div>
 
-          {sms && (
-            <div className="mt-3 rounded-[0.8rem] border border-[#d8e5f4] bg-white p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={sms}
-                  onClick={handleTextClick}
-                  className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-[0.7rem] border border-[#1B3C6C] px-4 py-3 text-base font-black text-[#1B3C6C] transition hover:bg-[#eef4fb]"
-                >
-                  <MessageSquare className="h-5 w-5" /> Text
-                </a>
-                {SMS_TEMPLATES.length > 1 && (
-                  <select
-                    value={smsTemplateId}
-                    onChange={(e) => handleTemplateChange(e.target.value)}
-                    aria-label="Text template"
-                    className="min-h-11 rounded-[0.7rem] border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700"
-                  >
-                    {SMS_TEMPLATES.map((t) => (
-                      <option key={t.id} value={t.id}>{t.label}</option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  onClick={copySms}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-[0.7rem] border border-slate-300 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                >
-                  {smsCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                  {smsCopied ? 'Copied' : 'Copy text'}
-                </button>
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-xs font-semibold leading-relaxed text-slate-500">
-                {smsBody}
-              </p>
+          {templates.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-sm">
+              <label htmlFor="sms-template" className="font-bold text-slate-500">Template</label>
+              <select
+                id="sms-template"
+                value={activeTemplate.id}
+                onChange={(ev) => handleTemplateChange(ev.target.value)}
+                className="min-h-9 max-w-[16rem] truncate rounded-[0.6rem] border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700"
+              >
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-[0.6rem] border border-slate-300 bg-white px-2.5 font-bold text-slate-600 transition hover:bg-slate-50"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </button>
+              <button
+                onClick={copySms}
+                disabled={!lead.phone}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-[0.6rem] border border-slate-300 bg-white px-2.5 font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                {smsCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {smsCopied ? 'Copied' : 'Copy'}
+              </button>
             </div>
           )}
         </div>
@@ -702,9 +725,106 @@ function CustomerCard({
           </div>
         )}
       </div>
+
+      {showTemplates && (
+        <TextTemplateManager
+          templates={templates}
+          onSave={handleTemplatesSave}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   );
 }
+
+// ─── Text template manager ────────────────────────────────────────────────────
+function TextTemplateManager({
+  templates,
+  onSave,
+  onClose,
+}: {
+  templates: SmsTemplate[];
+  onSave: (next: SmsTemplate[]) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<SmsTemplate[]>(() => templates.map((t) => ({ ...t })));
+
+  const update = (id: string, patch: Partial<SmsTemplate>) =>
+    setDraft((list) => list.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+
+  const add = () =>
+    setDraft((list) => [...list, { id: newTemplateId(), label: 'New template', body: 'Hi {first_name}, ' }]);
+
+  const remove = (id: string) => setDraft((list) => list.filter((t) => t.id !== id));
+
+  const handleSave = () => {
+    const cleaned = draft
+      .map((t) => ({ ...t, label: t.label.trim() || 'Untitled', body: t.body.trim() }))
+      .filter((t) => t.body);
+    onSave(cleaned.length ? cleaned : BUILT_IN_TEMPLATES);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div className="mt-10 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-[0.9rem] bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black tracking-[-0.02em]">Text templates</h2>
+            <p className="text-xs font-semibold text-slate-500">
+              Use {TEMPLATE_PLACEHOLDERS.join(' or ')} to drop in the lead&rsquo;s name.
+            </p>
+          </div>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {draft.map((t) => (
+            <div key={t.id} className="rounded-[0.7rem] border border-slate-200 p-3">
+              <div className="flex items-center gap-2">
+                <input
+                  value={t.label}
+                  onChange={(e) => update(t.id, { label: e.target.value })}
+                  placeholder="Template name"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
+                />
+                <button
+                  onClick={() => remove(t.id)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                  aria-label={`Delete ${t.label}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea
+                value={t.body}
+                onChange={(e) => update(t.id, { body: e.target.value })}
+                rows={4}
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#2b5a96] focus:ring-2 focus:ring-blue-100"
+              />
+              <p className="mt-1 text-xs font-semibold text-slate-400">
+                {t.body.length} characters{t.body.length > 320 ? ' — will send as multiple segments' : ''}
+              </p>
+            </div>
+          ))}
+          <button
+            onClick={add}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Plus className="h-4 w-4" /> Add template
+          </button>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600">Cancel</button>
+          <button onClick={handleSave} className="rounded-lg bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white">Save templates</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Import modal (admin) ─────────────────────────────────────────────────────
 const IMPORT_COLUMNS = [
   'name', 'phone', 'email', 'city', 'address', 'postalCode',
