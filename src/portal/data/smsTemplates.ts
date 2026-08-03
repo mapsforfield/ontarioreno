@@ -104,5 +104,8 @@ export function toE164(phone: string | null | undefined): string {
 export function quoMessageHref(phone: string | null | undefined, text: string): string | null {
   const number = toE164(phone);
   if (!number) return null;
-  return `openphone://message?number=${encodeURIComponent(number)}&text=${encodeURIComponent(text)}`;
+  // `quo://` rather than `openphone://`: the desktop app's main process only
+  // forwards tel: and quo:// URLs into the app window. openphone:// launches the
+  // app but the URL is dropped, which is why it focused Quo and did nothing.
+  return `quo://message?number=${encodeURIComponent(number)}&text=${encodeURIComponent(text)}`;
 }
