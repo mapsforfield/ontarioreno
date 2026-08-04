@@ -1,0 +1,31 @@
+name: CI
+
+# Runs on every pull request and every push to main. The portal inventory test
+# is the point: it fails the build if a page, route, or sidebar link disappears,
+# which is how the Contract Creator was lost once without anyone noticing.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` runs the postinstall hook, which generates the Prisma client
+      # that the typecheck needs.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Tests (includes portal feature inventory)
+        run: npm test
