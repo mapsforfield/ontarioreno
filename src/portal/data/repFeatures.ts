@@ -6,6 +6,7 @@ export type RepFeatureKey =
   | 'workspace'
   | 'contractors'
   | 'deals'
+  | 'contracts'
   | 'consultations'
   | 'clients'
   | 'tasks'
@@ -16,6 +17,7 @@ export const REP_FEATURES: Array<{ key: RepFeatureKey; label: string; descriptio
   { key: 'workspace', label: 'Call Queue', description: 'Sales Workspace — work the lead call queue' },
   { key: 'contractors', label: 'Contractors', description: 'View the contractor directory' },
   { key: 'deals', label: 'Deals', description: 'The deal pipeline' },
+  { key: 'contracts', label: 'Contracts', description: 'Generate branded sales agreements' },
   { key: 'consultations', label: 'Consultations', description: 'The consultation calendar' },
   { key: 'clients', label: 'Clients', description: 'Client profiles' },
   { key: 'tasks', label: 'Tasks', description: 'Personal to-do list' },
@@ -33,6 +35,7 @@ export function featureForPath(pathname: string): RepFeatureKey | null {
   if (pathname.startsWith('/portal/workspace')) return 'workspace';
   if (pathname.startsWith('/portal/contractors')) return 'contractors';
   if (pathname.startsWith('/portal/deals')) return 'deals';
+  if (pathname.startsWith('/portal/contracts')) return 'contracts';
   if (pathname.startsWith('/portal/appointments')) return 'consultations';
   if (pathname.startsWith('/portal/clients')) return 'clients';
   if (pathname.startsWith('/portal/tasks')) return 'tasks';

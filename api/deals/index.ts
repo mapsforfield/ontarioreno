@@ -91,6 +91,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(agreements);
     }
 
+    // ── Contract Creator presets ──
+    // A rep sees their own presets plus anything an admin has published to the
+    // team; admins see everything so they can curate the shared set.
+    if (req.query['_resource'] === 'contract_presets') {
+      const where = user.role === 'admin'
+        ? {}
+        : { OR: [{ ownerUserId: user.id }, { shared: true }] };
+      const presets = await withSchema(() =>
+        prisma.contractPreset.findMany({ where, orderBy: [{ shared: 'desc' }, { name: 'asc' }] })
+      );
+      return res.status(200).json(presets);
+    }
+
     // ── Sales Tracker rows ──
     if (req.query['_resource'] === 'tracker') {
       const where = user.role === 'admin' ? {} : { repId: user.id };
@@ -281,6 +294,120 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
       return res.status(200).json(updated);
+    }
+
+    // ── Parse an existing signed agreement into Contract Creator fields ──
+    //
+    // Reps rebuild the same 35-line scope by hand for every deal. Uploading a
+    // previously signed agreement and lifting its scope and terms is far
+    // faster than retyping it.
+    //
+    // The extraction is deliberately scoped to the *reusable* parts: scope
+    // lines, pricing structure, payment terms and dates. It never returns the
+    // previous homeowner's name, contact details or address — those change on
+    // every deal, and carrying them into a new contract is a hazard rather
+    // than a convenience. The prompt says so and the schema has nowhere to put
+    // them, so a stray value can't ride along.
+    if (data._action === 'parse_agreement') {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return res.status(503).json({ error: 'Agreement parsing is not configured.' });
+      const pdfBase64 = typeof data.pdfBase64 === 'string' ? data.pdfBase64 : '';
+      if (!pdfBase64) return res.status(400).json({ error: 'Missing document.' });
+
+
+      try {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        const anthropic = new Anthropic({ apiKey });
+        const message = await anthropic.messages.create({
+          model: 'claude-opus-4-8',
+          max_tokens: 16000,
+          thinking: { type: 'disabled' },
+          system:
+            "You extract reusable contract structure from signed home-renovation service agreements so a sales rep can reuse it as a template for a NEW client.\n\nExtract the scope of work verbatim, one entry per numbered line, preserving the document order. Put the work description in `item` and any specification, material, count or qualifier in `detail`. Also extract the pricing structure, payment terms and project dates.\n\nNEVER extract the previous homeowner's name, phone number, email address, or property address, and never copy them into any field including specialTerms. They belong to a different client and must not carry over. If a scope line names the previous owner or their address, omit that name or address from the text you return.\n\nUse empty strings for anything the document does not state. Do not invent values.\n\nRespond with ONE JSON object and nothing else — no prose, no explanation, no markdown code fence. Its keys are exactly: scope (array of {item, detail}), totalPrice (number), taxNote (string), paymentMethod (\"financing\"|\"cash\"|\"both\"), financeRate, financeTermMonths, financeAmortMonths, financeMonthlyPayment, financeUpfrontPct (all bare-number strings, no % or $), cashSchedule (array of {pct, when}), startDate, completionDate (YYYY-MM-DD or empty), specialTerms (string).",
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+                { type: 'text', text: 'Extract the reusable scope and terms from this agreement as the JSON object described.' },
+              ],
+            },
+          ],
+        });
+
+        const textBlock = message.content.find((b) => b.type === 'text');
+        if (!textBlock || textBlock.type !== 'text') {
+          return res.status(502).json({ error: 'The document could not be read.' });
+        }
+        // The model is told to return bare JSON; strip a stray code fence or any
+        // surrounding prose before parsing, defensively.
+        const rawText = textBlock.text.trim();
+        const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const jsonText = fenceMatch ? fenceMatch[1].trim() : rawText;
+        const firstBrace = jsonText.indexOf('{');
+        const lastBrace = jsonText.lastIndexOf('}');
+        if (firstBrace === -1 || lastBrace <= firstBrace) {
+          return res.status(502).json({ error: 'The agreement could not be read into fields.' });
+        }
+        const parsed = JSON.parse(jsonText.slice(firstBrace, lastBrace + 1));
+        return res.status(200).json(parsed);
+      } catch (err) {
+        console.error('[deals] parse_agreement failed:', err);
+        // Surface the API's own reason where there is one, so a genuine failure
+        // is legible instead of a wall of error JSON.
+        let reason = err instanceof Error ? err.message : 'Parsing failed.';
+        const inner = (err as { error?: { error?: { message?: string } } })?.error?.error?.message;
+        if (typeof inner === 'string' && inner) reason = inner;
+        return res.status(502).json({ error: reason.slice(0, 300) });
+      }
+    }
+
+    // ── Contract Creator presets ──
+    if (data._action === 'save_contract_preset') {
+      const name = String(data.name ?? '').trim();
+      if (!name) return res.status(400).json({ error: 'A preset needs a name.' });
+      if (data.payload == null) return res.status(400).json({ error: 'Missing payload.' });
+      // Only admins may publish a preset to the whole team.
+      const shared = user.role === 'admin' ? Boolean(data.shared) : false;
+      const fields = {
+        name,
+        shared,
+        contractorId: String(data.contractorId ?? ''),
+        templateId: String(data.templateId ?? ''),
+        payload: data.payload,
+      };
+
+      if (data.id) {
+        const existing = await withSchema(() =>
+          prisma.contractPreset.findUnique({ where: { id: String(data.id) } })
+        );
+        if (!existing) return res.status(404).json({ error: 'Preset not found.' });
+        if (user.role !== 'admin' && existing.ownerUserId !== user.id) {
+          return res.status(403).json({ error: 'You can only edit your own presets.' });
+        }
+        const updated = await withSchema(() =>
+          prisma.contractPreset.update({ where: { id: String(data.id) }, data: fields })
+        );
+        return res.status(200).json(updated);
+      }
+
+      const created = await withSchema(() =>
+        prisma.contractPreset.create({ data: { ...fields, ownerUserId: user.id } })
+      );
+      return res.status(201).json(created);
+    }
+
+    if (data._action === 'delete_contract_preset') {
+      if (!data.id) return res.status(400).json({ error: 'Missing id.' });
+      const existing = await withSchema(() =>
+        prisma.contractPreset.findUnique({ where: { id: String(data.id) } })
+      );
+      if (!existing) return res.status(404).json({ error: 'Preset not found.' });
+      if (user.role !== 'admin' && existing.ownerUserId !== user.id) {
+        return res.status(403).json({ error: 'You can only delete your own presets.' });
+      }
+      await withSchema(() => prisma.contractPreset.delete({ where: { id: String(data.id) } }));
+      return res.status(200).json({ ok: true });
     }
 
     if (data._action === 'delete_tracker_row') {

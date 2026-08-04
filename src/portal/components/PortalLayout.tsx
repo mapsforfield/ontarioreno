@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Camera,
   CreditCard,
+  FileSignature,
   Gauge,
   HandCoins,
   Inbox,
@@ -55,6 +56,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: Gauge },
   { label: 'Contractors', href: '/portal/contractors', icon: Building2, feature: 'contractors' },
   { label: 'Deals', href: '/portal/deals', icon: BriefcaseBusiness, feature: 'deals' },
+  { label: 'Contracts', href: '/portal/contracts', icon: FileSignature, feature: 'contracts' },
   {
     label: 'Consultations',
     mobileLabel: 'Consults',

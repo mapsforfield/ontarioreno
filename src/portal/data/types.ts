@@ -624,3 +624,22 @@ export type ContractorDispatch = {
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * A saved starting point for the Contract Creator. Captures everything that
+ * repeats between deals — contractor, template, payment structure and the whole
+ * scope of work — and deliberately omits client-specific fields, which change
+ * every time.
+ */
+export type ContractPreset = {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  /** Published by an admin for the whole team, rather than personal to one rep. */
+  shared: boolean;
+  contractorId: string;
+  templateId: string;
+  payload: unknown;
+  createdAt: string;
+  updatedAt: string;
+};

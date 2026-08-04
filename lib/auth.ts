@@ -2,7 +2,9 @@ import jwt from 'jsonwebtoken';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from './prisma.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+// Use || (not ??) so an empty-string env var falls back too — an empty secret
+// makes jwt.sign throw "secretOrPrivateKey must have a value" and crashes login.
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const COOKIE_NAME = 'or_token';
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
