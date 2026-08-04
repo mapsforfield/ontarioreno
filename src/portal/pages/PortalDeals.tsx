@@ -260,6 +260,7 @@ export default function PortalDeals() {
     assignContractorToDeal,
     clients,
     contractors,
+    financePartners,
     deleteDeal,
     restoreDeal,
     purgeDeal,
@@ -286,6 +287,19 @@ export default function PortalDeals() {
     : contractors.filter(
         (contractor) => contractor.contractorStatus === 'active'
       );
+
+  /** Lender names for a contractor, so financed deals go to someone who can
+   *  actually fund them — FinanceIt and iFinance are not interchangeable. */
+  const getPartnerNames = (contractor: Contractor) => {
+    const byId = new Map(
+      financePartners.map((partner) => [partner.id, partner])
+    );
+
+    return (contractor.financePartnerIds ?? [])
+      .map((partnerId) => byId.get(partnerId)?.name)
+      .filter(Boolean)
+      .join(', ');
+  };
   const [mobileStageFilter, setMobileStageFilter] = useState<DealStatus | null>(null);
   const columnsToRender = mobileStageFilter
     ? columns.filter((col) => col.status === mobileStageFilter)
@@ -513,6 +527,11 @@ export default function PortalDeals() {
   // deal links back to that client record.
   const prefillClientIdRef = useRef<string | null>(null);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
+  const assignedContractor = selectedDeal?.assignedContractorId
+    ? contractors.find(
+        (contractor) => contractor.id === selectedDeal.assignedContractorId
+      )
+    : undefined;
   const selectedDealAppointments = selectedDeal
     ? getAppointmentsForDeal(selectedDeal.id)
     : [];
@@ -1947,12 +1966,25 @@ OntarioReno Broker Portal`;
                             (Unavailable)
                           </option>
                         )}
-                      {selectableContractors.map((contractor) => (
-                        <option key={contractor.id} value={contractor.id}>
-                          {contractor.companyName}
-                        </option>
-                      ))}
+                      {selectableContractors.map((contractor) => {
+                        const partnerNames = getPartnerNames(contractor);
+
+                        return (
+                          <option key={contractor.id} value={contractor.id}>
+                            {contractor.companyName}
+                            {partnerNames ? ` — ${partnerNames}` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
+                    {assignedContractor &&
+                      assignedContractor.financingStatus !== 'cash_only' && (
+                        <span className="text-xs font-medium text-slate-500">
+                          {getPartnerNames(assignedContractor)
+                            ? `Finances through ${getPartnerNames(assignedContractor)}.`
+                            : 'No financing partner on file for this contractor.'}
+                        </span>
+                      )}
                   </label>
                 )}
                 {!isAddingDeal && selectedDeal && (
