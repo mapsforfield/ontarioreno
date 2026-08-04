@@ -266,9 +266,13 @@ const PREP_QUESTIONS: Question[] = [
  */
 const HAMILTON_FUNDING_GUIDANCE: FundingGuidance = {
   heading: 'That’s what the visit is for',
-  lead: 'Grant funds are released as project milestones are completed and inspected. Because main payouts come as work finishes, the project is funded upfront. Homeowners rarely have that cash ready.',
+  lead: 'The Hamilton grant is paid out after the work is finished and inspected. Homeowners rarely have that cash ready upfront.',
   leadEmphasis: 'That’s normal.',
-  milestones: ['Permit', 'Build', 'Inspection', 'Grant released'],
+  // Four steps. Approval must appear — leaving it out implied a homeowner builds
+  // first and finds out afterwards, which is the exact fear this screen answers.
+  // Inspection stays out: five labels wrap onto a second line at card width,
+  // which stops the strip reading as one sequence.
+  milestones: ['Permit', 'Grant approved', 'Build', 'Grant released'],
   highlight: 'Many use an open loan with no early-payoff fee, cleared as the grant money arrives.',
   closing: 'Your consultant will walk you through the exact math and timeline during your visit.',
   continueLabel: 'Continue',

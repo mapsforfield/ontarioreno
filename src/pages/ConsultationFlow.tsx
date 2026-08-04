@@ -636,21 +636,23 @@ export default function ConsultationFlow() {
             <span className="whitespace-nowrap">{program.fundingGuidance.leadEmphasis}</span>
           </p>
           {/* Labels only, no figures. The last step is the emphasised one — the
-              whole point of the strip is that the money sits at the end. */}
+              whole point of the strip is that the money sits at the end. Sized to
+              keep every label on ONE line at card width: wrapped onto a second
+              line it stops reading as a single sequence, which is all it does. */}
           {program.fundingGuidance.milestones.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-slate-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200 px-3 py-3">
               {program.fundingGuidance.milestones.map((m, i, all) => (
-                <span key={m} className="flex items-center gap-2">
+                <span key={m} className="flex items-center gap-x-1">
                   <span
                     className={
                       i === all.length - 1
-                        ? 'text-xs font-bold uppercase tracking-wide text-emerald-700'
-                        : 'text-xs font-semibold uppercase tracking-wide text-slate-500'
+                        ? 'whitespace-nowrap text-[11px] font-bold uppercase leading-tight text-emerald-700'
+                        : 'whitespace-nowrap text-[11px] font-semibold uppercase leading-tight text-slate-500'
                     }
                   >
                     {m}
                   </span>
-                  {i < all.length - 1 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />}
+                  {i < all.length - 1 && <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />}
                 </span>
               ))}
             </div>

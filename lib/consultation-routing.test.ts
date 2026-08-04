@@ -221,8 +221,8 @@ test('the funding guidance screen states the milestone payout, never the advance
   assert.ok(g.heading, 'a live program needs a heading');
   assert.ok(g.lead && g.highlight && g.closing, 'a live program needs the full screen');
   const text = [g.lead, g.leadEmphasis, ...g.milestones, g.highlight, g.closing].join(' ');
-  assert.match(text, /milestones/i, 'explains that payouts follow milestones');
-  assert.match(text, /funded upfront/i, 'states the homeowner funds the work first');
+  assert.match(text, /after the work is finished/i, 'states the grant arrives after the work');
+  assert.match(text, /grant approved/i, 'shows approval coming before the build');
   assert.match(text, /open loan/i, 'names the route without dwelling on it');
   // The first advance is capped at $8,000 against a $50–60k scope. Naming any
   // early money here invites the homeowner to conclude they need no financing,
