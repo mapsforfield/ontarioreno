@@ -315,6 +315,7 @@ export default function ConsultationFlow() {
     return [...map.entries()];
   }, [slots]);
 
+
   if (error && !program) return <Shell><p className="text-slate-600">{error}</p></Shell>;
   if (!program) return <Shell><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#1B3C6C]" /></Shell>;
 
@@ -448,25 +449,33 @@ export default function ConsultationFlow() {
       <Shell title="Pick a time that suits you" step={stepIndex}>
         <p className="mb-5 text-sm font-bold text-[#1B3C6C]">{meeting.line}</p>
         {byDate.length === 0 && <p className="text-slate-600">No times are free right now — we’ll call to arrange one.</p>}
-        <div className="space-y-3 text-left">
-          {byDate.slice(0, 8).map(([date, times]) => (
-            <div key={date} className="rounded-xl border border-slate-200 p-4">
-              <p className="mb-3 text-sm font-black text-slate-800">{fmtDateShort(date)}</p>
-              <div className="flex flex-wrap gap-2">
-                {times.map((time) => {
-                  const on = chosen?.date === date && chosen?.time === time;
-                  return (
-                    <button key={time} type="button" onClick={() => setChosen({ date, time })}
-                      className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition ${
-                        on ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-200 text-slate-700 hover:border-[#1B3C6C]'
-                      }`}>
-                      {fmtTime(time)}
-                    </button>
-                  );
-                })}
+        {/* Every day, in one place — but scrolling inside its own frame rather
+            than stretching the page. The card keeps a fixed height, so the
+            confirm button stays in view instead of sitting two screens down. */}
+        <div className="relative">
+          <div className="max-h-[52vh] space-y-3 overflow-y-auto overscroll-contain pr-1 text-left sm:max-h-[26rem]">
+            {byDate.slice(0, 8).map(([date, times]) => (
+              <div key={date} className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-3 text-sm font-black text-slate-800">{fmtDateShort(date)}</p>
+                <div className="flex flex-wrap gap-2">
+                  {times.map((time) => {
+                    const on = chosen?.date === date && chosen?.time === time;
+                    return (
+                      <button key={time} type="button" onClick={() => setChosen({ date, time })}
+                        className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition ${
+                          on ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-200 text-slate-700 hover:border-[#1B3C6C]'
+                        }`}>
+                        {fmtTime(time)}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          {/* Softens the cut-off edge so it reads as "more below", not as a
+              list that happens to end mid-card. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" />
         </div>
         {error && <ErrorNote>{error}</ErrorNote>}
         <PrimaryButton disabled={!chosen || busy} onClick={book}>
