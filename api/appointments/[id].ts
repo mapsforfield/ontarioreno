@@ -2,6 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
+import {
+  reminderContextFor,
+  resyncAppointmentReminders,
+  suppressPendingReminders,
+} from '../../lib/reminder-resync.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
@@ -48,21 +53,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Change detection is pure, and both the reminder resync and the rep
+    // notification below depend on it, so it sits outside either try block.
+    const dateChanged = before && data.appointmentDate !== undefined && data.appointmentDate !== before.appointmentDate;
+    const timeChanged = before && data.appointmentTime !== undefined && data.appointmentTime !== before.appointmentTime;
+    const wasCancelled = before && data.status === 'cancelled' && before.status !== 'cancelled';
+    const wasRescheduled = before && data.status === 'rescheduled' && before.status !== 'rescheduled';
+    const wasMoved = (dateChanged || timeChanged) && !wasCancelled && !wasRescheduled;
+
+    let event: 'rescheduled' | 'cancelled' | 'moved' | null = null;
+    if (wasCancelled) event = 'cancelled';
+    else if (wasRescheduled) event = 'rescheduled';
+    else if (wasMoved) event = 'moved';
+
+    // ── Keep the queued reminder texts honest ──
+    // Queued reminders have the old date written into their body, so a move
+    // that leaves them alone texts the homeowner about a visit that is not
+    // happening. This is its own try block, ahead of the rep alerts: a missing
+    // VAPID key must not be the reason a homeowner gets the wrong date.
+    if (event) {
+      try {
+        if (event === 'cancelled') {
+          await suppressPendingReminders(prisma, appointment.id, 'appointment_cancelled');
+        } else if (!dateChanged && !timeChanged) {
+          // Flagged as rescheduled but no new slot recorded yet. The old date
+          // is known to be wrong and the new one is not known at all, so the
+          // correct number of queued reminders is none; confirming the slot
+          // re-queues them through the branch below.
+          await suppressPendingReminders(prisma, appointment.id, 'awaiting_reschedule_confirmation');
+        } else {
+          await resyncAppointmentReminders(
+            prisma,
+            reminderContextFor(appointment),
+            `appointment_${event}`
+          );
+        }
+      } catch (err) {
+        // Loud, unlike the notification failures below: a resync that did not
+        // happen means a wrong text is still queued against a real homeowner.
+        console.error('[appointments/patch] reminder resync failed', appointment.id, err);
+      }
+    }
+
     // Best-effort notification to assigned rep
     try {
       const repId = appointment.assignedRepId;
       const rep = await prisma.user.findUnique({ where: { id: repId }, select: { name: true, email: true } });
-
-      const dateChanged = before && data.appointmentDate !== undefined && data.appointmentDate !== before.appointmentDate;
-      const timeChanged = before && data.appointmentTime !== undefined && data.appointmentTime !== before.appointmentTime;
-      const wasCancelled = before && data.status === 'cancelled' && before.status !== 'cancelled';
-      const wasRescheduled = before && data.status === 'rescheduled' && before.status !== 'rescheduled';
-      const wasMoved = (dateChanged || timeChanged) && !wasCancelled && !wasRescheduled;
-
-      let event: 'rescheduled' | 'cancelled' | 'moved' | null = null;
-      if (wasCancelled) event = 'cancelled';
-      else if (wasRescheduled) event = 'rescheduled';
-      else if (wasMoved) event = 'moved';
 
       if (event && rep?.email) {
         await sendAppointmentNotification({
@@ -119,6 +155,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (user.role !== 'admin' && existing.assignedRepId !== user.id) {
       return res.status(403).json({ error: 'You can only delete your own consultations.' });
     }
+    // Outbox rows hold the appointment id as a plain column, not a relation, so
+    // deleting the appointment — soft or hard — orphans its pending reminders
+    // rather than removing them, and the drain would happily text a homeowner
+    // about a visit that no longer exists in the system at all.
+    await suppressPendingReminders(prisma, id, 'appointment_deleted');
+
     // `?purge=1` permanently removes; default is a soft-delete (trash bin).
     if (req.query['purge'] === '1') {
       await prisma.appointment.delete({ where: { id } });

@@ -4,6 +4,11 @@
 
 import { deliverEmail, deliverSms, smsProviderConfigured } from './notifications.js';
 import { deliveryEnabled } from './app-config.js';
+import {
+  reconcileReminder,
+  REMINDER_KINDS,
+  type ReminderAppointment,
+} from './reminder-resync.js';
 
 export type DrainSummary = {
   considered: number;
@@ -13,6 +18,8 @@ export type DrainSummary = {
   failed: number;
   /** Rows dropped because their message had stopped being true. */
   stale: number;
+  /** Reminders carried forward because their visit moved further out. */
+  deferred: number;
 };
 
 /** Minimal surface of the Prisma client this needs. */
@@ -22,6 +29,8 @@ export type OutboxStore = {
       Array<{
         id: string;
         channel: string;
+        kind?: string;
+        appointmentId?: string | null;
         recipient: string;
         subject: string;
         body: string;
@@ -31,6 +40,11 @@ export type OutboxStore = {
       }>
     >;
     update: (args: unknown) => Promise<unknown>;
+  };
+  /** Reminders are rebuilt from the appointment at send time, so the drain has
+   *  to be able to read one. */
+  appointment: {
+    findUnique: (args: unknown) => Promise<ReminderAppointment | null>;
   };
 };
 
@@ -50,7 +64,7 @@ export async function drainOutbox(
   const canDeliver = deliveryEnabled(env);
   const now = new Date().toISOString();
   const summary: DrainSummary = {
-    considered: 0, sent: 0, suppressed: 0, blocked: 0, failed: 0, stale: 0,
+    considered: 0, sent: 0, suppressed: 0, blocked: 0, failed: 0, stale: 0, deferred: 0,
   };
 
   const due = await prisma.notificationOutbox
@@ -66,6 +80,58 @@ export async function drainOutbox(
   for (const row of due) {
     let state: string;
     let reason: string;
+
+    // ── Reminders are rebuilt from the appointment, never trusted as stored ──
+    // A queued reminder is a schedule, not a script. Its body was written when
+    // the visit was booked, and the visit may have moved since — by a rep in
+    // the portal, by the homeowner rescheduling themselves, or by something
+    // that does not exist yet. Deriving the wording here, at the last possible
+    // moment, is what makes a stale date impossible rather than merely
+    // unlikely: there is no write path that can forget to do this, because
+    // this is the only door a message leaves through.
+    if (row.kind && (REMINDER_KINDS as readonly string[]).includes(row.kind)) {
+      const appointment = row.appointmentId
+        ? await prisma.appointment
+            .findUnique({ where: { id: row.appointmentId } })
+            .catch(() => null)
+        : null;
+      const verdict = reconcileReminder(appointment, { kind: row.kind });
+
+      if (verdict.action === 'suppress') {
+        await prisma.notificationOutbox
+          .update({
+            where: { id: row.id },
+            data: { state: 'suppressed', stateReason: verdict.reason, attempts: row.attempts + 1 },
+          })
+          .catch(() => {});
+        summary.stale++;
+        continue;
+      }
+
+      if (verdict.action === 'defer') {
+        // Stays pending, re-timed to the slot the appointment now has. Attempts
+        // are untouched: nothing was tried, so nothing failed.
+        await prisma.notificationOutbox
+          .update({
+            where: { id: row.id },
+            data: {
+              sendAfter: verdict.sendAfter,
+              expiresAt: verdict.expiresAt,
+              body: verdict.body,
+              stateReason: 'rescheduled_to_match_appointment',
+            },
+          })
+          .catch(() => {});
+        summary.deferred++;
+        continue;
+      }
+
+      // Send the rebuilt wording, not the row's — and carry the recomputed
+      // expiry with it, so the stored one (written against a slot that may no
+      // longer exist) cannot veto a message the appointment says is valid.
+      row.body = verdict.body;
+      row.expiresAt = verdict.expiresAt;
+    }
 
     // Checked before anything else: a message whose wording has expired must
     // not go out even in an environment that would otherwise deliver it. The

@@ -6,6 +6,8 @@ import { drainOutbox, type OutboxStore } from './notification-drain.js';
 type Row = {
   id: string;
   channel: string;
+  kind?: string;
+  appointmentId?: string | null;
   recipient: string;
   subject: string;
   body: string;
@@ -14,21 +16,73 @@ type Row = {
   expiresAt?: string;
 };
 
+type Appt = {
+  id: string;
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+  status?: string;
+  deletedAt?: Date | null;
+};
+
 /** In-memory stand-in so the drain can be driven without a database. */
-function store(rows: Row[]) {
-  const updates: Array<{ id: string; state: string; stateReason: string }> = [];
+function store(rows: Row[], appointments: Appt[] = []) {
+  const updates: Array<{ id: string; state: string; stateReason: string; data: Record<string, unknown> }> = [];
   const prisma: OutboxStore = {
     notificationOutbox: {
       findMany: async () => rows,
       update: async (args: unknown) => {
-        const a = args as { where: { id: string }; data: { state: string; stateReason: string } };
-        updates.push({ id: a.where.id, state: a.data.state, stateReason: a.data.stateReason });
+        const a = args as { where: { id: string }; data: Record<string, unknown> };
+        updates.push({
+          id: a.where.id,
+          state: a.data.state as string,
+          stateReason: a.data.stateReason as string,
+          data: a.data,
+        });
         return null;
+      },
+    },
+    appointment: {
+      findUnique: async (args: unknown) => {
+        const a = args as { where: { id: string } };
+        return appointments.find((x) => x.id === a.where.id) ?? null;
       },
     },
   };
   return { prisma, updates };
 }
+
+const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+const appt = (over: Partial<Appt> = {}): Appt => ({
+  id: 'appt-1',
+  customerName: 'Jane',
+  phone: '9055550199',
+  address: '100 King St W',
+  city: 'Hamilton',
+  appointmentDate: inDays(3),
+  appointmentTime: '12:00',
+  status: 'scheduled',
+  deletedAt: null,
+  ...over,
+});
+
+/** A queued reminder carrying a body written against an older slot. */
+const reminderRow = (over: Partial<Row> = {}): Row => ({
+  id: 'r1',
+  channel: 'sms',
+  kind: 'reminder_24h',
+  appointmentId: 'appt-1',
+  recipient: '9055550199',
+  subject: '',
+  body: 'Reminder: ... scheduled for tomorrow (Friday, August 7) at 12:00 PM ...',
+  attempts: 0,
+  expiresAt: '',
+  ...over,
+});
 
 const PRODUCTION = { VERCEL_ENV: 'production' } as NodeJS.ProcessEnv;
 
@@ -81,6 +135,84 @@ test('an SMS row is no longer treated as an unsupported channel', async () => {
   // ready to send, not be discarded as undeliverable.
   assert.equal(updates[0]!.stateReason, 'no_sms_provider');
   assert.equal(summary.blocked, 1);
+});
+
+// ─── Reminders follow the appointment, not the stored message ─────────────────
+
+test('a reminder whose visit moved later is carried forward, not sent', async () => {
+  // The reported bug: booked for Friday, moved to the following Monday, and the
+  // Friday reminder was still sitting due in the queue.
+  const { prisma, updates } = store(
+    [reminderRow()],
+    [appt({ appointmentDate: inDays(10), appointmentTime: '16:00' })]
+  );
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.sent, 0);
+  assert.equal(summary.deferred, 1);
+  const update = updates[0]!;
+  assert.equal(update.state, undefined, 'stays pending');
+  assert.ok(String(update.data.sendAfter) > new Date().toISOString());
+  assert.ok(!String(update.data.body).includes('August 7'), 'old date is gone from the wording');
+});
+
+test('a reminder for a cancelled visit is dropped', async () => {
+  const { prisma, updates } = store([reminderRow()], [appt({ status: 'cancelled' })]);
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.sent, 0);
+  assert.equal(summary.stale, 1);
+  assert.equal(updates[0]!.state, 'suppressed');
+  assert.equal(updates[0]!.stateReason, 'appointment_cancelled');
+});
+
+test('a reminder for a deleted visit is dropped', async () => {
+  const { prisma, updates } = store([reminderRow()], [appt({ deletedAt: new Date() })]);
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.sent, 0);
+  assert.equal(updates[0]!.stateReason, 'appointment_deleted');
+});
+
+test('a reminder whose appointment is gone is dropped rather than sent blind', async () => {
+  const { prisma, updates } = store([reminderRow()], []);
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.sent, 0);
+  assert.equal(summary.stale, 1);
+  assert.equal(updates[0]!.stateReason, 'appointment_missing');
+});
+
+test('a stored expiry cannot veto a reminder the appointment still wants', async () => {
+  // Expiry written against the ORIGINAL slot, which has since been moved out.
+  // Under the old ordering this row was discarded as stale and the homeowner
+  // heard nothing at all.
+  const expired = new Date(Date.now() - 60 * 60_000).toISOString();
+  const { prisma, updates } = store(
+    [reminderRow({ expiresAt: expired })],
+    [appt({ appointmentDate: inDays(10), appointmentTime: '16:00' })]
+  );
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.stale, 0);
+  assert.equal(summary.deferred, 1);
+  assert.ok(String(updates[0]!.data.expiresAt) > new Date().toISOString());
+});
+
+test('non-reminder messages are sent as written', async () => {
+  // Confirmations and team alerts state what was true when they were composed;
+  // only reminders are rebuilt.
+  const { prisma } = store([reminderRow({ kind: 'booking_confirmation' })], []);
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.stale, 0);
+  assert.equal(summary.blocked, 1, 'reached delivery, parked only for want of Twilio');
 });
 
 test('expiry beats environment suppression so counts stay honest', async () => {

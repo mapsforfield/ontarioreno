@@ -121,11 +121,11 @@ export function smsBookingConfirmation(c: BookingContext): string {
   return `Hi ${c.name}, your OntarioReno site visit for ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. Need to reschedule? Reply to this text.`;
 }
 
-export function smsReminder24h(c: BookingContext): string {
+export function smsReminder24h(c: ReminderContext): string {
   return `Reminder: Your OntarioReno site visit for ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) at ${friendlyTime(c.time)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
 }
 
-export function smsReminderDayOf(c: BookingContext): string {
+export function smsReminderDayOf(c: ReminderContext): string {
   return `Hi ${c.name}, our specialist is looking forward to visiting ${c.propertyAddress} today at ${friendlyTime(c.time)} for your ADU assessment. See you soon!`;
 }
 
@@ -379,10 +379,77 @@ export function dayOfReminderAt(date: string, time: string): Date {
   return twoHoursBefore < eightAm ? twoHoursBefore : eightAm;
 }
 
+/**
+ * Everything a reminder consists of, for one appointment at one date and time.
+ *
+ * Split out of `planBookingNotifications` because reminders outlive the booking
+ * that created them: when a homeowner reschedules, the queued rows describe a
+ * visit that is no longer happening and have to be rebuilt. Both the booking
+ * path and the resync path plan them here, so the copy and the timing rules
+ * cannot drift apart.
+ */
+export type ReminderContext = Pick<
+  BookingContext,
+  'appointmentId' | 'name' | 'phone' | 'propertyAddress' | 'date' | 'time'
+>;
+
+export function planReminderNotifications(
+  c: ReminderContext,
+  /**
+   * Appended to the idempotency key. Empty for the original booking, which
+   * keeps the keys already in the table unchanged. A resync passes the new
+   * date and time, so moving to a new slot writes a new row, and moving BACK
+   * to a slot the homeowner already had revives that slot's original row
+   * rather than colliding with it.
+   */
+  revision = '',
+  now: Date = new Date(),
+  /**
+   * Normally a reminder whose send time has already passed is not queued at
+   * all — at booking time that means the moment for it never existed. The
+   * send-time reconciler needs the full schedule regardless, because "this
+   * row's send time has passed" is exactly the condition under which it should
+   * go out.
+   */
+  includeElapsed = false
+): PlannedNotification[] {
+  if (!c.phone) return [];
+  const suffix = revision ? `:${revision}` : '';
+  const start = torontoInstant(c.date, c.time);
+  const planned: PlannedNotification[] = [];
+
+  const reminderAt = new Date(start.getTime() - 24 * 60 * 60_000);
+  // A booking made inside 24 hours has already missed this window; the day-of
+  // reminder still covers it, so scheduling it in the past would only send a
+  // "tomorrow" message about today.
+  if (includeElapsed || reminderAt.getTime() > now.getTime()) {
+    planned.push({
+      channel: 'sms', kind: 'reminder_24h', recipient: c.phone,
+      subject: '', body: smsReminder24h(c), sendAfter: reminderAt.toISOString(),
+      // This message says "tomorrow". Once the appointment day has begun it
+      // is a lie, and the day-of reminder covers the same visit anyway.
+      expiresAt: torontoInstant(c.date, '00:00').toISOString(),
+      idempotencyKey: `${c.appointmentId}:sms:reminder_24h${suffix}`,
+    });
+  }
+
+  const dayOf = dayOfReminderAt(c.date, c.time);
+  if (includeElapsed || dayOf.getTime() > now.getTime()) {
+    planned.push({
+      channel: 'sms', kind: 'reminder_day_of', recipient: c.phone,
+      subject: '', body: smsReminderDayOf(c), sendAfter: dayOf.toISOString(),
+      // A reminder that arrives after the rep is on the doorstep is noise.
+      expiresAt: start.toISOString(),
+      idempotencyKey: `${c.appointmentId}:sms:reminder_day_of${suffix}`,
+    });
+  }
+
+  return planned;
+}
+
 /** Everything a confirmed booking should send, with its schedule. */
 export function planBookingNotifications(c: BookingContext): PlannedNotification[] {
   const now = new Date().toISOString();
-  const start = torontoInstant(c.date, c.time);
   const confirmation = buildPortalConfirmation(c);
   const team = emailTeamAlert(c);
   const planned: PlannedNotification[] = [];
@@ -406,31 +473,7 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
       idempotencyKey: `${c.appointmentId}:sms:booking_confirmation`,
     });
 
-    const reminderAt = new Date(start.getTime() - 24 * 60 * 60_000);
-    // A booking made inside 24 hours has already missed this window; the day-of
-    // reminder still covers it, so scheduling it in the past would only send a
-    // "tomorrow" message about today.
-    if (reminderAt.getTime() > Date.now()) {
-      planned.push({
-        channel: 'sms', kind: 'reminder_24h', recipient: c.phone,
-        subject: '', body: smsReminder24h(c), sendAfter: reminderAt.toISOString(),
-        // This message says "tomorrow". Once the appointment day has begun it
-        // is a lie, and the day-of reminder covers the same visit anyway.
-        expiresAt: torontoInstant(c.date, '00:00').toISOString(),
-        idempotencyKey: `${c.appointmentId}:sms:reminder_24h`,
-      });
-    }
-
-    const dayOf = dayOfReminderAt(c.date, c.time);
-    if (dayOf.getTime() > Date.now()) {
-      planned.push({
-        channel: 'sms', kind: 'reminder_day_of', recipient: c.phone,
-        subject: '', body: smsReminderDayOf(c), sendAfter: dayOf.toISOString(),
-        // A reminder that arrives after the rep is on the doorstep is noise.
-        expiresAt: start.toISOString(),
-        idempotencyKey: `${c.appointmentId}:sms:reminder_day_of`,
-      });
-    }
+    planned.push(...planReminderNotifications(c));
   }
 
   // The business inbox always hears about a booking; the assigned rep gets the

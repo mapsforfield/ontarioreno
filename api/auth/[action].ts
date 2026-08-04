@@ -5,6 +5,11 @@ import { prisma } from '../../lib/prisma.js';
 import { withSchema } from '../../lib/schema.js';
 import { parseNoteTemplates } from '../../lib/note-templates.js';
 import {
+  reminderContextFor,
+  resyncAppointmentReminders,
+  suppressPendingReminders,
+} from '../../lib/reminder-resync.js';
+import {
   signToken,
   setAuthCookie,
   clearAuthCookie,
@@ -342,6 +347,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await prisma.appointment.update({ where: { id: appointmentId.trim() }, data: dbUpdate }).catch((err: unknown) => {
         console.error('Failed to update appointment in DB:', err);
       });
+
+      // ── Move the queued reminder texts with the appointment ──
+      // No rep has to confirm anything for this to be right: the appointment
+      // row above now holds the new slot, and the drain rebuilds reminder
+      // wording from the appointment at send time. Resyncing here just keeps
+      // the outbox readable in the meantime.
+      if (type === 'cancel') {
+        await suppressPendingReminders(prisma, appointmentId.trim(), 'appointment_cancelled');
+      } else {
+        const updated = await prisma.appointment
+          .findUnique({ where: { id: appointmentId.trim() } })
+          .catch(() => null);
+        if (updated) {
+          await resyncAppointmentReminders(
+            prisma,
+            reminderContextFor(updated),
+            'customer_rescheduled'
+          );
+        }
+      }
     }
 
     const ref = appointmentId.trim().replace(/-/g, '').slice(-8).toUpperCase();
