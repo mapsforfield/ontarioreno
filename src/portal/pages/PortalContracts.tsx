@@ -93,7 +93,7 @@ const DEFAULT_CASH: Array<{ pct: string; when: string }> = [
 
 export default function PortalContracts() {
   const { currentUser } = usePortalAuth();
-  const { deals, contractors, addSalesAgreement, isLoading, loadError, refetch,
+  const { deals, contractors, users, addSalesAgreement, isLoading, loadError, refetch,
     contractPresets, saveContractPreset, deleteContractPreset } = usePortalData();
   const location = useLocation();
   const preselectedDealId = (location.state as { dealId?: string } | null)?.dealId ?? '';
@@ -107,7 +107,6 @@ export default function PortalContracts() {
   const [presetName, setPresetName] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [presetShared, setPresetShared] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
 
   // The embedded typefaces are a lazily-loaded chunk. Nothing renders until
@@ -335,7 +334,7 @@ export default function PortalContracts() {
     setSavingPreset(true);
     const saved = await saveContractPreset({
       name,
-      shared: currentUser?.role === 'admin' ? presetShared : false,
+      shared: true,
       contractorId: d.contractorId,
       templateId: d.templateId,
       payload: presetPayload(d),
@@ -343,7 +342,6 @@ export default function PortalContracts() {
     setSavingPreset(false);
     if (saved) {
       setPresetName('');
-      setPresetShared(false);
       showToast({ message: `Saved preset “${saved.name}”`, variant: 'success' });
     } else {
       showToast({ message: 'Could not save the preset', variant: 'error' });
@@ -603,20 +601,19 @@ export default function PortalContracts() {
                 {contractPresets.map((preset) => {
                   const owned = preset.ownerUserId === currentUser?.id;
                   const contractorName = contractors.find((x) => x.id === preset.contractorId)?.companyName;
+                  const ownerName = owned
+                    ? null
+                    : users.find((u) => u.id === preset.ownerUserId)?.name;
                   return (
                     <div key={preset.id} className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2.5">
                       <BookmarkCheck className="h-4 w-4 shrink-0 text-[#1B3C6C]" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-slate-900">
                           {preset.name}
-                          {preset.shared && (
-                            <span className="ml-2 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-emerald-700">
-                              Team
-                            </span>
-                          )}
                         </p>
                         <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-                          {[contractorName, CONTRACT_TEMPLATES.find((t) => t.id === preset.templateId)?.name]
+                          {[contractorName, CONTRACT_TEMPLATES.find((t) => t.id === preset.templateId)?.name,
+                            ownerName && `by ${ownerName}`]
                             .filter(Boolean).join(' · ') || 'Preset'}
                         </p>
                       </div>
@@ -645,8 +642,8 @@ export default function PortalContracts() {
                 })}
               </div>
               <p className="mt-2 text-xs font-semibold text-slate-400">
-                Loading a preset replaces the contractor, style, payment terms and scope. The client
-                details, dates and price on this deal are left alone.
+                Every rep sees every preset. Loading one replaces the contractor, style, payment
+                terms and scope. The client details, dates and price on this deal are left alone.
               </p>
             </section>
           )}
@@ -1210,6 +1207,7 @@ export default function PortalContracts() {
             <p className="mb-3 text-xs font-semibold text-slate-500">
               Stores the contractor, style, colour, payment terms and the whole scope of work —
               including product photos and links. Client details, dates and price are never saved.
+              Presets are shared with the whole team.
             </p>
             <div className="flex flex-wrap gap-2">
               <input
@@ -1229,17 +1227,6 @@ export default function PortalContracts() {
                 Create preset
               </button>
             </div>
-            {currentUser?.role === 'admin' && (
-              <label className="mt-2.5 inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={presetShared}
-                  onChange={(e) => setPresetShared(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-300"
-                />
-                Publish to the whole team
-              </label>
-            )}
           </section>
         </div>
 

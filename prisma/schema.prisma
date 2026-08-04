@@ -408,8 +408,9 @@ model ContractPreset {
   id          String   @id @default(cuid())
   name        String
   ownerUserId String
-  /// Shared presets are usable by every rep; personal ones only by their owner.
-  /// Only admins may publish a shared preset.
+  /// Every preset is usable by every rep; only the owner (or an admin) may
+  /// edit or delete one. Kept for the older personal presets, which the reader
+  /// no longer filters on.
   shared      Boolean  @default(false)
   /// Denormalised for the picker, so it can label presets without a join.
   contractorId String  @default("")

@@ -92,14 +92,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ── Contract Creator presets ──
-    // A rep sees their own presets plus anything an admin has published to the
-    // team; admins see everything so they can curate the shared set.
+    // Presets are team-wide: whoever saves one, every rep can start from it.
+    // Only the owner (or an admin) may edit or delete it.
     if (req.query['_resource'] === 'contract_presets') {
-      const where = user.role === 'admin'
-        ? {}
-        : { OR: [{ ownerUserId: user.id }, { shared: true }] };
       const presets = await withSchema(() =>
-        prisma.contractPreset.findMany({ where, orderBy: [{ shared: 'desc' }, { name: 'asc' }] })
+        prisma.contractPreset.findMany({ orderBy: { name: 'asc' } })
       );
       return res.status(200).json(presets);
     }
@@ -367,11 +364,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const name = String(data.name ?? '').trim();
       if (!name) return res.status(400).json({ error: 'A preset needs a name.' });
       if (data.payload == null) return res.status(400).json({ error: 'Missing payload.' });
-      // Only admins may publish a preset to the whole team.
-      const shared = user.role === 'admin' ? Boolean(data.shared) : false;
       const fields = {
         name,
-        shared,
+        // Every preset is visible to the whole team.
+        shared: true,
         contractorId: String(data.contractorId ?? ''),
         templateId: String(data.templateId ?? ''),
         payload: data.payload,
