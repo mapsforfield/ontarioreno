@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Loader2, Lock, MapPin } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Loader2, Lock, MapPin } from 'lucide-react';
 import { testingModeEnabled } from '../../lib/app-config';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../lib/calendar-links';
 import { newEventId, trackCustom, trackEvent } from '../lib/pixel';
@@ -26,6 +26,17 @@ type Question = {
   options: Array<{ value: string; label: string }>;
 };
 
+/** Mirrors lib/program-config.ts — shaped by the server, never built here. */
+type FundingGuidance = {
+  heading: string;
+  lead: string;
+  leadEmphasis: string;
+  milestones: string[];
+  highlight: string;
+  closing: string;
+  continueLabel: string;
+};
+
 type Program = {
   key: string;
   slug: string;
@@ -35,6 +46,7 @@ type Program = {
   fundingHighlights: string[];
   programTerms: string[];
   whyFreeText: string;
+  fundingGuidance: FundingGuidance;
   questions: Question[];
   visitMinutes: number;
   consultationMode: 'in_person' | 'phone';
@@ -46,7 +58,7 @@ type Program = {
 
 type Outcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
 type Slot = { date: string; time: string };
-type Phase = 'q1' | 'q2' | 'q3' | 'contact' | 'calendar' | 'result' | 'closed';
+type Phase = 'q1' | 'q2' | 'q3' | 'funding' | 'contact' | 'calendar' | 'result' | 'closed';
 
 /** Plain-English routing reasons, shown in testing mode only. */
 const REASON_TEXT: Record<string, string> = {
@@ -58,8 +70,8 @@ const REASON_TEXT: Record<string, string> = {
   OWNERSHIP_UNCERTAIN: 'Ownership was left as “It’s complicated”.',
   PROJECT_TYPE_UNCERTAIN: 'Project type was left as “Still deciding”.',
   PROJECT_TYPE_NOT_LISTED: 'That project type is not listed for this program.',
-  CONTRIBUTION_UNCERTAIN: 'Remaining-cost question was left as “Not sure yet”.',
   WANTS_FINANCING: 'Wants to discuss financing (noted for the specialist — not a barrier).',
+  NEEDS_FUNDING_GUIDANCE: 'Answered “Not sure yet” on funding and read the guidance screen (noted for the specialist — not a barrier).',
   EXPLORATORY_TIMELINE: 'Timeline is “Just exploring”.',
   ELIGIBLE_FOR_BOOKING: 'All checks passed.',
 };
@@ -314,7 +326,10 @@ export default function ConsultationFlow() {
     );
   }
 
-  const stepIndex = { q1: 1, q2: 2, q3: 3, contact: 4, calendar: 5, result: 5, closed: 0 }[phase];
+  // The funding explainer shares step 3's marker: it is the same step of the
+  // journey, not a new one, and a progress bar that grows for reading a screen
+  // makes the flow feel longer than it is.
+  const stepIndex = { q1: 1, q2: 2, q3: 3, funding: 3, contact: 4, calendar: 5, result: 5, closed: 0 }[phase];
 
   // What the homeowner is actually booking — stated the same way on the calendar
   // and the confirmation so there is no ambiguity about who goes where.
@@ -463,7 +478,16 @@ export default function ConsultationFlow() {
   }
 
   // ── Progressive question steps ──
-  const back = () => setPhase(phase === 'contact' ? 'q3' : phase === 'q3' ? 'q2' : 'q1');
+  // "Not sure yet" earns one extra screen — the funding explainer — before the
+  // contact form. It is a read-and-continue step, never a second question.
+  const needsFundingGuidance = answers.contribution === 'unsure';
+  const back = () =>
+    setPhase(
+      phase === 'contact' ? (needsFundingGuidance ? 'funding' : 'q3')
+        : phase === 'funding' ? 'q3'
+          : phase === 'q3' ? 'q2'
+            : 'q1',
+    );
 
   return (
     <Shell
@@ -471,7 +495,11 @@ export default function ConsultationFlow() {
         phase === 'q1' ? 'Let’s start with your property'
           : phase === 'q2' ? 'What are you planning?'
             : phase === 'q3' ? `How the ${program.areaLabel} funding works`
-              : 'Where should we send your confirmation?'
+              // The reassurance earns the page title here. Repeating it inside the
+              // card under a functional heading gave the screen two titles and
+              // left the line that matters at body weight.
+              : phase === 'funding' ? program.fundingGuidance.heading
+                : 'Where should we send your confirmation?'
       }
       step={stepIndex}
       onBack={phase === 'q1' ? undefined : back}
@@ -584,7 +612,58 @@ export default function ConsultationFlow() {
           {stepQuestions(3).map((q) => (
             <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
           ))}
-          <PrimaryButton disabled={!answered(3)} onClick={() => setPhase('contact')}>Continue</PrimaryButton>
+          <PrimaryButton
+            disabled={!answered(3)}
+            onClick={() => setPhase(needsFundingGuidance ? 'funding' : 'contact')}
+          >
+            Continue
+          </PrimaryButton>
+        </div>
+      )}
+
+      {/* Funding guidance — shown only for "Not sure yet / Need guidance".
+          One button, forward only: the homeowner is not being asked to judge
+          whether they can fund the build. That is the consultant's job, in
+          person, with the real numbers. */}
+      {phase === 'funding' && (
+        <div className="space-y-5 text-left">
+          {/* The reassurance closes the paragraph in ordinary body type. Given its
+              own line it read as a statement being made — isolation is emphasis at
+              any size, and this line persuades by sounding matter-of-fact. It is
+              nowrap so the two words that carry it can never split across lines. */}
+          <p className="text-base leading-relaxed text-slate-700">
+            {program.fundingGuidance.lead}{' '}
+            <span className="whitespace-nowrap">{program.fundingGuidance.leadEmphasis}</span>
+          </p>
+          {/* Labels only, no figures. The last step is the emphasised one — the
+              whole point of the strip is that the money sits at the end. */}
+          {program.fundingGuidance.milestones.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-slate-200 px-4 py-3">
+              {program.fundingGuidance.milestones.map((m, i, all) => (
+                <span key={m} className="flex items-center gap-2">
+                  <span
+                    className={
+                      i === all.length - 1
+                        ? 'text-xs font-bold uppercase tracking-wide text-emerald-700'
+                        : 'text-xs font-semibold uppercase tracking-wide text-slate-500'
+                    }
+                  >
+                    {m}
+                  </span>
+                  {i < all.length - 1 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />}
+                </span>
+              ))}
+            </div>
+          )}
+          {/* The screen's one focal point, in the same emerald the funding step
+              uses for the grant amount — the solution should look like one. */}
+          <p className="rounded-xl bg-emerald-50 px-4 py-3.5 text-base font-bold leading-relaxed text-emerald-800">
+            {program.fundingGuidance.highlight}
+          </p>
+          <p className="text-sm leading-relaxed text-slate-500">{program.fundingGuidance.closing}</p>
+          <PrimaryButton onClick={() => setPhase('contact')}>
+            {program.fundingGuidance.continueLabel || 'Continue'}
+          </PrimaryButton>
         </div>
       )}
 

@@ -53,10 +53,10 @@ test('an inferred address does not rescue an otherwise unqualified lead', () => 
   });
   assert.equal(exploring.outcome, 'NURTURE');
 
-  const unsureFunding = routeConsultation({
-    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, contribution: 'unsure' },
+  const unsureOwnership = routeConsultation({
+    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, ownership: 'unsure' },
   });
-  assert.equal(unsureFunding.outcome, 'MANUAL_REVIEW');
+  assert.equal(unsureOwnership.outcome, 'MANUAL_REVIEW');
 });
 
 test('a typed address that stayed unresolved still goes to a person', () => {
@@ -200,10 +200,34 @@ test('wanting financing books anyway — it is a note, not a barrier', () => {
   assert.ok(r.reasons.includes('WANTS_FINANCING'), 'flagged for the specialist');
 });
 
-test('an uncertain contribution answer goes to manual review', () => {
+test('an uncertain funding answer books — it asks for the conversation', () => {
+  // Whether a homeowner can fund the build is a lender's call, not theirs, so
+  // "not sure" is a request for guidance, never a reason to withhold the slot.
   const r = routeConsultation({ ...base, answers: { ...OK, contribution: 'unsure' } });
-  assert.equal(r.outcome, 'MANUAL_REVIEW');
-  assert.ok(r.reasons.includes('CONTRIBUTION_UNCERTAIN'));
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('NEEDS_FUNDING_GUIDANCE'), 'flagged for the consultant');
+});
+
+test('no funding answer can ever send a lead to manual review', () => {
+  const q = HAMILTON_PROGRAM.questions.find((x) => x.key === 'contribution');
+  for (const opt of q!.options) {
+    const r = routeConsultation({ ...base, answers: { ...OK, contribution: opt.value } });
+    assert.equal(r.outcome, 'DIRECT_CALENDAR', `${opt.value} must reach the calendar`);
+  }
+});
+
+test('the funding guidance screen states the milestone payout, never the advance', () => {
+  const g = HAMILTON_PROGRAM.fundingGuidance;
+  assert.ok(g.heading, 'a live program needs a heading');
+  assert.ok(g.lead && g.highlight && g.closing, 'a live program needs the full screen');
+  const text = [g.lead, g.leadEmphasis, ...g.milestones, g.highlight, g.closing].join(' ');
+  assert.match(text, /milestones/i, 'explains that payouts follow milestones');
+  assert.match(text, /funded upfront/i, 'states the homeowner funds the work first');
+  assert.match(text, /open loan/i, 'names the route without dwelling on it');
+  // The first advance is capped at $8,000 against a $50–60k scope. Naming any
+  // early money here invites the homeowner to conclude they need no financing,
+  // and leaves the consultant walking it back in their kitchen.
+  assert.doesNotMatch(text, /\$|\d+%|advance/i, 'no amounts, percentages or advances');
 });
 
 test('the fast-track case reaches the calendar with a single reason', () => {

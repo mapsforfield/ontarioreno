@@ -34,6 +34,47 @@ export type Question = {
   step: 1 | 2 | 3;
 };
 
+/**
+ * The screen shown to a homeowner who answers "Not sure yet / Need guidance" on
+ * the funding question, between that step and the contact form.
+ *
+ * It has no second question and no way out but forward: capacity to fund is a
+ * lender's call, so asking a homeowner to self-assess it only manufactures a
+ * decline. The screen exists to introduce financing the way a rep would on the
+ * phone — normalised first, mechanics second — and then continue to the calendar.
+ *
+ * Deliberately says NOTHING about the size or timing of the first advance. It is
+ * capped at $8,000 against a $50–60k scope, so naming it invites the homeowner
+ * to anchor on money arriving early, conclude they need no financing, and feel
+ * misled when the consultant lays out the real numbers at their kitchen table.
+ * The advance is the consultant's to raise in person.
+ */
+export type FundingGuidance = {
+  /** Rendered as the page title for this step — NOT repeated inside the card. */
+  heading: string;
+  /** Opening paragraph — the mechanics, and nothing else. */
+  lead: string;
+  /**
+   * The reassurance, standing alone. Kept out of the lead paragraph on purpose:
+   * trailing it behind an em dash both buried it and let it orphan across a line
+   * break, splitting the two words that carry the whole screen.
+   */
+  leadEmphasis: string;
+  /**
+   * The payout sequence, shown as a thin strip. Labels only — NEVER amounts,
+   * percentages or advance counts, for the same reason the copy omits them: a
+   * homeowner given figures here does the arithmetic themselves and reaches a
+   * conclusion the consultant has to undo in person. The strip exists to make
+   * one thing obvious at a glance — the money sits at the END of the line.
+   */
+  milestones: string[];
+  /** The solution, given the screen's one visual focal point. */
+  highlight: string;
+  /** Quiet closer, in lighter text so it does not compete with the highlight. */
+  closing: string;
+  continueLabel: string;
+};
+
 export type ProgramConfig = {
   key: string;
   version: number;
@@ -49,6 +90,8 @@ export type ProgramConfig = {
   /** Full terms, shown only behind a "full details" disclosure. */
   programTerms: string[];
   whyFreeText: string;
+  /** Shown when the funding answer is "unsure". Required: every live program needs one. */
+  fundingGuidance: FundingGuidance;
   eligibleProjectTypes: string[];
   /** Asked before booking, grouped by step. */
   questions: Question[];
@@ -221,6 +264,16 @@ const PREP_QUESTIONS: Question[] = [
  * place before construction — saying only "covers up to 70%" reads as money
  * arriving first, which sets the wrong expectation.
  */
+const HAMILTON_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'That’s what the visit is for',
+  lead: 'Grant funds are released as project milestones are completed and inspected. Because main payouts come as work finishes, the project is funded upfront. Homeowners rarely have that cash ready.',
+  leadEmphasis: 'That’s normal.',
+  milestones: ['Permit', 'Build', 'Inspection', 'Grant released'],
+  highlight: 'Many use an open loan with no early-payoff fee, cleared as the grant money arrives.',
+  closing: 'Your consultant will walk you through the exact math and timeline during your visit.',
+  continueLabel: 'Continue',
+};
+
 const HAMILTON_FUNDING_HIGHLIGHTS = [
   'Covers up to 70% of eligible costs, to a maximum of $40,000 per unit.',
   'Upfront Funding: You cover or finance initial construction costs (financing options available).',
@@ -246,6 +299,7 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   ],
   whyFreeText:
     "Contractors don't want to spend days researching grant rules and property eligibility for free, and homeowners don't want to pay upfront just to learn whether a secondary suite is even worth pursuing. We organize the details of your project upfront so it's ready for a builder to evaluate properly. When a project's a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps our review free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: HAMILTON_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
@@ -275,6 +329,12 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   fundingHighlights: [],
   programTerms: [],
   whyFreeText: HAMILTON_PROGRAM.whyFreeText,
+  // Empty like every other Simcoe funding field: the payout milestones are not
+  // confirmed, and this copy describes them. Simcoe asks no funding question, so
+  // the screen is unreachable until both are supplied together.
+  fundingGuidance: {
+    heading: '', lead: '', leadEmphasis: '', milestones: [], highlight: '', closing: '', continueLabel: '',
+  },
   eligibleProjectTypes: [],
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,

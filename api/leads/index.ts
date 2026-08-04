@@ -1022,6 +1022,7 @@ function publicProgramPayload(program: ProgramConfig) {
     fundingHighlights: program.fundingHighlights,
     programTerms: program.programTerms,
     whyFreeText: program.whyFreeText,
+    fundingGuidance: program.fundingGuidance,
     questions: publicQuestions(program),
     visitMinutes: program.visitMinutes,
     consultationMode: program.consultationMode,

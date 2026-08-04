@@ -5,7 +5,9 @@
 // Two principles, both asserted by tests:
 //   1. DECLINE is reachable only from something the homeowner stated as certain
 //      (they do not own the property) or a fact we resolved with confidence (the
-//      address is not in Ontario). Every ambiguity goes to MANUAL_REVIEW.
+//      address is not in Ontario). Every ambiguity about a fact we rely on goes
+//      to MANUAL_REVIEW — but "I don't know how I'd pay for it" is not one of
+//      those facts. See the funding note below.
 //   2. Property questions — basement condition, separate entrance, permit status
 //      — carry ZERO weight. We do not assess structure, zoning or eligibility.
 
@@ -22,8 +24,8 @@ export type RoutingReason =
   | 'OWNERSHIP_UNCERTAIN'
   | 'PROJECT_TYPE_UNCERTAIN'
   | 'PROJECT_TYPE_NOT_LISTED'
-  | 'CONTRIBUTION_UNCERTAIN'
   | 'WANTS_FINANCING'
+  | 'NEEDS_FUNDING_GUIDANCE'
   | 'EXPLORATORY_TIMELINE'
   | 'TIMELINE_BEYOND_BOOKING_WINDOW'
   | 'ELIGIBLE_FOR_BOOKING';
@@ -75,9 +77,15 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   if (area && (!program || !program.enabled)) reasons.push('PROGRAM_NOT_ENABLED');
   if (UNCERTAIN.has(ownership)) reasons.push('OWNERSHIP_UNCERTAIN');
   if (UNCERTAIN.has(projectType)) reasons.push('PROJECT_TYPE_UNCERTAIN');
-  // Only "not sure" needs a person. Wanting to discuss financing is a normal
-  // answer for a program that funds 70% — it must not block the calendar.
-  if (contribution === 'unsure') reasons.push('CONTRIBUTION_UNCERTAIN');
+  // No funding answer blocks the calendar — not even "not sure".
+  //
+  // "Not sure yet / Need guidance" is a REQUEST for the conversation, not doubt
+  // about eligibility, and it is the one answer a homeowner cannot give
+  // reliably: whether they can fund the build is a lender's call, not theirs.
+  // Queueing it meant chasing by phone the people who had already raised their
+  // hand. Instead the flow shows them how milestone payouts and an open loan
+  // work, then sends them to the calendar like everyone else; the answer rides
+  // along to the consultant's brief as context.
   if (
     program &&
     projectType &&
@@ -101,9 +109,13 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   }
 
   // ── 4. DIRECT_CALENDAR ──
-  // Wanting to discuss financing is recorded for the rep's brief, not a barrier.
+  // The funding answer is recorded for the rep's brief, never a barrier. The two
+  // tags differ in what the consultant should open with: WANTS_FINANCING already
+  // knows it needs financing, NEEDS_FUNDING_GUIDANCE has seen the explainer once
+  // and expects the numbers walked through in person.
   const booked: RoutingReason[] = ['ELIGIBLE_FOR_BOOKING'];
   if (contribution === 'need_financing') booked.push('WANTS_FINANCING');
+  if (contribution === 'unsure') booked.push('NEEDS_FUNDING_GUIDANCE');
   return { outcome: 'DIRECT_CALENDAR', reasons: booked };
 }
 
