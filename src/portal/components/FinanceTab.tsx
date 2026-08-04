@@ -37,6 +37,8 @@ function blankPayload(prefill: Prefill): FinancePayload {
     email: prefill.email ?? '',
     incomeWithTaxes: '',
     otherIncome: '',
+    housingStatus: '',
+    monthlyHousingPayment: '',
     employer: '',
     employmentPosition: '',
     employerAddress: '',
@@ -302,6 +304,23 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
         </div>
         {field('Income (including taxes)', 'incomeWithTaxes', { placeholder: 'e.g. 85,000' })}
         {field('Other income', 'otherIncome')}
+        <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          Do they own or rent?
+          <select
+            value={form.housingStatus ?? ''}
+            onChange={(e) => set('housingStatus', e.target.value as FinancePayload['housingStatus'])}
+            className="rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+          >
+            <option value="">Select…</option>
+            <option value="own">Own (mortgage)</option>
+            <option value="rent">Rent</option>
+          </select>
+        </label>
+        {field(
+          form.housingStatus === 'rent' ? 'Monthly rent' : form.housingStatus === 'own' ? 'Monthly mortgage' : 'Monthly mortgage or rent',
+          'monthlyHousingPayment',
+          { placeholder: 'e.g. 2,400' },
+        )}
         {field('Employer', 'employer')}
         {field('Employment position', 'employmentPosition')}
         <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">

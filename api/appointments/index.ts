@@ -1053,7 +1053,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       let payload: {
         firstName?: string; middleName?: string; lastName?: string; birthday?: string; phone?: string;
-        email?: string; address?: string; incomeWithTaxes?: string; otherIncome?: string; employer?: string;
+        email?: string; address?: string; incomeWithTaxes?: string; otherIncome?: string;
+        housingStatus?: string; monthlyHousingPayment?: string; employer?: string;
         employmentPosition?: string; employerAddress?: string; status?: string; dlPhotoKey?: string;
         mailingSameAsInstall?: boolean; mailingAddress?: string;
         documents?: Array<{ label?: string; key?: string }>;
@@ -1078,6 +1079,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : (payload.address ? 'Mailing address: same as install address' : ''),
         payload.incomeWithTaxes ? `Income (incl. taxes): ${payload.incomeWithTaxes}` : '',
         payload.otherIncome ? `Other income: ${payload.otherIncome}` : '',
+        payload.housingStatus ? `Housing: ${payload.housingStatus === 'own' ? 'Owns (mortgage)' : 'Rents'}` : '',
+        payload.monthlyHousingPayment
+          ? `Monthly ${payload.housingStatus === 'rent' ? 'rent' : payload.housingStatus === 'own' ? 'mortgage' : 'mortgage/rent'}: ${payload.monthlyHousingPayment}`
+          : '',
         payload.employer ? `Employer: ${payload.employer}` : '',
         payload.employmentPosition ? `Position: ${payload.employmentPosition}` : '',
         payload.employerAddress ? `Employer address: ${payload.employerAddress}` : '',

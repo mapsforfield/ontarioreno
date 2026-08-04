@@ -350,6 +350,8 @@ export type FinancePayload = {
   email: string;
   incomeWithTaxes: string;
   otherIncome: string;
+  housingStatus?: 'own' | 'rent' | ''; // owns with a mortgage, or rents
+  monthlyHousingPayment?: string; // monthly mortgage or rent
   employer: string;
   employmentPosition: string;
   employerAddress: string;
