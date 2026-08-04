@@ -19,7 +19,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
   if (denyContractor(user, res)) return;
 
+  // Finance partners (the lenders contractors run financing through) live on
+  // this route so the portal loads them alongside the contractors that
+  // reference them, instead of paying for another top-level fetch.
+  const isFinancePartners = req.query['_resource'] === 'finance_partners';
+
   if (req.method === 'GET') {
+    if (isFinancePartners) {
+      const partners = await withSchema(() =>
+        prisma.financePartner.findMany({
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        })
+      );
+      return res.status(200).json(partners);
+    }
+
     const contractors = await withSchema(() =>
       prisma.contractor.findMany({ orderBy: { companyName: 'asc' } })
     );
@@ -31,6 +45,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Admin only.' });
     }
     const data = req.body;
+
+    if (isFinancePartners) {
+      const name = String(data.name ?? '').trim();
+      if (!name) return res.status(400).json({ error: 'Name is required.' });
+      const partner = await withSchema(() =>
+        prisma.financePartner.create({
+          data: {
+            name,
+            logoUrl: data.logoUrl || null,
+            website: data.website ?? '',
+            notes: data.notes ?? '',
+            active: data.active ?? true,
+            sortOrder: Number(data.sortOrder) || 0,
+          },
+        })
+      );
+      return res.status(201).json(partner);
+    }
+
     const rate = Number(data.commissionRate);
     const contractor = await prisma.contractor.create({
       data: {
@@ -46,6 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         publicWebsite: data.publicWebsite ?? null,
         emailFooterText: data.emailFooterText ?? null,
         financingStatus: data.financingStatus ?? 'cash_only',
+        financePartnerIds: data.financePartnerIds ?? [],
         contractorStatus: data.contractorStatus ?? 'pending',
         serviceAreas: data.serviceAreas ?? [],
         projectTypes: data.projectTypes ?? [],

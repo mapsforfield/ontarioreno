@@ -22,6 +22,17 @@ export type FinancingStatus =
 
 export type ContractorStatus = 'active' | 'pending' | 'inactive';
 
+/** A lender a contractor runs financing through (FinanceIt, iFinance, …). */
+export type FinancePartner = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  website?: string;
+  notes?: string;
+  active: boolean;
+  sortOrder: number;
+};
+
 export type Contractor = {
   id: string;
   companyName: string;
@@ -36,6 +47,8 @@ export type Contractor = {
   publicWebsite?: string;
   emailFooterText?: string;
   financingStatus: FinancingStatus;
+  /** Ids of the FinancePartners this contractor is set up with. Often empty. */
+  financePartnerIds: string[];
   contractorStatus: ContractorStatus;
   serviceAreas: string[];
   projectTypes: string[];

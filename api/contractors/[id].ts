@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
+import { withSchema } from '../../lib/schema.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
@@ -8,6 +9,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (denyContractor(user, res)) return;
 
   const { id } = req.query as { id: string };
+  // Finance partners share this route (see api/contractors/index.ts) — here the
+  // id is a FinancePartner id rather than a contractor id.
+  const isFinancePartner = req.query['_resource'] === 'finance_partners';
+
+  if (isFinancePartner) {
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin only.' });
+    }
+
+    if (req.method === 'PUT' || req.method === 'PATCH') {
+      const { createdAt, updatedAt, id: _id, ...data } = req.body;
+      void createdAt; void updatedAt; void _id;
+      const partner = await withSchema(() =>
+        prisma.financePartner.update({ where: { id }, data })
+      );
+      return res.status(200).json(partner);
+    }
+
+    if (req.method === 'DELETE') {
+      // Drop the partner from every contractor that referenced it, so no card
+      // renders a dangling logo.
+      await withSchema(async () => {
+        const linked = await prisma.contractor.findMany({
+          where: { financePartnerIds: { has: id } },
+          select: { id: true, financePartnerIds: true },
+        });
+        for (const contractor of linked) {
+          await prisma.contractor.update({
+            where: { id: contractor.id },
+            data: {
+              financePartnerIds: contractor.financePartnerIds.filter(
+                (partnerId) => partnerId !== id
+              ),
+            },
+          });
+        }
+        await prisma.financePartner.delete({ where: { id } });
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
 
   if (req.method === 'GET') {
     const contractor = await prisma.contractor.findUnique({ where: { id } });
@@ -34,7 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? { commissionRate: Math.min(Math.max(rate, 0), 1) }
         : {}),
     };
-    const contractor = await prisma.contractor.update({ where: { id }, data: safeData });
+    const contractor = await withSchema(() =>
+      prisma.contractor.update({ where: { id }, data: safeData })
+    );
     return res.status(200).json(contractor);
   }
 

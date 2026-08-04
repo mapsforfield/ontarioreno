@@ -17,6 +17,7 @@ import {
   ContractorStatus,
   Contractor,
   ContractorDispatch,
+  FinancePartner,
   Deal,
   DealActivity,
   DealStatus,
@@ -48,6 +49,7 @@ import {
 } from './types';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
+type FinancePartnerDraft = Omit<FinancePartner, 'id'>;
 
 type DealDraft = Pick<
   Deal,
@@ -87,6 +89,8 @@ type PortalDataState = {
   tasks: Task[];
   users: User[];
   contractors: Contractor[];
+  /** Lenders contractors run financing through (admin-managed). */
+  financePartners: FinancePartner[];
   dispatches: ContractorDispatch[];
   deals: Deal[];
   commissions: Commission[];
@@ -139,6 +143,12 @@ type PortalDataContextValue = PortalDataState & {
   ) => void;
   deleteContractor: (contractorId: string, actor?: User) => void;
   toggleContractorStatus: (contractorId: string) => void;
+  addFinancePartner: (partner: FinancePartnerDraft) => void;
+  updateFinancePartner: (
+    partnerId: string,
+    updates: Partial<FinancePartner>
+  ) => void;
+  deleteFinancePartner: (partnerId: string) => void;
   addDeal: (deal: DealDraft, repId: string, actor?: User) => void;
   updateDeal: (dealId: string, updates: Partial<Deal>, actor?: User) => void;
   deleteDeal: (dealId: string, actor?: User) => void;
@@ -361,6 +371,7 @@ const emptyState: PortalDataState = {
   tasks: [],
   commissions: [],
   contractors: [],
+  financePartners: [],
   deals: [],
   dispatches: [],
   proposals: [],
@@ -775,7 +786,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Record<string, boolean>>('/api/auth/rep-access'),
       apiCall<NoteTemplate[]>('/api/auth/note-templates'),
       apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates, contractPresets]) => {
+      apiCall<FinancePartner[]>('/api/contractors?_resource=finance_partners'),
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates, contractPresets, financePartners]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -785,7 +797,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       setState({
         users: users ?? [],
-        contractors: contractors ?? [],
+        // financePartnerIds is absent until the column reaches an older database.
+        contractors: (contractors ?? []).map((c) => ({
+          ...c,
+          financePartnerIds: c.financePartnerIds ?? [],
+        })),
+        financePartners: financePartners ?? [],
         deals,
         appointments: (appointments ?? []).map((a) => normalizeAppointment(a, deals)),
         commissions: syncCommissionsWithDeals(commissions ?? [], deals),
@@ -1540,6 +1557,67 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         });
       },
 
+      // ── Finance partner mutations ───────────────────────────────────────────
+
+      addFinancePartner: (partner) => {
+        const tempId = createId('finance-partner');
+        setState((current) => ({
+          ...current,
+          financePartners: [...current.financePartners, { ...partner, id: tempId }],
+        }));
+
+        apiCall<FinancePartner>('/api/contractors?_resource=finance_partners', {
+          method: 'POST',
+          body: JSON.stringify(partner),
+        }).then((saved) => {
+          if (!saved) return;
+          setState((current) => ({
+            ...current,
+            financePartners: current.financePartners.map((p) =>
+              p.id === tempId ? saved : p
+            ),
+          }));
+        });
+      },
+
+      updateFinancePartner: (partnerId, updates) => {
+        setState((current) => ({
+          ...current,
+          financePartners: current.financePartners.map((p) =>
+            p.id === partnerId ? { ...p, ...updates, id: p.id } : p
+          ),
+        }));
+
+        apiCall(`/api/contractors/${partnerId}?_resource=finance_partners`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
+      },
+
+      deleteFinancePartner: (partnerId) => {
+        setState((current) => ({
+          ...current,
+          financePartners: current.financePartners.filter(
+            (p) => p.id !== partnerId
+          ),
+          // Mirror the server-side cleanup so no card keeps a dangling logo.
+          contractors: current.contractors.map((c) =>
+            c.financePartnerIds.includes(partnerId)
+              ? {
+                  ...c,
+                  financePartnerIds: c.financePartnerIds.filter(
+                    (id) => id !== partnerId
+                  ),
+                }
+              : c
+          ),
+        }));
+
+        apiCall(`/api/contractors/${partnerId}?_resource=finance_partners`, {
+          method: 'DELETE',
+        });
+      },
+
       // ── Deal mutations ──────────────────────────────────────────────────────
 
       addDeal: (dealDraft, repId, actor) => {
@@ -1575,6 +1653,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           contractPresets: current.contractPresets,
           tasks: current.tasks,
           contractors: current.contractors,
+          financePartners: current.financePartners,
           deals: [...current.deals, deal],
           dispatches: current.dispatches,
           proposals: current.proposals,

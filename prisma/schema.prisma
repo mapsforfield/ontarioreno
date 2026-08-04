@@ -66,6 +66,11 @@ model Contractor {
   publicWebsite      String?
   emailFooterText    String?
   financingStatus    String   @default("cash_only")
+  /// Which lenders this contractor is actually set up with (FinancePartner ids).
+  /// Kept as an id array rather than a relation so it travels with the
+  /// contractor payload the portal already loads. May be empty — cash-only
+  /// contractors have no partners, and some carry more than one.
+  financePartnerIds  String[]
   contractorStatus   String   @default("pending")
   serviceAreas       String[]
   projectTypes       String[]
@@ -88,6 +93,22 @@ model Contractor {
   appointments Appointment[]
   deals        Deal[]
   dispatches   ContractorDispatch[]
+}
+
+// ─── Finance Partners ────────────────────────────────────────────────────────
+
+/// A lender a contractor can run financing through (FinanceIt, iFinance, …).
+/// Admin-managed; referenced by Contractor.financePartnerIds.
+model FinancePartner {
+  id        String   @id @default(cuid())
+  name      String
+  logoUrl   String?
+  website   String   @default("")
+  notes     String   @default("")
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Deals ───────────────────────────────────────────────────────────────────

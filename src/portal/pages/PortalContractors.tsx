@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { usePortalAuth } from '../auth';
+import FinancePartnerManager from '../components/FinancePartnerManager';
 import {
   formatCurrency,
   formatDealStatus,
@@ -23,7 +24,7 @@ import {
   isFinancingStatus,
   usePortalData,
 } from '../data/store';
-import { Contractor } from '../data/types';
+import { Contractor, FinancePartner } from '../data/types';
 import { Deal, ProposalTemplateType } from '../data/types';
 
 type ContractorFormState = {
@@ -39,6 +40,7 @@ type ContractorFormState = {
   contractorStatus: Contractor['contractorStatus'];
   email: string;
   emailFooterText: string;
+  financePartnerIds: string[];
   financingStatus: Contractor['financingStatus'];
   logoUrl: string;
   notes: string;
@@ -89,6 +91,7 @@ const emptyContractorForm: ContractorFormState = {
   contractorStatus: 'active',
   email: '',
   emailFooterText: '',
+  financePartnerIds: [],
   financingStatus: 'pending_financing',
   logoUrl: '',
   notes: '',
@@ -118,6 +121,7 @@ function contractorToForm(contractor: Contractor): ContractorFormState {
     contractorStatus: contractor.contractorStatus,
     email: contractor.email,
     emailFooterText: contractor.emailFooterText ?? '',
+    financePartnerIds: contractor.financePartnerIds ?? [],
     financingStatus: contractor.financingStatus,
     logoUrl: contractor.logoUrl ?? '',
     notes: contractor.notes,
@@ -148,6 +152,9 @@ function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
     contractorStatus: form.contractorStatus,
     email: form.email.trim(),
     emailFooterText: form.emailFooterText.trim(),
+    // Cash-only contractors have no lender, whatever was ticked before.
+    financePartnerIds:
+      form.financingStatus === 'cash_only' ? [] : form.financePartnerIds,
     financingStatus: form.financingStatus,
     logoUrl: form.logoUrl.trim(),
     notes: form.notes.trim(),
@@ -167,6 +174,32 @@ function formToContractor(form: ContractorFormState): Omit<Contractor, 'id'> {
       .filter(Boolean),
     website: form.website.trim(),
   };
+}
+
+/**
+ * A financing partner shown on a contractor card — logo when the admin uploaded
+ * one, initials otherwise, so the lender is identifiable at a glance.
+ */
+function FinancePartnerChip({ partner }: { partner: FinancePartner }) {
+  return (
+    <span
+      className="inline-flex items-center gap-2 rounded-full border border-[#cfe0f2] bg-[#f6faff] py-1 pl-1 pr-3 text-xs font-black text-[#1B3C6C]"
+      title={partner.name}
+    >
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#cfe0f2] bg-white text-[0.6rem] font-black text-[#32639b]">
+        {partner.logoUrl ? (
+          <img
+            src={partner.logoUrl}
+            alt={`${partner.name} logo`}
+            className="h-full w-full object-contain p-0.5"
+          />
+        ) : (
+          partner.name.slice(0, 2).toUpperCase()
+        )}
+      </span>
+      {partner.name}
+    </span>
+  );
 }
 
 function formatContractorStatus(status: Contractor['contractorStatus']) {
@@ -261,6 +294,7 @@ export default function PortalContractors() {
     addProposalHistory,
     contractors,
     deleteContractor,
+    financePartners,
     getVisibleDealsForUser,
     updateContractor,
   } = usePortalData();
@@ -284,6 +318,19 @@ export default function PortalContractors() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState('');
   const [serviceAreaFilter, setServiceAreaFilter] = useState('');
+  const [financePartnerFilter, setFinancePartnerFilter] = useState('');
+  const [isManagingPartners, setIsManagingPartners] = useState(false);
+
+  const partnersById = useMemo(
+    () => new Map(financePartners.map((partner) => [partner.id, partner])),
+    [financePartners]
+  );
+
+  /** The partners a contractor is set up with, in the admin's chosen order. */
+  const getPartnersFor = (contractor: Contractor) =>
+    (contractor.financePartnerIds ?? [])
+      .map((partnerId) => partnersById.get(partnerId))
+      .filter((partner): partner is FinancePartner => Boolean(partner));
 
   const isDetailsOpen = Boolean(selectedContractor || isAddingContractor);
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
@@ -350,11 +397,23 @@ export default function PortalContractors() {
               )
             : true
         )
+        .filter((contractor) =>
+          financePartnerFilter
+            ? (contractor.financePartnerIds ?? []).includes(financePartnerFilter)
+            : true
+        )
         .sort(
         (first, second) => second.priorityScore - first.priorityScore
       );
     },
-    [contractorFilter, contractors, isAdmin, projectTypeFilter, serviceAreaFilter]
+    [
+      contractorFilter,
+      contractors,
+      financePartnerFilter,
+      isAdmin,
+      projectTypeFilter,
+      serviceAreaFilter,
+    ]
   );
 
   const openDetails = (contractor: Contractor) => {
@@ -421,6 +480,15 @@ export default function PortalContractors() {
     if (field === 'financingStatus' && !isFinancingStatus(value)) return;
     if (field === 'contractorStatus' && !isContractorStatus(value)) return;
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const toggleFormFinancePartner = (partnerId: string) => {
+    setForm((current) => ({
+      ...current,
+      financePartnerIds: current.financePartnerIds.includes(partnerId)
+        ? current.financePartnerIds.filter((id) => id !== partnerId)
+        : [...current.financePartnerIds, partnerId],
+    }));
   };
 
   /**
@@ -514,14 +582,24 @@ export default function PortalContractors() {
           </h1>
         </div>
         {isAdmin && (
-          <button
-            type="button"
-            onClick={openAddContractor}
-            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
-          >
-            <Plus className="h-4 w-4" />
-            Add Contractor
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setIsManagingPartners(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-4 py-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
+            >
+              <WalletCards className="h-4 w-4" />
+              Financing Partners
+            </button>
+            <button
+              type="button"
+              onClick={openAddContractor}
+              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
+            >
+              <Plus className="h-4 w-4" />
+              Add Contractor
+            </button>
+          </div>
         )}
       </header>
 
@@ -548,7 +626,21 @@ export default function PortalContractors() {
             </button>
           ))}
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+            Financing Partner
+            <select
+              value={financePartnerFilter}
+              onChange={(event) => setFinancePartnerFilter(event.target.value)}
+            >
+              <option value="">Any partner</option>
+              {financePartners.map((partner) => (
+                <option key={partner.id} value={partner.id}>
+                  {partner.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
             Project Type
             <input
@@ -571,6 +663,7 @@ export default function PortalContractors() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sortedContractors.map((contractor) => {
           const telHref = getTelHref(contractor.phone);
+          const partners = getPartnersFor(contractor);
 
           return (
             <article
@@ -622,6 +715,26 @@ export default function PortalContractors() {
                 <WalletCards className="h-4 w-4" />
                 {formatFinancingStatus(contractor.financingStatus)}
               </span>
+              {/* Which lender they actually run — FinanceIt and iFinance are not
+                  interchangeable, so the status alone isn't enough to route a deal. */}
+              {contractor.financingStatus !== 'cash_only' && (
+                <div className="mt-3">
+                  <p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">
+                    Financing partner{partners.length > 1 ? 's' : ''}
+                  </p>
+                  {partners.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {partners.map((partner) => (
+                        <FinancePartnerChip key={partner.id} partner={partner} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs font-bold text-slate-400">
+                      None recorded yet
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">
@@ -913,6 +1026,68 @@ export default function PortalContractors() {
                       </option>
                     </select>
                   </label>
+                  {/* ── Financing partners ── */}
+                  {form.financingStatus !== 'cash_only' && (
+                    <div className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                      Financing Partners
+                      <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4">
+                        {financePartners.length === 0 ? (
+                          <p className="text-xs font-normal leading-5 text-slate-500">
+                            No financing companies yet. Add them under{' '}
+                            <button
+                              type="button"
+                              onClick={() => setIsManagingPartners(true)}
+                              className="font-bold text-[#1B3C6C] underline"
+                            >
+                              Financing Partners
+                            </button>
+                            , then tick the ones this contractor is set up with.
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-xs font-normal leading-5 text-slate-500">
+                              Tick every lender this contractor can actually run a
+                              deal through. Leave empty if none are approved yet.
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {financePartners.map((partner) => {
+                                const isSelected =
+                                  form.financePartnerIds.includes(partner.id);
+
+                                return (
+                                  <button
+                                    key={partner.id}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleFormFinancePartner(partner.id)
+                                    }
+                                    className={
+                                      isSelected
+                                        ? 'inline-flex items-center gap-2 rounded-full border border-[#1B3C6C] bg-[#1B3C6C] py-1 pl-1 pr-3 text-xs font-black text-white'
+                                        : 'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-3 text-xs font-black text-slate-600 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]'
+                                    }
+                                  >
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-[0.6rem] font-black text-[#32639b]">
+                                      {partner.logoUrl ? (
+                                        <img
+                                          src={partner.logoUrl}
+                                          alt=""
+                                          className="h-full w-full object-contain p-0.5"
+                                        />
+                                      ) : (
+                                        partner.name.slice(0, 2).toUpperCase()
+                                      )}
+                                    </span>
+                                    {partner.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     Contractor Status
                     <select
@@ -1015,6 +1190,27 @@ export default function PortalContractors() {
               ) : (
                 selectedContractor && (
                   <div className="grid gap-4 sm:grid-cols-2">
+                    {selectedContractor.financingStatus !== 'cash_only' && (
+                      <div className="rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                          Financing partners
+                        </p>
+                        {getPartnersFor(selectedContractor).length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {getPartnersFor(selectedContractor).map((partner) => (
+                              <FinancePartnerChip
+                                key={partner.id}
+                                partner={partner}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm font-bold text-slate-400">
+                            None recorded yet
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {/* Logo — shown full-width at the top when present */}
                     {selectedContractor.logoUrl && (
                       <div className="flex items-center gap-4 rounded-[0.5rem] border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
@@ -1359,6 +1555,10 @@ export default function PortalContractors() {
             </div>
           </div>
         </div>
+      )}
+
+      {isAdmin && isManagingPartners && (
+        <FinancePartnerManager onClose={() => setIsManagingPartners(false)} />
       )}
     </div>
   );
