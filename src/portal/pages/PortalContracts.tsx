@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   FileSignature,
+  FileText,
   FileUp,
   ImagePlus,
   Link2,
@@ -115,6 +116,7 @@ export default function PortalContracts() {
   useEffect(() => { ensureContractFonts().then(() => setFontsReady(true)); }, []);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [wording, setWording] = useState(false);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -410,6 +412,33 @@ export default function PortalContracts() {
     buildContractPdf(contractData).save(contractFileName(contractData));
   };
 
+  /**
+   * The Word file is a second render of the same data, not a converted PDF —
+   * see contractDocx.ts. Building it pulls in a chunk, so the button reports
+   * that it's working rather than sitting dead for a beat.
+   */
+  const downloadWord = async () => {
+    if (!contractData || wording) return;
+    setWording(true);
+    try {
+      const { buildContractDocx, contractDocxFileName } = await import('../lib/contractDocx');
+      const blob = await buildContractDocx(contractData);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = contractDocxFileName(contractData);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast({
+        message: 'Could not build the Word version',
+        description: err instanceof Error ? err.message : 'Try the PDF instead.',
+        variant: 'error',
+      });
+    }
+    setWording(false);
+  };
+
   const attach = async () => {
     if (!contractData || !deal) return;
     setAttaching(true);
@@ -558,6 +587,15 @@ export default function PortalContracts() {
             className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3.5 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]"
           >
             <Download className="h-4 w-4" /> Download PDF
+          </button>
+          <button
+            type="button"
+            onClick={downloadWord}
+            disabled={wording}
+            title="Editable Word version of the same agreement"
+            className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3.5 py-2 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileText className="h-4 w-4" /> {wording ? 'Building…' : 'Download Word'}
           </button>
           <button
             type="button"
