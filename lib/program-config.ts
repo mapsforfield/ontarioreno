@@ -412,7 +412,122 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
-export const PROGRAMS: ProgramConfig[] = [HAMILTON_PROGRAM, SIMCOE_PROGRAM];
+
+// ─── Basement renovation financing ────────────────────────────────────────────
+// Not a grant and not a city's money: our own financing offer, so it has no
+// municipal boundary and is declared 'ontario_wide'. The landing page decides
+// that this program applies, not the address — see resolveProgramGeography.
+//
+// Every figure below is taken from signed sales agreements rather than written
+// for the page. The three most recent quote 7.99%, 8.99% and 9.99%, all on a
+// 36-month term with a 240-month amortization, and all state the same structure:
+// nothing upfront, up to 40% of funds released at signing or commencement with
+// the owner's authorization, the balance after completion, no early-payment
+// penalty and no lien registered. Nothing here may be changed without a document
+// that says so.
+
+const BASEMENT_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you planning?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'basement_finish', label: 'Finish an unfinished basement' },
+    { value: 'basement_renovation', label: 'Renovate an existing basement' },
+    { value: 'basement_apartment', label: 'Basement apartment or in-law suite' },
+    { value: 'unsure', label: 'Still deciding' },
+  ],
+};
+
+const BASEMENT_CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'How are you thinking about paying for the work?',
+  help: 'Financing covers the full cost with nothing due upfront. Paying cash is fine too.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'need_financing', label: "I'd like to use the monthly financing" },
+    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+  ],
+};
+
+/**
+ * Shown to someone who answers "Not sure yet" on funding — the one screen in the
+ * flow whose whole job is to remove a fear rather than collect an answer.
+ *
+ * The fear here is the opposite of the grant's. A grant homeowner worries the
+ * money arrives too late; a financing homeowner worries about being on the hook
+ * before anything is built. So the milestones lead with approval and with the
+ * fact that nothing is owed upfront, and the highlight is the open loan — the
+ * single term that most changes how the offer feels, because it means a payment
+ * schedule is a floor and not a commitment.
+ *
+ * States no rate. Rate is the lender's call on the day, it varied across all
+ * three agreements on file, and a number here would be quoted back to us.
+ */
+const BASEMENT_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'That is what the visit is for',
+  lead: 'The financing covers the full cost of the build, so there is nothing to pay before the work starts.',
+  leadEmphasis: 'Nothing upfront.',
+  milestones: ['Approved', 'Funds released', 'Build', 'Balance released'],
+  highlight:
+    'It is an open loan — you can pay it down or pay it off at any time, with no penalty and no lien on your home.',
+  closing: 'Your consultant will price your basement and walk through the exact monthly number with you.',
+  continueLabel: 'Continue',
+};
+
+const BASEMENT_FUNDING_HIGHLIGHTS = [
+  'No upfront cost — the build is financed in full, on approved credit.',
+  'Up to 40% of funds can be released at signing or project start with your authorization; the remaining 60% after completion.',
+  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
+];
+
+export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
+  key: 'basement-financing',
+  version: 1,
+  // ONTARIO is the bucket, not a region. Which properties are actually bookable
+  // is decided by the same-day travel radius against a rep's existing day, so
+  // widening coverage is a scheduling question, never a config edit here.
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'basement',
+  areaLabel: 'Ontario',
+  // "as low as" is doing real work: $399 is roughly a $42,000 project at the
+  // lowest rate on file, and most projects finance higher. Stating it as a
+  // starting point rather than a price is what keeps it honest.
+  displayAmountLabel: 'from about $399 a month, on approved credit',
+  fundingHighlights: BASEMENT_FUNDING_HIGHLIGHTS,
+  programTerms: [
+    'Financing is a personal open loan, subject to credit approval. The lender sets the rate, term and approved amount.',
+    'Recent agreements were written at rates between 7.99% and 9.99%, on a 36-month term with a 240-month amortization.',
+    'The monthly payment depends on the approved amount and rate. About $399 a month corresponds to a project near $42,000 at the lowest rate on file; larger projects cost more per month.',
+    'Quoted payments include applicable taxes. The project price is quoted plus HST.',
+    'Up to 40% of funds may be released at contract signing or project commencement, with the owner’s authorization. The remaining 60% is released after project completion.',
+    'During the project, a minimum payment calculated at 0.40% of the funds drawn to date is collected monthly or biweekly, on the schedule you choose. That payment goes entirely to principal and includes no interest.',
+    'A one-time administration fee applies.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property.',
+    'Some approvals include no interest and no payment for the first 3 months.',
+  ],
+  whyFreeText:
+    "Homeowners don't want to pay upfront just to find out what a basement costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: BASEMENT_FUNDING_GUIDANCE,
+  eligibleProjectTypes: ['basement_finish', 'basement_renovation', 'basement_apartment'],
+  questions: [OWNERSHIP, BASEMENT_PROJECT_TYPE, TIMELINE, BASEMENT_CONTRIBUTION],
+  prepQuestions: PREP_QUESTIONS,
+  // Nobody prices a basement without standing in it.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Basement Renovation Consultation',
+  // No dedicated template yet; the rep's brief still carries every answer.
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+};
+
+export const PROGRAMS: ProgramConfig[] = [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BASEMENT_FINANCING_PROGRAM];
 
 /**
  * Municipality → scheduling area.

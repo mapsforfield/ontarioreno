@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeConsultation } from './consultation-routing.ts';
 import {
+  BASEMENT_FINANCING_PROGRAM,
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   areaForMunicipality,
@@ -385,4 +386,61 @@ test('an Ontario-wide lead outside every mapped municipality reaches the calenda
     answers: OK,
   });
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
+});
+
+// ─── Basement financing ──────────────────────────────────────────────────────
+
+test('the basement program is Ontario-wide and live', () => {
+  assert.equal(BASEMENT_FINANCING_PROGRAM.geography, 'ontario_wide');
+  assert.equal(BASEMENT_FINANCING_PROGRAM.schedulingArea, 'ONTARIO');
+  assert.equal(BASEMENT_FINANCING_PROGRAM.enabled, true);
+  assert.equal(BASEMENT_FINANCING_PROGRAM.consultationMode, 'in_person');
+});
+
+test('a Toronto basement lead books rather than queueing', () => {
+  // Toronto maps to no SchedulingArea and never will — that is the point.
+  assert.equal(areaForMunicipality('Toronto'), null);
+  const geo = resolveProgramGeography(BASEMENT_FINANCING_PROGRAM, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program: BASEMENT_FINANCING_PROGRAM,
+    answers: { ownership: 'yes', projectType: 'basement_finish', timeline: 'asap', contribution: 'need_financing' },
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('WANTS_FINANCING'));
+});
+
+test('every basement project type the form offers is an eligible one', () => {
+  // A project type the flow can collect but the program does not list would tag
+  // PROJECT_TYPE_NOT_LISTED on a lead that answered exactly as asked.
+  const offered = BASEMENT_FINANCING_PROGRAM.questions
+    .find((q) => q.key === 'projectType')!
+    .options.map((o) => o.value)
+    .filter((v) => v !== 'unsure');
+  for (const value of offered) {
+    assert.ok(
+      BASEMENT_FINANCING_PROGRAM.eligibleProjectTypes.includes(value),
+      `${value} is offered but not eligible`
+    );
+  }
+});
+
+test('the basement terms never promise a rate or a payment', () => {
+  // $399 is a starting point in an ad, not a price. Approval, rate and amount
+  // are the lender's, and the terms must read that way or the first consultation
+  // starts by walking a number back.
+  const terms = BASEMENT_FINANCING_PROGRAM.programTerms.join(' ');
+  assert.match(terms, /subject to credit approval/i);
+  assert.match(terms, /lender sets the rate/i);
+  assert.match(BASEMENT_FINANCING_PROGRAM.displayAmountLabel, /on approved credit/i);
+  assert.equal(
+    BASEMENT_FINANCING_PROGRAM.fundingGuidance.highlight.includes('%'),
+    false,
+    'the funding screen must not quote a rate'
+  );
 });
