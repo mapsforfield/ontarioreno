@@ -7,11 +7,15 @@ name: Grant Radar
 on:
   schedule:
     - cron: '0 11 * * 1'    # Mondays 11:00 UTC — weekly DISCOVERY (find new city pages)
-    - cron: '30 11 * * *'   # Daily 11:30 UTC — MONITOR scan of known pages
+    - cron: '30 11 * * *'   # Daily 11:30 UTC — MONITOR scan: re-checks every known
+                            # page AND every program published to /grants for
+                            # closure signals (404, closure wording, apply link
+                            # gone, deadline passed). Publishing enrols a program
+                            # automatically, so the two sets cannot drift.
   workflow_dispatch:        # lets you run it manually from the Actions tab
     inputs:
       mode:
-        description: 'discover or scan'
+        description: 'scan | discover | backfill (enrol every published program + flag past deadlines) | deadlines'
         default: 'scan'
         required: true
       limit:

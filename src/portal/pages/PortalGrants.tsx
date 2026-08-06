@@ -17,6 +17,13 @@ type Program = {
   summary: string; sourceUrl: string; sourceUrls: string[] | null; fundingType: string;
   amountOverride: string; relevanceScore: number; reviewState: string;
   linkUrl: string; firstSeenAt: string; changedAt: string | null;
+  // Closure watch — set by the re-scan on programs published to /grants.
+  watched?: boolean;
+  closureSignals?: string;
+  closureDetail?: string;
+  closureFoundAt?: string | null;
+  closureState?: string;
+  publicStatusOverride?: string;
 };
 type Source = {
   id: string; name: string; url: string; jurisdiction: string; category: string;
@@ -48,6 +55,67 @@ function StatusPill({ status }: { status: string }) {
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.unknown}`}>
       {status}
     </span>
+  );
+}
+
+const SIGNAL_LABELS: Record<string, string> = {
+  'http-gone': 'Page removed (404)',
+  'closure-language': 'Page says closed',
+  'link-removed': 'Apply link gone',
+  'deadline-passed': 'Deadline passed',
+};
+
+/**
+ * A published program the re-scan thinks has closed. Separate from the discovery
+ * queue on purpose: "a live page may be wrong" is a different, more urgent job
+ * than "here is a new program to consider".
+ */
+function StatusChangedCard({ p, busy, onRule }: {
+  p: Program;
+  busy: boolean;
+  onRule: (id: string, closureState: string) => void;
+}) {
+  const signals = (p.closureSignals ?? '').split(',').filter(Boolean);
+  const downgraded = p.publicStatusOverride === 'check-status';
+  return (
+    <div className="flex flex-col gap-2 rounded-[0.5rem] border-2 border-amber-300 bg-amber-50/60 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-base font-black tracking-[-0.01em] text-slate-900">{p.name}</h3>
+        {signals.map((s) => (
+          <span key={s} className="rounded-full bg-amber-200 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+            {SIGNAL_LABELS[s] ?? s}
+          </span>
+        ))}
+      </div>
+      <p className="text-sm font-semibold text-[#32639b]">
+        {p.city || p.jurisdiction}{p.deadline ? ` · deadline ${p.deadline}` : ''}
+        {p.closureFoundAt ? ` · found ${new Date(p.closureFoundAt).toLocaleDateString('en-CA')}` : ''}
+      </p>
+      {p.closureDetail && <p className="text-sm text-slate-700">{p.closureDetail}</p>}
+
+      <p className={`rounded-[0.4rem] px-3 py-2 text-xs font-bold ${downgraded ? 'bg-amber-200/70 text-amber-900' : 'bg-white text-slate-600'}`}>
+        {downgraded
+          ? 'Public page has been downgraded to “Check status” automatically.'
+          : 'Public page is UNCHANGED — it still shows the old status until you confirm.'}
+      </p>
+
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        {(p.sourceUrls && p.sourceUrls.length ? p.sourceUrls : [p.sourceUrl]).filter(Boolean).map((u, i, arr) => (
+          <a key={u} href={u} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]">
+            <ExternalLink className="h-3.5 w-3.5" /> {arr.length > 1 ? `Check source ${i + 1}` : 'Check the official page'}
+          </a>
+        ))}
+        <button type="button" disabled={busy} onClick={() => onRule(p.id, 'confirmed')}
+          className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-amber-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-800 disabled:opacity-50">
+          <AlertTriangle className="h-3.5 w-3.5" /> Confirm closed
+        </button>
+        <button type="button" disabled={busy} onClick={() => onRule(p.id, 'dismissed')}
+          className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+          <X className="h-3.5 w-3.5" /> Still open — dismiss
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -205,7 +273,7 @@ export default function PortalGrants() {
       const res = await fetch(`${API}&action=scan`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Scan failed');
-      setNotice(`Scanned ${data.checked} sources · ${data.newPrograms} new · ${data.updatedPrograms} changed${data.errors ? ` · ${data.errors} errors` : ''}. Click again to continue through the list.`);
+      setNotice(`Scanned ${data.checked} sources · ${data.watchedChecked ?? 0} published programs re-checked · ${data.newPrograms} new · ${data.updatedPrograms} changed${data.closures?.length ? ` · ${data.closures.length} STATUS CHANGED` : ''}${data.errors ? ` · ${data.errors} errors` : ''}. Click again to continue through the list.`);
       await load();
     } catch (err) {
       setNotice(`Scan failed: ${(err as Error).message}`);
@@ -355,14 +423,46 @@ export default function PortalGrants() {
     } catch { await load(); }
   };
 
-  const needsReview = useMemo(
-    () => programs.filter((p) => p.reviewState === 'new' || (p.changedAt && p.reviewState !== 'dismissed' && p.reviewState !== 'targeting')),
+  /** Admin ruling on a flagged closure (confirm it closed / say it is still live). */
+  const ruleClosure = async (id: string, closureState: string) => {
+    setBusyId(id);
+    setPrograms((prev) => prev.map((p) => (p.id === id
+      ? { ...p, closureState, publicStatusOverride: closureState === 'dismissed' ? '' : 'check-status', status: closureState === 'confirmed' ? 'closed' : p.status }
+      : p)));
+    try {
+      await fetch(`${API}&id=${encodeURIComponent(id)}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ closureState }),
+      });
+      await load();
+    } catch {
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // "Status changed" — PUBLISHED programs the re-scan believes have closed. Kept
+  // out of "Needs review" deliberately: that lane is new-program discovery, and
+  // burying a live page that may be wrong inside it is how the last one was
+  // missed. Programs the admin has already ruled on drop out of the lane.
+  const statusChanged = useMemo(
+    () => programs
+      .filter((p) => p.closureSignals && (p.closureState === 'flagged' || p.closureState === 'auto-downgraded'))
+      .sort((a, b) => (b.closureFoundAt ?? '').localeCompare(a.closureFoundAt ?? '')),
     [programs]
   );
-  const targeting = useMemo(() => programs.filter((p) => p.reviewState === 'targeting'), [programs]);
+
+  const needsReview = useMemo(
+    () => programs.filter((p) => !statusChanged.includes(p)
+      && (p.reviewState === 'new' || (p.changedAt && p.reviewState !== 'dismissed' && p.reviewState !== 'targeting'))),
+    [programs, statusChanged]
+  );
+  const targeting = useMemo(() => programs.filter((p) => p.reviewState === 'targeting' && !statusChanged.includes(p)), [programs, statusChanged]);
   const active = useMemo(
-    () => programs.filter((p) => p.reviewState !== 'dismissed' && !needsReview.includes(p) && p.reviewState !== 'targeting'),
-    [programs, needsReview]
+    () => programs.filter((p) => p.reviewState !== 'dismissed' && !needsReview.includes(p) && !statusChanged.includes(p) && p.reviewState !== 'targeting'),
+    [programs, needsReview, statusChanged]
   );
   const deadSources = useMemo(() => sources.filter((s) => s.lastError), [sources]);
 
@@ -465,6 +565,26 @@ export default function PortalGrants() {
         <div className="flex items-center gap-2 p-8 text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading…</div>
       ) : (
         <>
+          {statusChanged.length > 0 && (
+            <section className="rounded-[0.5rem] border-2 border-amber-400 bg-amber-50 p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700" />
+                <h2 className="text-sm font-black uppercase tracking-[0.14em] text-amber-800">
+                  Status changed <span className="ml-1 rounded-full bg-amber-700 px-2 py-0.5 text-xs text-white">{statusChanged.length}</span>
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-amber-900">
+                These are <strong>published on /grants</strong> and the re-scan thinks they have closed. A passed deadline already
+                downgraded the public row to “Check status”; everything else is waiting on you before the public page changes.
+              </p>
+              <div className="mt-3 flex flex-col gap-3">
+                {statusChanged.map((p) => (
+                  <StatusChangedCard key={p.id} p={p} busy={busyId === p.id} onRule={ruleClosure} />
+                ))}
+              </div>
+            </section>
+          )}
+
           <Section title="Needs review" count={needsReview.length} accent
             empty="Nothing new to review. The daily scan will surface new or changed programs here.">
             {needsReview.map((p) => <ProgramCard key={p.id} p={p} onAction={act} busy={busyId === p.id} page={pageByProgram.get(p.id)} onGenerate={() => generatePage(p.id)} onEditPage={() => { const pg = pageByProgram.get(p.id); if (pg) setEditing(pg); }} generating={generatingId === p.id} onSetLink={(url) => setLink(p.id, url)} onSetAmount={(v) => setAmount(p.id, v)} />)}
@@ -489,6 +609,10 @@ export default function PortalGrants() {
               {municipalities.filter((m) => m.discoveryState === 'candidate').length} not yet searched
             </p>
             <p className="mt-1">Watching {sources.filter((s) => s.active).length} live pages ({sources.filter((s) => s.pageType === 'money').length} money, {sources.filter((s) => s.pageType === 'future').length} upcoming). Discovery + daily scan run automatically on the worker.</p>
+            <p className="mt-1 font-bold text-emerald-700">
+              {programs.filter((p) => p.watched).length} published program{programs.filter((p) => p.watched).length === 1 ? '' : 's'} enrolled in the closure re-scan —
+              publishing enrols automatically, so nothing can be public without being watched.
+            </p>
             {deadSources.length > 0 && (
               <div className="mt-2 flex items-start gap-2 text-amber-700">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
