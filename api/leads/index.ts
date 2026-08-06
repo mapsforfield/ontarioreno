@@ -1018,6 +1018,7 @@ function publicProgramPayload(program: ProgramConfig) {
     slug: program.slug,
     areaLabel: program.areaLabel,
     enabled: program.enabled,
+    closure: program.closure ?? null,
     displayAmountLabel: program.displayAmountLabel,
     fundingHighlights: program.fundingHighlights,
     programTerms: program.programTerms,

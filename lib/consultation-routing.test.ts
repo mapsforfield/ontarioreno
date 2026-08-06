@@ -10,11 +10,34 @@ import {
 import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
 const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
+/**
+ * A LIVE program, used by every routing test below.
+ *
+ * Hamilton itself is disabled now that its intake has closed, and these tests
+ * are about the routing rules rather than about which programs happen to be
+ * accepting bookings this month — pointing them at the real Hamilton config
+ * would make all of them assert PROGRAM_NOT_ENABLED and stop covering the rules
+ * entirely. The content assertions further down still read HAMILTON_PROGRAM
+ * directly, because those ARE about Hamilton.
+ */
+const LIVE_PROGRAM = { ...HAMILTON_PROGRAM, enabled: true, closure: undefined };
+
 const base = {
   addressState: 'ADDRESS_VERIFIED' as const,
   area: 'HAMILTON' as const,
-  program: HAMILTON_PROGRAM,
+  program: LIVE_PROGRAM,
 };
+
+test('Hamilton is closed, so its flow cannot reach the calendar', () => {
+  // The whole point of the change: a perfect Hamilton lead must NOT be offered a
+  // visit for a grant that no longer accepts applications. If Hamilton reopens,
+  // this test is the one to delete, in the same commit as the flag.
+  assert.equal(HAMILTON_PROGRAM.enabled, false);
+  assert.ok(HAMILTON_PROGRAM.closure, 'a disabled program that closed must say why');
+  const r = routeConsultation({ ...base, program: HAMILTON_PROGRAM, answers: OK });
+  assert.equal(r.outcome, 'MANUAL_REVIEW');
+  assert.ok(r.reasons.includes('PROGRAM_NOT_ENABLED'));
+});
 
 test('a fully qualified Hamilton homeowner reaches the calendar', () => {
   const r = routeConsultation({ ...base, answers: OK });
