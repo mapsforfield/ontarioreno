@@ -767,6 +767,35 @@ model GrantProgram {
   firstSeenAt     DateTime  @default(now())
   lastConfirmedAt DateTime  @default(now())  // last scan that still saw this program
   changedAt       DateTime?                   // last time a material field changed
+
+  // ─── Closure watch ──────────────────────────────────────────────────────────
+  // PUBLISHING IS ENROLMENT. Anything that makes a program public (reviewState
+  // reviewed/targeting, or a published landing page) sets `watched`, and the
+  // monitor scans every watched program's source whether or not that source is
+  // still `active`. Without this the watch list and the published set drift, and
+  // a program can go public and never be re-checked — which is how a closed
+  // program stayed live on /grants until a rep caught it by hand.
+  watched         Boolean   @default(false)
+  watchedAt       DateTime?
+  /// Deadline parsed out of the free-text `deadline` field, so "earlier than
+  /// today" is a query rather than a hope. Null = no fixed/unreadable end date.
+  deadlineDate    DateTime?
+  /// Comma-separated ClosureSignalKind values from the most recent scan:
+  /// 'http-gone' | 'closure-language' | 'link-removed' | 'deadline-passed'.
+  /// Empty = the program still looks live.
+  closureSignals  String    @default("")
+  /// Human-readable evidence for those signals (the phrase, the HTTP code…).
+  closureDetail   String    @default("")
+  closureFoundAt  DateTime?
+  /// '' (no signal) | 'flagged' (awaiting admin confirmation — public page
+  /// UNCHANGED) | 'auto-downgraded' (deadline passed; public page now reads
+  /// "Check status") | 'confirmed' (admin agreed it closed) | 'dismissed'
+  /// (admin says it is still live).
+  closureState    String    @default("")
+  /// Set to 'check-status' when a passed deadline auto-downgrades the public
+  /// row. Overrides `status` on /grants only — the scraped status is preserved.
+  publicStatusOverride String @default("")
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -775,6 +804,8 @@ model GrantProgram {
   @@index([reviewState])
   @@index([status])
   @@index([sourceId])
+  @@index([watched])
+  @@index([closureState])
 }
 
 // ─── Grant landing pages (AI-drafted, human-reviewed, published to ontarioreno.ca)

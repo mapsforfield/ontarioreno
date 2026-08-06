@@ -5,6 +5,11 @@ import { Resend } from 'resend';
 import { prisma } from './prisma.js';
 import { requireAdmin } from './auth.js';
 import { ensureSchema, withSchema } from './schema.js';
+import {
+  detectClosureSignals, shouldAutoDowngrade, summarizeSignals, signalKeys,
+  parseDeadlineDate, isDeadlinePassed, CHECK_STATUS_LABEL,
+  type ClosureSignal, type ScanObservation,
+} from './grant-closure.js';
 
 // ─── Grant Radar ─────────────────────────────────────────────────────────────
 // Admin-only opportunity-discovery system for Ontario homeowner renovation / ADU
@@ -133,21 +138,35 @@ function htmlToText(html: string): string {
     .trim();
 }
 
+// Present as a normal browser — many municipal sites (IIS/.aspx, Cloudflare)
+// reject non-browser user-agents with 403/406.
+const BROWSER_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-CA,en;q=0.9',
+};
+
+/**
+ * Fetch a page WITHOUT throwing, returning everything closure detection needs:
+ * the HTTP status (a 404 is a closure signal, not just an error), the visible
+ * text, and the raw HTML (so we can tell whether the apply link is still there).
+ */
+async function fetchPage(url: string): Promise<ScanObservation> {
+  try {
+    const resp = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: AbortSignal.timeout(12_000) });
+    if (!resp.ok) return { httpStatus: resp.status, fetchError: `HTTP ${resp.status}`, text: '', html: '' };
+    const html = await resp.text();
+    return { httpStatus: resp.status, text: htmlToText(html).slice(0, MAX_PAGE_CHARS), html: html.slice(0, MAX_PAGE_CHARS * 2) };
+  } catch (err) {
+    return { httpStatus: 0, fetchError: String((err as Error).message ?? err), text: '', html: '' };
+  }
+}
+
+/** Throwing wrapper — discovery paths want a hard failure on an unreadable page. */
 async function fetchPageText(url: string): Promise<string> {
-  const resp = await fetch(url, {
-    // Present as a normal browser — many municipal sites (IIS/.aspx, Cloudflare)
-    // reject non-browser user-agents with 403/406.
-    headers: {
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'accept-language': 'en-CA,en;q=0.9',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const text = htmlToText(await resp.text());
-  return text.slice(0, MAX_PAGE_CHARS);
+  const obs = await fetchPage(url);
+  if (obs.fetchError) throw new Error(obs.fetchError);
+  return obs.text;
 }
 
 // Hash only the funding-relevant slice of a page, so cosmetic edits (footers,
@@ -341,6 +360,7 @@ async function applyClassification(
           jurisdiction: p.jurisdiction || source.jurisdiction, status: p.status, category: p.category,
           fundingType: p.fundingType, maxAmount: p.maxAmount, eligibility: p.eligibility, deadline: p.deadline,
           summary: p.summary, sourceUrl: source.url, sourceUrls: [source.url], relevanceScore: score, reviewState: 'new',
+          deadlineDate: parseDeadlineDate(p.deadline),
         },
       });
       newPrograms++;
@@ -353,7 +373,11 @@ async function applyClassification(
       const maxAmount = richerAmount(existing.maxAmount, p.maxAmount);
       const eligibility = longer(existing.eligibility, p.eligibility);
       const summary = longer(existing.summary, p.summary);
-      const deadline = existing.deadline || p.deadline;
+      // Freshly-scraped wins. The old `existing.deadline || p.deadline` pinned
+      // the first deadline ever seen, so a program that opened a NEW intake kept
+      // showing an expired date — and one whose date quietly moved was never
+      // re-evaluated for closure.
+      const deadline = p.deadline || existing.deadline;
       const status = p.status !== 'unknown' ? p.status : existing.status;
       const name = existing.name.length >= p.name.length ? existing.name : p.name;
       const materiallyChanged = existing.status !== status || existing.maxAmount !== maxAmount || existing.deadline !== deadline;
@@ -364,6 +388,7 @@ async function applyClassification(
         where: { id: existing.id },
         data: {
           fingerprint: fp, name, status, maxAmount, deadline, eligibility, summary, sourceUrls, reviewState,
+          deadlineDate: parseDeadlineDate(deadline),
           category: existing.category || p.category, fundingType: existing.fundingType || p.fundingType,
           sourceUrl: officialSourceFromProgram({ sourceUrl: existing.sourceUrl, sourceUrls, source: { url: source.url } }) || source.url,
           relevanceScore: Math.max(existing.relevanceScore, score), lastConfirmedAt: new Date(),
@@ -380,31 +405,208 @@ async function applyClassification(
   return { newPrograms, updatedPrograms };
 }
 
+// ─── Enrolment: PUBLISHING A PROGRAM IS ENROLLING IT IN THE RE-SCAN ───────────
+// The watch list used to be "sources classified as money/future", which is not
+// the same set as "programs published to /grants". A program could go public and
+// then fall out of the scan — e.g. its source got deactivated by a later
+// re-classification ([applyClassification] sets active=false for zoning/news/
+// noise) — and nothing would ever look at it again. Every publish path now calls
+// enrollProgramInRescan, and the monitor scans the union of active sources and
+// watched programs' sources, so "public but unwatched" is not a reachable state.
+
+/** Review states that put a program on the public /grants hub. */
+export const PUBLISHED_REVIEW_STATES = ['reviewed', 'targeting'];
+
+/**
+ * Enrol one program in the recurring closure re-scan. Idempotent.
+ *
+ * Also force-reactivates the program's source: a public program whose source is
+ * inactive is exactly the gap this fixes, so enrolment has to be able to pull a
+ * source back into the scan loop, not merely mark the program.
+ */
+export async function enrollProgramInRescan(programId: string): Promise<void> {
+  const p = await prisma.grantProgram.findUnique({ where: { id: programId } });
+  if (!p) return;
+  await prisma.grantProgram.update({
+    where: { id: p.id },
+    data: {
+      watched: true,
+      watchedAt: p.watchedAt ?? new Date(),
+      deadlineDate: parseDeadlineDate(p.deadline),
+    },
+  });
+  await prisma.grantSource.update({ where: { id: p.sourceId }, data: { active: true } }).catch(() => { /* source gone */ });
+}
+
+/**
+ * Enrol every program that is currently public — the backfill for programs
+ * published before enrolment existed. Safe to re-run; returns how many it added.
+ */
+export async function backfillWatchlist(): Promise<{ enrolled: number; alreadyWatched: number; ids: string[] }> {
+  await ensureSchema();
+  const [byReview, publishedPages] = await Promise.all([
+    prisma.grantProgram.findMany({ where: { reviewState: { in: PUBLISHED_REVIEW_STATES } }, select: { id: true, watched: true } }),
+    prisma.grantLandingPage.findMany({ where: { status: 'published' }, select: { programId: true } }),
+  ]);
+  const pageProgramIds = publishedPages.map((p) => p.programId).filter((x): x is string => Boolean(x));
+  const fromPages = pageProgramIds.length
+    ? await prisma.grantProgram.findMany({ where: { id: { in: pageProgramIds } }, select: { id: true, watched: true } })
+    : [];
+
+  const all = new Map<string, boolean>();
+  for (const p of [...byReview, ...fromPages]) all.set(p.id, p.watched);
+
+  let enrolled = 0, alreadyWatched = 0;
+  const ids: string[] = [];
+  for (const [id, watched] of all) {
+    if (watched) { alreadyWatched++; continue; }
+    await enrollProgramInRescan(id);
+    enrolled++;
+    ids.push(id);
+  }
+  return { enrolled, alreadyWatched, ids };
+}
+
+// ─── Closure detection on a watched program ───────────────────────────────────
+export type ClosureFinding = {
+  programId: string; program: string; city: string; url: string;
+  signals: string; detail: string; autoDowngraded: boolean;
+};
+
+/**
+ * Apply this scan's observation to one watched program. Returns a finding only
+ * when the signal set CHANGED, so a program that has been closed for a month
+ * does not re-alert every night.
+ */
+async function applyClosureCheck(
+  program: { id: string; name: string; city: string; deadline: string; sourceUrl: string; closureSignals: string; closureState: string },
+  sourceUrl: string,
+  obs: ScanObservation,
+  now: Date,
+): Promise<ClosureFinding | null> {
+  const signals: ClosureSignal[] = detectClosureSignals(
+    { name: program.name, deadline: program.deadline, sourceUrl: program.sourceUrl || sourceUrl },
+    obs,
+    now,
+  );
+  const keys = signalKeys(signals);
+
+  // No signals: the program looks live again. Clear a previous flag unless an
+  // admin has already confirmed the closure by hand — their call outranks a scan.
+  if (keys === '') {
+    if (program.closureSignals && program.closureState !== 'confirmed') {
+      await prisma.grantProgram.update({
+        where: { id: program.id },
+        data: { closureSignals: '', closureDetail: '', closureFoundAt: null, closureState: '', publicStatusOverride: '' },
+      });
+    }
+    return null;
+  }
+
+  const unchanged = keys === program.closureSignals;
+  const autoDowngrade = shouldAutoDowngrade(signals);
+  // A passed deadline is a fact, so it downgrades the public row on its own.
+  // Every other signal is an inference: flag it and leave the public page alone
+  // until a human confirms.
+  const closureState = program.closureState === 'confirmed' || program.closureState === 'dismissed'
+    ? program.closureState
+    : autoDowngrade ? 'auto-downgraded' : 'flagged';
+
+  await prisma.grantProgram.update({
+    where: { id: program.id },
+    data: {
+      closureSignals: keys,
+      closureDetail: summarizeSignals(signals),
+      closureFoundAt: unchanged ? undefined : now,
+      closureState,
+      deadlineDate: parseDeadlineDate(program.deadline),
+      // The downgrade applies even to an already-confirmed program; it never
+      // un-sets an override an admin is relying on.
+      ...(autoDowngrade ? { publicStatusOverride: 'check-status' } : {}),
+    },
+  });
+
+  // Already reported this exact set, or the admin has ruled on it — stay quiet.
+  if (unchanged || program.closureState === 'dismissed') return null;
+
+  return {
+    programId: program.id, program: program.name, city: program.city, url: program.sourceUrl || sourceUrl,
+    signals: keys, detail: summarizeSignals(signals), autoDowngraded: autoDowngrade,
+  };
+}
+
 // ─── MONITOR job ──────────────────────────────────────────────────────────────
 export type ScanResult = {
   checked: number; changed: number; newPrograms: number; updatedPrograms: number; errors: number;
+  /** Watched (published) programs re-checked for closure this run. */
+  watchedChecked: number;
+  closures: ClosureFinding[];
   digest: Array<{ program: string; city: string; status: string; kind: 'new' | 'changed'; url: string }>;
 };
 
-export async function scanAllSources(opts: { force?: boolean; limit?: number } = {}): Promise<ScanResult> {
+export async function scanAllSources(opts: { force?: boolean; limit?: number; now?: Date } = {}): Promise<ScanResult> {
   await ensureSchema();
-  const sources = await prisma.grantSource.findMany({
-    where: { active: true },
-    orderBy: { lastCheckedAt: { sort: 'asc', nulls: 'first' } },
-    ...(opts.limit ? { take: opts.limit } : {}),
-  });
-  const result: ScanResult = { checked: 0, changed: 0, newPrograms: 0, updatedPrograms: 0, errors: 0, digest: [] };
+  const now = opts.now ?? new Date();
+
+  // THE WATCH LIST = active sources ∪ the sources behind every watched (public)
+  // program. The second half is the fix: a published program is re-checked even
+  // when its source has been deactivated, which is how one slipped through.
+  const watchedPrograms = await prisma.grantProgram.findMany({ where: { watched: true } });
+  const watchedSourceIds = [...new Set(watchedPrograms.map((p) => p.sourceId))];
+  const [activeSources, watchedSources] = await Promise.all([
+    prisma.grantSource.findMany({ where: { active: true }, orderBy: { lastCheckedAt: { sort: 'asc', nulls: 'first' } } }),
+    watchedSourceIds.length ? prisma.grantSource.findMany({ where: { id: { in: watchedSourceIds } } }) : Promise.resolve([]),
+  ]);
+  // Watched sources go FIRST, and a `limit` can never cut into them: on a bounded
+  // run the public pages are precisely the ones that must not be skipped.
+  const ordered = [...watchedSources, ...activeSources.filter((s) => !watchedSourceIds.includes(s.id))];
+  const sources = opts.limit ? ordered.slice(0, Math.max(opts.limit, watchedSources.length)) : ordered;
+
+  const programsBySource = new Map<string, typeof watchedPrograms>();
+  for (const p of watchedPrograms) {
+    const list = programsBySource.get(p.sourceId) ?? [];
+    list.push(p);
+    programsBySource.set(p.sourceId, list);
+  }
+
+  const result: ScanResult = { checked: 0, changed: 0, newPrograms: 0, updatedPrograms: 0, errors: 0, watchedChecked: 0, closures: [], digest: [] };
 
   for (const source of sources) {
     result.checked++;
+    const obs = await fetchPage(source.url);
+    const watching = programsBySource.get(source.id) ?? [];
+
+    // CLOSURE CHECK FIRST, and on every run — it must not sit behind the
+    // content-hash short-circuit or the "did the fetch succeed" guard. A page
+    // that 404s, or whose deadline has simply passed, is exactly the case the
+    // old flow dropped on the floor.
+    for (const p of watching) {
+      result.watchedChecked++;
+      const finding = await applyClosureCheck(p, source.url, obs, now).catch((err) => {
+        console.error('[grant-radar] closure check failed for', p.name, err);
+        return null;
+      });
+      if (finding) result.closures.push(finding);
+    }
+
+    if (obs.fetchError) {
+      result.errors++;
+      await prisma.grantSource.update({
+        where: { id: source.id },
+        data: { lastCheckedAt: now, lastError: obs.fetchError.slice(0, 300) },
+      }).catch(() => { /* best-effort */ });
+      continue;
+    }
+
+    // Discovery/extraction still only runs for sources classified as live money.
+    const sig = relevantSignature(obs.text);
+    const unchanged = sig === source.lastHash && !opts.force;
+    await prisma.grantSource.update({ where: { id: source.id }, data: { lastCheckedAt: now, lastHash: sig, lastError: '' } });
+    if (!source.active || unchanged) continue;
+
     try {
-      const text = await fetchPageText(source.url);
-      const sig = relevantSignature(text);
-      const unchanged = sig === source.lastHash && !opts.force;
-      await prisma.grantSource.update({ where: { id: source.id }, data: { lastCheckedAt: new Date(), lastHash: sig, lastError: '' } });
-      if (unchanged) continue;
       result.changed++;
-      const cls = await classifyAndExtract(text, { name: source.name, url: source.url, jurisdiction: source.jurisdiction });
+      const cls = await classifyAndExtract(obs.text, { name: source.name, url: source.url, jurisdiction: source.jurisdiction });
       const { newPrograms, updatedPrograms } = await applyClassification(source, cls, result.digest);
       result.newPrograms += newPrograms;
       result.updatedPrograms += updatedPrograms;
@@ -412,12 +614,53 @@ export async function scanAllSources(opts: { force?: boolean; limit?: number } =
       result.errors++;
       await prisma.grantSource.update({
         where: { id: source.id },
-        data: { lastCheckedAt: new Date(), lastError: String((err as Error).message ?? err).slice(0, 300) },
+        data: { lastError: String((err as Error).message ?? err).slice(0, 300) },
       }).catch(() => { /* best-effort */ });
     }
   }
+
+  // Closure of a live public program is urgent and goes out on its own, ahead of
+  // the routine discovery digest.
+  if (result.closures.length > 0) await alertClosures(result.closures);
   if (result.digest.length > 0) await sendDigest(result);
   return result;
+}
+
+/**
+ * One-off sweep: flag every watched program whose scraped deadline is already
+ * past, without fetching anything. Cheap, and it catches the backlog the moment
+ * enrolment happens instead of waiting for the next nightly run.
+ */
+export async function sweepPastDeadlines(opts: { now?: Date } = {}): Promise<ClosureFinding[]> {
+  await ensureSchema();
+  const now = opts.now ?? new Date();
+  const programs = await prisma.grantProgram.findMany({ where: { watched: true } });
+  const findings: ClosureFinding[] = [];
+
+  for (const p of programs) {
+    const parsed = parseDeadlineDate(p.deadline);
+    if (parsed && !p.deadlineDate) await prisma.grantProgram.update({ where: { id: p.id }, data: { deadlineDate: parsed } });
+    if (!isDeadlinePassed(p.deadline, now)) continue;
+
+    const detail = `Scraped deadline “${p.deadline}” is earlier than today, but the program still shows “${p.status}”.`;
+    const already = p.closureSignals.includes('deadline-passed');
+    await prisma.grantProgram.update({
+      where: { id: p.id },
+      data: {
+        deadlineDate: parsed,
+        closureSignals: signalKeys([...(p.closureSignals ? p.closureSignals.split(',').map((k) => ({ kind: k, detail: '' })) : []), { kind: 'deadline-passed', detail }] as ClosureSignal[]),
+        closureDetail: detail,
+        closureFoundAt: already ? undefined : now,
+        closureState: p.closureState === 'confirmed' || p.closureState === 'dismissed' ? p.closureState : 'auto-downgraded',
+        publicStatusOverride: 'check-status',
+      },
+    });
+    if (!already && p.closureState !== 'dismissed') {
+      findings.push({ programId: p.id, program: p.name, city: p.city, url: p.sourceUrl, signals: 'deadline-passed', detail, autoDowngraded: true });
+    }
+  }
+  if (findings.length > 0) await alertClosures(findings);
+  return findings;
 }
 
 // ─── DISCOVERY job (Tavily) ───────────────────────────────────────────────────
@@ -512,7 +755,7 @@ export async function runDiscovery(opts: { limit?: number } = {}): Promise<Disco
     const discoveryState = sawMoney ? 'verified' : sawFuture ? 'watching' : 'rejected';
     await prisma.municipality.update({ where: { id: muni.id }, data: { lastDiscoveryAt: new Date(), discoveryState } });
   }
-  if (digest.length > 0) await sendDigest({ checked: out.cities, changed: 0, newPrograms: digest.filter((d) => d.kind === 'new').length, updatedPrograms: 0, errors: out.errors, digest });
+  if (digest.length > 0) await sendDigest({ checked: out.cities, changed: 0, newPrograms: digest.filter((d) => d.kind === 'new').length, updatedPrograms: 0, errors: out.errors, watchedChecked: 0, closures: [], digest });
   return out;
 }
 
@@ -602,6 +845,90 @@ async function sendDigest(result: ScanResult): Promise<void> {
     await resend.emails.send({ from, to, subject: `Grant Radar — ${result.newPrograms} new, ${result.updatedPrograms} changed`, html, text });
   } catch (err) {
     console.error('[grant-radar] digest email failed:', err);
+  }
+}
+
+// ─── Closure alert (reuses the lead-alert notification path) ──────────────────
+// Goes through NotificationOutbox exactly like a lead alert, so it is durable,
+// idempotent (unique idempotencyKey), and visible in the same place as every
+// other outgoing message. It is ALSO delivered inline, because this job runs on
+// GitHub Actions while the outbox drain runs on the Vercel cron — waiting for
+// the next drain would blunt "alert me immediately".
+
+/** Business inbox, derived the same way the lead alerts derive it. */
+function alertInbox(): string {
+  const explicit = process.env.GRANT_ALERT_EMAIL;
+  if (explicit) return explicit;
+  const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
+  const match = from.match(/<([^\s@>]+@[^\s@>]+\.[^\s@>]+)>/);
+  return match ? match[1] : from.trim();
+}
+
+export function closureAlertMessage(findings: ClosureFinding[]): { subject: string; body: string; html: string } {
+  const downgraded = findings.filter((f) => f.autoDowngraded);
+  const needsCall = findings.filter((f) => !f.autoDowngraded);
+  const lead = findings[0];
+  const subject = findings.length === 1
+    ? `⚠ Grant status changed — ${lead.program} (${lead.city})`
+    : `⚠ ${findings.length} published grants changed status`;
+
+  const lines = [
+    'A program PUBLISHED on ontarioreno.ca/grants has raised a closure signal.',
+    '',
+  ];
+  if (downgraded.length) {
+    lines.push('AUTO-DOWNGRADED — the public page now reads “Check status”:', '');
+    for (const f of downgraded) lines.push(`  • ${f.program} (${f.city})`, `    ${f.detail}`, `    ${f.url}`, '');
+  }
+  if (needsCall.length) {
+    lines.push('NEEDS YOUR CONFIRMATION — the public page is UNCHANGED for now:', '');
+    for (const f of needsCall) lines.push(`  • ${f.program} (${f.city})`, `    Signals: ${f.signals}`, `    ${f.detail}`, `    ${f.url}`, '');
+  }
+  lines.push('Confirm or dismiss each one in the “Status changed” lane:', 'https://ontarioreno.ca/portal/grants');
+
+  const card = (f: ClosureFinding) => `<tr>
+    <td style="padding:10px;border-bottom:1px solid #eee"><strong>${esc(f.program)}</strong><br><span style="color:#64748b">${esc(f.city)}</span></td>
+    <td style="padding:10px;border-bottom:1px solid #eee">${esc(f.detail)}<br><a href="${esc(f.url)}">official page</a></td>
+    <td style="padding:10px;border-bottom:1px solid #eee;white-space:nowrap">${f.autoDowngraded ? '<span style="color:#b45309;font-weight:700">Check status</span>' : '<span style="color:#b91c1c;font-weight:700">Confirm</span>'}</td>
+  </tr>`;
+  const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:660px">
+    <h2 style="color:#b91c1c;margin-bottom:4px">Published grant status changed</h2>
+    <p style="color:#475569;margin-top:0">These programs are live on <a href="https://ontarioreno.ca/grants">/grants</a>. A passed deadline already downgraded the public row to “Check status”; anything else is waiting on your confirmation before the public page changes.</p>
+    <table style="border-collapse:collapse;width:100%"><tbody>${findings.map(card).join('')}</tbody></table>
+    <p style="margin-top:18px"><a href="https://ontarioreno.ca/portal/grants" style="background:#1B3C6C;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open the Status changed lane</a></p>
+  </div>`;
+
+  return { subject, body: lines.join('\n'), html };
+}
+
+async function alertClosures(findings: ClosureFinding[]): Promise<void> {
+  if (findings.length === 0) return;
+  const to = alertInbox();
+  const { subject, body, html } = closureAlertMessage(findings);
+  // Keyed to the programs and their signal sets, so re-running a scan that finds
+  // the same thing cannot produce a second email.
+  const idempotencyKey = `grant-closure:${createHash('sha256')
+    .update(findings.map((f) => `${f.programId}:${f.signals}`).sort().join('|'))
+    .digest('hex').slice(0, 32)}`;
+
+  await prisma.notificationOutbox.create({
+    data: {
+      channel: 'email', kind: 'grant_closure_alert', recipient: to,
+      subject, body, html, sendAfter: new Date().toISOString(), expiresAt: '', idempotencyKey,
+    },
+  }).catch(() => { /* duplicate key = already queued for this exact finding set */ });
+
+  try {
+    const { deliverEmail } = await import('./notifications.js');
+    const outcome = await deliverEmail(to, subject, body, process.env, html);
+    await prisma.notificationOutbox.updateMany({
+      where: { idempotencyKey },
+      data: outcome.state === 'sent'
+        ? { state: 'sent', attempts: 1 }
+        : { state: 'pending', attempts: 1, lastError: outcome.reason.slice(0, 300) },
+    }).catch(() => { /* the drain will pick it up */ });
+  } catch (err) {
+    console.error('[grant-radar] closure alert send failed (queued for drain):', err);
   }
 }
 
@@ -944,13 +1271,16 @@ ${siteFooterHtml()}
 // page where one exists, otherwise a consultation CTA. Freshness ("Updated …")
 // comes free from the live monitor — a real edge over manually-kept lists.
 
-type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; category: string; relevanceScore: number; linkUrl: string; sourceUrl: string; sourceUrls?: unknown; source?: { url: string } | null; updatedAt: Date | string };
+type HubProgram = { id: string; city: string; name: string; maxAmount: string; status: string; publicStatusOverride?: string; category: string; relevanceScore: number; linkUrl: string; sourceUrl: string; sourceUrls?: unknown; source?: { url: string } | null; updatedAt: Date | string };
 type HubPage = { programId: string | null; slug: string; city: string };
 
 function statusBadge(status: string): string {
   const map: Record<string, [string, string]> = {
     active: ['#059669', 'Open now'], upcoming: ['#d97706', 'Upcoming'],
     closed: ['#64748b', 'Closed'], unknown: ['#64748b', 'Check status'],
+    // A program auto-downgraded off a passed deadline. Amber, not grey: we are
+    // telling the homeowner to verify, not that the program is gone.
+    [CHECK_STATUS_LABEL]: ['#b45309', 'Check status'],
   };
   const [color, label] = map[status] ?? map.unknown;
   return `<span class="badge" style="background:${color}1a;color:${color}">${esc(label)}</span>`;
@@ -1025,7 +1355,7 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
       <td data-l="City"><strong>${esc(p.city || '—')}</strong></td>
       <td data-l="Program">${esc(p.name)}${sourceUrl ? `<br><a class="sourcelink" href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Official program source ↗</a>` : ''}</td>
       <td data-l="Amount">${esc(p.maxAmount || '—')}</td>
-      <td data-l="Status">${statusBadge(p.status)}</td>
+      <td data-l="Status">${statusBadge(publicStatus(p))}</td>
       <td data-l="">${action}</td>
     </tr>`;
   }).join('');
@@ -1157,6 +1487,19 @@ export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; 
   { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
 ];
 
+/**
+ * What the PUBLIC page should say about a program's status.
+ *
+ * A passed deadline (or an admin-confirmed closure) sets publicStatusOverride,
+ * and that beats the scraped status everywhere the program shows. We say "Check
+ * status" rather than "Closed" because a passed deadline usually means the
+ * intake lapsed, not that the money is gone for good — and a homeowner should
+ * still be told to ask, not turned away.
+ */
+export function publicStatus(p: { status: string; publicStatusOverride?: string }): string {
+  return p.publicStatusOverride === 'check-status' ? CHECK_STATUS_LABEL : p.status;
+}
+
 export type HubRow = { city: string; name: string; amount: string; status: string; href: string; sourceUrl: string | null; fundingType: string; lat: number | null; lng: number | null };
 export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
 
@@ -1190,7 +1533,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     // Admin override wins; else auto-shorten the scraped value. Full text goes to
     // the table; the map pin uses a compact label (pillLabel).
     const displayAmount = (p.amountOverride && p.amountOverride.trim()) || shortAmount(p.maxAmount);
-    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: p.status, href, sourceUrl: officialSourceFromProgram(p), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: p.city, name: p.name, amount: displayAmount, status: publicStatus(p), href, sourceUrl: officialSourceFromProgram(p), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
   const agg = new Map<string, HubMapCity>();
@@ -1281,6 +1624,18 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'POST') {
     const action = req.query['action'];
     if (action === 'seed') { const added = await seedSources(); res.status(200).json({ ok: true, added }); return; }
+    if (action === 'backfill-watchlist') {
+      // Enrol every already-published program. Idempotent, then immediately sweep
+      // for deadlines that are already in the past.
+      const enrolment = await withSchema(() => backfillWatchlist());
+      const pastDeadlines = await withSchema(() => sweepPastDeadlines());
+      res.status(200).json({ ok: true, ...enrolment, pastDeadlines });
+      return;
+    }
+    if (action === 'sweep-deadlines') {
+      res.status(200).json({ ok: true, pastDeadlines: await withSchema(() => sweepPastDeadlines()) });
+      return;
+    }
     if (action === 'scan') {
       await seedSources();
       const limit = Math.min(Math.max(Number(req.query['limit'] ?? 6) || 6, 1), 8);
@@ -1320,6 +1675,11 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
       for (const k of editable) if (k in body) data[k] = body[k];
       if (data.status === 'published') { data.publishedAt = new Date(); data.needsReview = false; }
       const updated = await withSchema(() => prisma.grantLandingPage.update({ where: { id }, data }));
+      // Publishing a landing page also enrols its program — the /grants/:slug
+      // page is public, so the program behind it must be watched.
+      if (updated.status === 'published' && updated.programId) {
+        await withSchema(() => enrollProgramInRescan(updated.programId as string));
+      }
       res.status(200).json({ ok: true, page: updated });
       return;
     }
@@ -1353,11 +1713,31 @@ export async function handleGrantsApi(req: VercelRequest, res: VercelResponse): 
       const rs = String(body.reviewState ?? '');
       if (!['new', 'reviewed', 'targeting', 'dismissed'].includes(rs)) { res.status(400).json({ error: 'invalid reviewState.' }); return; }
       data.reviewState = rs;
+      // Dismissing takes a program off /grants, so stop spending scans on it.
+      // Every other transition is handled by the enrolment call below.
+      if (rs === 'dismissed') data.watched = false;
     }
     if ('linkUrl' in body) data.linkUrl = String(body.linkUrl ?? '');
     if ('amountOverride' in body) data.amountOverride = String(body.amountOverride ?? '');
+    // Admin ruling on a flagged closure.
+    if ('closureState' in body) {
+      const cs = String(body.closureState ?? '');
+      if (!['', 'flagged', 'auto-downgraded', 'confirmed', 'dismissed'].includes(cs)) { res.status(400).json({ error: 'invalid closureState.' }); return; }
+      data.closureState = cs;
+      // Confirming a closure is the admin telling us it really is closed: mark it
+      // closed and take the public row down to "Check status". Dismissing says
+      // it is still live — clear the flag and restore the public row.
+      if (cs === 'confirmed') { data.status = 'closed'; data.publicStatusOverride = 'check-status'; }
+      if (cs === 'dismissed') { data.publicStatusOverride = ''; }
+    }
     if (Object.keys(data).length === 0) { res.status(400).json({ error: 'nothing to update.' }); return; }
-    res.status(200).json(await withSchema(() => prisma.grantProgram.update({ where: { id }, data })));
+    const updated = await withSchema(() => prisma.grantProgram.update({ where: { id }, data }));
+    // PUBLISHING IS ENROLMENT — a program that just became public is watched from
+    // this moment, with no separate step an admin could forget.
+    if (PUBLISHED_REVIEW_STATES.includes(String(updated.reviewState))) {
+      await withSchema(() => enrollProgramInRescan(updated.id));
+    }
+    res.status(200).json(updated);
     return;
   }
 
