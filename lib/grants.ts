@@ -1503,7 +1503,8 @@ export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; 
   // Closed August 6, 2026 — "reached its allocated funding capacity, and the
   // application portal is now closed to new submissions" (hamilton.ca).
   { city: 'Hamilton', name: 'Hamilton ADU / Secondary Suite Grant', amount: '$40k', url: '/hamilton-grant-guide', status: 'closed' },
-  { city: 'St. Catharines', name: 'St. Catharines ADU Grant', amount: '$40k', url: '/st-catharines-adu-grant' },
+  // Closed August 6, 2026 — the HAF-funded ADU cash grant pool is depleted.
+  { city: 'St. Catharines', name: 'St. Catharines ADU Grant', amount: '$40k', url: '/st-catharines-adu-grant', status: 'closed' },
   { city: 'Burlington', name: 'Burlington ARU Incentive Program', amount: '$95k', url: '/burlington-aru-incentive-program' },
   { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
 ];
