@@ -640,7 +640,21 @@ export async function sweepPastDeadlines(opts: { now?: Date } = {}): Promise<Clo
   for (const p of programs) {
     const parsed = parseDeadlineDate(p.deadline);
     if (parsed && !p.deadlineDate) await prisma.grantProgram.update({ where: { id: p.id }, data: { deadlineDate: parsed } });
-    if (!isDeadlinePassed(p.deadline, now)) continue;
+
+    if (!isDeadlinePassed(p.deadline, now)) {
+      // Self-correcting: a program previously downgraded ONLY for a passed
+      // deadline that no longer reads as passed gets its public row back. This
+      // is how a parser fix undoes its own false positives — a real run
+      // downgraded three live programs whose "deadline" was actually a start
+      // date, and re-running this restores them without a full fetch sweep.
+      if (p.closureSignals === 'deadline-passed' && p.closureState === 'auto-downgraded') {
+        await prisma.grantProgram.update({
+          where: { id: p.id },
+          data: { closureSignals: '', closureDetail: '', closureFoundAt: null, closureState: '', publicStatusOverride: '', deadlineDate: parsed },
+        });
+      }
+      continue;
+    }
 
     const detail = `Scraped deadline “${p.deadline}” is earlier than today, but the program still shows “${p.status}”.`;
     const already = p.closureSignals.includes('deadline-passed');

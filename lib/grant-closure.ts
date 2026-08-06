@@ -109,6 +109,20 @@ const MONTHS: Record<string, number> = {
 const OPEN_ENDED =
   /\b(?:ongoing|continuous|rolling|no\s+deadline|open\s+until\s+(?:funds|funding|budget)|while\s+funds\s+last|until\s+(?:funds|funding)\s+(?:are\s+|is\s+)?(?:exhausted|depleted)|first[\s-]come|indefinite|n\/?a|tbd|unknown)\b/i;
 
+// The scraped `deadline` field is free text and frequently holds a START date —
+// "Launched January 15, 2025", "March 6, 2025 (applications open)". Read as an
+// end date those look long expired, and a real backfill run auto-downgraded
+// three live programs on exactly this before anyone caught it. A start date is
+// not a deadline: refuse to parse rather than guess the wrong direction.
+const START_DATE =
+  /\b(?:launch(?:ed|es|ing)?|open(?:ed|s|ing)?|effective|as\s+of|beginning|begins|starts?|started|starting|available\s+from|since|intake\s+opens?|accepting\s+(?:applications\s+)?from)\b/i;
+
+// Words that mean the date really is an END date. When one of these is present
+// the start-date veto above does not apply — "opened March 2024, closes December
+// 31, 2027" is a genuine deadline, and we should still read it.
+const DEADLINE_WORD =
+  /\b(?:deadline|clos(?:e|es|ed|ing)|due|expir(?:e|es|ed|y|ation)|end(?:s|ed|ing)?|last\s+day|no\s+later\s+than|until|by\s+\w+\s+\d)\b/i;
+
 const monthNum = (s: string): number | undefined => MONTHS[s.slice(0, 3).toLowerCase()];
 const utc = (y: number, m: number, d: number): Date => new Date(Date.UTC(y, m, d, 12, 0, 0));
 const lastDayOfMonth = (y: number, m: number): number => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -126,6 +140,8 @@ export function parseDeadlineDate(raw: string): Date | null {
   const text = (raw ?? '').trim();
   if (!text) return null;
   if (OPEN_ENDED.test(text)) return null;
+  // A start date with no closing language is not a deadline at all.
+  if (START_DATE.test(text) && !DEADLINE_WORD.test(text)) return null;
 
   // 2025-12-31 / 2025/12/31
   const iso = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);

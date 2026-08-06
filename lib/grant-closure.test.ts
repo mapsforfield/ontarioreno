@@ -52,6 +52,34 @@ test('an open-ended phrase wins even when it mentions a year', () => {
   assert.equal(parseDeadlineDate('Ongoing since 2021'), null);
 });
 
+// These three are verbatim from a real backfill run. Every one of them is a
+// START date sitting in the scraped `deadline` field, and reading them as end
+// dates auto-downgraded three live programs on the public page.
+test('a start date in the deadline field is not a deadline', () => {
+  for (const raw of [
+    'Launched January 15, 2025',
+    'March 6, 2025 (applications open; pending appeal period)',
+    'Program opened April 2024',
+    'Effective January 1, 2025',
+    'Accepting applications from June 2025',
+  ]) {
+    assert.equal(parseDeadlineDate(raw), null, raw);
+    assert.equal(isDeadlinePassed(raw, NOW), false, raw);
+  }
+});
+
+test('a real deadline still parses when the text also names a start date', () => {
+  assert.equal(
+    parseDeadlineDate('Opened March 2024; applications close December 31, 2027')?.toISOString().slice(0, 10),
+    '2027-12-31',
+  );
+  assert.equal(parseDeadlineDate('Open now, deadline March 31, 2025')?.toISOString().slice(0, 10), '2025-03-31');
+});
+
+test('the St. Catharines case still fires — it is a genuine end date', () => {
+  assert.equal(isDeadlinePassed('December 31, 2025', NOW), true);
+});
+
 test('today is not past; yesterday is', () => {
   assert.equal(isDeadlinePassed('August 6, 2026', NOW), false);
   assert.equal(isDeadlinePassed('August 5, 2026', NOW), true);
