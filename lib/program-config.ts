@@ -5,6 +5,8 @@
 // Shared by the public page and the API, so this module must stay free of Node
 // imports — it is bundled into the browser.
 
+import { HAMILTON_ADU_CLOSURE, type ProgramClosure } from '../src/lib/programClosures.js';
+
 export type SchedulingArea = 'HAMILTON' | 'SIMCOE';
 
 /** Server-assigned. Never chosen by the homeowner. */
@@ -81,6 +83,15 @@ export type ProgramConfig = {
   schedulingArea: SchedulingArea;
   /** Public flow is live only when true. */
   enabled: boolean;
+  /**
+   * Why a disabled program is disabled — set only when the intake CLOSED, and
+   * left unset when it has simply not opened yet. The two read very differently
+   * to a homeowner who followed an ad here: "not yet" invites them to come
+   * back, "the funding ran out" tells them to look elsewhere now. The facts come
+   * from src/lib/programClosures.ts so this page and the city pages can never
+   * disagree about a date or a reason.
+   */
+  closure?: ProgramClosure;
   slug: string;
   areaLabel: string;
   /** The ONLY place an amount is rendered from. Never a literal in a component. */
@@ -288,7 +299,22 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   key: 'hamilton-adu-grant',
   version: 1,
   schedulingArea: 'HAMILTON',
-  enabled: true,
+  // Closed August 6, 2026 — the City's intake reached its funding capacity.
+  //
+  // Commit #17 removed the booking CTAs from the three pages that sold this
+  // grant, but the flow itself stayed live, so every link that does not pass
+  // through those pages — a running Meta ad, an earlier SMS, a bookmark — still
+  // walked a homeowner to the calendar for a grant they can no longer apply
+  // for. This is the switch that actually stops the booking: the API refuses
+  // slots and bookings for a disabled program, so it closes on the server, not
+  // just in the UI.
+  //
+  // Everything else here is left exactly as it was. Leads already booked keep
+  // resolving their program by key, and nothing about the configuration needs
+  // rebuilding if Hamilton reopens — this flips back to true with the closure
+  // entry removed.
+  enabled: false,
+  closure: HAMILTON_ADU_CLOSURE,
   slug: 'hamilton',
   areaLabel: 'Hamilton',
   displayAmountLabel: 'up to $40,000 per eligible unit',

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Loader2, Lock, MapPin } from 'lucide-react';
 import { testingModeEnabled } from '../../lib/app-config';
@@ -42,6 +42,8 @@ type Program = {
   slug: string;
   areaLabel: string;
   enabled: boolean;
+  /** Present only when the intake closed, as opposed to not having opened yet. */
+  closure: { program: string; city: string; reason: string; sourceUrl: string; confirmedOn: string } | null;
   displayAmountLabel: string;
   fundingHighlights: string[];
   programTerms: string[];
@@ -320,9 +322,43 @@ export default function ConsultationFlow() {
   if (!program) return <Shell><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#1B3C6C]" /></Shell>;
 
   if (phase === 'closed') {
+    // A program that CLOSED and one that has not opened yet both stop here, but
+    // they owe the reader different things. Someone who arrived from an ad for a
+    // grant that has since run out needs to be told that plainly, and then given
+    // somewhere to go — dead-ending them is what loses the lead we already paid
+    // for. The "not yet" wording below is unchanged for programs like Simcoe.
     return (
       <Shell title={`${program.areaLabel} consultations`}>
-        <p className="text-slate-600">We aren’t taking online bookings for {program.areaLabel} yet.</p>
+        {program.closure ? (
+          <div className="text-left">
+            <p className="font-bold text-slate-900">{program.closure.program} is closed.</p>
+            <p className="mt-2 text-slate-600">{program.closure.reason}</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Confirmed {program.closure.confirmedOn} against the{' '}
+              <a
+                href={program.closure.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-slate-700"
+              >
+                City of {program.closure.city} program page
+              </a>
+              .
+            </p>
+            <p className="mt-4 text-slate-600">
+              Other Ontario cities are still funding this work, and we can still help you plan the
+              build either way.
+            </p>
+            <Link
+              to="/grants"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-5 py-3 font-bold text-white transition hover:bg-[#16325a]"
+            >
+              See grants still open <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ) : (
+          <p className="text-slate-600">We aren’t taking online bookings for {program.areaLabel} yet.</p>
+        )}
       </Shell>
     );
   }
