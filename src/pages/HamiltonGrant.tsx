@@ -1,15 +1,17 @@
 import { Helmet } from "react-helmet-async";
 import {
   ArrowRight,
-  CalendarCheck,
   Calculator,
   CheckCircle2,
   FileText,
   House,
+  Search,
   ShieldCheck,
 } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
+import ProgramClosedNotice from "../components/ProgramClosedNotice";
+import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonGrant() {
   return (
@@ -27,6 +29,11 @@ export default function HamiltonGrant() {
           href="https://ontarioreno.ca/hamilton-grant-guide"
         />
       </Helmet>
+
+      {/* Closure notice sits ABOVE the hero. The hero still says "$40,000",
+          and a homeowner who reads that and starts planning before hitting a
+          caveat further down has been misled by us. */}
+      <ProgramClosedNotice {...HAMILTON_ADU_CLOSURE} />
 
       {/* HERO */}
       <section className="bg-slate-900 text-white">
@@ -84,22 +91,23 @@ export default function HamiltonGrant() {
                 ))}
               </div>
 
-              {/* Booking leads. It is the only path here that ends in a
-                  confirmed appointment rather than a queue, so it takes the
-                  solid fill; the other two stay reachable but quieter. */}
+              {/* The booking CTA used to lead here. Hamilton has closed the
+                  program to new submissions, so booking an in-home visit for it
+                  would waste the homeowner's time — the open programs elsewhere
+                  in Ontario are the useful next step now. */}
               <div className="mt-1.5 space-y-2.5">
                 <a
-                  href="/consultation/hamilton?src=grant-guide-hero"
+                  href="/grants"
                   className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <CalendarCheck className="h-5 w-5 shrink-0" />
-                    <span>Book your in-home visit</span>
+                    <Search className="h-5 w-5 shrink-0" />
+                    <span>See grants that are still open</span>
                   </span>
                   <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
                 </a>
                 <p className="px-1 text-[0.82rem] font-semibold text-slate-400">
-                  Pick a time that works — no waiting for a callback.
+                  Hamilton's program is closed — other Ontario cities are still funding.
                 </p>
 
                 <a
@@ -186,15 +194,15 @@ export default function HamiltonGrant() {
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
               If you're planning to finish your basement into a legal rental unit, this is everything you need to know before getting started.
             </p>
-            {/* Booking leads here too. It is the only one of the three that
-                ends in a confirmed appointment instead of a queue. */}
+            {/* Booking removed with the program's closure — see the notice
+                above. The open-grants hub takes its place as the primary CTA. */}
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="/consultation/hamilton?src=grant-guide-hero"
+                href="/grants"
                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
               >
-                <CalendarCheck className="h-5 w-5" />
-                Book your in-home visit
+                <Search className="h-5 w-5" />
+                See grants that are still open
                 <ArrowRight className="h-5 w-5" />
               </a>
 
@@ -214,7 +222,7 @@ export default function HamiltonGrant() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-slate-400">
-              Pick a time that works — no waiting for a callback.
+              Hamilton's program is closed to new applications — other Ontario cities are still funding.
             </p>
           </div>
         </div>
@@ -283,50 +291,53 @@ export default function HamiltonGrant() {
       {/* BOOK A VISIT — primary path
           The form below routes to a callback. This routes to a calendar the
           homeowner books themselves, and lands the lead in the portal with an
-          address we have actually verified. It sits ABOVE the form and carries
-          the page's primary styling on purpose: two equally weighted choices
-          would just split the traffic and teach us nothing.
-          `?src=` is recorded on the lead, so this button's contribution is
-          measurable against the form rather than a matter of opinion. */}
+          address we have actually verified.
+
+          It no longer books: Hamilton closed the program to new submissions, and
+          sending someone to an in-home visit for a grant they cannot apply for
+          wastes their time and our credibility. The section now routes to the
+          cities still funding, which is the honest next step and keeps the page
+          converting. Restore the booking CTA if Hamilton reopens. */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
             <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
               <div className="max-w-xl">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-400">
-                  Fastest way to get answers
+                  Hamilton is closed — here's what isn't
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold leading-tight md:text-4xl">
-                  Book your in-home visit
+                  Other Ontario cities are still funding
                 </h2>
                 <p className="mt-4 text-lg leading-8 text-slate-300">
-                  Pick a time that works. No waiting for a callback. A specialist
-                  comes to you, reviews the space, and walks you through what your
-                  project would actually qualify for.
+                  Hamilton's intake has closed, but ADU, secondary-suite and basement
+                  programs are open in cities across Ontario — several with funding
+                  comparable to Hamilton's. We track every one of them and re-check
+                  each official page daily.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-slate-300">
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> 45 minutes
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Updated daily
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Free
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Official sources
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> No obligation
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Free to check
                   </span>
                 </div>
               </div>
 
               <div className="shrink-0">
                 <a
-                  href="/consultation/hamilton?src=grant-guide"
+                  href="/grants"
                   className="inline-flex items-center gap-2.5 rounded-2xl bg-yellow-400 px-8 py-5 text-lg font-extrabold text-slate-950 shadow-[0_18px_34px_rgba(2,12,27,0.4)] transition hover:opacity-95"
                 >
-                  See available times
+                  See open grants by city
                   <ArrowRight className="h-5 w-5" />
                 </a>
                 <p className="mt-3 text-center text-sm text-slate-400">
-                  Takes about a minute
+                  Updated daily
                 </p>
               </div>
             </div>

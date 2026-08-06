@@ -1,7 +1,9 @@
 import { Helmet } from "react-helmet-async";
-import { ArrowRight, CalendarCheck, Calculator, CheckCircle2, FileText } from "lucide-react";
+import { ArrowRight, Calculator, CheckCircle2, FileText, Search } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
+import ProgramClosedNotice from "../components/ProgramClosedNotice";
+import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonBasementGrantAd() {
   return (
@@ -19,6 +21,9 @@ export default function HamiltonBasementGrantAd() {
           href="https://ontarioreno.ca/hamilton-basement-grant"
         />
       </Helmet>
+
+      {/* Above the hero on purpose — the hero leads with the grant amount. */}
+      <ProgramClosedNotice {...HAMILTON_ADU_CLOSURE} />
 
       {/* HERO */}
       <section className="bg-slate-900 text-white">
@@ -76,22 +81,22 @@ export default function HamiltonBasementGrantAd() {
                 ))}
               </div>
 
-              {/* Booking leads: the only path here that ends in a confirmed
-                  appointment rather than a queue. The form and calculator stay
-                  one tap away, quieter. */}
+              {/* Booking removed with Hamilton's closure — see the notice above
+                  the hero. The form and calculator stay one tap away, quieter.
+                  Restore the booking CTA if Hamilton reopens. */}
               <div className="mt-1.5 space-y-2.5">
                 <a
-                  href="/consultation/hamilton?src=basement-grant-hero"
+                  href="/grants"
                   className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <CalendarCheck className="h-5 w-5 shrink-0" />
-                    <span>Book your in-home visit</span>
+                    <Search className="h-5 w-5 shrink-0" />
+                    <span>See grants that are still open</span>
                   </span>
                   <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
                 </a>
                 <p className="px-1 text-[0.82rem] font-semibold text-slate-400">
-                  Pick a time that works — no waiting for a callback.
+                  Hamilton's program is closed — other Ontario cities are still funding.
                 </p>
 
                 <a
@@ -161,11 +166,11 @@ export default function HamiltonBasementGrantAd() {
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="/consultation/hamilton?src=basement-grant-hero"
+                href="/grants"
                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
               >
-                <CalendarCheck className="h-5 w-5" />
-                Book your in-home visit
+                <Search className="h-5 w-5" />
+                See grants that are still open
                 <ArrowRight className="h-5 w-5" />
               </a>
 
@@ -185,7 +190,7 @@ export default function HamiltonBasementGrantAd() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-slate-400">
-              Pick a time that works — no waiting for a callback.
+              Hamilton's program is closed to new applications — other Ontario cities are still funding.
             </p>
 
             <p className="mt-2 text-xs text-slate-300">
