@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ArrowRight, Landmark } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Landmark } from 'lucide-react';
 import HamiltonGrantCalculator from '../components/HamiltonGrantCalculator';
 import StCatharinesGrantCalculator from '../components/StCatharinesGrantCalculator';
 import { buttonStyles } from '../lib/uiStyles';
@@ -11,6 +11,8 @@ type ProgramKey = 'hamilton' | 'st-catharines';
 const programCards: Array<{
   key: ProgramKey;
   eyebrow: string;
+  /** Program is no longer taking applications — styled and worded differently. */
+  closed?: boolean;
   title: string;
   summary: string;
   note: string;
@@ -21,24 +23,28 @@ const programCards: Array<{
 }> = [
   {
     key: 'hamilton',
-    eyebrow: 'Up to $40,000',
+    eyebrow: 'Closed to new applications',
+    closed: true,
     title: 'Hamilton Basement Grant',
     summary:
       'For legal secondary suite and basement conversion projects under the Hamilton funding framework.',
-    note: 'Best for homeowners comparing grant impact before locking project scope.',
-    cta: 'Calculate Hamilton Grant',
+    note: 'Hamilton has reached its allocated funding capacity. Kept for reference, and for anyone with an application already submitted.',
+    cta: 'Open Hamilton calculator (reference)',
     logoSrc: '/images/hamilton-logo.png',
     logoAlt: 'Hamilton logo',
     logoClassName: 'h-9 w-auto object-contain sm:h-10',
   },
   {
     key: 'st-catharines',
-    eyebrow: 'Funding active, limited availability',
+    // Was "Funding active, limited availability" — the HAF ADU cash grant pool
+    // is depleted, so that line was telling homeowners the opposite of the truth.
+    eyebrow: 'Closed to new applications',
+    closed: true,
     title: 'St. Catharines ADU Program',
     summary:
       'Useful for understanding future project economics for basement apartments and detached ADUs.',
-    note: 'Helpful for homeowners pressure-testing the published framework before assuming funding will be available for their project.',
-    cta: 'Calculate St. Catharines Program',
+    note: 'The HAF-funded ADU cash grant pool is depleted. The cost framework is still useful for planning a project budget.',
+    cta: 'Open St. Catharines calculator (reference)',
     logoSrc: '/images/st-catharines-logo.png',
     logoAlt: 'St. Catharines logo',
     logoClassName: 'h-10 w-auto object-contain sm:h-11',
@@ -121,6 +127,38 @@ export default function GrantEligibilityCalculator() {
         </div>
       </section>
 
+      {/* Both calculators on this page cover programs that have now closed.
+          Saying so at the top — before anyone works through a funding estimate
+          they cannot act on — is the whole point of this block. Remove it if a
+          program here reopens or an open one is added. */}
+      <section className="bg-amber-50">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border-2 border-amber-300 bg-white p-5 md:p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-amber-600" aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="text-lg font-extrabold text-slate-900 md:text-xl">
+                  Both programs below are closed to new applications
+                </h2>
+                <p className="mt-2 text-base leading-7 text-slate-700">
+                  Hamilton has reached its allocated funding capacity, and the St. Catharines
+                  HAF-funded ADU cash grant pool is depleted. These calculators are kept for
+                  planning and for anyone with an application already submitted — they will not
+                  tell you about funding you can apply for today.
+                </p>
+                <a
+                  href="/grants"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-3.5 text-base font-extrabold text-white transition hover:bg-[#153158]"
+                >
+                  See Ontario grants that are still open
+                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="border-b border-slate-200 bg-white py-16 md:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
@@ -185,10 +223,15 @@ export default function GrantEligibilityCalculator() {
 
                   <div className="flex items-start justify-between gap-4">
                     <div>
+                      {/* A closed program reads amber, not brand navy — the
+                          eyebrow is the first thing scanned, and navy here says
+                          "offer" when it needs to say "warning". */}
                       <p
                         className={cn(
                           'text-sm font-semibold uppercase tracking-[0.18em]',
-                          active ? 'text-blue-200' : 'text-[#1B3C6C]'
+                          program.closed
+                            ? (active ? 'text-amber-300' : 'text-amber-700')
+                            : (active ? 'text-blue-200' : 'text-[#1B3C6C]')
                         )}
                       >
                         {program.eyebrow}

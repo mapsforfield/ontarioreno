@@ -94,6 +94,18 @@ export default function Navbar() {
     { name: 'Burlington ARU Incentive Program', href: '/burlington-aru-incentive-program' },
   ];
 
+  // Ordered by what a homeowner can actually act on TODAY.
+  //
+  // This menu used to lead with "Core Grant Resources: Hamilton Grant Guide" —
+  // and Hamilton has closed its intake, as has St. Catharines. Sending someone
+  // to a closed program from the top of the nav wastes their time and ours, so
+  // the live, daily-updated list leads, the two programs still open come next,
+  // and the closed ones stay reachable but are LABELLED as closed rather than
+  // quietly removed: they still matter for anyone with an application in, and
+  // they carry the search traffic.
+  //
+  // When a curated city's status changes, update it here AND in CURATED_PAGES
+  // (lib/grants.ts) — those two are not yet wired together.
   const grantSections = [
     {
       label: 'Browse',
@@ -102,18 +114,23 @@ export default function Navbar() {
       ],
     },
     {
-      label: 'Core Grant Resources',
+      label: 'Open Now',
       items: [
-        { name: 'Hamilton Grant Guide', href: '/hamilton-grant-guide' },
-        { name: 'Grant Eligibility Calculator', href: '/grant-eligibility-calculator' },
+        { name: 'Barrie Secondary Suite Funding', href: '/barrie-secondary-suite-funding' },
+        { name: 'Burlington ARU Incentive Program', href: '/burlington-aru-incentive-program' },
       ],
     },
     {
-      label: 'City Programs',
+      label: 'Closed — Reference Only',
       items: [
-        { name: 'Barrie Secondary Suite Funding', href: '/barrie-secondary-suite-funding' },
+        { name: 'Hamilton Grant Guide', href: '/hamilton-grant-guide' },
         { name: 'St. Catharines ADU Grant', href: '/st-catharines-adu-grant' },
-        { name: 'Burlington ARU Incentive Program', href: '/burlington-aru-incentive-program' },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        { name: 'Grant Eligibility Calculator', href: '/grant-eligibility-calculator' },
       ],
     },
   ];
