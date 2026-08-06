@@ -1,7 +1,9 @@
 import { Helmet } from "react-helmet-async";
-import { ArrowRight, CalendarCheck, CheckCircle, Home, ShieldCheck, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle, Home, Search, ShieldCheck, FileText } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
+import ProgramClosedNotice from "../components/ProgramClosedNotice";
+import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonSecondarySuiteGrant() {
     return (
@@ -19,6 +21,9 @@ export default function HamiltonSecondarySuiteGrant() {
                     href="https://ontarioreno.ca/hamilton-secondary-suite-grant"
                 />
             </Helmet>
+
+            {/* Above the hero on purpose — the hero leads with "$40,000". */}
+            <ProgramClosedNotice {...HAMILTON_ADU_CLOSURE} />
 
             {/* HERO */}
             <section className="bg-slate-900 text-white">
@@ -48,15 +53,15 @@ export default function HamiltonSecondarySuiteGrant() {
                             <span>Designed for rental-ready units</span>
                         </div>
 
-                        {/* Booking leads: the only path here that ends in a
-                            confirmed appointment rather than a queue. */}
+                        {/* Booking removed with Hamilton's closure — see the
+                            notice above the hero. Restore it if Hamilton reopens. */}
                         <div className="mt-8 flex flex-wrap items-center gap-4">
                             <a
-                                href="/consultation/hamilton?src=secondary-suite-hero"
+                                href="/grants"
                                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
                             >
-                                <CalendarCheck className="h-5 w-5" />
-                                Book your in-home visit
+                                <Search className="h-5 w-5" />
+                                See grants that are still open
                                 <ArrowRight className="h-5 w-5" />
                             </a>
 
@@ -76,7 +81,7 @@ export default function HamiltonSecondarySuiteGrant() {
                         </div>
 
                         <p className="mt-4 text-sm font-semibold text-slate-400">
-                            Pick a time that works — no waiting for a callback.
+                            Hamilton's program is closed to new applications — other Ontario cities are still funding.
                         </p>
                     </div>
                 </div>

@@ -1494,8 +1494,15 @@ map.fitBounds(g.getBounds().pad(0.3),{maxZoom:10});
 // Your existing hand-made grant pages (built before the scanner). These ALWAYS
 // appear on the hub/map and link to their real pages — no scanner approval needed.
 // The scanner only adds NEW cities you don't already have a page for.
-export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; url: string }> = [
-  { city: 'Hamilton', name: 'Hamilton ADU / Secondary Suite Grant', amount: '$40k', url: '/hamilton-grant-guide' },
+// `status` used to be hardcoded 'active' at the render site, which meant a
+// curated row could never say anything else — Hamilton's program closed and the
+// hub kept advertising it as open, because no scan touches these rows and no
+// field existed to change. It is explicit per row now. Until these are folded
+// into the watch list, THIS is the field to edit when a curated city closes.
+export const CURATED_PAGES: Array<{ city: string; name: string; amount: string; url: string; status?: string }> = [
+  // Closed August 6, 2026 — "reached its allocated funding capacity, and the
+  // application portal is now closed to new submissions" (hamilton.ca).
+  { city: 'Hamilton', name: 'Hamilton ADU / Secondary Suite Grant', amount: '$40k', url: '/hamilton-grant-guide', status: 'closed' },
   { city: 'St. Catharines', name: 'St. Catharines ADU Grant', amount: '$40k', url: '/st-catharines-adu-grant' },
   { city: 'Burlington', name: 'Burlington ARU Incentive Program', amount: '$95k', url: '/burlington-aru-incentive-program' },
   { city: 'Barrie', name: 'Barrie Secondary Suite Funding', amount: '', url: '/barrie-secondary-suite-funding' },
@@ -1534,7 +1541,7 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
   for (const c of CURATED_PAGES) {
     const co = cityCoords(c.city);
     const matchingProgram = programs.find((p) => p.city.trim().toLowerCase() === c.city.toLowerCase());
-    rows.push({ city: c.city, name: c.name, amount: c.amount, status: 'active', href: c.url, sourceUrl: matchingProgram ? officialSourceFromProgram(matchingProgram) : null, fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
+    rows.push({ city: c.city, name: c.name, amount: c.amount, status: c.status ?? 'active', href: c.url, sourceUrl: matchingProgram ? officialSourceFromProgram(matchingProgram) : null, fundingType: 'grant', lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
   const seen = new Set<string>();
   for (const p of programs) {
