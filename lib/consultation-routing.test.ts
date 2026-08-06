@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { routeConsultation } from './consultation-routing.ts';
 import {
   BASEMENT_FINANCING_PROGRAM,
+  DEFAULT_NURTURE_TIMELINES,
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   areaForMunicipality,
@@ -443,4 +444,36 @@ test('the basement terms never promise a rate or a payment', () => {
     false,
     'the funding screen must not quote a rate'
   );
+});
+
+test('the basement program books an exploratory lead and tags it', () => {
+  // Deliberate override of the nurture rule: there is no application window to
+  // be early for, and reps close these in person. The tag is what keeps it
+  // honest -- the consultant sees the timeline, and the decision stays
+  // measurable afterwards instead of vanishing into the booked pile.
+  for (const timeline of ['exploring', '3_plus_months']) {
+    const r = routeConsultation({
+      addressState: 'ADDRESS_VERIFIED',
+      area: 'ONTARIO',
+      program: BASEMENT_FINANCING_PROGRAM,
+      answers: { ownership: 'yes', projectType: 'basement_finish', timeline, contribution: 'cash_equity' },
+    });
+    assert.equal(r.outcome, 'DIRECT_CALENDAR', `${timeline} must reach the calendar`);
+    assert.ok(
+      r.reasons.includes(timeline === 'exploring' ? 'EXPLORATORY_TIMELINE' : 'TIMELINE_BEYOND_BOOKING_WINDOW'),
+      `${timeline} must still be tagged for the rep`
+    );
+  }
+});
+
+test('opting out of nurture is per-program, not global', () => {
+  // The grant keeps its scarce in-person slots near the decision. If this ever
+  // starts booking, the basement change has leaked into every program.
+  assert.deepEqual(BASEMENT_FINANCING_PROGRAM.nurtureTimelines, []);
+  assert.deepEqual(HAMILTON_PROGRAM.nurtureTimelines, DEFAULT_NURTURE_TIMELINES);
+  const r = routeConsultation({
+    ...base,
+    answers: { ...OK, timeline: 'exploring' },
+  });
+  assert.equal(r.outcome, 'NURTURE');
 });

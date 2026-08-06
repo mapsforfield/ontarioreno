@@ -11,6 +11,7 @@
 //   2. Property questions — basement condition, separate entrance, permit status
 //      — carry ZERO weight. We do not assess structure, zoning or eligibility.
 
+import { DEFAULT_NURTURE_TIMELINES } from './program-config.js';
 import type { AddressState, ProgramConfig, SchedulingArea } from './program-config.js';
 
 export type RoutingOutcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
@@ -101,11 +102,23 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // A 45-minute in-person slot is the scarcest thing we have. Someone who is
   // browsing, or who is a quarter away from starting, gets the guide and a
   // follow-up instead — the visit is far more useful nearer the decision.
-  if (timeline === 'exploring' || timeline === '3_plus_months') {
-    return {
-      outcome: 'NURTURE',
-      reasons: [timeline === 'exploring' ? 'EXPLORATORY_TIMELINE' : 'TIMELINE_BEYOND_BOOKING_WINDOW'],
-    };
+  //
+  // Which timelines that covers is the PROGRAM's call, because the trade-off is
+  // not the same everywhere. A grant has an application window, so being early
+  // is a real cost. A financing offer has none, and someone "just exploring" is
+  // usually someone who has not yet been shown the build is affordable — which a
+  // rep demonstrates in person and a follow-up email does not. A program that
+  // wants everyone on the calendar sets nurtureTimelines to [].
+  const nurtureTimelines = program?.nurtureTimelines ?? DEFAULT_NURTURE_TIMELINES;
+  const timelineTag: RoutingReason | null =
+    timeline === 'exploring'
+      ? 'EXPLORATORY_TIMELINE'
+      : timeline === '3_plus_months'
+        ? 'TIMELINE_BEYOND_BOOKING_WINDOW'
+        : null;
+
+  if (nurtureTimelines.includes(timeline) && timelineTag) {
+    return { outcome: 'NURTURE', reasons: [timelineTag] };
   }
 
   // ── 4. DIRECT_CALENDAR ──
@@ -116,6 +129,12 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   const booked: RoutingReason[] = ['ELIGIBLE_FOR_BOOKING'];
   if (contribution === 'need_financing') booked.push('WANTS_FINANCING');
   if (contribution === 'unsure') booked.push('NEEDS_FUNDING_GUIDANCE');
+  // An early timeline that this program chose to book anyway is TAGGED, never
+  // dropped. The rep is walking into a conversation about whether to do this at
+  // all rather than when — they should know that before they knock, and the
+  // same tag keeps these leads queryable afterwards so the choice to book them
+  // can actually be measured.
+  if (timelineTag) booked.push(timelineTag);
   return { outcome: 'DIRECT_CALENDAR', reasons: booked };
 }
 

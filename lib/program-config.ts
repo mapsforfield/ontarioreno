@@ -102,6 +102,12 @@ export type FundingGuidance = {
   continueLabel: string;
 };
 
+/**
+ * The default nurture set: browsing, or a quarter away from starting. Programs
+ * opt out by setting nurtureTimelines to [].
+ */
+export const DEFAULT_NURTURE_TIMELINES = ['exploring', '3_plus_months'];
+
 export type ProgramConfig = {
   key: string;
   version: number;
@@ -135,6 +141,22 @@ export type ProgramConfig = {
   /** Shown when the funding answer is "unsure". Required: every live program needs one. */
   fundingGuidance: FundingGuidance;
   eligibleProjectTypes: string[];
+  /**
+   * Timelines that get the guide and a follow-up INSTEAD of a calendar slot.
+   *
+   * A 45-minute in-person visit is the scarcest thing we have, so a grant
+   * program spends it near the decision and nurtures the rest. A financing
+   * program is the opposite case: there is no application window to be early
+   * for, and a homeowner who is "just exploring" is usually someone who has not
+   * yet been shown that the build is affordable at all — which is a conversation
+   * a rep wins in person and a follow-up email does not. Such a program sets
+   * this to [] and books everyone.
+   *
+   * The timeline still reaches the rep's brief either way: booking an
+   * exploratory lead tags it rather than hiding it, so the consultant knows what
+   * they are walking into.
+   */
+  nurtureTimelines: string[];
   /** Asked before booking, grouped by step. */
   questions: Question[];
   /** Asked after booking. Never blocks the calendar. */
@@ -365,6 +387,8 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
     "Contractors don't want to spend days researching grant rules and property eligibility for free, and homeowners don't want to pay upfront just to learn whether a secondary suite is even worth pursuing. We organize the details of your project upfront so it's ready for a builder to evaluate properly. When a project's a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps our review free for you, and you're free to compare or decline any proposal you receive.",
   fundingGuidance: HAMILTON_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
+  // The grant's scarce in-person slots stay near the decision.
+  nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
@@ -401,6 +425,7 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
     heading: '', lead: '', leadEmphasis: '', milestones: [], highlight: '', closing: '', continueLabel: '',
   },
   eligibleProjectTypes: [],
+  nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
@@ -514,6 +539,10 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
     "Homeowners don't want to pay upfront just to find out what a basement costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
   fundingGuidance: BASEMENT_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['basement_finish', 'basement_renovation', 'basement_apartment'],
+  // Everyone gets the calendar. There is no application deadline to be early
+  // for, and someone "just exploring" is usually someone who does not yet know
+  // the build is affordable — which is exactly what the visit demonstrates.
+  nurtureTimelines: [],
   questions: [OWNERSHIP, BASEMENT_PROJECT_TYPE, TIMELINE, BASEMENT_CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
   // Nobody prices a basement without standing in it.
