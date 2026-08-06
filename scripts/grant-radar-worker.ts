@@ -47,8 +47,13 @@ async function main(): Promise<void> {
     console.log('[grant-radar:backfill]', JSON.stringify({ ...enrolment, pastDeadlines }, null, 2));
   } else if (mode === 'deadlines') {
     console.log('[grant-radar:deadlines]', JSON.stringify(await sweepPastDeadlines(), null, 2));
+  } else if (mode === 'audit') {
+    // READ-ONLY. Prints the published set vs. the enrolled set so the gap this
+    // whole feature exists to close can actually be checked, not assumed.
+    const { runAudit } = await import('./grant-watch-audit.js');
+    await runAudit();
   } else {
-    throw new Error(`Unknown mode "${mode}" — expected "discover", "scan", "backfill", or "deadlines".`);
+    throw new Error(`Unknown mode "${mode}" — expected "discover", "scan", "backfill", "deadlines", or "audit".`);
   }
 }
 

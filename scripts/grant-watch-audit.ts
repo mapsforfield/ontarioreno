@@ -18,7 +18,7 @@ function pad(s: string, n: number): string {
   return v + ' '.repeat(Math.max(0, n - v.length));
 }
 
-async function main(): Promise<void> {
+export async function runAudit(): Promise<void> {
   const { prisma } = await import('../lib/prisma.js');
   const { CURATED_PAGES } = await import('../lib/grants.js');
 
@@ -88,4 +88,8 @@ async function main(): Promise<void> {
   await prisma.$disconnect();
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+// Run directly (npx tsx scripts/grant-watch-audit.ts); the worker's `audit` mode
+// imports runAudit instead so it can await it.
+if (process.argv[1] && process.argv[1].includes('grant-watch-audit')) {
+  runAudit().catch((err) => { console.error(err); process.exit(1); });
+}
