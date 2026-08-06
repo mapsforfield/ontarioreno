@@ -6,6 +6,7 @@ import {
   SIMCOE_PROGRAM,
   areaForMunicipality,
   questionsForStep,
+  resolveProgramGeography,
 } from './program-config.ts';
 import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
@@ -299,4 +300,89 @@ test('Simcoe municipalities are deliberately unmapped until confirmed', () => {
   assert.equal(areaForMunicipality('Barrie'), null);
   assert.equal(areaForMunicipality('Toronto'), null);
   assert.equal(areaForMunicipality(''), null);
+});
+
+// ─── Ontario-wide programs ───────────────────────────────────────────────────
+// A municipality-gated program is the City's money, so the address decides. An
+// Ontario-wide program (financing) has no municipal boundary, and before this
+// existed every one of its leads died the same way: a complete Toronto address
+// maps to no SchedulingArea, so it arrived UNVERIFIED with area null, routing
+// called it MUNICIPALITY_UNRECOGNISED, and slot generation offered no calendar.
+// Every lead would have reached a queue instead of a booking.
+
+const ONTARIO_WIDE = { geography: 'ontario_wide' as const };
+const MUNICIPAL = { geography: 'municipality' as const };
+
+test('a municipality-gated program is not touched by geography resolution', () => {
+  const input = {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED' as const,
+    cause: 'MUNICIPALITY_UNMAPPED' as const,
+  };
+  assert.deepEqual(resolveProgramGeography(MUNICIPAL, input), {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+  });
+});
+
+test('an unmapped Ontario municipality schedules under an Ontario-wide program', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  assert.equal(r.area, 'ONTARIO');
+  assert.equal(r.addressState, 'ADDRESS_VERIFIED', 'the only defect was the unmapped municipality');
+});
+
+test('an Ontario-wide program still declines an address outside Ontario', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA',
+    cause: 'OUTSIDE_ONTARIO',
+  });
+  assert.equal(r.area, null);
+  assert.equal(r.addressState, 'ADDRESS_OUTSIDE_SERVICE_AREA', 'a decline stays a decline');
+});
+
+test('an Ontario-wide program does not rescue doubt about the ADDRESS itself', () => {
+  // Geography cannot fix an address we could not confirm. These must keep going
+  // to a person exactly as they do for a municipality-gated program.
+  for (const cause of ['INCOMPLETE_ADDRESS', 'TYPED_TEXT_AMBIGUOUS', 'PROVIDER_ERROR'] as const) {
+    const r = resolveProgramGeography(ONTARIO_WIDE, {
+      area: null,
+      addressState: 'ADDRESS_UNVERIFIED',
+      cause,
+    });
+    assert.equal(r.area, null, `${cause} must not get an area`);
+    assert.equal(r.addressState, 'ADDRESS_UNVERIFIED', `${cause} must stay unverified`);
+  }
+});
+
+test('an inferred address keeps its weaker provenance under an Ontario-wide program', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_INFERRED',
+    cause: 'RESOLVED_FROM_TYPED_TEXT',
+  });
+  assert.equal(r.area, 'ONTARIO', 'inferred is schedulable, so it gets the area');
+  assert.equal(r.addressState, 'ADDRESS_INFERRED', 'but is never upgraded to verified');
+});
+
+test('an Ontario-wide lead outside every mapped municipality reaches the calendar', () => {
+  // The end-to-end point of the change, expressed as routing sees it: a Toronto
+  // homeowner answering an Ontario-wide offer books, rather than queueing.
+  const program = { ...LIVE_PROGRAM, geography: 'ontario_wide' as const, schedulingArea: 'ONTARIO' as const };
+  const geo = resolveProgramGeography(program, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program,
+    answers: OK,
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
 });

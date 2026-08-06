@@ -6,8 +6,33 @@
 // imports — it is bundled into the browser.
 
 import { HAMILTON_ADU_CLOSURE, type ProgramClosure } from '../src/lib/programClosures.js';
+import type { AddressResolutionCause } from './address-resolution.js';
 
-export type SchedulingArea = 'HAMILTON' | 'SIMCOE';
+/**
+ * A scheduling area is a coarse bucket for a rep's day, not an eligibility rule.
+ *
+ * HAMILTON and SIMCOE are municipality-gated: the program only exists inside
+ * that city, so the address decides which one applies. ONTARIO is different —
+ * it is the bucket for programs we can deliver anywhere in the province
+ * (financing, for instance, is not a city's money and has no municipal
+ * boundary). It is deliberately NOT a region: what actually keeps a rep's day
+ * drivable is the same-day travel radius in lib/scheduling.ts, measured in
+ * kilometres between real coordinates, and that constraint applies to an
+ * ONTARIO booking exactly as it does to a Hamilton one.
+ */
+export type SchedulingArea = 'HAMILTON' | 'SIMCOE' | 'ONTARIO';
+
+/**
+ * How a program decides whether it applies to an address.
+ *
+ *   'municipality'  — the City's money, so the ADDRESS decides. An address
+ *                     outside the mapped municipalities gets no program.
+ *   'ontario_wide'  — ours to deliver anywhere in Ontario, so the LANDING PAGE
+ *                     decides. The address still has to resolve to Ontario, and
+ *                     the travel radius still has to be satisfiable, but no
+ *                     municipality list gates it.
+ */
+export type ProgramGeography = 'municipality' | 'ontario_wide';
 
 /** Server-assigned. Never chosen by the homeowner. */
 export type AddressState =
@@ -81,6 +106,12 @@ export type ProgramConfig = {
   key: string;
   version: number;
   schedulingArea: SchedulingArea;
+  /**
+   * Whether the address or the landing page decides that this program applies.
+   * See ProgramGeography. Every existing program is 'municipality', which is
+   * exactly what they did before this field existed.
+   */
+  geography: ProgramGeography;
   /** Public flow is live only when true. */
   enabled: boolean;
   /**
@@ -299,6 +330,9 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   key: 'hamilton-adu-grant',
   version: 1,
   schedulingArea: 'HAMILTON',
+  // The City's money, so the address decides — a Burlington address must never
+  // pick up Hamilton's grant just because it arrived on Hamilton's page.
+  geography: 'municipality',
   // Closed August 6, 2026 — the City's intake reached its funding capacity.
   //
   // Commit #17 removed the booking CTAs from the three pages that sold this
@@ -352,6 +386,7 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   key: 'simcoe-adu-program',
   version: 0,
   schedulingArea: 'SIMCOE',
+  geography: 'municipality',
   enabled: false,
   slug: 'simcoe',
   areaLabel: 'Simcoe County',
@@ -406,6 +441,63 @@ const normalizeMunicipality = (v: string) => v.trim().toLowerCase().replace(/\s+
 export function areaForMunicipality(municipality: string | null | undefined): SchedulingArea | null {
   if (!municipality) return null;
   return MUNICIPALITY_AREA[normalizeMunicipality(municipality)] ?? null;
+}
+
+/**
+ * Causes that mean "we have a real, complete, Ontario address" — even if the
+ * municipality maps to no scheduling area. An Ontario-wide program can schedule
+ * on any of these; the rest are genuine doubt about the address itself and must
+ * keep going to a human exactly as they do today.
+ */
+const ADDRESS_USABLE_CAUSES = new Set<AddressResolutionCause>([
+  'RESOLVED',
+  'RESOLVED_FROM_TYPED_TEXT',
+  'MUNICIPALITY_UNMAPPED',
+]);
+
+export type GeographyInput = {
+  area: SchedulingArea | null;
+  addressState: AddressState;
+  cause: AddressResolutionCause;
+};
+
+/**
+ * The scheduling area and address state a program should actually be routed on.
+ *
+ * For a municipality-gated program this returns its input untouched — the City's
+ * money, the address decides, nothing changes.
+ *
+ * For an Ontario-wide program it fills the gap that would otherwise send every
+ * lead to a queue: a complete Toronto address maps to no SchedulingArea, so it
+ * arrived as ADDRESS_UNVERIFIED with area null, which routing reads as
+ * MUNICIPALITY_UNRECOGNISED and slot generation reads as "no area, no calendar".
+ * That is correct for a Hamilton grant and wrong for financing, which has no
+ * municipal boundary. So the area becomes ONTARIO and an address that was only
+ * unverified BECAUSE of the unmapped municipality is promoted to verified.
+ *
+ * What it deliberately does not do:
+ *   - rescue an address outside Ontario. That decline is still a decline.
+ *   - rescue an incomplete address, ambiguous typed text, or a provider outage.
+ *     Those are doubt about the ADDRESS, which no program's geography can fix.
+ *   - upgrade ADDRESS_INFERRED to ADDRESS_VERIFIED. Inferred is already
+ *     schedulable and the weaker provenance stays on the record.
+ */
+export function resolveProgramGeography(
+  program: Pick<ProgramConfig, 'geography'>,
+  resolved: GeographyInput
+): { area: SchedulingArea | null; addressState: AddressState } {
+  const { area, addressState, cause } = resolved;
+  if (program.geography !== 'ontario_wide') return { area, addressState };
+  if (addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') return { area, addressState };
+  if (!ADDRESS_USABLE_CAUSES.has(cause)) return { area, addressState };
+
+  return {
+    area: 'ONTARIO',
+    addressState:
+      addressState === 'ADDRESS_UNVERIFIED' && cause === 'MUNICIPALITY_UNMAPPED'
+        ? 'ADDRESS_VERIFIED'
+        : addressState,
+  };
 }
 
 export function programForArea(area: SchedulingArea | null): ProgramConfig | null {

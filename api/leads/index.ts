@@ -12,7 +12,9 @@ import { ensureSchema } from '../../lib/schema.js';
 import {
   areaForMunicipality,
   programBySlug,
+  programByKey,
   programForArea,
+  resolveProgramGeography,
   publicQuestions,
   type AddressState,
   type ProgramConfig,
@@ -1369,7 +1371,12 @@ type FlowLead = NonNullable<Awaited<ReturnType<typeof loadPublicFlowLead>>>;
 async function availableSlotsForLead(lead: FlowLead) {
   const empty = { slots: [] as ReturnType<typeof computeAvailability>, visitMinutes: 0 };
   if (!lead.schedulingArea) return empty;
-  const program = programForArea(lead.schedulingArea as SchedulingArea);
+  // The program the lead was CAPTURED under, falling back to the area's program
+  // for rows written before programKey was reliable. Keying on the lead is what
+  // lets two Ontario-wide programs coexist: they share the ONTARIO area, so
+  // resolving by area alone would hand every one of them the first match.
+  const program =
+    programByKey(lead.programKey) ?? programForArea(lead.schedulingArea as SchedulingArea);
   if (!program || !program.enabled) return empty;
 
   const nowWall = torontoWallClock();
@@ -1464,7 +1471,8 @@ async function bookVisitForLead(params: {
   if (!lead.schedulingArea) {
     return { ok: false, status: 400, payload: { error: 'This lead has no scheduling area.' } };
   }
-  const program = programForArea(lead.schedulingArea as SchedulingArea);
+  const program =
+    programByKey(lead.programKey) ?? programForArea(lead.schedulingArea as SchedulingArea);
   if (!program || !program.enabled) {
     return {
       ok: false,
@@ -1810,8 +1818,25 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     if (!requested) return res.status(404).json({ error: 'Unknown program.' });
 
     const resolved = await resolveAddress(clean(body.placeId), clean(body.addressText));
-    // The program comes from the resolved address, never from the homeowner.
-    const areaProgram = programForArea(resolved.area);
+
+    // What geography means for THIS program. A municipality-gated program gets
+    // its input back unchanged; an Ontario-wide one gets the ONTARIO bucket and,
+    // where the only defect was an unmapped municipality, a verified address.
+    const geo = resolveProgramGeography(requested, resolved);
+
+    // Which program applies.
+    //
+    // For a municipality-gated program the RESOLVED ADDRESS decides, never the
+    // homeowner and never the page they landed on — a Burlington address must
+    // not pick up Hamilton's grant by arriving on Hamilton's link.
+    //
+    // An Ontario-wide program is the opposite case: it has no municipal
+    // boundary, so there is no address for it to be derived FROM. The landing
+    // page is the only thing that knows which offer this lead answered, and
+    // deriving it from the address would silently hand a Hamilton homeowner who
+    // clicked a basement-financing ad the grant flow instead.
+    const areaProgram =
+      requested.geography === 'ontario_wide' ? requested : programForArea(geo.area);
     const program = areaProgram ?? requested;
 
     const answers: Record<string, string> = {};
@@ -1821,8 +1846,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     }
 
     const routing = routeConsultation({
-      addressState: resolved.addressState,
-      area: resolved.area,
+      addressState: geo.addressState,
+      area: geo.area,
       program: areaProgram,
       answers,
     });
@@ -1844,8 +1869,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           assignedRepId: null,
           programKey: program.key,
           programVersion: program.version,
-          schedulingArea: resolved.area,
-          addressState: resolved.addressState,
+          schedulingArea: geo.area,
+          addressState: geo.addressState,
           resolvedMunicipality: resolved.municipality,
           answersJson: answers,
           latitude: resolved.latitude,
