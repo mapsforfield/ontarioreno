@@ -176,6 +176,16 @@ export type ProgramConfig = {
   appointmentProjectTypeLabel: string;
   /** Customer Notes template applied automatically, by id (Setting.note_templates). */
   noteTemplateId: string;
+  /**
+   * Browser tab title and the step-3 heading. Both default to the grant-shaped
+   * wording every program used before there was a program that is not a grant
+   * ("<area> Secondary Suite Consultation", "How the <area> funding works"),
+   * which is accurate for Hamilton and wrong for a basement financing offer that
+   * is neither a secondary suite nor funding. Set them when the defaults would
+   * describe the wrong thing.
+   */
+  pageTitle?: string;
+  fundingStepHeading?: string;
   /** Guide offered to exploratory leads instead of a live consultation slot. */
   guideUrl: string;
   guideLabel: string;
@@ -548,6 +558,8 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // Nobody prices a basement without standing in it.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Basement Renovation Consultation',
+  pageTitle: 'Basement Renovation Consultation | OntarioReno',
+  fundingStepHeading: 'How the monthly financing works',
   // No dedicated template yet; the rep's brief still carries every answer.
   noteTemplateId: '',
   guideUrl: '',

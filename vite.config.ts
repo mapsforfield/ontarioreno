@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { HAMILTON_PROGRAM, publicQuestions } from './lib/program-config'
+import { programBySlug, publicQuestions } from './lib/program-config'
+import { routeConsultation } from './lib/consultation-routing'
 
 /**
  * Local-only stand-in for /api/leads.
@@ -18,7 +19,6 @@ import { HAMILTON_PROGRAM, publicQuestions } from './lib/program-config'
  * are generated, not real availability.
  */
 function mockLeadsApi(): Plugin {
-  const program = HAMILTON_PROGRAM
   const slots = Array.from({ length: 8 }, (_, d) => {
     const date = new Date(Date.now() + (d + 1) * 86_400_000).toISOString().slice(0, 10)
     return ['10:00', '12:00', '14:00', '16:00', '18:00'].map((time) => ({ date, time }))
@@ -29,11 +29,15 @@ function mockLeadsApi(): Plugin {
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use('/api/leads', (req, res) => {
-        const flow = new URL(req.url ?? '', 'http://localhost').searchParams.get('flow')
+        const params = new URL(req.url ?? '', 'http://localhost').searchParams
+        const flow = params.get('flow')
         const send = (body: unknown) => {
           res.setHeader('Content-Type', 'application/json')
           res.end(JSON.stringify(body))
         }
+        // Whichever program the URL asks for, so /consultation/<slug> previews
+        // the real config rather than a hardcoded one.
+        const program = programBySlug(params.get('slug') ?? '') ?? programBySlug('hamilton')!
         if (flow === 'program') {
           return send({
             key: program.key,
@@ -41,6 +45,7 @@ function mockLeadsApi(): Plugin {
             slug: program.slug,
             areaLabel: program.areaLabel,
             enabled: program.enabled,
+            closure: program.closure ?? null,
             displayAmountLabel: program.displayAmountLabel,
             fundingHighlights: program.fundingHighlights,
             programTerms: program.programTerms,
@@ -49,6 +54,8 @@ function mockLeadsApi(): Plugin {
             questions: publicQuestions(program),
             visitMinutes: program.visitMinutes,
             consultationMode: program.consultationMode,
+            pageTitle: program.pageTitle ?? null,
+            fundingStepHeading: program.fundingStepHeading ?? null,
             guideUrl: program.guideUrl,
             guideLabel: program.guideLabel,
             smsEnabled: false,
@@ -62,17 +69,24 @@ function mockLeadsApi(): Plugin {
           let body = ''
           req.on('data', (c) => (body += c))
           return req.on('end', () => {
-            const answers = (JSON.parse(body || '{}').answers ?? {}) as Record<string, string>
-            const declined = answers.ownership === 'no'
-            const nurture = answers.timeline === 'exploring' || answers.timeline === '3_plus_months'
-            const offersCalendar = !declined && !nurture
+            const parsed = JSON.parse(body || '{}')
+            const answers = (parsed.answers ?? {}) as Record<string, string>
+            const submitted = programBySlug(String(parsed.programSlug ?? '')) ?? program
+            // The REAL router, so the preview cannot disagree with production
+            // about who gets a calendar. Only the address is faked: localhost has
+            // no Places key, so we assume a verified address in the program's own
+            // area rather than reimplementing resolution.
+            const routing = routeConsultation({
+              addressState: 'ADDRESS_VERIFIED',
+              area: submitted.schedulingArea,
+              program: submitted,
+              answers,
+            })
             send({
               leadRef: 'LOCAL-MOCK',
-              outcome: declined ? 'DECLINE' : nurture ? 'NURTURE' : 'DIRECT_CALENDAR',
-              reasons: offersCalendar
-                ? ['ELIGIBLE_FOR_BOOKING', ...(answers.contribution === 'unsure' ? ['NEEDS_FUNDING_GUIDANCE'] : [])]
-                : [],
-              offersCalendar,
+              outcome: routing.outcome,
+              reasons: routing.reasons,
+              offersCalendar: routing.outcome === 'DIRECT_CALENDAR',
             })
           })
         }

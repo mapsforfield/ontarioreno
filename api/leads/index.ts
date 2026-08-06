@@ -1029,6 +1029,8 @@ function publicProgramPayload(program: ProgramConfig) {
     questions: publicQuestions(program),
     visitMinutes: program.visitMinutes,
     consultationMode: program.consultationMode,
+    pageTitle: program.pageTitle ?? null,
+    fundingStepHeading: program.fundingStepHeading ?? null,
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
     // Told to the client so confirmation copy can't promise a text we cannot
