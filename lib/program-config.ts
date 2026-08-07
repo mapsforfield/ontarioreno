@@ -546,11 +546,17 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // What survives is only what changes whether booking is a good idea: that
   // approval is required, that nothing is owed upfront, that they are never
   // trapped in it, and that the real numbers arrive in writing before anything
-  // is signed. Nothing here is softer than the agreements — it is shorter.
+  // is signed.
+  //
+  // The one-time administration fee is deliberately not listed. It is financed
+  // rather than paid upfront, so "no upfront cost" stays true without it, and
+  // the fee lands with the rest of the real numbers in the written quote the
+  // consultant walks through. It is not a term someone needs in order to decide
+  // whether to book a visit.
   programTerms: [
     'Financing is a personal open loan and is subject to credit approval.',
     'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
-    'No upfront cost, no early payment penalties, and no liens registered against the property. A one-time administration fee applies.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property.',
     'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
   ],
   whyFreeText:
