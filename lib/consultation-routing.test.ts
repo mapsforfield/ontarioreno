@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeConsultation } from './consultation-routing.ts';
 import {
+  BASEMENT_FINANCING_PROGRAM,
+  DEFAULT_NURTURE_TIMELINES,
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   areaForMunicipality,
   questionsForStep,
+  resolveProgramGeography,
 } from './program-config.ts';
 import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
@@ -299,4 +302,189 @@ test('Simcoe municipalities are deliberately unmapped until confirmed', () => {
   assert.equal(areaForMunicipality('Barrie'), null);
   assert.equal(areaForMunicipality('Toronto'), null);
   assert.equal(areaForMunicipality(''), null);
+});
+
+// ─── Ontario-wide programs ───────────────────────────────────────────────────
+// A municipality-gated program is the City's money, so the address decides. An
+// Ontario-wide program (financing) has no municipal boundary, and before this
+// existed every one of its leads died the same way: a complete Toronto address
+// maps to no SchedulingArea, so it arrived UNVERIFIED with area null, routing
+// called it MUNICIPALITY_UNRECOGNISED, and slot generation offered no calendar.
+// Every lead would have reached a queue instead of a booking.
+
+const ONTARIO_WIDE = { geography: 'ontario_wide' as const };
+const MUNICIPAL = { geography: 'municipality' as const };
+
+test('a municipality-gated program is not touched by geography resolution', () => {
+  const input = {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED' as const,
+    cause: 'MUNICIPALITY_UNMAPPED' as const,
+  };
+  assert.deepEqual(resolveProgramGeography(MUNICIPAL, input), {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+  });
+});
+
+test('an unmapped Ontario municipality schedules under an Ontario-wide program', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  assert.equal(r.area, 'ONTARIO');
+  assert.equal(r.addressState, 'ADDRESS_VERIFIED', 'the only defect was the unmapped municipality');
+});
+
+test('an Ontario-wide program still declines an address outside Ontario', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA',
+    cause: 'OUTSIDE_ONTARIO',
+  });
+  assert.equal(r.area, null);
+  assert.equal(r.addressState, 'ADDRESS_OUTSIDE_SERVICE_AREA', 'a decline stays a decline');
+});
+
+test('an Ontario-wide program does not rescue doubt about the ADDRESS itself', () => {
+  // Geography cannot fix an address we could not confirm. These must keep going
+  // to a person exactly as they do for a municipality-gated program.
+  for (const cause of ['INCOMPLETE_ADDRESS', 'TYPED_TEXT_AMBIGUOUS', 'PROVIDER_ERROR'] as const) {
+    const r = resolveProgramGeography(ONTARIO_WIDE, {
+      area: null,
+      addressState: 'ADDRESS_UNVERIFIED',
+      cause,
+    });
+    assert.equal(r.area, null, `${cause} must not get an area`);
+    assert.equal(r.addressState, 'ADDRESS_UNVERIFIED', `${cause} must stay unverified`);
+  }
+});
+
+test('an inferred address keeps its weaker provenance under an Ontario-wide program', () => {
+  const r = resolveProgramGeography(ONTARIO_WIDE, {
+    area: null,
+    addressState: 'ADDRESS_INFERRED',
+    cause: 'RESOLVED_FROM_TYPED_TEXT',
+  });
+  assert.equal(r.area, 'ONTARIO', 'inferred is schedulable, so it gets the area');
+  assert.equal(r.addressState, 'ADDRESS_INFERRED', 'but is never upgraded to verified');
+});
+
+test('an Ontario-wide lead outside every mapped municipality reaches the calendar', () => {
+  // The end-to-end point of the change, expressed as routing sees it: a Toronto
+  // homeowner answering an Ontario-wide offer books, rather than queueing.
+  const program = { ...LIVE_PROGRAM, geography: 'ontario_wide' as const, schedulingArea: 'ONTARIO' as const };
+  const geo = resolveProgramGeography(program, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program,
+    answers: OK,
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+});
+
+// ─── Basement financing ──────────────────────────────────────────────────────
+
+test('the basement program is Ontario-wide and live', () => {
+  assert.equal(BASEMENT_FINANCING_PROGRAM.geography, 'ontario_wide');
+  assert.equal(BASEMENT_FINANCING_PROGRAM.schedulingArea, 'ONTARIO');
+  assert.equal(BASEMENT_FINANCING_PROGRAM.enabled, true);
+  assert.equal(BASEMENT_FINANCING_PROGRAM.consultationMode, 'in_person');
+});
+
+test('a Toronto basement lead books rather than queueing', () => {
+  // Toronto maps to no SchedulingArea and never will — that is the point.
+  assert.equal(areaForMunicipality('Toronto'), null);
+  const geo = resolveProgramGeography(BASEMENT_FINANCING_PROGRAM, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program: BASEMENT_FINANCING_PROGRAM,
+    answers: { ownership: 'yes', projectType: 'basement_finish', timeline: 'asap', contribution: 'need_financing' },
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('WANTS_FINANCING'));
+});
+
+test('every basement project type the form offers is an eligible one', () => {
+  // A project type the flow can collect but the program does not list would tag
+  // PROJECT_TYPE_NOT_LISTED on a lead that answered exactly as asked.
+  const offered = BASEMENT_FINANCING_PROGRAM.questions
+    .find((q) => q.key === 'projectType')!
+    .options.map((o) => o.value)
+    .filter((v) => v !== 'unsure');
+  for (const value of offered) {
+    assert.ok(
+      BASEMENT_FINANCING_PROGRAM.eligibleProjectTypes.includes(value),
+      `${value} is offered but not eligible`
+    );
+  }
+});
+
+test('the basement terms never promise a rate or a payment', () => {
+  // $399 is a starting point in an ad, not a price. Approval and the real
+  // numbers are the lender's, and the terms must read that way or the first
+  // consultation starts by walking a number back.
+  const terms = BASEMENT_FINANCING_PROGRAM.programTerms.join(' ');
+  assert.match(terms, /subject to credit approval/i);
+  assert.match(terms, /confirmed in writing before you sign/i);
+  assert.match(BASEMENT_FINANCING_PROGRAM.displayAmountLabel, /on approved credit/i);
+  assert.equal(
+    BASEMENT_FINANCING_PROGRAM.fundingGuidance.highlight.includes('%'),
+    false,
+    'the funding screen must not quote a rate'
+  );
+});
+
+test('the basement terms stay short and quote no interest rate', () => {
+  // Deliberate: this screen decides whether to BOOK, not whether to sign. The
+  // rate table and the construction-draw mechanics are true and belong in the
+  // agreement the consultant walks through in person. A decimal percentage here
+  // is an interest rate that escaped the contract -- the 40/60 release split is
+  // a whole number and stays allowed.
+  const terms = BASEMENT_FINANCING_PROGRAM.programTerms;
+  assert.ok(terms.length <= 5, `terms grew back to ${terms.length} lines`);
+  assert.doesNotMatch(terms.join(' '), /\d+\.\d+\s*%/, 'no interest rate on the public flow');
+});
+
+test('the basement program books an exploratory lead and tags it', () => {
+  // Deliberate override of the nurture rule: there is no application window to
+  // be early for, and reps close these in person. The tag is what keeps it
+  // honest -- the consultant sees the timeline, and the decision stays
+  // measurable afterwards instead of vanishing into the booked pile.
+  for (const timeline of ['exploring', '3_plus_months']) {
+    const r = routeConsultation({
+      addressState: 'ADDRESS_VERIFIED',
+      area: 'ONTARIO',
+      program: BASEMENT_FINANCING_PROGRAM,
+      answers: { ownership: 'yes', projectType: 'basement_finish', timeline, contribution: 'cash_equity' },
+    });
+    assert.equal(r.outcome, 'DIRECT_CALENDAR', `${timeline} must reach the calendar`);
+    assert.ok(
+      r.reasons.includes(timeline === 'exploring' ? 'EXPLORATORY_TIMELINE' : 'TIMELINE_BEYOND_BOOKING_WINDOW'),
+      `${timeline} must still be tagged for the rep`
+    );
+  }
+});
+
+test('opting out of nurture is per-program, not global', () => {
+  // The grant keeps its scarce in-person slots near the decision. If this ever
+  // starts booking, the basement change has leaked into every program.
+  assert.deepEqual(BASEMENT_FINANCING_PROGRAM.nurtureTimelines, []);
+  assert.deepEqual(HAMILTON_PROGRAM.nurtureTimelines, DEFAULT_NURTURE_TIMELINES);
+  const r = routeConsultation({
+    ...base,
+    answers: { ...OK, timeline: 'exploring' },
+  });
+  assert.equal(r.outcome, 'NURTURE');
 });

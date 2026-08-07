@@ -13,6 +13,9 @@
 //     appointments that date must agree on one area.
 //   * Reps are independent — one may be locked to HAMILTON while the other is
 //     locked to SIMCOE on the same date.
+//   * ONTARIO is exempt from that lock in both directions: it is a program
+//     bucket, not a place. The same-day travel radius is what keeps such a day
+//     drivable, and it applies to every booking regardless of area.
 
 import type { SchedulingArea } from './program-config.js';
 
@@ -111,6 +114,15 @@ export function deriveAreaLock(sameDayAppointments: BookedAppointment[]): AreaLo
       .filter(isActive)
       .map((a) => a.schedulingArea)
       .filter((a): a is SchedulingArea => Boolean(a))
+      // ONTARIO never locks a day. It is not a place — it is the bucket for
+      // programs with no municipal boundary, so it carries no information about
+      // where the rep actually is. What keeps their day drivable is the travel
+      // radius below, measured between real coordinates, which constrains an
+      // ONTARIO booking exactly as tightly as a Hamilton one. Letting it lock
+      // would strand a rep: one province-wide booking at 10am would refuse
+      // every other program for the rest of the day, including a property two
+      // kilometres away.
+      .filter((a) => a !== 'ONTARIO')
   );
   if (areas.size === 0) return { area: null, conflict: false };
   if (areas.size === 1) return { area: [...areas][0], conflict: false };
@@ -124,6 +136,11 @@ export function repEligibleForArea(
 ): boolean {
   const lock = deriveAreaLock(sameDayAppointments);
   if (lock.conflict) return false;
+  // The mirror of the filter in deriveAreaLock: a province-wide booking is not
+  // blocked by a rep's existing municipal lock either. Both directions have to
+  // agree, or the rule would be asymmetric — a Hamilton visit could be added to
+  // an ONTARIO day but not the reverse, purely by ordering.
+  if (area === 'ONTARIO') return true;
   return lock.area === null || lock.area === area;
 }
 

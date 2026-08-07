@@ -52,6 +52,8 @@ type Program = {
   questions: Question[];
   visitMinutes: number;
   consultationMode: 'in_person' | 'phone';
+  pageTitle: string | null;
+  fundingStepHeading: string | null;
   guideUrl: string;
   guideLabel: string;
   /** False until a Twilio adapter is configured — copy adapts rather than lying. */
@@ -539,7 +541,7 @@ export default function ConsultationFlow() {
       title={
         phase === 'q1' ? 'Let’s start with your property'
           : phase === 'q2' ? 'What are you planning?'
-            : phase === 'q3' ? `How the ${program.areaLabel} funding works`
+            : phase === 'q3' ? program.fundingStepHeading ?? `How the ${program.areaLabel} funding works`
               // The reassurance earns the page title here. Repeating it inside the
               // card under a functional heading gave the screen two titles and
               // left the line that matters at body weight.
@@ -549,7 +551,7 @@ export default function ConsultationFlow() {
       step={stepIndex}
       onBack={phase === 'q1' ? undefined : back}
     >
-      <Helmet><title>{`${program.areaLabel} Secondary Suite Consultation | OntarioReno`}</title></Helmet>
+      <Helmet><title>{program.pageTitle ?? `${program.areaLabel} Secondary Suite Consultation | OntarioReno`}</title></Helmet>
 
       {/* Step 1 — address + ownership */}
       {phase === 'q1' && (

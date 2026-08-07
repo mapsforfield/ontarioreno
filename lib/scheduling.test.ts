@@ -24,7 +24,7 @@ const appt = (
   repId: string,
   date: string,
   time: string,
-  area: 'HAMILTON' | 'SIMCOE' | null,
+  area: 'HAMILTON' | 'SIMCOE' | 'ONTARIO' | null,
   status = 'scheduled'
 ): BookedAppointment => ({
   assignedRepId: repId,
@@ -312,4 +312,51 @@ test('missing coordinates fall back to city, and never block on absent data', ()
 test('cancelled bookings release both the cap and the travel anchor', () => {
   const day = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON', 'cancelled'), ...HAMILTON_A }];
   assert.equal(withinTravelRadius(BARRIE, day, 10), true, 'a cancelled visit anchors nothing');
+});
+
+// ─── ONTARIO is a program bucket, not a place ────────────────────────────────
+// An Ontario-wide program (financing, say) has no municipal boundary, so its
+// bookings must not pin a rep's day to a region. Everything below asserts that
+// the AREA lock steps aside for it while the TRAVEL radius — the rule that
+// actually keeps a day drivable — keeps applying unchanged.
+
+test('an ONTARIO booking never locks a rep to an area', () => {
+  const day = [appt('r1', '2026-08-20', '10:00', 'ONTARIO')];
+  assert.equal(deriveAreaLock(day).area, null, 'ONTARIO must not become the lock for the day');
+  assert.equal(deriveAreaLock(day).conflict, false);
+});
+
+test('a rep on an ONTARIO booking can still take municipal work that day', () => {
+  const day = [appt('r1', '2026-08-20', '10:00', 'ONTARIO')];
+  assert.equal(repEligibleForArea(day, 'HAMILTON'), true);
+  assert.equal(repEligibleForArea(day, 'SIMCOE'), true);
+});
+
+test('a rep locked to a municipality can still take ONTARIO work', () => {
+  // The mirror of the case above. If this direction failed, the rule would
+  // depend on which booking happened to come first.
+  const day = [appt('r1', '2026-08-20', '10:00', 'HAMILTON')];
+  assert.equal(repEligibleForArea(day, 'HAMILTON'), true);
+  assert.equal(repEligibleForArea(day, 'SIMCOE'), false, 'municipal lock still binds municipal work');
+  assert.equal(repEligibleForArea(day, 'ONTARIO'), true);
+});
+
+test('ONTARIO does not rescue a day whose stored rows already conflict', () => {
+  const day = [appt('r1', '2026-08-20', '10:00', 'HAMILTON'), appt('r1', '2026-08-20', '12:00', 'SIMCOE')];
+  assert.equal(deriveAreaLock(day).conflict, true);
+  assert.equal(repEligibleForArea(day, 'ONTARIO'), false, 'a contradictory day stays unavailable');
+});
+
+test('the travel radius still binds an ONTARIO booking', () => {
+  // The whole justification for exempting ONTARIO from the area lock is that
+  // this rule is stricter and geographic. If it ever stopped applying, the
+  // exemption would let one rep be sent across the province in a day.
+  const brampton = { latitude: 43.7315, longitude: -79.7624, city: 'Brampton' };
+  const nearby = { latitude: 43.7000, longitude: -79.7400, city: 'Brampton' };
+  const ajax = { latitude: 43.8509, longitude: -79.0204, city: 'Ajax' };
+  const day: BookedAppointment[] = [
+    { ...appt('r1', '2026-08-20', '10:00', 'ONTARIO'), ...brampton },
+  ];
+  assert.equal(withinTravelRadius(nearby, day, 10), true, 'a few km away is bookable');
+  assert.equal(withinTravelRadius(ajax, day, 10), false, 'across the GTA is not');
 });

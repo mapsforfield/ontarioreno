@@ -6,8 +6,33 @@
 // imports — it is bundled into the browser.
 
 import { HAMILTON_ADU_CLOSURE, type ProgramClosure } from '../src/lib/programClosures.js';
+import type { AddressResolutionCause } from './address-resolution.js';
 
-export type SchedulingArea = 'HAMILTON' | 'SIMCOE';
+/**
+ * A scheduling area is a coarse bucket for a rep's day, not an eligibility rule.
+ *
+ * HAMILTON and SIMCOE are municipality-gated: the program only exists inside
+ * that city, so the address decides which one applies. ONTARIO is different —
+ * it is the bucket for programs we can deliver anywhere in the province
+ * (financing, for instance, is not a city's money and has no municipal
+ * boundary). It is deliberately NOT a region: what actually keeps a rep's day
+ * drivable is the same-day travel radius in lib/scheduling.ts, measured in
+ * kilometres between real coordinates, and that constraint applies to an
+ * ONTARIO booking exactly as it does to a Hamilton one.
+ */
+export type SchedulingArea = 'HAMILTON' | 'SIMCOE' | 'ONTARIO';
+
+/**
+ * How a program decides whether it applies to an address.
+ *
+ *   'municipality'  — the City's money, so the ADDRESS decides. An address
+ *                     outside the mapped municipalities gets no program.
+ *   'ontario_wide'  — ours to deliver anywhere in Ontario, so the LANDING PAGE
+ *                     decides. The address still has to resolve to Ontario, and
+ *                     the travel radius still has to be satisfiable, but no
+ *                     municipality list gates it.
+ */
+export type ProgramGeography = 'municipality' | 'ontario_wide';
 
 /** Server-assigned. Never chosen by the homeowner. */
 export type AddressState =
@@ -77,10 +102,22 @@ export type FundingGuidance = {
   continueLabel: string;
 };
 
+/**
+ * The default nurture set: browsing, or a quarter away from starting. Programs
+ * opt out by setting nurtureTimelines to [].
+ */
+export const DEFAULT_NURTURE_TIMELINES = ['exploring', '3_plus_months'];
+
 export type ProgramConfig = {
   key: string;
   version: number;
   schedulingArea: SchedulingArea;
+  /**
+   * Whether the address or the landing page decides that this program applies.
+   * See ProgramGeography. Every existing program is 'municipality', which is
+   * exactly what they did before this field existed.
+   */
+  geography: ProgramGeography;
   /** Public flow is live only when true. */
   enabled: boolean;
   /**
@@ -104,6 +141,22 @@ export type ProgramConfig = {
   /** Shown when the funding answer is "unsure". Required: every live program needs one. */
   fundingGuidance: FundingGuidance;
   eligibleProjectTypes: string[];
+  /**
+   * Timelines that get the guide and a follow-up INSTEAD of a calendar slot.
+   *
+   * A 45-minute in-person visit is the scarcest thing we have, so a grant
+   * program spends it near the decision and nurtures the rest. A financing
+   * program is the opposite case: there is no application window to be early
+   * for, and a homeowner who is "just exploring" is usually someone who has not
+   * yet been shown that the build is affordable at all — which is a conversation
+   * a rep wins in person and a follow-up email does not. Such a program sets
+   * this to [] and books everyone.
+   *
+   * The timeline still reaches the rep's brief either way: booking an
+   * exploratory lead tags it rather than hiding it, so the consultant knows what
+   * they are walking into.
+   */
+  nurtureTimelines: string[];
   /** Asked before booking, grouped by step. */
   questions: Question[];
   /** Asked after booking. Never blocks the calendar. */
@@ -123,6 +176,16 @@ export type ProgramConfig = {
   appointmentProjectTypeLabel: string;
   /** Customer Notes template applied automatically, by id (Setting.note_templates). */
   noteTemplateId: string;
+  /**
+   * Browser tab title and the step-3 heading. Both default to the grant-shaped
+   * wording every program used before there was a program that is not a grant
+   * ("<area> Secondary Suite Consultation", "How the <area> funding works"),
+   * which is accurate for Hamilton and wrong for a basement financing offer that
+   * is neither a secondary suite nor funding. Set them when the defaults would
+   * describe the wrong thing.
+   */
+  pageTitle?: string;
+  fundingStepHeading?: string;
   /** Guide offered to exploratory leads instead of a live consultation slot. */
   guideUrl: string;
   guideLabel: string;
@@ -299,6 +362,9 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   key: 'hamilton-adu-grant',
   version: 1,
   schedulingArea: 'HAMILTON',
+  // The City's money, so the address decides — a Burlington address must never
+  // pick up Hamilton's grant just because it arrived on Hamilton's page.
+  geography: 'municipality',
   // Closed August 6, 2026 — the City's intake reached its funding capacity.
   //
   // Commit #17 removed the booking CTAs from the three pages that sold this
@@ -331,6 +397,8 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
     "Contractors don't want to spend days researching grant rules and property eligibility for free, and homeowners don't want to pay upfront just to learn whether a secondary suite is even worth pursuing. We organize the details of your project upfront so it's ready for a builder to evaluate properly. When a project's a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps our review free for you, and you're free to compare or decline any proposal you receive.",
   fundingGuidance: HAMILTON_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
+  // The grant's scarce in-person slots stay near the decision.
+  nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
@@ -352,6 +420,7 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   key: 'simcoe-adu-program',
   version: 0,
   schedulingArea: 'SIMCOE',
+  geography: 'municipality',
   enabled: false,
   slug: 'simcoe',
   areaLabel: 'Simcoe County',
@@ -366,6 +435,7 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
     heading: '', lead: '', leadEmphasis: '', milestones: [], highlight: '', closing: '', continueLabel: '',
   },
   eligibleProjectTypes: [],
+  nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
   questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
@@ -377,7 +447,142 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
-export const PROGRAMS: ProgramConfig[] = [HAMILTON_PROGRAM, SIMCOE_PROGRAM];
+
+// ─── Basement renovation financing ────────────────────────────────────────────
+// Not a grant and not a city's money: our own financing offer, so it has no
+// municipal boundary and is declared 'ontario_wide'. The landing page decides
+// that this program applies, not the address — see resolveProgramGeography.
+//
+// Every figure below is taken from signed sales agreements rather than written
+// for the page. The three most recent quote 7.99%, 8.99% and 9.99%, all on a
+// 36-month term with a 240-month amortization, and all state the same structure:
+// nothing upfront, up to 40% of funds released at signing or commencement with
+// the owner's authorization, the balance after completion, no early-payment
+// penalty and no lien registered. Nothing here may be changed without a document
+// that says so.
+
+const BASEMENT_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you planning?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'basement_finish', label: 'Finish an unfinished basement' },
+    { value: 'basement_renovation', label: 'Renovate an existing basement' },
+    { value: 'basement_apartment', label: 'Basement apartment or in-law suite' },
+    { value: 'unsure', label: 'Still deciding' },
+  ],
+};
+
+const BASEMENT_CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'How are you thinking about paying for the work?',
+  help: 'Financing covers the full cost with nothing due upfront. Paying cash is fine too.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'need_financing', label: "I'd like to use the monthly financing" },
+    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+  ],
+};
+
+/**
+ * Shown to someone who answers "Not sure yet" on funding — the one screen in the
+ * flow whose whole job is to remove a fear rather than collect an answer.
+ *
+ * The fear here is the opposite of the grant's. A grant homeowner worries the
+ * money arrives too late; a financing homeowner worries about being on the hook
+ * before anything is built. So the milestones lead with approval and with the
+ * fact that nothing is owed upfront, and the highlight is the open loan — the
+ * single term that most changes how the offer feels, because it means a payment
+ * schedule is a floor and not a commitment.
+ *
+ * States no rate. Rate is the lender's call on the day, it varied across all
+ * three agreements on file, and a number here would be quoted back to us.
+ */
+const BASEMENT_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'That is what the visit is for',
+  lead: 'The financing covers the full cost of the build, so there is nothing to pay before the work starts.',
+  leadEmphasis: 'Nothing upfront.',
+  milestones: ['Approved', 'Funds released', 'Build', 'Balance released'],
+  highlight:
+    'It is an open loan — you can pay it down or pay it off at any time, with no penalty and no lien on your home.',
+  closing: 'Your consultant will price your basement and walk through the exact monthly number with you.',
+  continueLabel: 'Continue',
+};
+
+const BASEMENT_FUNDING_HIGHLIGHTS = [
+  'No upfront cost — the build is financed in full, on approved credit.',
+  'Up to 40% of funds can be released at signing or project start with your authorization; the remaining 60% after completion.',
+  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
+];
+
+export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
+  key: 'basement-financing',
+  version: 1,
+  // ONTARIO is the bucket, not a region. Which properties are actually bookable
+  // is decided by the same-day travel radius against a rep's existing day, so
+  // widening coverage is a scheduling question, never a config edit here.
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'basement',
+  areaLabel: 'Ontario',
+  // "as low as" is doing real work: $399 is roughly a $42,000 project at the
+  // lowest rate on file, and most projects finance higher. Stating it as a
+  // starting point rather than a price is what keeps it honest.
+  displayAmountLabel: 'from about $399 a month, on approved credit',
+  fundingHighlights: BASEMENT_FUNDING_HIGHLIGHTS,
+  // Four lines, not nine.
+  //
+  // This screen sits between a homeowner and a booking, not between them and a
+  // signature. The rate table, the amortization, the 0.40% construction draw and
+  // the worked example of what $399 buys are all TRUE and all belong in the
+  // agreement the consultant walks through in person — putting them here asked
+  // somebody to underwrite themselves off a phone screen, which is how a lead
+  // talks itself out of a free visit.
+  //
+  // What survives is only what changes whether booking is a good idea: that
+  // approval is required, that nothing is owed upfront, that they are never
+  // trapped in it, and that the real numbers arrive in writing before anything
+  // is signed.
+  //
+  // The one-time administration fee is deliberately not listed. It is financed
+  // rather than paid upfront, so "no upfront cost" stays true without it, and
+  // the fee lands with the rest of the real numbers in the written quote the
+  // consultant walks through. It is not a term someone needs in order to decide
+  // whether to book a visit.
+  programTerms: [
+    'Financing is a personal open loan and is subject to credit approval.',
+    'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property.',
+    'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
+  ],
+  whyFreeText:
+    "Homeowners don't want to pay upfront just to find out what a basement costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: BASEMENT_FUNDING_GUIDANCE,
+  eligibleProjectTypes: ['basement_finish', 'basement_renovation', 'basement_apartment'],
+  // Everyone gets the calendar. There is no application deadline to be early
+  // for, and someone "just exploring" is usually someone who does not yet know
+  // the build is affordable — which is exactly what the visit demonstrates.
+  nurtureTimelines: [],
+  questions: [OWNERSHIP, BASEMENT_PROJECT_TYPE, TIMELINE, BASEMENT_CONTRIBUTION],
+  prepQuestions: PREP_QUESTIONS,
+  // Nobody prices a basement without standing in it.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Basement Renovation Consultation',
+  pageTitle: 'Basement Renovation Consultation | OntarioReno',
+  fundingStepHeading: 'How the monthly financing works',
+  // No dedicated template yet; the rep's brief still carries every answer.
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+};
+
+export const PROGRAMS: ProgramConfig[] = [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BASEMENT_FINANCING_PROGRAM];
 
 /**
  * Municipality → scheduling area.
@@ -406,6 +611,63 @@ const normalizeMunicipality = (v: string) => v.trim().toLowerCase().replace(/\s+
 export function areaForMunicipality(municipality: string | null | undefined): SchedulingArea | null {
   if (!municipality) return null;
   return MUNICIPALITY_AREA[normalizeMunicipality(municipality)] ?? null;
+}
+
+/**
+ * Causes that mean "we have a real, complete, Ontario address" — even if the
+ * municipality maps to no scheduling area. An Ontario-wide program can schedule
+ * on any of these; the rest are genuine doubt about the address itself and must
+ * keep going to a human exactly as they do today.
+ */
+const ADDRESS_USABLE_CAUSES = new Set<AddressResolutionCause>([
+  'RESOLVED',
+  'RESOLVED_FROM_TYPED_TEXT',
+  'MUNICIPALITY_UNMAPPED',
+]);
+
+export type GeographyInput = {
+  area: SchedulingArea | null;
+  addressState: AddressState;
+  cause: AddressResolutionCause;
+};
+
+/**
+ * The scheduling area and address state a program should actually be routed on.
+ *
+ * For a municipality-gated program this returns its input untouched — the City's
+ * money, the address decides, nothing changes.
+ *
+ * For an Ontario-wide program it fills the gap that would otherwise send every
+ * lead to a queue: a complete Toronto address maps to no SchedulingArea, so it
+ * arrived as ADDRESS_UNVERIFIED with area null, which routing reads as
+ * MUNICIPALITY_UNRECOGNISED and slot generation reads as "no area, no calendar".
+ * That is correct for a Hamilton grant and wrong for financing, which has no
+ * municipal boundary. So the area becomes ONTARIO and an address that was only
+ * unverified BECAUSE of the unmapped municipality is promoted to verified.
+ *
+ * What it deliberately does not do:
+ *   - rescue an address outside Ontario. That decline is still a decline.
+ *   - rescue an incomplete address, ambiguous typed text, or a provider outage.
+ *     Those are doubt about the ADDRESS, which no program's geography can fix.
+ *   - upgrade ADDRESS_INFERRED to ADDRESS_VERIFIED. Inferred is already
+ *     schedulable and the weaker provenance stays on the record.
+ */
+export function resolveProgramGeography(
+  program: Pick<ProgramConfig, 'geography'>,
+  resolved: GeographyInput
+): { area: SchedulingArea | null; addressState: AddressState } {
+  const { area, addressState, cause } = resolved;
+  if (program.geography !== 'ontario_wide') return { area, addressState };
+  if (addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') return { area, addressState };
+  if (!ADDRESS_USABLE_CAUSES.has(cause)) return { area, addressState };
+
+  return {
+    area: 'ONTARIO',
+    addressState:
+      addressState === 'ADDRESS_UNVERIFIED' && cause === 'MUNICIPALITY_UNMAPPED'
+        ? 'ADDRESS_VERIFIED'
+        : addressState,
+  };
 }
 
 export function programForArea(area: SchedulingArea | null): ProgramConfig | null {
