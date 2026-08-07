@@ -534,16 +534,24 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // starting point rather than a price is what keeps it honest.
   displayAmountLabel: 'from about $399 a month, on approved credit',
   fundingHighlights: BASEMENT_FUNDING_HIGHLIGHTS,
+  // Four lines, not nine.
+  //
+  // This screen sits between a homeowner and a booking, not between them and a
+  // signature. The rate table, the amortization, the 0.40% construction draw and
+  // the worked example of what $399 buys are all TRUE and all belong in the
+  // agreement the consultant walks through in person — putting them here asked
+  // somebody to underwrite themselves off a phone screen, which is how a lead
+  // talks itself out of a free visit.
+  //
+  // What survives is only what changes whether booking is a good idea: that
+  // approval is required, that nothing is owed upfront, that they are never
+  // trapped in it, and that the real numbers arrive in writing before anything
+  // is signed. Nothing here is softer than the agreements — it is shorter.
   programTerms: [
-    'Financing is a personal open loan, subject to credit approval. The lender sets the rate, term and approved amount.',
-    'Recent agreements were written at rates between 7.99% and 9.99%, on a 36-month term with a 240-month amortization.',
-    'The monthly payment depends on the approved amount and rate. About $399 a month corresponds to a project near $42,000 at the lowest rate on file; larger projects cost more per month.',
-    'Quoted payments include applicable taxes. The project price is quoted plus HST.',
-    'Up to 40% of funds may be released at contract signing or project commencement, with the owner’s authorization. The remaining 60% is released after project completion.',
-    'During the project, a minimum payment calculated at 0.40% of the funds drawn to date is collected monthly or biweekly, on the schedule you choose. That payment goes entirely to principal and includes no interest.',
-    'A one-time administration fee applies.',
-    'No upfront cost, no early payment penalties, and no liens registered against the property.',
-    'Some approvals include no interest and no payment for the first 3 months.',
+    'Financing is a personal open loan and is subject to credit approval.',
+    'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property. A one-time administration fee applies.',
+    'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
   ],
   whyFreeText:
     "Homeowners don't want to pay upfront just to find out what a basement costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",

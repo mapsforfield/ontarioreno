@@ -432,18 +432,29 @@ test('every basement project type the form offers is an eligible one', () => {
 });
 
 test('the basement terms never promise a rate or a payment', () => {
-  // $399 is a starting point in an ad, not a price. Approval, rate and amount
-  // are the lender's, and the terms must read that way or the first consultation
-  // starts by walking a number back.
+  // $399 is a starting point in an ad, not a price. Approval and the real
+  // numbers are the lender's, and the terms must read that way or the first
+  // consultation starts by walking a number back.
   const terms = BASEMENT_FINANCING_PROGRAM.programTerms.join(' ');
   assert.match(terms, /subject to credit approval/i);
-  assert.match(terms, /lender sets the rate/i);
+  assert.match(terms, /confirmed in writing before you sign/i);
   assert.match(BASEMENT_FINANCING_PROGRAM.displayAmountLabel, /on approved credit/i);
   assert.equal(
     BASEMENT_FINANCING_PROGRAM.fundingGuidance.highlight.includes('%'),
     false,
     'the funding screen must not quote a rate'
   );
+});
+
+test('the basement terms stay short and quote no interest rate', () => {
+  // Deliberate: this screen decides whether to BOOK, not whether to sign. The
+  // rate table and the construction-draw mechanics are true and belong in the
+  // agreement the consultant walks through in person. A decimal percentage here
+  // is an interest rate that escaped the contract -- the 40/60 release split is
+  // a whole number and stays allowed.
+  const terms = BASEMENT_FINANCING_PROGRAM.programTerms;
+  assert.ok(terms.length <= 5, `terms grew back to ${terms.length} lines`);
+  assert.doesNotMatch(terms.join(' '), /\d+\.\d+\s*%/, 'no interest rate on the public flow');
 });
 
 test('the basement program books an exploratory lead and tags it', () => {
