@@ -1,9 +1,9 @@
 import { Helmet } from "react-helmet-async";
-import { ArrowRight, Calculator, CheckCircle2, FileText, Search } from "lucide-react";
+import { ArrowRight, Calculator, CheckCircle2, FileText, Wallet } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import ProgramClosedNotice from "../components/ProgramClosedNotice";
-import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
+import { BASEMENT_FINANCING_OFFER, HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonBasementGrantAd() {
   return (
@@ -81,22 +81,25 @@ export default function HamiltonBasementGrantAd() {
                 ))}
               </div>
 
-              {/* Booking removed with Hamilton's closure — see the notice above
-                  the hero. The form and calculator stay one tap away, quieter.
-                  Restore the booking CTA if Hamilton reopens. */}
+              {/* Grant booking removed with Hamilton's closure — see the notice
+                  above the hero. This books the basement financing consultation
+                  instead: still open, still gets the basement built, and nothing
+                  is owed upfront. The form and calculator stay one tap away,
+                  quieter. Restore the grant CTA if Hamilton reopens. */}
               <div className="mt-1.5 space-y-2.5">
                 <a
-                  href="/grants"
+                  href={BASEMENT_FINANCING_OFFER.href}
                   className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <Search className="h-5 w-5 shrink-0" />
-                    <span>See grants that are still open</span>
+                    <Wallet className="h-5 w-5 shrink-0" />
+                    <span>{BASEMENT_FINANCING_OFFER.ctaLabel}</span>
                   </span>
                   <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
                 </a>
                 <p className="px-1 text-[0.82rem] font-semibold text-slate-400">
-                  Hamilton's program is closed — other Ontario cities are still funding.
+                  Hamilton's grant is closed — the build is financed instead, with no
+                  upfront cost.
                 </p>
 
                 <a
@@ -166,11 +169,11 @@ export default function HamiltonBasementGrantAd() {
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="/grants"
+                href={BASEMENT_FINANCING_OFFER.href}
                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
               >
-                <Search className="h-5 w-5" />
-                See grants that are still open
+                <Wallet className="h-5 w-5" />
+                {BASEMENT_FINANCING_OFFER.ctaLabel}
                 <ArrowRight className="h-5 w-5" />
               </a>
 
@@ -190,7 +193,8 @@ export default function HamiltonBasementGrantAd() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-slate-400">
-              Hamilton's program is closed to new applications — other Ontario cities are still funding.
+              Hamilton's grant is closed to new applications — the build can still be financed in
+              full, with no upfront cost.
             </p>
 
             <p className="mt-2 text-xs text-slate-300">

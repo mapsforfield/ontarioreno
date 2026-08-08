@@ -5,13 +5,13 @@ import {
   CheckCircle2,
   FileText,
   House,
-  Search,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import ProgramClosedNotice from "../components/ProgramClosedNotice";
-import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
+import { BASEMENT_FINANCING_OFFER, HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonGrant() {
   return (
@@ -91,23 +91,25 @@ export default function HamiltonGrant() {
                 ))}
               </div>
 
-              {/* The booking CTA used to lead here. Hamilton has closed the
-                  program to new submissions, so booking an in-home visit for it
-                  would waste the homeowner's time — the open programs elsewhere
-                  in Ontario are the useful next step now. */}
+              {/* The grant booking CTA used to lead here. Hamilton has closed the
+                  program to new submissions, so booking an in-home visit for the
+                  GRANT would waste the homeowner's time. This books the basement
+                  financing consultation instead — a live offer, and the thing the
+                  visitor actually came for. */}
               <div className="mt-1.5 space-y-2.5">
                 <a
-                  href="/grants"
+                  href={BASEMENT_FINANCING_OFFER.href}
                   className="flex w-full items-center rounded-2xl bg-yellow-400 px-5 py-4 text-left text-[1.02rem] font-extrabold leading-6 text-slate-950 shadow-[0_18px_34px_rgba(15,23,42,0.22)] transition hover:opacity-95"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <Search className="h-5 w-5 shrink-0" />
-                    <span>See grants that are still open</span>
+                    <Wallet className="h-5 w-5 shrink-0" />
+                    <span>{BASEMENT_FINANCING_OFFER.ctaLabel}</span>
                   </span>
                   <ArrowRight className="ml-auto h-5 w-5 shrink-0" />
                 </a>
                 <p className="px-1 text-[0.82rem] font-semibold text-slate-400">
-                  Hamilton's program is closed — other Ontario cities are still funding.
+                  Hamilton's grant is closed — the build is financed instead, with no
+                  upfront cost.
                 </p>
 
                 <a
@@ -194,15 +196,16 @@ export default function HamiltonGrant() {
             <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
               If you're planning to finish your basement into a legal rental unit, this is everything you need to know before getting started.
             </p>
-            {/* Booking removed with the program's closure — see the notice
-                above. The open-grants hub takes its place as the primary CTA. */}
+            {/* Grant booking removed with the program's closure — see the notice
+                above. The basement financing consultation takes its place as the
+                primary CTA: it is open, and it gets the same basement built. */}
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="/grants"
+                href={BASEMENT_FINANCING_OFFER.href}
                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
               >
-                <Search className="h-5 w-5" />
-                See grants that are still open
+                <Wallet className="h-5 w-5" />
+                {BASEMENT_FINANCING_OFFER.ctaLabel}
                 <ArrowRight className="h-5 w-5" />
               </a>
 
@@ -222,7 +225,8 @@ export default function HamiltonGrant() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-slate-400">
-              Hamilton's program is closed to new applications — other Ontario cities are still funding.
+              Hamilton's program is closed to new applications — the build can still be
+              financed in full, with no upfront cost.
             </p>
           </div>
         </div>
@@ -293,51 +297,50 @@ export default function HamiltonGrant() {
           homeowner books themselves, and lands the lead in the portal with an
           address we have actually verified.
 
-          It no longer books: Hamilton closed the program to new submissions, and
-          sending someone to an in-home visit for a grant they cannot apply for
-          wastes their time and our credibility. The section now routes to the
-          cities still funding, which is the honest next step and keeps the page
-          converting. Restore the booking CTA if Hamilton reopens. */}
+          It no longer books the GRANT: Hamilton closed the program to new
+          submissions, and sending someone to an in-home visit for a grant they
+          cannot apply for wastes their time and our credibility. It books the
+          basement financing consultation instead — an open offer that builds the
+          same basement with nothing owed upfront, which is the honest next step
+          and keeps the page converting. Restore the grant CTA if Hamilton
+          reopens. */}
       <section className="bg-slate-900 text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 md:px-8">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
             <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
               <div className="max-w-xl">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-400">
-                  Hamilton is closed — here's what isn't
+                  {BASEMENT_FINANCING_OFFER.eyebrow}
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold leading-tight md:text-4xl">
-                  Other Ontario cities are still funding
+                  {BASEMENT_FINANCING_OFFER.heading}
                 </h2>
                 <p className="mt-4 text-lg leading-8 text-slate-300">
-                  Hamilton's intake has closed, but ADU, secondary-suite and basement
-                  programs are open in cities across Ontario — several with funding
-                  comparable to Hamilton's. We track every one of them and re-check
-                  each official page daily.
+                  {BASEMENT_FINANCING_OFFER.body}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-slate-300">
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Updated daily
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> No upfront cost
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Official sources
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> No penalty to pay it off
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Free to check
+                    <CheckCircle2 className="h-4 w-4 text-sky-400" /> Free in-home visit
                   </span>
                 </div>
               </div>
 
               <div className="shrink-0">
                 <a
-                  href="/grants"
+                  href={BASEMENT_FINANCING_OFFER.href}
                   className="inline-flex items-center gap-2.5 rounded-2xl bg-yellow-400 px-8 py-5 text-lg font-extrabold text-slate-950 shadow-[0_18px_34px_rgba(2,12,27,0.4)] transition hover:opacity-95"
                 >
-                  See open grants by city
+                  {BASEMENT_FINANCING_OFFER.ctaLabel}
                   <ArrowRight className="h-5 w-5" />
                 </a>
                 <p className="mt-3 text-center text-sm text-slate-400">
-                  Updated daily
+                  On approved credit
                 </p>
               </div>
             </div>
