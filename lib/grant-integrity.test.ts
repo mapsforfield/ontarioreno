@@ -11,8 +11,9 @@
  *     /grants advertises a program nobody is watching. (The original bug.)
  *   • A closed program's notice or its status flag disappears, so a dead
  *     program silently reads as open again.
- *   • A booking CTA comes back on a closed program's page, sending a homeowner
- *     to an appointment for funding they cannot apply for.
+ *   • A booking CTA for the CLOSED program comes back on its page, sending a
+ *     homeowner to an appointment for funding they cannot apply for — or the
+ *     live offer that replaced it disappears, dead-ending the visitor instead.
  *   • The two hand-maintained status lists drift apart, so the nav and the hub
  *     tell a visitor different things about the same city.
  *
@@ -26,6 +27,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { BASEMENT_FINANCING_PROGRAM } from './program-config.ts';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel: string) => readFileSync(join(repoRoot, rel), 'utf8');
@@ -129,16 +131,53 @@ test('closed Hamilton pages show the closure notice', () => {
   }
 });
 
-test('closed Hamilton pages do not send anyone to the booking calendar', () => {
+test('closed Hamilton pages do not book the closed grant', () => {
+  // Narrowed deliberately from "no /consultation/ link at all".
+  //
+  // What must never happen is a homeowner booking an in-home visit for a grant
+  // they cannot apply for — that is a wasted afternoon and our credibility. The
+  // ban is therefore on Hamilton's own booking slug, not on booking as such.
+  //
+  // These pages now route to /consultation/basement, an OPEN Ontario-wide
+  // financing offer that builds the same basement with nothing owed upfront.
+  // Linking a live program is the point; if that program ever closes, disable
+  // it in program-config and the flow's closed screen catches it.
   for (const rel of CLOSED_PROGRAM_PAGES) {
     const source = read(rel);
-    const bookingLinks = source.match(/href="\/consultation\//g) ?? [];
+    const closedBookings = source.match(/href="\/consultation\/hamilton/g) ?? [];
     assert.equal(
-      bookingLinks.length,
+      closedBookings.length,
       0,
-      `${rel} links to the booking calendar again. A homeowner would book an in-home visit for a grant they cannot apply for.`,
+      `${rel} links to Hamilton's booking calendar again. A homeowner would book an in-home visit for a grant they cannot apply for.`,
     );
   }
+});
+
+test('closed Hamilton pages offer the open basement financing consultation', () => {
+  // The other half of the rule above: a closed page must not dead-end either.
+  // These are paid-for visitors who wanted a finished basement, and the live
+  // offer is what keeps the page converting without advertising closed money.
+  for (const rel of CLOSED_PROGRAM_PAGES) {
+    const source = read(rel);
+    assert.ok(
+      source.includes('BASEMENT_FINANCING_OFFER'),
+      `${rel} no longer offers the basement financing consultation. A closed page with no live next step loses the lead entirely.`,
+    );
+  }
+});
+
+test('the basement financing offer points at a program that is actually enabled', () => {
+  // The offer is shown to people whose program just closed. Pointing it at a
+  // second closed program would repeat the exact failure it exists to fix.
+  const offer = read('src/lib/programClosures.ts');
+  const slug = offer.match(/href:\s*"\/consultation\/([a-z-]+)"/)?.[1];
+  assert.ok(slug, 'BASEMENT_FINANCING_OFFER must state the consultation slug it links to');
+  assert.equal(BASEMENT_FINANCING_PROGRAM.slug, slug);
+  assert.equal(
+    BASEMENT_FINANCING_PROGRAM.enabled,
+    true,
+    `/consultation/${slug} is disabled, so every closed page now sends its traffic to another closed program.`,
+  );
 });
 
 test('the shared closure notice and its data still exist', () => {

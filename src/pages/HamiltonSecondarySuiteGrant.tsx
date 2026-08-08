@@ -1,9 +1,9 @@
 import { Helmet } from "react-helmet-async";
-import { ArrowRight, CheckCircle, Home, Search, ShieldCheck, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle, Home, ShieldCheck, FileText, Wallet } from "lucide-react";
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import ProgramClosedNotice from "../components/ProgramClosedNotice";
-import { HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
+import { BASEMENT_FINANCING_OFFER, HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
 
 export default function HamiltonSecondarySuiteGrant() {
     return (
@@ -53,15 +53,17 @@ export default function HamiltonSecondarySuiteGrant() {
                             <span>Designed for rental-ready units</span>
                         </div>
 
-                        {/* Booking removed with Hamilton's closure — see the
-                            notice above the hero. Restore it if Hamilton reopens. */}
+                        {/* Grant booking removed with Hamilton's closure — see the
+                            notice above the hero. This books the basement financing
+                            consultation instead, which is open and builds the same
+                            suite. Restore the grant CTA if Hamilton reopens. */}
                         <div className="mt-8 flex flex-wrap items-center gap-4">
                             <a
-                                href="/grants"
+                                href={BASEMENT_FINANCING_OFFER.href}
                                 className="inline-flex items-center gap-2.5 rounded-xl bg-yellow-400 px-7 py-4 text-base font-extrabold text-slate-900 shadow-[0_16px_30px_rgba(2,12,27,0.35)] transition hover:opacity-95"
                             >
-                                <Search className="h-5 w-5" />
-                                See grants that are still open
+                                <Wallet className="h-5 w-5" />
+                                {BASEMENT_FINANCING_OFFER.ctaLabel}
                                 <ArrowRight className="h-5 w-5" />
                             </a>
 
@@ -81,7 +83,8 @@ export default function HamiltonSecondarySuiteGrant() {
                         </div>
 
                         <p className="mt-4 text-sm font-semibold text-slate-400">
-                            Hamilton's program is closed to new applications — other Ontario cities are still funding.
+                            Hamilton's grant is closed to new applications — the build can still be financed in
+                              full, with no upfront cost.
                         </p>
                     </div>
                 </div>

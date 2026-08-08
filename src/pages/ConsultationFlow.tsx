@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Ch
 import { testingModeEnabled } from '../../lib/app-config';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../lib/calendar-links';
 import { newEventId, trackCustom, trackEvent } from '../lib/pixel';
+import { BASEMENT_FINANCING_OFFER } from '../lib/programClosures';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
@@ -43,7 +44,7 @@ type Program = {
   areaLabel: string;
   enabled: boolean;
   /** Present only when the intake closed, as opposed to not having opened yet. */
-  closure: { program: string; city: string; reason: string; sourceUrl: string; confirmedOn: string } | null;
+  closure: { program: string; shortName: string; city: string; reason: string; sourceUrl: string; confirmedOn: string } | null;
   displayAmountLabel: string;
   fundingHighlights: string[];
   programTerms: string[];
@@ -328,35 +329,64 @@ export default function ConsultationFlow() {
     // they owe the reader different things. Someone who arrived from an ad for a
     // grant that has since run out needs to be told that plainly, and then given
     // somewhere to go — dead-ending them is what loses the lead we already paid
-    // for. The "not yet" wording below is unchanged for programs like Simcoe.
+    // for. Where they go is the basement financing consultation rather than the
+    // grants index: they came here to get a basement built, and an open offer
+    // with no upfront cost answers that, where a list of other cities' programs
+    // just restarts their search. The "not yet" wording below is unchanged for
+    // programs like Simcoe.
     return (
       <Shell title={`${program.areaLabel} consultations`}>
         {program.closure ? (
           <div className="text-left">
-            <p className="font-bold text-slate-900">{program.closure.program} is closed.</p>
-            <p className="mt-2 text-slate-600">{program.closure.reason}</p>
-            <p className="mt-2 text-sm text-slate-500">
-              Confirmed {program.closure.confirmedOn} against the{' '}
-              <a
-                href={program.closure.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-slate-700"
-              >
-                City of {program.closure.city} program page
-              </a>
-              .
-            </p>
-            <p className="mt-4 text-slate-600">
-              Other Ontario cities are still funding this work, and we can still help you plan the
-              build either way.
-            </p>
-            <Link
-              to="/grants"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-5 py-3 font-bold text-white transition hover:bg-[#16325a]"
-            >
-              See grants still open <ChevronRight className="h-4 w-4" />
-            </Link>
+            {/* Short, for the same reason as ProgramClosedNotice: the offer
+                below is the useful part, and it has to be visible without a
+                scroll. The official wording stays one tap away. */}
+            <p className="font-bold text-slate-900">{program.closure.shortName} is closed.</p>
+            <details className="group mt-2">
+              <summary className="cursor-pointer list-none text-sm font-bold text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-700">
+                Why it closed
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {program.closure.program}: {program.closure.reason}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Confirmed {program.closure.confirmedOn} against the{' '}
+                <a
+                  href={program.closure.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-slate-700"
+                >
+                  City of {program.closure.city} program page
+                </a>
+                .
+              </p>
+            </details>
+            {/* If the basement offer itself ever closes, this screen must not
+                send someone back to the page they are standing on. */}
+            {program.slug === 'basement' ? (
+              <p className="mt-4 text-slate-600">
+                We can still help you plan the build — reach out and we&apos;ll go through
+                your options.
+              </p>
+            ) : (
+              <>
+                <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                  <p className="font-extrabold leading-snug text-slate-900">
+                    {BASEMENT_FINANCING_OFFER.heading}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    {BASEMENT_FINANCING_OFFER.shortBody}
+                  </p>
+                </div>
+                <Link
+                  to={BASEMENT_FINANCING_OFFER.href}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-5 py-3 font-bold text-white transition hover:bg-[#16325a]"
+                >
+                  {BASEMENT_FINANCING_OFFER.ctaLabel} <ChevronRight className="h-4 w-4" />
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <p className="text-slate-600">We aren’t taking online bookings for {program.areaLabel} yet.</p>
