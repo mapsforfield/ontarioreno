@@ -144,6 +144,16 @@ to.
 Guarded by `lib/remote-consultation.test.ts` and the remote section at the end
 of `lib/scheduling.test.ts`, including the Wednesday regression.
 
+`remoteConsultation` defaults to false, so every row written before the feature
+shipped reads as an in-person visit. A **future** booking in a remote city that
+is still unflagged keeps anchoring that rep's travel radius. Check at any time:
+
+```bash
+DATABASE_URL='<neon url>' npx tsx scripts/remote-consultation-audit.ts
+```
+
+`FUTURE + active + NOT flagged` must read 0. The script is read-only.
+
 ## Public-facing copy: never advertise money that isn't there
 
 A homeowner who books an in-home visit for a closed grant loses an afternoon and
