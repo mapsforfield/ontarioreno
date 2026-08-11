@@ -35,6 +35,8 @@ import { showToast } from '../lib/toast';
 import { countUnworkedSubmissions, isUnworkedSubmission } from '../data/submissions';
 import { programByKey, readableAnswers } from '../../../lib/program-config';
 import type { Lead, RoutingOutcome, SubmissionAppointment } from '../data/types';
+import type { SlotBlock } from '../../../lib/lead-slots';
+import { BASEMENT_FINANCING_OFFER } from '../../lib/programClosures';
 
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
@@ -727,6 +729,65 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'wa
   );
 }
 
+/**
+ * Why this lead has no times.
+ *
+ * The old copy said one thing — "check rep availability under Admin" — for
+ * every empty result, including the case where availability was never computed
+ * because the lead's program had closed. That sent reps to a calendar that was
+ * fine while a homeowner waited on the phone. Each reason now says what it is,
+ * and the closed case says what to offer instead.
+ */
+function NoSlotsReason({ blocked }: { blocked?: SlotBlock }) {
+  if (blocked?.reason === 'PROGRAM_CLOSED') {
+    return (
+      <div className="space-y-2 px-4 py-3 text-sm text-slate-600">
+        <p className="font-bold text-slate-800">
+          {blocked.programName} has closed — this submission cannot be booked under it.
+        </p>
+        <p>
+          Confirmed closed {blocked.confirmedOn}. The calendar was not consulted, so rep
+          availability is not the problem and there is nothing to check under Admin.
+        </p>
+        <p>
+          {BASEMENT_FINANCING_OFFER.shortBody} Send them to{' '}
+          <span className="font-bold">{BASEMENT_FINANCING_OFFER.href}</span> to book against the
+          open program.
+        </p>
+      </div>
+    );
+  }
+  if (blocked?.reason === 'PROGRAM_NOT_OPEN') {
+    return (
+      <p className="px-4 py-3 text-sm text-slate-500">
+        The {blocked.programName} program is not open for booking, so no times were computed.
+      </p>
+    );
+  }
+  if (blocked?.reason === 'NO_AREA') {
+    return (
+      <p className="px-4 py-3 text-sm text-slate-500">
+        This submission never resolved to a service area, so no calendar applies. Check the address
+        above.
+      </p>
+    );
+  }
+  if (blocked?.reason === 'NO_REPS') {
+    return (
+      <p className="px-4 py-3 text-sm text-slate-500">
+        No reps are set up to take bookings — add one under Admin.
+      </p>
+    );
+  }
+  // No block: the calendar really was consulted and really is full.
+  return (
+    <p className="px-4 py-3 text-sm text-slate-500">
+      Every slot in the booking window is taken or blocked — check rep availability and days off
+      under Admin.
+    </p>
+  );
+}
+
 // ─── Detail drawer ────────────────────────────────────────────────────────────
 
 function SubmissionDrawer({
@@ -746,6 +807,7 @@ function SubmissionDrawer({
 
   const { fetchLeadSlots, bookLeadVisit } = usePortalData();
   const [slots, setSlots] = useState<Array<{ date: string; time: string }> | null>(null);
+  const [blocked, setBlocked] = useState<SlotBlock | undefined>(undefined);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [picked, setPicked] = useState<{ date: string; time: string } | null>(null);
   const [notify, setNotify] = useState(false);
@@ -756,6 +818,7 @@ function SubmissionDrawer({
     setLoadingSlots(true);
     const payload = await fetchLeadSlots(lead.id);
     setSlots(payload.slots);
+    setBlocked(payload.blocked);
     setLoadingSlots(false);
   };
 
@@ -918,9 +981,7 @@ function SubmissionDrawer({
                   </button>
                 </div>
               ) : slots.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-slate-500">
-                  No times are free in the booking window — check rep availability under Admin.
-                </p>
+                <NoSlotsReason blocked={blocked} />
               ) : (
                 <div className="space-y-3 px-4 py-3">
                   <div className="max-h-60 space-y-3 overflow-y-auto">

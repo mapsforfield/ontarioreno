@@ -269,6 +269,14 @@ model Appointment {
   /// 'HAMILTON' | 'SIMCOE'. Drives the per-rep, per-date scheduling-area lock:
   /// all of a rep's appointments on one date must share one area.
   schedulingArea           String?
+  /// True when the property is in a remote-consultation city (lib/remote-
+  /// consultation.ts) and this booking is a video/phone call rather than a site
+  /// visit. THE source of truth for scheduling: a remote row is invisible to
+  /// the travel radius, the area lock, the daily cap and rep assignment
+  /// weighting, so a far-away lead cannot anchor a rep's whole date. The
+  /// appointmentType shown in the portal is derived from this at booking time —
+  /// never read appointmentType to make a scheduling decision.
+  remoteConsultation       Boolean  @default(false)
   /// 'portal' | 'public_flow' — how this appointment was created.
   bookedVia                String   @default("portal")
   /// Short reference shown to the homeowner. Public bookings only.

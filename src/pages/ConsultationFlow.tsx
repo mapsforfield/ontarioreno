@@ -145,6 +145,9 @@ export default function ConsultationFlow() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  // Server's answer, never the browser's guess: whether this property is close
+  // enough to drive to is a business rule, and the page only renders it.
+  const [remote, setRemote] = useState(false);
   const [chosen, setChosen] = useState<Slot | null>(null);
   const [booking, setBooking] = useState<
     { publicReference: string; date: string; time: string; propertyAddress?: string } | null
@@ -262,6 +265,7 @@ export default function ConsultationFlow() {
       if (j.offersCalendar) {
         const av = await (await fetch(`/api/leads?flow=availability&leadRef=${encodeURIComponent(j.leadRef)}`)).json();
         setSlots(av.slots ?? []);
+        setRemote(av.remoteConsultation === true);
         setPhase('calendar');
       } else {
         setPhase('result');
@@ -298,6 +302,10 @@ export default function ConsultationFlow() {
         return;
       }
       if (!r.ok) throw new Error(j?.error ?? 'We could not complete the booking.');
+      // The server decides again at booking time; trust that over what the
+      // availability call said, so the confirmation can never disagree with
+      // the appointment that was actually written.
+      setRemote(j.remoteConsultation === true);
       setBooking(j);
       setPhase('result');
       // Stronger than Lead — a booked consultation. Useful as the optimisation
@@ -402,8 +410,19 @@ export default function ConsultationFlow() {
 
   // What the homeowner is actually booking — stated the same way on the calendar
   // and the confirmation so there is no ambiguity about who goes where.
+  //
+  // A property outside the drive radius overrides the program's own mode: the
+  // grant or the financing is the same offer either way, but nobody is getting
+  // in a van for it, and a homeowner told "a specialist will visit your
+  // property" clears an afternoon for a doorbell that never rings.
   const meeting =
-    program.consultationMode === 'phone'
+    remote
+      ? {
+          line: `Virtual Consultation · ${program.visitMinutes} minutes`,
+          detail:
+            'Your city is outside our in-person visit area, so this one is done by video or phone. A specialist will contact you around your chosen time.',
+        }
+      : program.consultationMode === 'phone'
       ? {
           line: `Initial Consultation Call · ${program.visitMinutes} minutes`,
           detail: 'A specialist will call you at your scheduled time.',
@@ -430,7 +449,7 @@ export default function ConsultationFlow() {
     return (
       <Shell
         title={
-          booking ? 'Your visit is booked'
+          booking ? (remote ? 'Your consultation is booked' : 'Your visit is booked')
             : outcome === 'NURTURE' ? 'Info package sent'
               : 'Thanks — we have your details'
         }
@@ -448,11 +467,17 @@ export default function ConsultationFlow() {
 
             <AddToCalendar
               event={{
-                title: `OntarioReno - ${program.areaLabel} ADU Site Visit`,
-                location: booking.propertyAddress || addressText,
-                description: `${program.visitMinutes}-minute ${
-                  program.consultationMode === 'phone' ? 'consultation call' : 'in-person'
-                } ADU grant & property assessment with an OntarioReno specialist. Reference: ${booking.publicReference}`,
+                title: remote
+                  ? `OntarioReno - ${program.areaLabel} Virtual Consultation`
+                  : `OntarioReno - ${program.areaLabel} ADU Site Visit`,
+                // A calendar entry with the property as its location reads as
+                // "be here" — wrong for a call the specialist places.
+                location: remote ? '' : booking.propertyAddress || addressText,
+                description: remote
+                  ? `${program.visitMinutes}-minute virtual consultation about ${booking.propertyAddress || addressText} with an OntarioReno specialist, by video or phone. Reference: ${booking.publicReference}`
+                  : `${program.visitMinutes}-minute ${
+                      program.consultationMode === 'phone' ? 'consultation call' : 'in-person'
+                    } ADU grant & property assessment with an OntarioReno specialist. Reference: ${booking.publicReference}`,
                 date: booking.date,
                 time: booking.time,
                 durationMinutes: program.visitMinutes,
@@ -467,8 +492,15 @@ export default function ConsultationFlow() {
                   ['Confirmation Sent:', program.smsEnabled
                     ? 'Check your SMS & email for booking details.'
                     : 'Check your email for booking details.'],
-                  ['Zoning Review:', 'Our team will perform a preliminary property assessment prior to arrival.'],
-                  ['Site Visit:', `A specialist will arrive at ${booking.propertyAddress || addressText} at the scheduled time.`],
+                  remote
+                    ? ['Property Review:', 'Our team will perform a preliminary property assessment before the call.']
+                    : ['Zoning Review:', 'Our team will perform a preliminary property assessment prior to arrival.'],
+                  remote
+                    // Says "around" deliberately. The specialist fits these
+                    // between in-person visits, and promising a call to the
+                    // minute is a promise the day will not always keep.
+                    ? ['Virtual Consultation:', `A specialist will contact you around the scheduled time to go through ${booking.propertyAddress || addressText}.`]
+                    : ['Site Visit:', `A specialist will arrive at ${booking.propertyAddress || addressText} at the scheduled time.`],
                 ].map(([bold, rest]) => (
                   <li key={bold} className="flex gap-2.5 text-sm leading-relaxed text-slate-600">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -515,7 +547,16 @@ export default function ConsultationFlow() {
   if (phase === 'calendar') {
     return (
       <Shell title="Pick a time that suits you" step={stepIndex}>
-        <p className="mb-5 text-sm font-bold text-[#1B3C6C]">{meeting.line}</p>
+        <p className="mb-2 text-sm font-bold text-[#1B3C6C]">{meeting.line}</p>
+        {/* Said BEFORE they pick, not after they have booked. Someone choosing a
+            time believing a specialist is driving out has been misled by the
+            time the confirmation corrects them. */}
+        {remote && (
+          <p className="mb-5 rounded-xl border border-[#1B3C6C]/20 bg-[#e8f1fb] p-3 text-left text-sm text-slate-700">
+            {meeting.detail}
+          </p>
+        )}
+        {!remote && <div className="mb-5" />}
         {byDate.length === 0 && <p className="text-slate-600">No times are free right now — we’ll call to arrange one.</p>}
         {/* Every day, in one place — but scrolling inside its own frame rather
             than stretching the page. The card keeps a fixed height, so the

@@ -111,6 +111,49 @@ Folding these four into the scanner's watch list is the outstanding fix — the
 detector already catches Hamilton's exact wording, it just never looks at these
 rows. The user has chosen to flag them manually for now.
 
+## Remote (virtual) consultations — what must stay true
+
+Some cities are real business and a bad drive. `lib/remote-consultation.ts` lists
+them (**Windsor · Niagara Falls · Thorold**); adding a city there is the whole
+change, everything downstream reads that list.
+
+A remote booking is **inert in both directions** — see the header of
+`lib/scheduling.ts`. It does not anchor the same-day travel radius, is not
+measured against it, neither sets nor respects the scheduling-area lock, does
+not consume a fixed start, and carries no weight in the daily cap or in rep
+assignment. Days off are the one rule it still obeys.
+
+That is the point of the feature, not an oversight. The original bug: one
+Niagara Falls lead taken as the first appointment of a day anchored that rep's
+travel radius on Niagara Falls, so the next three leads were ineligible for them
+and fell to the other rep — a full day of capacity lost to a lead nobody drove
+to.
+
+- `Appointment.remoteConsultation` is **the** scheduling source of truth. The
+  `appointmentType` shown in the portal (`video_consultation`) is derived from
+  it at booking time. **Never read `appointmentType` to make a scheduling
+  decision** — a rep changing that dropdown must not re-anchor anyone's day.
+- Every constraint funnels through `constrainingAppointments()`. Keep it that
+  way; a rule that filters remote rows by hand is a rule that will drift.
+- A remote booking must never be described as a visit. `consultationMode` goes
+  to `'phone'` for these, and the confirmation, the SMS, both reminders and the
+  calendar entry all branch on it. Known gap: appointments **hand-created in the
+  portal** do not set `remoteConsultation` — only the public flow and
+  `book_lead` do.
+
+Guarded by `lib/remote-consultation.test.ts` and the remote section at the end
+of `lib/scheduling.test.ts`, including the Wednesday regression.
+
+`remoteConsultation` defaults to false, so every row written before the feature
+shipped reads as an in-person visit. A **future** booking in a remote city that
+is still unflagged keeps anchoring that rep's travel radius. Check at any time:
+
+```bash
+DATABASE_URL='<neon url>' npx tsx scripts/remote-consultation-audit.ts
+```
+
+`FUTURE + active + NOT flagged` must read 0. The script is read-only.
+
 ## Public-facing copy: never advertise money that isn't there
 
 A homeowner who books an in-home visit for a closed grant loses an afternoon and

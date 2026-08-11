@@ -30,6 +30,12 @@ export type ReminderAppointment = {
   appointmentTime?: string | null;
   status?: string | null;
   deletedAt?: Date | string | null;
+  /**
+   * Set when the property is outside the drive radius. Reminders are rebuilt
+   * from this row each time they go out, so without it a resynced reminder
+   * would tell a virtual homeowner a specialist is on the way.
+   */
+  remoteConsultation?: boolean | null;
 };
 
 /** Build the reminder inputs from an appointment row. */
@@ -43,6 +49,7 @@ export function reminderContextFor(appointment: ReminderAppointment): ReminderCo
       (appointment.address ?? ''),
     date: appointment.appointmentDate ?? '',
     time: appointment.appointmentTime ?? '',
+    consultationMode: appointment.remoteConsultation ? 'phone' : 'in_person',
   };
 }
 
