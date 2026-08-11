@@ -7,6 +7,7 @@ import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../.
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
+import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -1487,6 +1488,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appointmentTime: data.appointmentTime,
         durationMinutes: data.durationMinutes ?? 60,
         appointmentType: data.appointmentType ?? 'home_visit',
+        // Closes the hand-created gap: a rep booking a Windsor property from
+        // the portal used to leave this false, so that appointment anchored
+        // their travel radius on a city nobody drives to — the same capacity
+        // loss the public flow already avoids. Derived from the property, not
+        // from the type dropdown, so the two can never disagree.
+        //
+        // City only. Matching is exact-on-normalised, and a street address
+        // ("14 Main St, Windsor, ON") would never match anyway — pretending it
+        // might would make this look more thorough than it is. A booking whose
+        // city field is left blank is caught by the audit script instead.
+        remoteConsultation: isRemoteConsultationCity(data.city),
         reminderMinutes: data.reminderMinutes ?? 30,
         status: data.status ?? 'scheduled',
         consultationStage: data.consultationStage ?? 'consultation_scheduled',

@@ -15,6 +15,7 @@ import {
   Trash2,
   UserRound,
   UserX,
+  Video,
   X,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -464,6 +465,47 @@ function appointmentPillBg(a: Appointment): string {
   return getStagePillBg(a.consultationStage, a.status, a.appointmentType).bg;
 }
 
+/**
+ * Is this a video/phone consultation rather than a drive?
+ *
+ * Reads `remoteConsultation` — the scheduling source of truth — and falls back
+ * to the appointment type only for display. A rep who sets the type by hand in
+ * the portal has told us what the meeting is even though nothing was booked
+ * through the public flow, and the calendar should say so; the fallback is safe
+ * here precisely BECAUSE this function decides nothing but pixels.
+ */
+function isRemoteAppointment(a: Appointment): boolean {
+  return (
+    a.remoteConsultation === true ||
+    a.appointmentType === 'video_consultation' ||
+    a.appointmentType === 'phone_consultation'
+  );
+}
+
+/**
+ * The marker that tells a rep, at a glance, that nobody is driving to this one.
+ *
+ * A chip rather than a new pill colour: the colours are the consultation
+ * lifecycle and the legend maps them one-to-one, so spending one on delivery
+ * mode would make a virtual won-deal indistinguishable from a virtual no-show.
+ * Mode and stage are different questions and get different channels.
+ */
+function VirtualChip({ tone }: { tone: 'onColor' | 'onWhite' }) {
+  return (
+    <span
+      title="Virtual consultation — outside the drive radius, no travel involved"
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[0.55rem] font-black uppercase tracking-wide ${
+        tone === 'onColor'
+          ? 'bg-white/25 text-white ring-1 ring-white/40'
+          : 'bg-violet-100 text-violet-700 ring-1 ring-violet-200'
+      }`}
+    >
+      <Video className="h-2.5 w-2.5" />
+      Virtual
+    </span>
+  );
+}
+
 function fmt12(time: string | undefined): string {
   if (!time) return 'TBD';
   const [h, m] = time.split(':').map(Number);
@@ -492,6 +534,7 @@ function AppointmentPill({
   const outcomeBadge = getOutcomeBadge(appointment);
   const name = appointment.customerName || appointment.title || 'Consultation';
   const time = fmt12(appointment.appointmentTime);
+  const remote = isRemoteAppointment(appointment);
 
   // ── Month / Week: compact solid-color pill (Google Calendar style) ──────────
   if (variant === 'compact') {
@@ -499,11 +542,20 @@ function AppointmentPill({
       <button
         type="button"
         onClick={onClick}
-        className={`w-full rounded-lg ${bg} px-2 py-1 text-left shadow-sm ring-1 ring-black/10 transition hover:brightness-110 active:brightness-90`}
+        className={`w-full rounded-lg ${bg} px-2 py-1 text-left shadow-sm ring-1 ring-black/10 transition hover:brightness-110 active:brightness-90 ${
+          // A dashed edge as well as the chip, so the distinction survives the
+          // squint test across a full month — a rep scanning for "what am I
+          // driving to on Wednesday" should not have to read every label.
+          // outline, not ring: a ring is a box-shadow and cannot be dashed.
+          remote ? 'outline-2 outline-dashed outline-offset-1 outline-white/70' : ''
+        }`}
       >
-        <p className={`truncate text-[0.6rem] font-bold ${lightText ? 'text-white/70' : 'text-slate-600'}`}>
-          {time}
-        </p>
+        <div className="flex items-center justify-between gap-1">
+          <p className={`truncate text-[0.6rem] font-bold ${lightText ? 'text-white/70' : 'text-slate-600'}`}>
+            {time}
+          </p>
+          {remote && <VirtualChip tone={lightText ? 'onColor' : 'onWhite'} />}
+        </div>
         <p className={`truncate text-[0.7rem] font-black leading-tight ${lightText ? 'text-white' : 'text-slate-800'}`}>
           {name}
         </p>
@@ -530,7 +582,10 @@ function AppointmentPill({
         </div>
         {/* White detail panel */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-3">
-          <p className="truncate text-sm font-black text-slate-900">{name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-sm font-black text-slate-900">{name}</p>
+            {remote && <VirtualChip tone="onWhite" />}
+          </div>
           <p className="truncate text-xs text-slate-500">
             {projectType || 'Project type TBD'} · {repName}
             {contractorName ? ` · ${contractorName}` : ''}
@@ -1854,6 +1909,7 @@ export default function PortalAppointments() {
           <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
             {appointment.customerName || appointment.title || 'Consultation'}
           </span>
+          {isRemoteAppointment(appointment) && <VirtualChip tone="onWhite" />}
           <span className="hidden shrink-0 text-xs font-semibold text-slate-500 sm:block">
             {appointment.projectType || deal?.projectType || ''}
             {(appointment.projectType || deal?.projectType) && (appointment.city || deal?.city) ? ' / ' : ''}
@@ -2325,9 +2381,12 @@ export default function PortalAppointments() {
                         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
-                              {apt.customerName || apt.title || 'Consultation'}
-                            </p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                {apt.customerName || apt.title || 'Consultation'}
+                              </p>
+                              {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                            </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums leading-tight text-slate-500">
                               {fmt12(apt.appointmentTime)}
                             </p>
@@ -2461,9 +2520,12 @@ export default function PortalAppointments() {
                         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
-                              {apt.customerName || apt.title || 'Consultation'}
-                            </p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                {apt.customerName || apt.title || 'Consultation'}
+                              </p>
+                              {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                            </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                               {apt.appointmentDate}
                             </p>
@@ -2638,9 +2700,12 @@ export default function PortalAppointments() {
                             <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
-                                  {apt.customerName || apt.title || 'Consultation'}
-                                </p>
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                    {apt.customerName || apt.title || 'Consultation'}
+                                  </p>
+                                  {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                                </div>
                                 <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                                   {fmt12(apt.appointmentTime)}
                                 </p>
@@ -2708,9 +2773,12 @@ export default function PortalAppointments() {
                         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${sc.dot}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
-                              {apt.customerName || apt.title || 'Consultation'}
-                            </p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="truncate text-[0.88rem] font-black leading-tight text-slate-900">
+                                {apt.customerName || apt.title || 'Consultation'}
+                              </p>
+                              {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                            </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                               {apt.appointmentDate}
                             </p>
@@ -3343,11 +3411,14 @@ export default function PortalAppointments() {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="truncate text-[0.88rem] font-black text-slate-900 leading-tight">
-                              {appointment.customerName ||
-                                appointment.title ||
-                                'Consultation'}
-                            </p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="truncate text-[0.88rem] font-black text-slate-900 leading-tight">
+                                {appointment.customerName ||
+                                  appointment.title ||
+                                  'Consultation'}
+                              </p>
+                              {isRemoteAppointment(appointment) && <VirtualChip tone="onWhite" />}
+                            </div>
                             <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500 leading-tight mt-px">
                               {fmt12(appointment.appointmentTime)}
                             </p>
