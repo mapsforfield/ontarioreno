@@ -67,6 +67,24 @@ function fakeStore(seed: Row[] = []) {
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
+/**
+ * Today as ONTARIO sees it.
+ *
+ * `new Date().toISOString().slice(0, 10)` is the UTC date, and Toronto is four
+ * or five hours behind — so from 8pm Ontario time onward the UTC date is
+ * already tomorrow. A test that wants "an appointment later today" and uses the
+ * UTC date silently gets "tomorrow night" instead, which is 27 hours out rather
+ * than a few, so reminders that should have been suppressed are legitimately
+ * still scheduled. That made this file pass all day and fail every evening.
+ */
+const todayToronto = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
 const ctx = (over: Partial<BookingContext> = {}): BookingContext => ({
   appointmentId: 'appt-1',
   publicReference: 'OR-ABCD2345',
@@ -173,7 +191,7 @@ test('a visit moved to within the day queues nothing rather than a late reminder
 
   const summary = await resyncAppointmentReminders(
     store,
-    { ...c, date: new Date().toISOString().slice(0, 10), time: '23:30' },
+    { ...c, date: todayToronto(), time: '23:30' },
     'appointment_moved'
   );
 

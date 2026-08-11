@@ -173,6 +173,13 @@ export type Appointment = {
   leadId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /**
+   * True when the property is outside the drive radius and this consultation is
+   * a video/phone call. THE scheduling source of truth (see lib/scheduling.ts)
+   * — the calendar reads it to mark the booking so a rep can tell a call from a
+   * drive at a glance. Never derive scheduling behaviour from appointmentType.
+   */
+  remoteConsultation?: boolean | null;
   deletedAt?: string | null;
   externalCalendarId?: string;
   externalEventId?: string;
