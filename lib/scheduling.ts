@@ -16,6 +16,23 @@
 //   * ONTARIO is exempt from that lock in both directions: it is a program
 //     bucket, not a place. The same-day travel radius is what keeps such a day
 //     drivable, and it applies to every booking regardless of area.
+//   * REMOTE bookings are exempt from all of it. See below.
+//
+// ─── Remote consultations ─────────────────────────────────────────────────────
+// Every rule in this file exists to keep a rep's DRIVING day coherent. A remote
+// consultation involves no driving, so none of them should apply to it — and,
+// just as importantly, it must not apply any of them to anyone else.
+//
+// A remote booking is therefore inert in both directions:
+//   * it never anchors the travel radius, and is never measured against it
+//   * it neither sets nor respects the scheduling-area lock
+//   * it does not consume a fixed start, so it cannot remove a slot
+//   * it does not count toward the daily cap or toward rep assignment weight
+//
+// This is deliberate and is the point of the feature, not an oversight. One
+// far-away lead used to anchor a rep's entire date on a city they were never
+// going to drive to, which handed the rest of that day's leads to the other
+// rep. See lib/remote-consultation.ts for which cities these are and why.
 
 import type { SchedulingArea } from './program-config.js';
 
@@ -34,6 +51,13 @@ export type BookedAppointment = {
   longitude?: number | null;
   /** Fallback for proximity when coordinates are missing. */
   city?: string | null;
+  /**
+   * True when this is a video/phone consultation rather than a site visit.
+   * Such a row is invisible to every rule in this file — see the header.
+   * Optional and defaulted false, so a legacy row with no column is in-person,
+   * which is exactly what it was before this field existed.
+   */
+  remoteConsultation?: boolean | null;
 };
 
 /** A rep, as the assignment rules see them. Never a name — ordering is data. */
@@ -66,6 +90,24 @@ export function isActive(a: Pick<BookedAppointment, 'status'>): boolean {
   return ACTIVE_STATUSES.has(a.status);
 }
 
+/** A booking someone has to drive to. The only kind these rules constrain. */
+export function isInPerson(a: Pick<BookedAppointment, 'remoteConsultation'>): boolean {
+  return a.remoteConsultation !== true;
+}
+
+/**
+ * The rows a rep's day is actually built from: active AND in-person.
+ *
+ * Every constraint funnels through here, so "a remote booking constrains
+ * nothing" is one filter rather than a rule repeated in five places that can
+ * drift apart.
+ */
+export function constrainingAppointments(
+  appointments: BookedAppointment[]
+): BookedAppointment[] {
+  return appointments.filter((a) => isActive(a) && isInPerson(a));
+}
+
 /** Minutes since midnight for "HH:MM", or null when malformed. */
 export function minutesOfDay(time: string): number | null {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
@@ -91,7 +133,7 @@ export function collidesWithExisting(
 ): boolean {
   const start = minutesOfDay(proposedTime);
   if (start === null) return true; // malformed input is never bookable
-  return sameDayAppointments.filter(isActive).some((a) => {
+  return constrainingAppointments(sameDayAppointments).some((a) => {
     const existingStart = minutesOfDay(a.appointmentTime);
     if (existingStart === null) return true; // unparseable existing row blocks the slot
     return intervalsOverlap(start, proposedDuration, existingStart, a.durationMinutes);
@@ -110,8 +152,10 @@ export type AreaLock =
  */
 export function deriveAreaLock(sameDayAppointments: BookedAppointment[]): AreaLock {
   const areas = new Set(
-    sameDayAppointments
-      .filter(isActive)
+    // Remote bookings are dropped here as well as everywhere else: a call to
+    // Windsor says nothing about where the rep's van is, so letting it set the
+    // day's area would strand them exactly as an ONTARIO booking would.
+    constrainingAppointments(sameDayAppointments)
       .map((a) => a.schedulingArea)
       .filter((a): a is SchedulingArea => Boolean(a))
       // ONTARIO never locks a day. It is not a place — it is the bucket for
@@ -186,13 +230,20 @@ const sameCity = (a?: string | null, b?: string | null) =>
  * blocking the slot: refusing to offer times because of missing legacy data
  * would be a worse failure than an occasional long drive, and public bookings
  * always carry coordinates from Places.
+ *
+ * Remote consultations sit outside this entirely, in both directions:
+ * `destinationIsRemote` means nobody is driving to the new booking, and remote
+ * rows are filtered out of the existing day because nobody drove to those
+ * either. A rep on a call is wherever they already were.
  */
 export function withinTravelRadius(
   destination: Coordinates | null,
   sameDayAppointments: BookedAppointment[],
-  maxKm: number
+  maxKm: number,
+  destinationIsRemote = false
 ): boolean {
-  const existing = sameDayAppointments.filter(isActive);
+  if (destinationIsRemote) return true; // no drive to constrain
+  const existing = constrainingAppointments(sameDayAppointments);
   if (existing.length === 0) return true; // a free day imposes no constraint
   if (!destination) return true; // unknown destination ⇒ don't block
 
@@ -271,6 +322,12 @@ export type AvailabilityInput = {
   maxSameDayTravelKm: number;
   /** Where this booking would be. Null when the address wasn't geocoded. */
   destination: Coordinates | null;
+  /**
+   * True when the property sits in a remote-consultation city, so this booking
+   * is a call. Optional and defaulted false — a caller that predates the
+   * feature books an in-person visit, exactly as it always did.
+   */
+  destinationIsRemote?: boolean;
   /** Ontario wall clock "YYYY-MM-DDTHH:MM". Injected so tests are deterministic. */
   nowWallToronto: string;
 };
@@ -293,14 +350,24 @@ export function eligibleRepsForSlot(input: AvailabilityInput, date: string, time
   const {
     reps, appointments, daysOff, area, reservationMinutes,
     maxBookingsPerRepPerDay, maxSameDayTravelKm, destination,
+    destinationIsRemote = false,
   } = input;
 
   return reps
     .filter((rep) => {
+      // A day off is a day off — the one rule a remote booking still obeys,
+      // because it is about the person and not about the driving.
       if (daysOff.has(`${rep.id}|${date}`)) return false;
-      const day = sameDay(appointments, rep.id, date);
+      // Only in-person work shapes a rep's day. A remote booking neither
+      // appears in this list nor is measured against it.
+      const day = constrainingAppointments(sameDay(appointments, rep.id, date));
+
+      // A call has no location, no drive and no two-hour block, so none of the
+      // rules below describe it. It hovers alongside whatever the rep has on.
+      if (destinationIsRemote) return true;
+
       // Daily cap — a rep at capacity is done for the day regardless of gaps.
-      if (day.filter(isActive).length >= maxBookingsPerRepPerDay) return false;
+      if (day.length >= maxBookingsPerRepPerDay) return false;
       if (!repEligibleForArea(day, area)) return false;
       if (collidesWithExisting(time, reservationMinutes, day)) return false;
       // Keep a rep's day geographically tight.
@@ -358,7 +425,11 @@ export function chooseRep(
     (a, b) => a.bookingPriority - b.bookingPriority || a.id.localeCompare(b.id)
   );
   const rank = new Map(byPriority.map((rep, index) => [rep.id, index]));
-  const load = (repId: string) => sameDay(appointments, repId, date).filter(isActive).length;
+  // Load is IN-PERSON work only. A rep who has taken three calls has given up
+  // no driving time, so counting those would push the next site visit onto the
+  // other rep — the same capacity loss, arriving by the other door.
+  const load = (repId: string) =>
+    constrainingAppointments(sameDay(appointments, repId, date)).length;
 
   // Phase 1 — prime the top-priority rep, provided they are actually eligible.
   const primary = byPriority[0];

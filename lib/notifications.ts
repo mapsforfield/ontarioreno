@@ -118,14 +118,26 @@ export function torontoInstant(date: string, time: string): Date {
 // ─── Message copy ─────────────────────────────────────────────────────────────
 
 export function smsBookingConfirmation(c: BookingContext): string {
+  if (c.consultationMode === 'phone') {
+    return `Hi ${c.name}, your OntarioReno consultation call about ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. A specialist will call you. Need to reschedule? Reply to this text.`;
+  }
   return `Hi ${c.name}, your OntarioReno site visit for ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. Need to reschedule? Reply to this text.`;
 }
 
 export function smsReminder24h(c: ReminderContext): string {
+  if (c.consultationMode === 'phone') {
+    return `Reminder: Your OntarioReno consultation call about ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) at ${friendlyTime(c.time)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
+  }
   return `Reminder: Your OntarioReno site visit for ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) at ${friendlyTime(c.time)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
 }
 
 export function smsReminderDayOf(c: ReminderContext): string {
+  // Never promise a doorstep for a call. This message goes to real prospects
+  // on the morning of, and "looking forward to visiting" would have someone in
+  // Windsor clearing their afternoon for a van.
+  if (c.consultationMode === 'phone') {
+    return `Hi ${c.name}, our specialist is looking forward to speaking with you today at ${friendlyTime(c.time)} about ${c.propertyAddress}. Talk soon!`;
+  }
   return `Hi ${c.name}, our specialist is looking forward to visiting ${c.propertyAddress} today at ${friendlyTime(c.time)} for your ADU assessment. See you soon!`;
 }
 
@@ -169,11 +181,18 @@ export function buildPortalConfirmation(c: BookingContext): { subject: string; b
 }
 
 export function emailBookingConfirmation(c: BookingContext): { subject: string; body: string } {
-  const meeting = c.consultationMode === 'phone'
-    ? `Initial Consultation Call · ${c.visitMinutes} minutes`
+  // A remote consultation must never be described as a visit. The subject
+  // line, the "Where", and step 3 all used to say a specialist was coming to
+  // the property no matter the mode — which for a Windsor homeowner is someone
+  // waiting in their kitchen for a van that was never dispatched.
+  const remote = c.consultationMode === 'phone';
+  const meeting = remote
+    ? `Consultation Call · ${c.visitMinutes} minutes`
     : `In-Person Site Visit · ${c.visitMinutes} minutes`;
   return {
-    subject: `Your OntarioReno site visit — ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
+    subject: remote
+      ? `Your OntarioReno consultation call — ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`
+      : `Your OntarioReno site visit — ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
     body: [
       `Hi ${c.name},`,
       '',
@@ -181,13 +200,22 @@ export function emailBookingConfirmation(c: BookingContext): { subject: string; 
       '',
       `When:      ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
       `What:      ${meeting}`,
-      `Where:     ${c.propertyAddress}`,
+      remote
+        ? `Call:      ${c.phone || 'the number you gave us'}`
+        : `Where:     ${c.propertyAddress}`,
       `Reference: ${c.publicReference}`,
       '',
       'What happens next',
       '  1. Confirmation sent — this email.',
-      '  2. Zoning review — we run a preliminary property assessment before we arrive.',
-      `  3. Site visit — a specialist arrives at ${c.propertyAddress} at the scheduled time.`,
+      remote
+        ? '  2. Property review — we look over your address and project before we call.'
+        : '  2. Zoning review — we run a preliminary property assessment before we arrive.',
+      remote
+        // Honest about the timing: the specialist works this around their
+        // in-person day, so the slot is when they will reach out, not a
+        // guaranteed ring at the second.
+        ? '  3. Consultation call — a specialist calls you around your chosen time to go through the project.'
+        : `  3. Site visit — a specialist arrives at ${c.propertyAddress} at the scheduled time.`,
       '',
       'Need to change anything? Just reply to this email.',
       '',
@@ -197,10 +225,15 @@ export function emailBookingConfirmation(c: BookingContext): { subject: string; 
 }
 
 export function emailTeamAlert(c: BookingContext): { subject: string; body: string } {
+  const remote = c.consultationMode === 'phone';
   return {
-    subject: `New site visit booked — ${c.name}, ${friendlyDate(c.date)} ${friendlyTime(c.time)}`,
+    subject: remote
+      ? `New consultation CALL booked — ${c.name}, ${friendlyDate(c.date)} ${friendlyTime(c.time)}`
+      : `New site visit booked — ${c.name}, ${friendlyDate(c.date)} ${friendlyTime(c.time)}`,
     body: [
-      'A homeowner booked a site visit through the public consultation flow.',
+      remote
+        ? 'A homeowner booked a VIRTUAL consultation through the public flow — outside the drive radius, so nobody is travelling to this one.'
+        : 'A homeowner booked a site visit through the public consultation flow.',
       '',
       `Name:           ${c.name}`,
       `Phone:          ${c.phone || 'Not provided'}`,
@@ -391,7 +424,11 @@ export function dayOfReminderAt(date: string, time: string): Date {
 export type ReminderContext = Pick<
   BookingContext,
   'appointmentId' | 'name' | 'phone' | 'propertyAddress' | 'date' | 'time'
->;
+> &
+  // Reminders are rebuilt from the appointment row every time they are sent, so
+  // this has to travel with it. Optional because most callers describe a site
+  // visit, which is what the wording assumed before remote bookings existed.
+  Partial<Pick<BookingContext, 'consultationMode'>>;
 
 export function planReminderNotifications(
   c: ReminderContext,

@@ -47,6 +47,7 @@ import {
   User,
   TERMINAL_LEAD_STATUSES,
 } from './types';
+import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
 type FinancePartnerDraft = Omit<FinancePartner, 'id'>;
@@ -273,9 +274,7 @@ type PortalDataContextValue = PortalDataState & {
     note: string
   ) => Promise<Lead | null>;
   /** Free slots for one lead, computed the same way the homeowner's calendar is. */
-  fetchLeadSlots: (
-    leadId: string
-  ) => Promise<{ slots: Array<{ date: string; time: string }>; visitMinutes: number }>;
+  fetchLeadSlots: (leadId: string) => Promise<LeadSlotsPayload>;
   /**
    * Book a visit for a lead from the portal. `notify` sends the homeowner the
    * usual confirmation; it defaults to off at the call site because the rep is
@@ -3704,10 +3703,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
 
       fetchLeadSlots: async (leadId) => {
-        const payload = await apiCall<{ slots: Array<{ date: string; time: string }>; visitMinutes: number }>(
+        const payload = await apiCall<LeadSlotsPayload>(
           `/api/leads?_resource=lead_slots&leadId=${encodeURIComponent(leadId)}`
         );
-        return { slots: payload?.slots ?? [], visitMinutes: payload?.visitMinutes ?? 0 };
+        return {
+          slots: payload?.slots ?? [],
+          visitMinutes: payload?.visitMinutes ?? 0,
+          blocked: payload?.blocked,
+        };
       },
 
       bookLeadVisit: async (leadId, date, time, notify) => {

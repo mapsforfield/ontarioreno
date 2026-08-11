@@ -38,6 +38,12 @@ export type BookingRequest = {
   maxSameDayTravelKm: number;
   /** Property coordinates, for the same-day travel radius. */
   destination: Coordinates | null;
+  /**
+   * True when the property is in a remote-consultation city, so this is a call
+   * rather than a site visit. Carried through to the stored appointment, which
+   * is what keeps the row inert for every later booking on that rep's day.
+   */
+  remoteConsultation?: boolean;
   nowWallToronto: string;
   programKey: string;
   programVersion: number;
@@ -130,6 +136,7 @@ export async function bookSlot(
     primaryRepPrimingBookings: request.primaryRepPrimingBookings,
     maxSameDayTravelKm: request.maxSameDayTravelKm,
     destination: request.destination,
+    destinationIsRemote: request.remoteConsultation === true,
     nowWallToronto: request.nowWallToronto,
   };
 

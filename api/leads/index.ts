@@ -21,11 +21,13 @@ import {
   type SchedulingArea,
 } from '../../lib/program-config.js';
 import { routeConsultation } from '../../lib/consultation-routing.js';
+import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
 import {
   computeAvailability,
   torontoWallClock,
   type BookedAppointment,
 } from '../../lib/scheduling.js';
+import type { LeadSlotsPayload, SlotBlock } from '../../lib/lead-slots.js';
 import {
   bookSlot,
   SYSTEM_BOOKING_USER_ID,
@@ -1353,7 +1355,21 @@ const SCHEDULING_APPOINTMENT_SELECT = {
   latitude: true,
   longitude: true,
   city: true,
+  // Without this the rules cannot tell a call from a site visit, and every
+  // remote booking anchors the rep's day again — the exact bug it fixes.
+  remoteConsultation: true,
 };
+
+/**
+ * Is this lead's property served remotely?
+ *
+ * Both name fields are consulted: Places fills `city` for most addresses and
+ * `resolvedMunicipality` carries what it actually returned, and a lead that
+ * arrived with one of them blank must not quietly fall back to in-person.
+ */
+function leadIsRemote(lead: { city?: string | null; resolvedMunicipality?: string | null }): boolean {
+  return isRemoteConsultationCity(lead.city, lead.resolvedMunicipality);
+}
 
 async function loadPublicFlowLead(leadRef: string) {
   if (!leadRef) return null;
@@ -1370,21 +1386,33 @@ type FlowLead = NonNullable<Awaited<ReturnType<typeof loadPublicFlowLead>>>;
  * booking itself is shared: a rep offered a time in one place and not the other
  * is a rep who ends up double-booked.
  */
-async function availableSlotsForLead(lead: FlowLead) {
-  const empty = { slots: [] as ReturnType<typeof computeAvailability>, visitMinutes: 0 };
-  if (!lead.schedulingArea) return empty;
+async function availableSlotsForLead(lead: FlowLead): Promise<LeadSlotsPayload> {
+  const empty = (blocked: SlotBlock): LeadSlotsPayload => ({ slots: [], visitMinutes: 0, blocked });
+  if (!lead.schedulingArea) return empty({ reason: 'NO_AREA' });
   // The program the lead was CAPTURED under, falling back to the area's program
   // for rows written before programKey was reliable. Keying on the lead is what
   // lets two Ontario-wide programs coexist: they share the ONTARIO area, so
   // resolving by area alone would hand every one of them the first match.
   const program =
     programByKey(lead.programKey) ?? programForArea(lead.schedulingArea as SchedulingArea);
-  if (!program || !program.enabled) return empty;
+  if (!program) return empty({ reason: 'NO_AREA' });
+  if (!program.enabled) {
+    return empty(
+      program.closure
+        ? {
+            reason: 'PROGRAM_CLOSED',
+            programName: program.closure.shortName,
+            confirmedOn: program.closure.confirmedOn,
+          }
+        : { reason: 'PROGRAM_NOT_OPEN', programName: program.areaLabel }
+    );
+  }
 
   const nowWall = torontoWallClock();
+  const remote = leadIsRemote(lead);
   const reps = await prisma.user.findMany(BOOKABLE_REP_QUERY);
   const repIds = reps.map((r) => r.id);
-  if (repIds.length === 0) return empty;
+  if (repIds.length === 0) return empty({ reason: 'NO_REPS' });
 
   const fromDate = nowWall.slice(0, 10);
   const toDate = new Date(
@@ -1426,10 +1454,11 @@ async function availableSlotsForLead(lead: FlowLead) {
     primaryRepPrimingBookings: program.primaryRepPrimingBookings,
     maxSameDayTravelKm: program.maxSameDayTravelKm,
     destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
+    destinationIsRemote: remote,
     nowWallToronto: nowWall,
   });
 
-  return { slots, visitMinutes: program.visitMinutes };
+  return { slots, visitMinutes: program.visitMinutes, remoteConsultation: remote };
 }
 
 export type LeadBookingResult =
@@ -1442,6 +1471,8 @@ export type LeadBookingResult =
       visitMinutes: number;
       propertyAddress: string;
       program: ProgramConfig;
+      /** True when this booking is a call rather than a site visit. */
+      remoteConsultation: boolean;
     }
   | { ok: false; status: number; payload: Record<string, unknown> };
 
@@ -1484,6 +1515,10 @@ async function bookVisitForLead(params: {
   }
 
   const nowWall = torontoWallClock();
+  // Decided once, here, from the property — never from the rep's dropdown and
+  // never from the program's own consultationMode. A Windsor basement is a call
+  // whichever program brought it in.
+  const remote = leadIsRemote(lead);
 
   // The same Customer Notes template a rep would insert by hand, read from the
   // admin-editable setting so the two never drift.
@@ -1505,6 +1540,12 @@ async function bookVisitForLead(params: {
     bookedVia === 'public_flow'
       ? 'Booked through the public Hamilton grant flow.'
       : 'Booked from the portal on the homeowner’s behalf.',
+    // First line the rep reads, and the one that changes what they do: nobody
+    // is driving to this, and the time is a starting point rather than a
+    // doorstep appointment.
+    remote
+      ? `VIRTUAL CONSULTATION — ${lead.city || lead.resolvedMunicipality} is outside the drive radius. Call the homeowner; arrange the time around your in-person day.`
+      : '',
     answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
     answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
     answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
@@ -1570,9 +1611,17 @@ async function bookVisitForLead(params: {
             appointmentTime: request.time,
             durationMinutes: request.reservationMinutes,
             // Follows the program's consultation mode so the calendar entry
-            // matches what the homeowner was told they were booking.
-            appointmentType:
-              program.consultationMode === 'phone' ? 'phone_consultation' : 'home_visit',
+            // matches what the homeowner was told they were booking — unless
+            // the property is too far to drive to, which overrides it.
+            appointmentType: request.remoteConsultation
+              ? 'video_consultation'
+              : program.consultationMode === 'phone'
+                ? 'phone_consultation'
+                : 'home_visit',
+            // The scheduling fact, stored separately from the display type
+            // above so a rep changing the dropdown in the portal cannot
+            // silently re-anchor everyone else's travel radius.
+            remoteConsultation: request.remoteConsultation === true,
             status: 'scheduled',
             source: 'manual',
             location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
@@ -1611,6 +1660,7 @@ async function bookVisitForLead(params: {
       primaryRepPrimingBookings: program.primaryRepPrimingBookings,
       maxSameDayTravelKm: program.maxSameDayTravelKm,
       destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
+      remoteConsultation: remote,
       nowWallToronto: nowWall,
       programKey: program.key,
       programVersion: program.version,
@@ -1662,7 +1712,10 @@ async function bookVisitForLead(params: {
           date: booking.date,
           time: booking.time,
           visitMinutes: program.visitMinutes,
-          consultationMode: program.consultationMode,
+          // A remote property overrides the program's mode. Everything the
+          // homeowner is told — subject line, "Where", the reminders — hangs
+          // off this, so it must be the property's answer, not the program's.
+          consultationMode: remote ? 'phone' : program.consultationMode,
           teamInbox: teamInbox(),
           repEmail: assignedRep?.email ?? '',
           repName: assignedRep?.name ?? '',
@@ -1710,6 +1763,7 @@ async function bookVisitForLead(params: {
     visitMinutes: program.visitMinutes,
     propertyAddress: [lead.address, lead.city].filter(Boolean).join(', '),
     program,
+    remoteConsultation: remote,
   };
 }
 
@@ -2117,6 +2171,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
         durationMinutes: result.durationMinutes,
         visitMinutes: result.visitMinutes,
         propertyAddress: result.propertyAddress,
+        remoteConsultation: result.remoteConsultation,
         notifications: delivery,
       });
     } catch (err) {

@@ -360,3 +360,132 @@ test('the travel radius still binds an ONTARIO booking', () => {
   assert.equal(withinTravelRadius(nearby, day, 10), true, 'a few km away is bookable');
   assert.equal(withinTravelRadius(ajax, day, 10), false, 'across the GTA is not');
 });
+
+// ─── Remote consultations hover alongside the driving day ────────────────────
+// A property too far to drive to is sold by video or phone. Such a booking must
+// be inert in BOTH directions: it constrains nobody, and nothing constrains it.
+// The bug it fixes is concrete — one Niagara Falls lead taken as the first
+// appointment of a day anchored that rep's travel radius on Niagara Falls, so
+// the next three leads were ineligible for them and fell to the other rep. The
+// far lead cost no drive time and a whole day of capacity.
+
+/** A booking someone drives to, and the same booking done as a call. */
+const remoteAppt = (
+  repId: string,
+  date: string,
+  time: string,
+  area: 'HAMILTON' | 'SIMCOE' | 'ONTARIO' | null,
+  coords: { latitude: number; longitude: number; city: string }
+): BookedAppointment => ({ ...appt(repId, date, time, area), ...coords, remoteConsultation: true });
+
+/** Niagara Falls — well outside the 10 km radius from Hamilton. */
+const NIAGARA = { latitude: 43.0896, longitude: -79.0849, city: 'Niagara Falls' };
+
+test('a remote booking never anchors the travel radius', () => {
+  const day = [remoteAppt('rep-a', DATE, '16:00', 'ONTARIO', NIAGARA)];
+  assert.equal(
+    withinTravelRadius(HAMILTON_A, day, 10),
+    true,
+    'a call to Niagara Falls must not put Hamilton out of range'
+  );
+});
+
+test('a remote destination is never measured against the radius', () => {
+  const day: BookedAppointment[] = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A }];
+  assert.equal(withinTravelRadius(NIAGARA, day, 10, false), false, 'as a site visit: too far');
+  assert.equal(withinTravelRadius(NIAGARA, day, 10, true), true, 'as a call: no drive to constrain');
+});
+
+test('a remote booking neither sets nor breaks the scheduling-area lock', () => {
+  const day = [remoteAppt('rep-a', DATE, '16:00', 'SIMCOE', NIAGARA)];
+  assert.equal(deriveAreaLock(day).area, null, 'a call says nothing about where the van is');
+  assert.equal(deriveAreaLock(day).conflict, false);
+  assert.equal(repEligibleForArea(day, 'HAMILTON'), true);
+});
+
+test('a remote booking does not consume a fixed start', () => {
+  const day = [remoteAppt('rep-a', DATE, '16:00', 'ONTARIO', NIAGARA)];
+  assert.equal(collidesWithExisting('16:00', RESERVE, day), false);
+  assert.deepEqual(freeStartsForRep(day, SLOTS, RESERVE), SLOTS, 'every start stays open');
+});
+
+test('a remote booking does not count toward the daily cap', () => {
+  const day = [
+    remoteAppt('rep-a', DATE, '10:00', 'ONTARIO', NIAGARA),
+    remoteAppt('rep-a', DATE, '12:00', 'ONTARIO', NIAGARA),
+    remoteAppt('rep-a', DATE, '14:00', 'ONTARIO', NIAGARA),
+  ];
+  const input = { ...baseInput, appointments: day, destination: HAMILTON_A };
+  assert.ok(
+    eligibleRepsForSlot(input, DATE, '16:00').includes('rep-a'),
+    'three calls must not use up a rep’s three site visits'
+  );
+});
+
+test('a remote booking carries no weight in rep assignment', () => {
+  // The priming rep takes the first two visits of a day. If calls counted, two
+  // far-away leads would push the next real visit onto the other rep.
+  const day = [
+    remoteAppt('rep-a', DATE, '10:00', 'ONTARIO', NIAGARA),
+    remoteAppt('rep-a', DATE, '12:00', 'ONTARIO', NIAGARA),
+  ];
+  assert.equal(chooseRep(['rep-a', 'rep-b'], REPS, day, DATE, 2), 'rep-a');
+});
+
+test('a remote lead is offered every time, whatever the reps are doing', () => {
+  // Nothing about a rep’s driving day can make a call impossible, so the
+  // homeowner sees the full calendar and the rep arranges it around their road
+  // time. Days off are the one rule that still applies — that is about the
+  // person, not the driving.
+  const appointments = [
+    { ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A },
+    { ...appt('rep-b', DATE, '10:00', 'HAMILTON'), ...HAMILTON_B },
+  ];
+  const input = {
+    ...baseInput,
+    appointments,
+    destination: NIAGARA,
+    destinationIsRemote: true,
+  };
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '10:00'), ['rep-a', 'rep-b']);
+
+  const bothOff = { ...input, daysOff: new Set([`rep-a|${DATE}`, `rep-b|${DATE}`]) };
+  assert.deepEqual(eligibleRepsForSlot(bothOff, DATE, '10:00'), [], 'a day off is still a day off');
+});
+
+test('regression: a far-away lead no longer blocks the rest of the rep’s day', () => {
+  // The Wednesday that prompted this. The priority rep took the first booking
+  // of the day, in Niagara Falls. Every later Hamilton lead then found them
+  // ineligible and went to the other rep.
+  const asSiteVisit: BookedAppointment[] = [
+    { ...appt('rep-a', DATE, '16:00', 'ONTARIO'), ...NIAGARA },
+  ];
+  const before = { ...baseInput, appointments: asSiteVisit, destination: HAMILTON_A };
+  assert.deepEqual(
+    eligibleRepsForSlot(before, DATE, '18:00'),
+    ['rep-b'],
+    'the old behaviour: the priority rep is locked out of their own city'
+  );
+
+  const asCall = [remoteAppt('rep-a', DATE, '16:00', 'ONTARIO', NIAGARA)];
+  const after = { ...baseInput, appointments: asCall, destination: HAMILTON_A };
+  assert.deepEqual(
+    eligibleRepsForSlot(after, DATE, '18:00'),
+    ['rep-a', 'rep-b'],
+    'as a call, the far lead costs the priority rep nothing'
+  );
+  assert.equal(
+    chooseRep(eligibleRepsForSlot(after, DATE, '18:00'), REPS, asCall, DATE, 2),
+    'rep-a',
+    'and the next Hamilton lead still goes to the priority rep'
+  );
+});
+
+test('an in-person booking is unchanged by the remote field being absent', () => {
+  // Every row written before the column existed reads as false. If that ever
+  // flipped, the travel radius would quietly stop applying to real visits.
+  const legacy: BookedAppointment[] = [{ ...appt('rep-a', DATE, '10:00', 'HAMILTON'), ...HAMILTON_A }];
+  assert.equal(legacy[0].remoteConsultation, undefined);
+  assert.equal(withinTravelRadius(BARRIE, legacy, 10), false, 'still too far');
+  assert.equal(deriveAreaLock(legacy).area, 'HAMILTON', 'still locks the day');
+});
