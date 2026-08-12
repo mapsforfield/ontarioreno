@@ -582,7 +582,163 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
-export const PROGRAMS: ProgramConfig[] = [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BASEMENT_FINANCING_PROGRAM];
+// ─── Bathroom renovation financing ────────────────────────────────────────────
+// The same financing product as the basement offer above — same lender, same
+// signed structure — pointed at a different project. It is a separate program
+// rather than another project type on the basement flow because the two are sold
+// on different pages to different intent, and the rep's brief, the questions and
+// the appointment label all need to say "bathroom".
+//
+// The financing terms below are copied from the basement program deliberately
+// rather than shared: if one offer's terms ever change without the other's, the
+// diff has to show it. Nothing here may be changed without a document that says
+// so, exactly as above.
+
+const BATHROOM_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you planning?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'bathroom_refresh', label: 'Update an existing bathroom' },
+    { value: 'bathroom_gut', label: 'Full gut and rebuild' },
+    { value: 'bathroom_addition', label: 'Add a new bathroom' },
+    { value: 'multiple_bathrooms', label: 'More than one bathroom' },
+    { value: 'unsure', label: 'Still deciding' },
+  ],
+};
+
+const BATHROOM_CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'How are you thinking about paying for the work?',
+  help: 'Financing covers the full cost with nothing due upfront. Paying cash is fine too.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'need_financing', label: "I'd like to use the monthly financing" },
+    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+  ],
+};
+
+/**
+ * Prep questions — asked AFTER booking, never before, and carrying no routing
+ * weight. The basement set asks about entrances and permits, which a bathroom
+ * project has no use for. What a rep actually wants before walking in is whether
+ * the layout is moving (the single biggest driver of a bathroom quote), what is
+ * there now, and whether there is a known water problem.
+ */
+const BATHROOM_PREP_QUESTIONS: Question[] = [
+  {
+    key: 'bathroomType',
+    label: 'Which bathroom is it?',
+    step: 3,
+    options: [
+      { value: 'main', label: 'Main / family bathroom' },
+      { value: 'ensuite', label: 'Primary ensuite' },
+      { value: 'powder', label: 'Powder room' },
+      { value: 'basement', label: 'Basement bathroom' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'layoutChange',
+    label: 'Is the layout staying the same?',
+    step: 3,
+    options: [
+      { value: 'same_layout', label: 'Same layout, new finishes' },
+      { value: 'moving_fixtures', label: 'Moving the tub, shower or toilet' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'waterDamage',
+    label: 'Any known leaks or water damage?',
+    step: 3,
+    options: [
+      { value: 'none', label: 'None that we know of' },
+      { value: 'suspected', label: 'Something we are worried about' },
+      { value: 'known', label: 'Yes, there is damage' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+];
+
+const BATHROOM_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'That is what the visit is for',
+  lead: 'The financing covers the full cost of the renovation, so there is nothing to pay before the work starts.',
+  leadEmphasis: 'Nothing upfront.',
+  milestones: ['Approved', 'Funds released', 'Build', 'Balance released'],
+  highlight:
+    'It is an open loan — you can pay it down or pay it off at any time, with no penalty and no lien on your home.',
+  closing: 'Your consultant will price your bathroom and walk through the exact monthly number with you.',
+  continueLabel: 'Continue',
+};
+
+const BATHROOM_FUNDING_HIGHLIGHTS = [
+  'No upfront cost — the renovation is financed in full, on approved credit.',
+  'Up to 40% of funds can be released at signing or project start with your authorization; the remaining 60% after completion.',
+  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
+];
+
+export const BATHROOM_FINANCING_PROGRAM: ProgramConfig = {
+  key: 'bathroom-financing',
+  version: 1,
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'bathroom',
+  areaLabel: 'Ontario',
+  // "from about" is load bearing, more so here than on the basement offer.
+  //
+  // $99 is an entry-point payment, not a price: at the same rate and
+  // amortization the basement's $399 comes from, it is roughly a $10,000
+  // project, and this site's own bathroom page puts a typical Ontario bathroom
+  // at $15,000–$40,000. So most homeowners reading this will finance well above
+  // $99, and the wording has to make that obvious before a consultant is stood
+  // in a bathroom walking a number back. Stated as a starting point, never as
+  // "your payment", and never without "on approved credit".
+  displayAmountLabel: 'from about $99 a month, on approved credit',
+  fundingHighlights: BATHROOM_FUNDING_HIGHLIGHTS,
+  programTerms: [
+    'Financing is a personal open loan and is subject to credit approval.',
+    'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property.',
+    'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
+  ],
+  whyFreeText:
+    "Homeowners don't want to pay upfront just to find out what a bathroom costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: BATHROOM_FUNDING_GUIDANCE,
+  eligibleProjectTypes: [
+    'bathroom_refresh',
+    'bathroom_gut',
+    'bathroom_addition',
+    'multiple_bathrooms',
+  ],
+  // Same reasoning as the basement offer: no application window to be early for,
+  // and an exploratory lead is usually someone who has not been shown the build
+  // is affordable yet. Everyone gets the calendar.
+  nurtureTimelines: [],
+  questions: [OWNERSHIP, BATHROOM_PROJECT_TYPE, TIMELINE, BATHROOM_CONTRIBUTION],
+  prepQuestions: BATHROOM_PREP_QUESTIONS,
+  // Nobody prices tile, waterproofing and a plumbing move off a photo.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Bathroom Renovation Consultation',
+  pageTitle: 'Bathroom Renovation Consultation | OntarioReno',
+  fundingStepHeading: 'How the monthly financing works',
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+};
+
+export const PROGRAMS: ProgramConfig[] = [
+  HAMILTON_PROGRAM,
+  SIMCOE_PROGRAM,
+  BASEMENT_FINANCING_PROGRAM,
+  BATHROOM_FINANCING_PROGRAM,
+];
 
 /**
  * Municipality → scheduling area.
@@ -670,6 +826,16 @@ export function resolveProgramGeography(
   };
 }
 
+/**
+ * Derive a program from a scheduling area.
+ *
+ * Only meaningful for a municipality-gated area, where the area IS the program.
+ * ONTARIO now holds more than one program (basement and bathroom financing), so
+ * this returns the first — which is why the submit branch never routes an
+ * ontario_wide program through here and uses the landing page's slug instead.
+ * The remaining callers are the legacy fallback for a stored lead with no
+ * programKey, all of which predate the bathroom offer.
+ */
 export function programForArea(area: SchedulingArea | null): ProgramConfig | null {
   if (!area) return null;
   return PROGRAMS.find((p) => p.schedulingArea === area) ?? null;

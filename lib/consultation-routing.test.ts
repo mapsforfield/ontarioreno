@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import { routeConsultation } from './consultation-routing.ts';
 import {
   BASEMENT_FINANCING_PROGRAM,
+  BATHROOM_FINANCING_PROGRAM,
   DEFAULT_NURTURE_TIMELINES,
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   areaForMunicipality,
+  programBySlug,
   questionsForStep,
   resolveProgramGeography,
 } from './program-config.ts';
@@ -487,4 +489,114 @@ test('opting out of nurture is per-program, not global', () => {
     answers: { ...OK, timeline: 'exploring' },
   });
   assert.equal(r.outcome, 'NURTURE');
+});
+
+// ─── Bathroom financing ──────────────────────────────────────────────────────
+
+test('the bathroom program is Ontario-wide and live', () => {
+  assert.equal(BATHROOM_FINANCING_PROGRAM.geography, 'ontario_wide');
+  assert.equal(BATHROOM_FINANCING_PROGRAM.schedulingArea, 'ONTARIO');
+  assert.equal(BATHROOM_FINANCING_PROGRAM.enabled, true);
+  assert.equal(BATHROOM_FINANCING_PROGRAM.consultationMode, 'in_person');
+  assert.equal(programBySlug('bathroom'), BATHROOM_FINANCING_PROGRAM);
+});
+
+test('the two Ontario-wide programs stay distinct records', () => {
+  // They share a lender and a scheduling area, so the only things keeping a
+  // bathroom lead out of the basement pile are the key and the slug. A copied
+  // config that forgot to change one would route silently and be found in the
+  // rep's brief weeks later.
+  assert.notEqual(BATHROOM_FINANCING_PROGRAM.key, BASEMENT_FINANCING_PROGRAM.key);
+  assert.notEqual(BATHROOM_FINANCING_PROGRAM.slug, BASEMENT_FINANCING_PROGRAM.slug);
+  assert.notEqual(
+    BATHROOM_FINANCING_PROGRAM.appointmentProjectTypeLabel,
+    BASEMENT_FINANCING_PROGRAM.appointmentProjectTypeLabel
+  );
+});
+
+test('a Toronto bathroom lead books rather than queueing', () => {
+  const geo = resolveProgramGeography(BATHROOM_FINANCING_PROGRAM, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program: BATHROOM_FINANCING_PROGRAM,
+    answers: { ownership: 'yes', projectType: 'bathroom_gut', timeline: 'asap', contribution: 'need_financing' },
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('WANTS_FINANCING'));
+});
+
+test('every bathroom project type the form offers is an eligible one', () => {
+  const offered = BATHROOM_FINANCING_PROGRAM.questions
+    .find((q) => q.key === 'projectType')!
+    .options.map((o) => o.value)
+    .filter((v) => v !== 'unsure');
+  for (const value of offered) {
+    assert.ok(
+      BATHROOM_FINANCING_PROGRAM.eligibleProjectTypes.includes(value),
+      `${value} is offered but not eligible`
+    );
+  }
+});
+
+test('the bathroom terms never promise a rate or a payment', () => {
+  // Same rule as the basement offer. $99 is an entry point, not a price — at
+  // the rate the basement's $399 comes from it is about a $10,000 project,
+  // where a typical Ontario bathroom is $15,000–$40,000. So the headline has to
+  // keep BOTH qualifiers: "from about" (it is a floor) and "on approved credit"
+  // (it is the lender's call). Dropping either turns a starting point into a
+  // quote, and the consultant is the one who has to walk it back.
+  const terms = BATHROOM_FINANCING_PROGRAM.programTerms;
+  assert.match(terms.join(' '), /subject to credit approval/i);
+  assert.match(terms.join(' '), /confirmed in writing before you sign/i);
+  assert.ok(terms.length <= 5, `terms grew to ${terms.length} lines`);
+  assert.doesNotMatch(terms.join(' '), /\d+\.\d+\s*%/, 'no interest rate on the public flow');
+  const headline = BATHROOM_FINANCING_PROGRAM.displayAmountLabel;
+  assert.match(headline, /from about/i, 'the monthly figure must read as a starting point');
+  assert.match(headline, /on approved credit/i);
+  assert.equal(
+    BATHROOM_FINANCING_PROGRAM.fundingGuidance.highlight.includes('%'),
+    false,
+    'the funding screen must not quote a rate'
+  );
+});
+
+test('the bathroom program books an exploratory lead and tags it', () => {
+  assert.deepEqual(BATHROOM_FINANCING_PROGRAM.nurtureTimelines, []);
+  for (const timeline of ['exploring', '3_plus_months']) {
+    const r = routeConsultation({
+      addressState: 'ADDRESS_VERIFIED',
+      area: 'ONTARIO',
+      program: BATHROOM_FINANCING_PROGRAM,
+      answers: { ownership: 'yes', projectType: 'bathroom_refresh', timeline, contribution: 'cash_equity' },
+    });
+    assert.equal(r.outcome, 'DIRECT_CALENDAR', `${timeline} must reach the calendar`);
+  }
+});
+
+test('the bathroom flow asks something on every step', () => {
+  // The flow renders three screens unconditionally; a step with no questions is
+  // a blank screen between an ad click and the calendar.
+  for (const step of [1, 2, 3] as const) {
+    assert.ok(
+      questionsForStep(BATHROOM_FINANCING_PROGRAM, step).length > 0,
+      `step ${step} has no questions`
+    );
+  }
+});
+
+test('the bathroom prep questions ask about a bathroom', () => {
+  // The basement set asks about separate entrances and building permits, which
+  // tell a rep nothing before a bathroom visit. Copying it over was the easy
+  // mistake here.
+  const keys = BATHROOM_FINANCING_PROGRAM.prepQuestions.map((q) => q.key);
+  assert.ok(keys.includes('layoutChange'), 'the layout question drives the whole quote');
+  assert.deepEqual(
+    keys.filter((k) => ['separateEntrance', 'permitStatus', 'basementStatus'].includes(k)),
+    []
+  );
 });
