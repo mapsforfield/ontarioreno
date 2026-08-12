@@ -15,7 +15,11 @@ import {
   withinTravelRadius,
   type BookedAppointment,
 } from './scheduling.ts';
-import { HAMILTON_PROGRAM } from './program-config.ts';
+import {
+  BASEMENT_FINANCING_PROGRAM,
+  BATHROOM_FINANCING_PROGRAM,
+  HAMILTON_PROGRAM,
+} from './program-config.ts';
 
 const SLOTS = HAMILTON_PROGRAM.slotStartTimes;
 const RESERVE = HAMILTON_PROGRAM.reservationMinutes; // 120
@@ -488,4 +492,103 @@ test('an in-person booking is unchanged by the remote field being absent', () =>
   assert.equal(legacy[0].remoteConsultation, undefined);
   assert.equal(withinTravelRadius(BARRIE, legacy, 10), false, 'still too far');
   assert.equal(deriveAreaLock(legacy).area, 'HAMILTON', 'still locks the day');
+});
+
+// ─── One rep, one day, every program ─────────────────────────────────────────
+//
+// The scheduler is program-agnostic on purpose: it is handed a rep's whole day
+// and never filters by programKey. That is what makes a rep's calendar a single
+// calendar rather than one per offer. These tests pin it, because the failure
+// mode is silent and expensive — two programs each believing they own the day
+// would double-book a rep into one 45-minute visit twice over, and nobody would
+// find out until a homeowner is standing at the door.
+//
+// They use the BATHROOM program's constants against BASEMENT bookings
+// deliberately. Both offers spread SHARED_SCHEDULING, so if a future edit gives
+// one program its own starts or its own cap, these are the tests that notice.
+
+test('a basement booking blocks the same start for a bathroom lead', () => {
+  const appointments = [
+    appt('rep-a', DATE, '10:00', 'ONTARIO'),
+    appt('rep-b', DATE, '10:00', 'ONTARIO'),
+  ];
+  const input = {
+    ...baseInput,
+    appointments,
+    area: 'ONTARIO' as const,
+    slotStartTimes: BATHROOM_FINANCING_PROGRAM.slotStartTimes,
+    reservationMinutes: BATHROOM_FINANCING_PROGRAM.reservationMinutes,
+    maxBookingsPerRepPerDay: BATHROOM_FINANCING_PROGRAM.maxBookingsPerRepPerDay,
+  };
+  const slots = computeAvailability(input);
+  assert.equal(
+    slots.some((s) => s.date === DATE && s.time === '10:00'),
+    false,
+    'both reps are already out on basement visits at 10:00'
+  );
+  assert.ok(slots.some((s) => s.date === DATE && s.time === '12:00'), 'the rest of the day is still open');
+});
+
+test('the daily cap counts a rep’s visits across programs, not per program', () => {
+  // The cap protects a rep's day, so three basement visits must exhaust it for
+  // a bathroom lead too. A per-program cap would quietly allow six.
+  const cap = BATHROOM_FINANCING_PROGRAM.maxBookingsPerRepPerDay;
+  const appointments: BookedAppointment[] = [];
+  for (const rep of ['rep-a', 'rep-b']) {
+    for (const time of SLOTS.slice(0, cap)) appointments.push(appt(rep, DATE, time, 'ONTARIO'));
+  }
+  const slots = computeAvailability({
+    ...baseInput,
+    appointments,
+    area: 'ONTARIO' as const,
+    maxBookingsPerRepPerDay: cap,
+  });
+  assert.equal(slots.some((s) => s.date === DATE), false, 'the day is full regardless of which offer fills it');
+});
+
+test('the travel radius measures a bathroom lead against a basement visit', () => {
+  // Neither program locks an area (both are ONTARIO), so the radius is the only
+  // thing keeping the drive sane. A rep anchored in Hamilton by a basement
+  // visit must not be handed a Barrie bathroom on the same day.
+  const appointments = [
+    { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A },
+    { ...appt('rep-b', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A },
+  ];
+  const input = {
+    ...baseInput,
+    appointments,
+    area: 'ONTARIO' as const,
+    destination: BARRIE,
+    maxSameDayTravelKm: BATHROOM_FINANCING_PROGRAM.maxSameDayTravelKm,
+  };
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '12:00'), []);
+  // ...and a nearby bathroom on the same day is still fine.
+  assert.deepEqual(
+    eligibleRepsForSlot({ ...input, destination: HAMILTON_B }, DATE, '12:00'),
+    ['rep-a', 'rep-b']
+  );
+});
+
+test('the two financing offers share one set of scheduling constants', () => {
+  // If these ever diverge it is a deliberate act, and it should show up here as
+  // a failing test rather than as a rep with two overlapping 10:00 visits.
+  for (const field of [
+    'visitMinutes',
+    'reservationMinutes',
+    'leadTimeHours',
+    'bookingHorizonDays',
+    'maxBookingsPerRepPerDay',
+    'primaryRepPrimingBookings',
+    'maxSameDayTravelKm',
+  ] as const) {
+    assert.equal(
+      BATHROOM_FINANCING_PROGRAM[field],
+      BASEMENT_FINANCING_PROGRAM[field],
+      `${field} differs between the basement and bathroom offers`
+    );
+  }
+  assert.deepEqual(
+    BATHROOM_FINANCING_PROGRAM.slotStartTimes,
+    BASEMENT_FINANCING_PROGRAM.slotStartTimes
+  );
 });
