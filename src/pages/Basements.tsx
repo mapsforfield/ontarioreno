@@ -7,7 +7,8 @@ import {
   Calculator,
   Hammer,
 } from 'lucide-react';
-import { buttonStyles } from '../lib/uiStyles';
+import { buttonStyles, eyebrowStyles } from '../lib/uiStyles';
+import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function Basements() {
@@ -44,6 +45,46 @@ export default function Basements() {
                 Start Project Review <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Transformation, before the numbers.
+          A reader arriving from "basement renovation cost" is trying to picture
+          the result. Showing the change first is what makes the cost tables
+          below read as a price for something, rather than as a bill. */}
+      <section className="border-b border-slate-200 bg-white py-14 sm:py-16">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className={eyebrowStyles}>See the difference</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-[-0.02em] text-slate-900 md:text-4xl">
+              From unfinished basement to finished living space
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              The same square footage you already own, turned into a room the
+              rest of the house actually uses. Drag the handle to compare.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-4xl">
+            <BeforeAfterSlider
+              beforeSrc="/images/before-image-hero.jpg"
+              afterSrc="/images/after-image-hero.jpg"
+              beforeAlt="Unfinished Ontario basement before renovation"
+              afterAlt="Finished basement living space after renovation"
+              beforeLabel="Before"
+              afterLabel="After"
+              attribution="Basement renovation, before and after."
+            />
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              to="/consultation/basement"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-7 py-4 font-bold text-white shadow-lg transition hover:bg-[#16325a]"
+            >
+              Book a free in-home consultation <ArrowRight className="h-5 w-5" />
+            </Link>
           </div>
         </div>
       </section>
