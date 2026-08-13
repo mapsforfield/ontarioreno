@@ -8,6 +8,7 @@ import {
   Hammer,
   AlertTriangle,
 } from 'lucide-react';
+import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function BathroomRenovations() {
   return (
@@ -29,12 +30,22 @@ export default function BathroomRenovations() {
               renovation costs across Ontario before you lock in your next step.
             </p>
 
-            <Link
-              to="/match"
-              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2"
-            >
-              Start Project Review <ArrowRight className="w-5 h-5" />
-            </Link>
+            {/* Both paths stay live; the booking leads because a reader on
+                a cost guide has usually already decided they want the work. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link
+                to="/consultation/bathroom"
+                className="bg-white hover:bg-blue-50 text-[#1B3C6C] px-8 py-4 rounded-xl font-bold text-lg shadow-lg transition-all inline-flex items-center justify-center gap-2"
+              >
+                Book a free in-home consultation <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/match"
+                className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center justify-center gap-2"
+              >
+                Start Project Review <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -311,22 +322,15 @@ export default function BathroomRenovations() {
                   forward with the right renovation path.
                 </p>
 
+                {/* Booking takes the top slot: this page's whole subject is
+                    what a bathroom costs, and the consultation is where that
+                    gets priced for real. The project review keeps its place. */}
+                <BookConsultationButton slug="bathroom" />
                 <Link
                   to="/match"
                   className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors"
                 >
                   Start Project Review
-                </Link>
-
-                {/* Added alongside the project review, not in place of it. This
-                    page's whole subject is what a bathroom costs, and the
-                    consultation is where that gets priced for real — with the
-                    financing that makes the number answerable. */}
-                <Link
-                  to="/consultation/bathroom"
-                  className="block w-full text-center mt-3 border-2 border-blue-600 text-blue-700 hover:bg-blue-50 font-bold py-4 rounded-xl transition-colors"
-                >
-                  Book a free in-home consultation
                 </Link>
 
                 <p className="text-xs text-center text-slate-400 mt-4">
@@ -368,6 +372,12 @@ export default function BathroomRenovations() {
           </div>
         </div>
       </section>
+
+      <BookConsultationBand
+        slug="bathroom"
+        heading="Get your bathroom priced properly, in person"
+        body="A consultant measures the room, walks the layout and condition with you, and puts a real number on the project — with monthly financing from about $99 if you want it."
+      />
     </div>
   );
 }
