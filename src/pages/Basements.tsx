@@ -7,7 +7,35 @@ import {
   Calculator,
   Hammer,
 } from 'lucide-react';
-import { buttonStyles } from '../lib/uiStyles';
+import { buttonStyles, eyebrowStyles } from '../lib/uiStyles';
+import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
+import { ProjectGallery, type GalleryPhoto } from '../components/ProjectGallery';
+
+/**
+ * Gallery contents.
+ *
+ * Every file here is ALREADY PUBLISHED elsewhere on this site — the same photo
+ * with the same city that the Ajax, Whitby, Milton, Brampton, Burlington, Oshawa
+ * and Mississauga pages have been showing. Reusing an existing pairing rather
+ * than inventing one is deliberate: the city on each caption is a claim this
+ * site already makes, not a new one written to fill a grid. If one of them is
+ * wrong it is wrong in two places, and should be fixed in both.
+ *
+ * Intrinsic dimensions are recorded so every tile reserves its box before the
+ * image decodes — an image grid is the usual place a Core Web Vitals score is
+ * lost, and these are the pages organic search lands on.
+ */
+const BASEMENT_PHOTOS: GalleryPhoto[] = [
+  { src: '/images/ontarioreno/modern-wide-angle-basement.jpg', alt: 'Wide-angle view of a finished basement living area', caption: 'Finished basement living area', width: 1200, height: 800 },
+  { src: '/images/ontarioreno/bright-finished-whitby-basement.jpg', alt: 'Bright finished basement in Whitby, Ontario', caption: 'Whitby', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/finished-basement-milton.jpg', alt: 'Finished basement in Milton, Ontario', caption: 'Milton', width: 1200, height: 800 },
+  { src: '/images/ontarioreno/brampton-finished-basement.jpg', alt: 'Finished basement in Brampton, Ontario', caption: 'Brampton', width: 1200, height: 675 },
+  { src: '/images/ontarioreno/burlington-basement.jpg', alt: 'Finished basement in Burlington, Ontario', caption: 'Burlington', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/oshawa-finished-basement.webp', alt: 'Finished basement in Oshawa, Ontario', caption: 'Oshawa', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/ajax-basement-1.webp', alt: 'Finished basement in Ajax, Ontario', caption: 'Ajax', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/basement-mississauga.webp', alt: 'Finished basement in Mississauga, Ontario', caption: 'Mississauga', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/whitby-basement-staircase.webp', alt: 'Basement staircase in a finished Whitby basement', caption: 'Whitby — staircase', width: 1024, height: 683 },
+];
 import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function Basements() {
@@ -44,6 +72,56 @@ export default function Basements() {
                 Start Project Review <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Transformation, before the numbers.
+          A reader arriving from "basement renovation cost" is trying to picture
+          the result. Showing the change first is what makes the cost tables
+          below read as a price for something, rather than as a bill. */}
+      <section className="border-b border-slate-200 bg-white py-14 sm:py-16">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className={eyebrowStyles}>See the difference</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-[-0.02em] text-slate-900 md:text-4xl">
+              From unfinished basement to finished living space
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              The same square footage you already own, turned into a room the
+              rest of the house actually uses. Drag the handle to compare.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-4xl">
+            <BeforeAfterSlider
+              beforeSrc="/images/before-image-hero.jpg"
+              afterSrc="/images/after-image-hero.jpg"
+              beforeAlt="Unfinished Ontario basement before renovation"
+              afterAlt="Finished basement living space after renovation"
+              beforeLabel="Before"
+              afterLabel="After"
+              attribution="Basement renovation, before and after."
+            />
+          </div>
+
+          {/* The grid answers the question the slider provokes: "fine, but what
+              do finished ones actually look like?" Evidence after persuasion,
+              rather than decoration standing on its own. */}
+          <div className="mx-auto mt-14 max-w-5xl">
+            <h3 className="text-center text-xl font-bold tracking-[-0.01em] text-slate-900">
+              Finished basements across the GTA
+            </h3>
+            <ProjectGallery className="mt-6" photos={BASEMENT_PHOTOS} />
+          </div>
+
+          <div className="mt-12 flex justify-center">
+            <Link
+              to="/consultation/basement"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-7 py-4 font-bold text-white shadow-lg transition hover:bg-[#16325a]"
+            >
+              Book a free in-home consultation <ArrowRight className="h-5 w-5" />
+            </Link>
           </div>
         </div>
       </section>
