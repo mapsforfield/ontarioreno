@@ -88,6 +88,29 @@ function NotRecorded() {
 }
 
 /**
+ * What `sourceDetail` actually tells you about where a submission came from.
+ *
+ * The flow captures `?src=` first, then `utm_source[/utm_medium]`, then a bare
+ * `fbclid` as 'meta' — and when none of those are present the API falls back to
+ * the program's own slug. That fallback is the subtlety this exists for: a row
+ * reading "basement" did NOT come from a campaign called basement, it came from
+ * an untagged visit to the basement page. Rendering the two identically would
+ * quietly credit organic traffic to whichever ad happens to share the name.
+ *
+ * So a value that merely echoes the lead's own program is reported as untagged,
+ * and only a value the URL actually carried is shown as a campaign.
+ */
+function trafficSource(lead: Lead): { label: string; tagged: boolean } {
+  const detail = (lead.sourceDetail ?? '').trim();
+  if (!detail) return { label: '', tagged: false };
+  const programSlug = programByKey(lead.programKey)?.slug ?? '';
+  if (programSlug && detail.toLowerCase() === programSlug.toLowerCase()) {
+    return { label: detail, tagged: false };
+  }
+  return { label: detail, tagged: true };
+}
+
+/**
  * Slot date and time, written the way the homeowner sees them in the booking
  * flow. A rep reading a time aloud on a call should not have to convert it.
  */
@@ -194,7 +217,10 @@ export default function PortalSubmissions() {
       // the rows you land on always agree.
       if (unworkedOnly && !isUnworkedSubmission(lead)) return false;
       if (!q) return true;
-      return [lead.name, lead.phone, lead.email, lead.address, lead.city, lead.resolvedMunicipality]
+      // sourceDetail is searchable so a campaign can be pulled up as a set —
+      // typing "fb-basement-financing" is the fastest way to see what one ad
+      // actually produced.
+      return [lead.name, lead.phone, lead.email, lead.address, lead.city, lead.resolvedMunicipality, lead.sourceDetail]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q));
     });
@@ -412,7 +438,7 @@ export default function PortalSubmissions() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, phone, email, address"
+            placeholder="Search name, phone, email, address, source"
             className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-[#32639b]"
           />
         </div>
@@ -511,6 +537,7 @@ export default function PortalSubmissions() {
                   <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Address</th>
                   <th className="px-4 py-3">Municipality</th>
+                  <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Outcome</th>
                   <th className="px-4 py-3">Appointment</th>
                   <th className="px-4 py-3">Address cause</th>
@@ -524,6 +551,7 @@ export default function PortalSubmissions() {
                     ? appointmentById.get(lead.appointmentId)
                     : undefined;
                   const cause = lead.addressResolutionCause ?? '';
+                  const source = trafficSource(lead);
                   return (
                     <tr
                       key={lead.id}
@@ -566,6 +594,27 @@ export default function PortalSubmissions() {
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {lead.resolvedMunicipality || <NotRecorded />}
+                      </td>
+                      <td className="max-w-[12rem] px-4 py-3">
+                        {source.label ? (
+                          source.tagged ? (
+                            <span
+                              title={source.label}
+                              className="inline-block max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[0.65rem] font-bold text-slate-700"
+                            >
+                              {source.label}
+                            </span>
+                          ) : (
+                            // Untagged: the URL carried no campaign, so this is
+                            // the program slug echoed back. Said plainly rather
+                            // than shown as if an ad had produced it.
+                            <span className="text-xs italic text-slate-400" title={`No campaign tag — landed on /consultation/${source.label}`}>
+                              untagged
+                            </span>
+                          )
+                        ) : (
+                          <NotRecorded />
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {lead.routingOutcome ? (
@@ -917,6 +966,23 @@ function SubmissionDrawer({
             <Field label="Municipality">{lead.resolvedMunicipality || <NotRecorded />}</Field>
             <Field label="Address cause">
               {cause ? humanCause(cause) : <NotRecorded />}
+            </Field>
+            {/* The exact string the URL carried, unabbreviated — the table
+                truncates long campaign names and this is where you read the
+                whole thing. */}
+            <Field label="Source">
+              {(() => {
+                const source = trafficSource(lead);
+                if (!source.label) return <NotRecorded />;
+                if (!source.tagged) {
+                  return (
+                    <span className="italic text-slate-400">
+                      untagged — landed on /consultation/{source.label} with no campaign tag
+                    </span>
+                  );
+                }
+                return <span className="font-mono text-xs font-bold">{source.label}</span>;
+              })()}
             </Field>
           </Section>
 
