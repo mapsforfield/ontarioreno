@@ -623,7 +623,7 @@ test('a Toronto kitchen lead books rather than queueing', () => {
     addressState: geo.addressState,
     area: geo.area,
     program: KITCHEN_FINANCING_PROGRAM,
-    answers: { ownership: 'yes', projectType: 'kitchen_gut', timeline: 'asap', contribution: 'need_financing' },
+    answers: { ownership: 'yes', projectType: 'full_remodel', timeline: 'asap', contribution: 'need_financing' },
   });
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
   assert.ok(r.reasons.includes('WANTS_FINANCING'));
@@ -667,11 +667,19 @@ test('every financing offer is a distinct, live, bookable record', () => {
   assert.equal(labels.size, FINANCING_PROGRAMS.length, 'two offers share an appointment label');
 });
 
-test('every financing offer books an exploratory lead rather than nurturing it', () => {
+test('every timeline a financing offer asks about reaches the calendar', () => {
+  // Derived from each program's OWN options rather than a hardcoded list. The
+  // kitchen form folds "3+ months" into "Just planning / Exploring", so a fixed
+  // list would either miss its real answers or assert one it never offers.
+  // Whatever a program puts in front of a homeowner is what has to book.
   for (const program of FINANCING_PROGRAMS) {
     assert.deepEqual(program.nurtureTimelines, [], `${program.slug} started nurturing`);
     const projectType = program.eligibleProjectTypes[0]!;
-    for (const timeline of ['exploring', '3_plus_months']) {
+    const timelines = program.questions
+      .find((q) => q.key === 'timeline')!
+      .options.map((o) => o.value);
+    assert.ok(timelines.length >= 3, `${program.slug} asks about too few timelines`);
+    for (const timeline of timelines) {
       const r = routeConsultation({
         addressState: 'ADDRESS_VERIFIED',
         area: 'ONTARIO',
@@ -681,6 +689,42 @@ test('every financing offer books an exploratory lead rather than nurturing it',
       assert.equal(r.outcome, 'DIRECT_CALENDAR', `${program.slug}/${timeline} must reach the calendar`);
     }
   }
+});
+
+test('the shared timeline question is untouched by the kitchen form', () => {
+  // Kitchen has its own shorter timeline question. If it were ever pointed back
+  // at the shared TIMELINE — or the shared one edited to match — four other
+  // live flows would lose an option nobody asked to change.
+  for (const program of [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BASEMENT_FINANCING_PROGRAM, BATHROOM_FINANCING_PROGRAM]) {
+    const values = program.questions.find((q) => q.key === 'timeline')!.options.map((o) => o.value);
+    assert.deepEqual(
+      values,
+      ['asap', '1_3_months', '3_plus_months', 'exploring'],
+      `${program.slug} lost a timeline option`
+    );
+  }
+});
+
+test('the kitchen form asks three project types and three timelines', () => {
+  // Explicitly requested shape. Pinned because "simplify the form" is the kind
+  // of change that grows an option back one release later.
+  const projectTypes = KITCHEN_FINANCING_PROGRAM.questions.find((q) => q.key === 'projectType')!;
+  assert.deepEqual(
+    projectTypes.options.map((o) => o.value),
+    ['full_remodel', 'cabinets_countertops', 'unsure']
+  );
+  const timelines = KITCHEN_FINANCING_PROGRAM.questions.find((q) => q.key === 'timeline')!;
+  assert.deepEqual(
+    timelines.options.map((o) => o.value),
+    ['asap', '1_3_months', 'exploring']
+  );
+  // The values stay in the shared vocabulary so routing and the rep's brief
+  // read a kitchen timeline exactly as they read any other program's.
+  assert.equal(
+    timelines.options.some((o) => o.value === '3_plus_months'),
+    false,
+    'the two low-intent answers are deliberately folded into one'
+  );
 });
 
 test('every financing offer asks something on all three steps', () => {
