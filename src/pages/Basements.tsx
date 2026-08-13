@@ -9,6 +9,33 @@ import {
 } from 'lucide-react';
 import { buttonStyles, eyebrowStyles } from '../lib/uiStyles';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
+import { ProjectGallery, type GalleryPhoto } from '../components/ProjectGallery';
+
+/**
+ * Gallery contents.
+ *
+ * Every file here is ALREADY PUBLISHED elsewhere on this site — the same photo
+ * with the same city that the Ajax, Whitby, Milton, Brampton, Burlington, Oshawa
+ * and Mississauga pages have been showing. Reusing an existing pairing rather
+ * than inventing one is deliberate: the city on each caption is a claim this
+ * site already makes, not a new one written to fill a grid. If one of them is
+ * wrong it is wrong in two places, and should be fixed in both.
+ *
+ * Intrinsic dimensions are recorded so every tile reserves its box before the
+ * image decodes — an image grid is the usual place a Core Web Vitals score is
+ * lost, and these are the pages organic search lands on.
+ */
+const BASEMENT_PHOTOS: GalleryPhoto[] = [
+  { src: '/images/ontarioreno/modern-wide-angle-basement.jpg', alt: 'Wide-angle view of a finished basement living area', caption: 'Finished basement living area', width: 1200, height: 800 },
+  { src: '/images/ontarioreno/bright-finished-whitby-basement.jpg', alt: 'Bright finished basement in Whitby, Ontario', caption: 'Whitby', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/finished-basement-milton.jpg', alt: 'Finished basement in Milton, Ontario', caption: 'Milton', width: 1200, height: 800 },
+  { src: '/images/ontarioreno/brampton-finished-basement.jpg', alt: 'Finished basement in Brampton, Ontario', caption: 'Brampton', width: 1200, height: 675 },
+  { src: '/images/ontarioreno/burlington-basement.jpg', alt: 'Finished basement in Burlington, Ontario', caption: 'Burlington', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/oshawa-finished-basement.webp', alt: 'Finished basement in Oshawa, Ontario', caption: 'Oshawa', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/ajax-basement-1.webp', alt: 'Finished basement in Ajax, Ontario', caption: 'Ajax', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/basement-mississauga.webp', alt: 'Finished basement in Mississauga, Ontario', caption: 'Mississauga', width: 1024, height: 683 },
+  { src: '/images/ontarioreno/whitby-basement-staircase.webp', alt: 'Basement staircase in a finished Whitby basement', caption: 'Whitby — staircase', width: 1024, height: 683 },
+];
 import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function Basements() {
@@ -78,7 +105,17 @@ export default function Basements() {
             />
           </div>
 
-          <div className="mt-10 flex justify-center">
+          {/* The grid answers the question the slider provokes: "fine, but what
+              do finished ones actually look like?" Evidence after persuasion,
+              rather than decoration standing on its own. */}
+          <div className="mx-auto mt-14 max-w-5xl">
+            <h3 className="text-center text-xl font-bold tracking-[-0.01em] text-slate-900">
+              Finished basements across the GTA
+            </h3>
+            <ProjectGallery className="mt-6" photos={BASEMENT_PHOTOS} />
+          </div>
+
+          <div className="mt-12 flex justify-center">
             <Link
               to="/consultation/basement"
               className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-7 py-4 font-bold text-white shadow-lg transition hover:bg-[#16325a]"
