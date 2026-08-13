@@ -748,11 +748,40 @@ const KITCHEN_PROJECT_TYPE: Question = {
   routingRelevant: true,
   step: 2,
   options: [
-    { value: 'kitchen_refresh', label: 'New cabinets and counters, same layout' },
-    { value: 'kitchen_gut', label: 'Full gut and rebuild' },
-    { value: 'kitchen_layout', label: 'Removing a wall or changing the layout' },
-    { value: 'kitchen_plus', label: 'Kitchen as part of a larger renovation' },
-    { value: 'unsure', label: 'Still deciding' },
+    { value: 'full_remodel', label: 'Full Kitchen Remodel' },
+    { value: 'cabinets_countertops', label: 'Cabinets & Countertops Only' },
+    { value: 'unsure', label: 'Not Sure / Undecided' },
+  ],
+};
+
+/**
+ * Kitchen's own timeline question — NOT the shared TIMELINE above.
+ *
+ * The shared one is used by Hamilton, Simcoe, basement and bathroom, and
+ * editing it in place would have silently changed four live flows to make one
+ * of them shorter. This is the same question with the two low-intent answers
+ * folded together.
+ *
+ * The VALUES are deliberately unchanged from the shared set ('asap',
+ * '1_3_months', 'exploring'), so routing, the rep's brief and anything counting
+ * timelines across programs keep reading the same vocabulary.
+ *
+ * What genuinely changes: a homeowner who is three-plus months out now answers
+ * 'exploring' rather than '3_plus_months', so they are tagged
+ * EXPLORATORY_TIMELINE instead of TIMELINE_BEYOND_BOOKING_WINDOW. Both still
+ * book — kitchen sets nurtureTimelines to [] — but the rep's brief no longer
+ * distinguishes "far out but committed" from "browsing". That is the intended
+ * trade for a shorter form, not an oversight.
+ */
+const KITCHEN_TIMELINE: Question = {
+  key: 'timeline',
+  label: 'When would you like to start?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'asap', label: 'As soon as possible' },
+    { value: '1_3_months', label: '1–3 months' },
+    { value: 'exploring', label: 'Just planning / Exploring' },
   ],
 };
 
@@ -851,9 +880,9 @@ export const KITCHEN_FINANCING_PROGRAM: ProgramConfig = {
   whyFreeText:
     "Homeowners don't want to pay upfront just to find out what a kitchen costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
   fundingGuidance: KITCHEN_FUNDING_GUIDANCE,
-  eligibleProjectTypes: ['kitchen_refresh', 'kitchen_gut', 'kitchen_layout', 'kitchen_plus'],
+  eligibleProjectTypes: ['full_remodel', 'cabinets_countertops'],
   nurtureTimelines: [],
-  questions: [OWNERSHIP, KITCHEN_PROJECT_TYPE, TIMELINE, KITCHEN_CONTRIBUTION],
+  questions: [OWNERSHIP, KITCHEN_PROJECT_TYPE, KITCHEN_TIMELINE, KITCHEN_CONTRIBUTION],
   prepQuestions: KITCHEN_PREP_QUESTIONS,
   // Nobody prices cabinetry and a possible wall removal off a photo.
   consultationMode: 'in_person',
