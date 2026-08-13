@@ -315,6 +315,17 @@ export default function KitchenRenovations() {
                   Start Project Review
                 </Link>
 
+                {/* Added alongside the project review, not in place of it. This
+                    page's whole subject is what a kitchen costs, and the
+                    consultation is where that gets priced for real — with the
+                    financing that makes the number answerable. */}
+                <Link
+                  to="/consultation/kitchen"
+                  className="block w-full text-center mt-3 border-2 border-blue-600 text-blue-700 hover:bg-blue-50 font-bold py-4 rounded-xl transition-colors"
+                >
+                  Book a free in-home consultation
+                </Link>
+
                 <p className="text-xs text-center text-slate-400 mt-4">
                   100% free. No obligation to hire.
                 </p>

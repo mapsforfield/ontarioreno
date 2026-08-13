@@ -733,11 +733,157 @@ export const BATHROOM_FINANCING_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
+// ─── Kitchen renovation financing ─────────────────────────────────────────────
+// Third of the three financing offers, same lender and same signed structure as
+// the basement and bathroom ones. Separate program for the same reason the
+// bathroom is separate: different page, different intent, and the rep's brief
+// and the appointment label have to say "kitchen".
+//
+// Terms are copied rather than shared, deliberately, exactly as above — if one
+// offer's terms ever change without the others', the diff has to show it.
+
+const KITCHEN_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you planning?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'kitchen_refresh', label: 'New cabinets and counters, same layout' },
+    { value: 'kitchen_gut', label: 'Full gut and rebuild' },
+    { value: 'kitchen_layout', label: 'Removing a wall or changing the layout' },
+    { value: 'kitchen_plus', label: 'Kitchen as part of a larger renovation' },
+    { value: 'unsure', label: 'Still deciding' },
+  ],
+};
+
+const KITCHEN_CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'How are you thinking about paying for the work?',
+  help: 'Financing covers the full cost with nothing due upfront. Paying cash is fine too.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'need_financing', label: "I'd like to use the monthly financing" },
+    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+  ],
+};
+
+/**
+ * Prep questions — asked AFTER booking, never before, carrying no routing
+ * weight. What actually moves a kitchen quote is cabinetry, whether services
+ * are being moved, and whether appliances are in scope. None of the basement's
+ * entrance-and-permit questions apply.
+ */
+const KITCHEN_PREP_QUESTIONS: Question[] = [
+  {
+    key: 'cabinetPlan',
+    label: 'What are you thinking for cabinets?',
+    step: 3,
+    options: [
+      { value: 'reface', label: 'Reface or paint what is there' },
+      { value: 'all_new', label: 'All new cabinets' },
+      { value: 'unsure', label: 'Not sure yet' },
+    ],
+  },
+  {
+    key: 'layoutChange',
+    label: 'Is the layout staying the same?',
+    step: 3,
+    options: [
+      { value: 'same_layout', label: 'Same layout, new finishes' },
+      { value: 'moving_services', label: 'Moving the sink, gas or the range' },
+      { value: 'removing_wall', label: 'Removing a wall' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'applianceScope',
+    label: 'Are appliances part of the project?',
+    step: 3,
+    options: [
+      { value: 'keeping', label: 'Keeping the current appliances' },
+      { value: 'new_appliances', label: 'New appliances included' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+];
+
+const KITCHEN_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'That is what the visit is for',
+  lead: 'The financing covers the full cost of the renovation, so there is nothing to pay before the work starts.',
+  leadEmphasis: 'Nothing upfront.',
+  milestones: ['Approved', 'Funds released', 'Build', 'Balance released'],
+  highlight:
+    'It is an open loan — you can pay it down or pay it off at any time, with no penalty and no lien on your home.',
+  closing: 'Your consultant will price your kitchen and walk through the exact monthly number with you.',
+  continueLabel: 'Continue',
+};
+
+const KITCHEN_FUNDING_HIGHLIGHTS = [
+  'No upfront cost — the renovation is financed in full, on approved credit.',
+  'Up to 40% of funds can be released at signing or project start with your authorization; the remaining 60% after completion.',
+  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
+];
+
+export const KITCHEN_FINANCING_PROGRAM: ProgramConfig = {
+  key: 'kitchen-financing',
+  version: 1,
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'kitchen',
+  areaLabel: 'Ontario',
+  // "from about" is doing the same work here as on the other two offers, and
+  // the gap is the widest of the three: at the rate the basement's $399 comes
+  // from, $199 is roughly a $21,000 project, where this site's own kitchen page
+  // puts a typical Ontario kitchen at $30,000–$70,000 and most between $35,000
+  // and $55,000. So $199 is an entry point most readers will finance well above.
+  // Stated as a starting point, never as "your payment".
+  displayAmountLabel: 'from about $199 a month, on approved credit',
+  fundingHighlights: KITCHEN_FUNDING_HIGHLIGHTS,
+  programTerms: [
+    'Financing is a personal open loan and is subject to credit approval.',
+    'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'No upfront cost, no early payment penalties, and no liens registered against the property.',
+    'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
+  ],
+  whyFreeText:
+    "Homeowners don't want to pay upfront just to find out what a kitchen costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: KITCHEN_FUNDING_GUIDANCE,
+  eligibleProjectTypes: ['kitchen_refresh', 'kitchen_gut', 'kitchen_layout', 'kitchen_plus'],
+  nurtureTimelines: [],
+  questions: [OWNERSHIP, KITCHEN_PROJECT_TYPE, TIMELINE, KITCHEN_CONTRIBUTION],
+  prepQuestions: KITCHEN_PREP_QUESTIONS,
+  // Nobody prices cabinetry and a possible wall removal off a photo.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Kitchen Renovation Consultation',
+  pageTitle: 'Kitchen Renovation Consultation | OntarioReno',
+  fundingStepHeading: 'How the monthly financing works',
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+};
+
+/**
+ * The three financing offers, as a set.
+ *
+ * Exported so the tests can assert across all of them rather than pairwise —
+ * the scheduling rules only hold if EVERY offer shares them, and a fourth
+ * offer added without these constants would otherwise ship unnoticed.
+ */
+export const FINANCING_PROGRAMS: ProgramConfig[] = [
+  BASEMENT_FINANCING_PROGRAM,
+  BATHROOM_FINANCING_PROGRAM,
+  KITCHEN_FINANCING_PROGRAM,
+];
+
 export const PROGRAMS: ProgramConfig[] = [
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
-  BASEMENT_FINANCING_PROGRAM,
-  BATHROOM_FINANCING_PROGRAM,
+  ...FINANCING_PROGRAMS,
 ];
 
 /**
@@ -830,8 +976,8 @@ export function resolveProgramGeography(
  * Derive a program from a scheduling area.
  *
  * Only meaningful for a municipality-gated area, where the area IS the program.
- * ONTARIO now holds more than one program (basement and bathroom financing), so
- * this returns the first — which is why the submit branch never routes an
+ * ONTARIO holds every financing offer (basement, bathroom, kitchen), so this
+ * returns the first — which is why the submit branch never routes an
  * ontario_wide program through here and uses the landing page's slug instead.
  * The remaining callers are the legacy fallback for a stored lead with no
  * programKey, all of which predate the bathroom offer.

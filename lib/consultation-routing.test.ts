@@ -5,7 +5,9 @@ import {
   BASEMENT_FINANCING_PROGRAM,
   BATHROOM_FINANCING_PROGRAM,
   DEFAULT_NURTURE_TIMELINES,
+  FINANCING_PROGRAMS,
   HAMILTON_PROGRAM,
+  KITCHEN_FINANCING_PROGRAM,
   SIMCOE_PROGRAM,
   areaForMunicipality,
   programBySlug,
@@ -599,4 +601,140 @@ test('the bathroom prep questions ask about a bathroom', () => {
     keys.filter((k) => ['separateEntrance', 'permitStatus', 'basementStatus'].includes(k)),
     []
   );
+});
+
+// ─── Kitchen financing ───────────────────────────────────────────────────────
+
+test('the kitchen program is Ontario-wide and live', () => {
+  assert.equal(KITCHEN_FINANCING_PROGRAM.geography, 'ontario_wide');
+  assert.equal(KITCHEN_FINANCING_PROGRAM.schedulingArea, 'ONTARIO');
+  assert.equal(KITCHEN_FINANCING_PROGRAM.enabled, true);
+  assert.equal(KITCHEN_FINANCING_PROGRAM.consultationMode, 'in_person');
+  assert.equal(programBySlug('kitchen'), KITCHEN_FINANCING_PROGRAM);
+});
+
+test('a Toronto kitchen lead books rather than queueing', () => {
+  const geo = resolveProgramGeography(KITCHEN_FINANCING_PROGRAM, {
+    area: null,
+    addressState: 'ADDRESS_UNVERIFIED',
+    cause: 'MUNICIPALITY_UNMAPPED',
+  });
+  const r = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program: KITCHEN_FINANCING_PROGRAM,
+    answers: { ownership: 'yes', projectType: 'kitchen_gut', timeline: 'asap', contribution: 'need_financing' },
+  });
+  assert.equal(r.outcome, 'DIRECT_CALENDAR');
+  assert.ok(r.reasons.includes('WANTS_FINANCING'));
+});
+
+test('the kitchen prep questions ask about a kitchen', () => {
+  // Copying the basement or bathroom set over was the easy mistake here. What
+  // moves a kitchen quote is cabinetry, moved services and appliances.
+  const keys = KITCHEN_FINANCING_PROGRAM.prepQuestions.map((q) => q.key);
+  assert.ok(keys.includes('cabinetPlan'));
+  assert.ok(keys.includes('applianceScope'));
+  assert.deepEqual(
+    keys.filter((k) => ['separateEntrance', 'permitStatus', 'basementStatus', 'bathroomType'].includes(k)),
+    []
+  );
+});
+
+// ─── Rules that must hold for EVERY financing offer ──────────────────────────
+//
+// Asserted across the set rather than one program at a time. Each of these was
+// written for a single offer first and generalised when the next one landed —
+// the point is that a fourth offer added later cannot quietly skip them.
+
+test('every financing offer is a distinct, live, bookable record', () => {
+  const keys = new Set<string>();
+  const slugs = new Set<string>();
+  const labels = new Set<string>();
+  for (const program of FINANCING_PROGRAMS) {
+    assert.equal(program.enabled, true, `${program.slug} is not live`);
+    assert.equal(program.geography, 'ontario_wide', `${program.slug} is not Ontario-wide`);
+    assert.equal(program.schedulingArea, 'ONTARIO', `${program.slug} is not in the ONTARIO bucket`);
+    assert.equal(program.consultationMode, 'in_person', `${program.slug} is not an in-person visit`);
+    assert.equal(programBySlug(program.slug), program, `${program.slug} is not reachable by slug`);
+    keys.add(program.key);
+    slugs.add(program.slug);
+    labels.add(program.appointmentProjectTypeLabel);
+  }
+  // The only things keeping one offer's leads out of another's pile.
+  assert.equal(keys.size, FINANCING_PROGRAMS.length, 'two offers share a program key');
+  assert.equal(slugs.size, FINANCING_PROGRAMS.length, 'two offers share a slug');
+  assert.equal(labels.size, FINANCING_PROGRAMS.length, 'two offers share an appointment label');
+});
+
+test('every financing offer books an exploratory lead rather than nurturing it', () => {
+  for (const program of FINANCING_PROGRAMS) {
+    assert.deepEqual(program.nurtureTimelines, [], `${program.slug} started nurturing`);
+    const projectType = program.eligibleProjectTypes[0]!;
+    for (const timeline of ['exploring', '3_plus_months']) {
+      const r = routeConsultation({
+        addressState: 'ADDRESS_VERIFIED',
+        area: 'ONTARIO',
+        program,
+        answers: { ownership: 'yes', projectType, timeline, contribution: 'cash_equity' },
+      });
+      assert.equal(r.outcome, 'DIRECT_CALENDAR', `${program.slug}/${timeline} must reach the calendar`);
+    }
+  }
+});
+
+test('every financing offer asks something on all three steps', () => {
+  for (const program of FINANCING_PROGRAMS) {
+    for (const step of [1, 2, 3] as const) {
+      assert.ok(
+        questionsForStep(program, step).length > 0,
+        `${program.slug} step ${step} has no questions`
+      );
+    }
+  }
+});
+
+test('every offered project type is an eligible one, on every offer', () => {
+  // A project type the flow can collect but the program does not list would tag
+  // PROJECT_TYPE_NOT_LISTED on a lead that answered exactly as asked.
+  for (const program of FINANCING_PROGRAMS) {
+    const offered = program.questions
+      .find((q) => q.key === 'projectType')!
+      .options.map((o) => o.value)
+      .filter((v) => v !== 'unsure');
+    for (const value of offered) {
+      assert.ok(
+        program.eligibleProjectTypes.includes(value),
+        `${program.slug}: ${value} is offered but not eligible`
+      );
+    }
+  }
+});
+
+test('no financing offer promises a rate, and every monthly figure is a floor', () => {
+  // The headline figures ($399 / $99 / $199) are entry points, not prices, and
+  // each sits well below what a typical project of that kind costs. Both
+  // qualifiers have to survive: "from about" says it is a floor, "on approved
+  // credit" says the lender decides. Drop either and a consultant is walking a
+  // number back in someone's kitchen.
+  for (const program of FINANCING_PROGRAMS) {
+    const terms = program.programTerms;
+    assert.ok(terms.length <= 5, `${program.slug} terms grew to ${terms.length} lines`);
+    assert.match(terms.join(' '), /subject to credit approval/i, `${program.slug}`);
+    assert.match(terms.join(' '), /confirmed in writing before you sign/i, `${program.slug}`);
+    assert.doesNotMatch(terms.join(' '), /\d+\.\d+\s*%/, `${program.slug} quotes an interest rate`);
+    assert.equal(
+      program.fundingGuidance.highlight.includes('%'),
+      false,
+      `${program.slug} funding screen quotes a rate`
+    );
+    assert.match(program.displayAmountLabel, /on approved credit/i, `${program.slug} headline`);
+    if (/\$\s?\d/.test(program.displayAmountLabel)) {
+      assert.match(
+        program.displayAmountLabel,
+        /from about/i,
+        `${program.slug} states a dollar figure without framing it as a starting point`
+      );
+    }
+  }
 });

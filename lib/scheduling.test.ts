@@ -16,8 +16,8 @@ import {
   type BookedAppointment,
 } from './scheduling.ts';
 import {
-  BASEMENT_FINANCING_PROGRAM,
   BATHROOM_FINANCING_PROGRAM,
+  FINANCING_PROGRAMS,
   HAMILTON_PROGRAM,
 } from './program-config.ts';
 
@@ -569,26 +569,87 @@ test('the travel radius measures a bathroom lead against a basement visit', () =
   );
 });
 
-test('the two financing offers share one set of scheduling constants', () => {
-  // If these ever diverge it is a deliberate act, and it should show up here as
-  // a failing test rather than as a rep with two overlapping 10:00 visits.
-  for (const field of [
-    'visitMinutes',
-    'reservationMinutes',
-    'leadTimeHours',
-    'bookingHorizonDays',
-    'maxBookingsPerRepPerDay',
-    'primaryRepPrimingBookings',
-    'maxSameDayTravelKm',
-  ] as const) {
+test('every financing offer shares one set of scheduling constants', () => {
+  // Asserted across the whole set rather than pairwise: the rules below only
+  // hold if EVERY offer shares them, and a fourth offer added without these
+  // constants would otherwise ship unnoticed. If they ever diverge it is a
+  // deliberate act, and it should show up here as a failing test rather than as
+  // a rep with two overlapping 10:00 visits.
+  const [first, ...rest] = FINANCING_PROGRAMS;
+  assert.ok(rest.length >= 2, 'expected basement, bathroom and kitchen');
+  for (const program of rest) {
+    for (const field of [
+      'visitMinutes',
+      'reservationMinutes',
+      'leadTimeHours',
+      'bookingHorizonDays',
+      'maxBookingsPerRepPerDay',
+      'primaryRepPrimingBookings',
+      'maxSameDayTravelKm',
+    ] as const) {
+      assert.equal(
+        program[field],
+        first[field],
+        `${field} differs between the ${first.slug} and ${program.slug} offers`
+      );
+    }
+    assert.deepEqual(program.slotStartTimes, first.slotStartTimes, `${program.slug} slot starts differ`);
+  }
+});
+
+test('every financing offer shares one rep calendar', () => {
+  // The three run through the same scheduler with the same constants, so each
+  // one must see a day the others have already filled. Run per program so a
+  // future offer that quietly sets its own cap fails here rather than in a
+  // rep's inbox.
+  for (const program of FINANCING_PROGRAMS) {
+    const cap = program.maxBookingsPerRepPerDay;
+    const appointments: BookedAppointment[] = [];
+    for (const rep of ['rep-a', 'rep-b']) {
+      for (const time of program.slotStartTimes.slice(0, cap)) {
+        appointments.push(appt(rep, DATE, time, 'ONTARIO'));
+      }
+    }
+    const slots = computeAvailability({
+      ...baseInput,
+      appointments,
+      area: 'ONTARIO' as const,
+      slotStartTimes: program.slotStartTimes,
+      reservationMinutes: program.reservationMinutes,
+      maxBookingsPerRepPerDay: cap,
+    });
     assert.equal(
-      BATHROOM_FINANCING_PROGRAM[field],
-      BASEMENT_FINANCING_PROGRAM[field],
-      `${field} differs between the basement and bathroom offers`
+      slots.some((s) => s.date === DATE),
+      false,
+      `${program.slug} still offers a day both reps have already filled`
     );
   }
-  assert.deepEqual(
-    BATHROOM_FINANCING_PROGRAM.slotStartTimes,
-    BASEMENT_FINANCING_PROGRAM.slotStartTimes
-  );
+});
+
+test('every financing offer measures its lead against the same travel radius', () => {
+  // No financing offer locks an area — all three are ONTARIO — so the radius is
+  // the only thing keeping a basement-then-kitchen day drivable.
+  for (const program of FINANCING_PROGRAMS) {
+    const appointments = [
+      { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A },
+      { ...appt('rep-b', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A },
+    ];
+    const input = {
+      ...baseInput,
+      appointments,
+      area: 'ONTARIO' as const,
+      maxSameDayTravelKm: program.maxSameDayTravelKm,
+      destination: BARRIE,
+    };
+    assert.deepEqual(
+      eligibleRepsForSlot(input, DATE, '12:00'),
+      [],
+      `${program.slug} would send a rep anchored in Hamilton to Barrie`
+    );
+    assert.deepEqual(
+      eligibleRepsForSlot({ ...input, destination: HAMILTON_B }, DATE, '12:00'),
+      ['rep-a', 'rep-b'],
+      `${program.slug} refuses a nearby property it should accept`
+    );
+  }
 });
