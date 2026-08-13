@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Hammer,
 } from 'lucide-react';
+import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function LegalSuites() {
   return (
@@ -38,12 +39,22 @@ export default function LegalSuites() {
               </Link>.
             </p>
 
-            <Link
-              to="/match"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center gap-2"
-            >
-              Start Project Review <ArrowRight className="w-5 h-5" />
-            </Link>
+            {/* Both paths stay live. A legal suite is a basement build, so
+                the booking goes to the basement consultation. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link
+                to="/consultation/basement"
+                className="bg-white hover:bg-emerald-50 text-emerald-800 px-8 py-4 rounded-xl font-bold text-lg shadow-lg transition-all inline-flex items-center justify-center gap-2"
+              >
+                Book a free in-home consultation <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/match"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all inline-flex items-center justify-center gap-2"
+              >
+                Start Project Review <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -374,6 +385,7 @@ export default function LegalSuites() {
                   forward with the right renovation path.
                 </p>
 
+                <BookConsultationButton slug="basement" accent="emerald" />
                 <Link
                   to="/match"
                   className="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-colors"
@@ -444,6 +456,13 @@ export default function LegalSuites() {
           </div>
         </div>
       </section>
+
+      <BookConsultationBand
+        slug="basement"
+        accent="emerald"
+        heading="Get your legal suite scoped and priced in person"
+        body="A consultant walks the space with you — layout, egress, separation, condition — and puts a real number on the build, with monthly financing from about $399 if you want it."
+      />
     </div>
   );
 }

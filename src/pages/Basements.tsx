@@ -8,6 +8,7 @@ import {
   Hammer,
 } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
+import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
 
 export default function Basements() {
   return (
@@ -26,12 +27,23 @@ export default function Basements() {
               Everything you need to know about costs, permits, layouts, and
               the right renovation path for your basement project.
             </p>
-            <Link
-              to="/match"
-              className={buttonStyles.primary}
-            >
-              Start Project Review <ArrowRight className="w-5 h-5" />
-            </Link>
+            {/* Two paths, both live. The booking is listed first because a
+                reader who searched their way onto a basement cost guide is
+                further along than a project review assumes. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link
+                to="/consultation/basement"
+                className="inline-flex items-center justify-center gap-2 rounded-[0.72rem] bg-white px-7 py-[0.95rem] text-base font-bold text-[#1B3C6C] shadow-lg transition hover:bg-blue-50"
+              >
+                Book a free in-home consultation <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/match"
+                className={buttonStyles.primary}
+              >
+                Start Project Review <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -316,6 +328,7 @@ export default function Basements() {
                     review your requirements, understand your next steps, and
                     move forward with the right renovation path.
                   </p>
+                  <BookConsultationButton slug="basement" />
                   <Link
                     to="/match"
                     className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors"
@@ -372,6 +385,12 @@ export default function Basements() {
           </div>
         </div>
       </section>
+
+      <BookConsultationBand
+        slug="basement"
+        heading="Get your basement priced properly, in person"
+        body="A consultant measures the space, walks the condition with you, and puts a real number on the project — with monthly financing from about $399 if you want it."
+      />
     </div>
   );
 }
