@@ -792,7 +792,11 @@ test('no financing offer promises a rate, and every monthly figure is a floor', 
       false,
       `${program.slug} funding screen quotes a rate`
     );
-    assert.match(program.displayAmountLabel, /on approved credit/i, `${program.slug} headline`);
+    // An empty label means the program renders no amount banner at all, which
+    // is a valid choice — there is no claim to qualify.
+    if (program.displayAmountLabel) {
+      assert.match(program.displayAmountLabel, /on approved credit/i, `${program.slug} headline`);
+    }
     // A MONTHLY figure is a floor and must say so. A CAP is the opposite kind
     // of number — an upper limit, where "from about" would be actively
     // misleading — so the rule keys on whether the headline quotes a payment.
@@ -822,21 +826,48 @@ test('the garden suite program is live and reachable', () => {
   assert.equal(GARDEN_SUITE_FINANCING_PROGRAM.consultationMode, 'in_person');
 });
 
-test('the garden suite flow states the financing cap everywhere it matters', () => {
+test('the garden suite funding step is stripped back to the question', () => {
+  // Step 3 used to open with a green amount banner and three bullets leading
+  // with what a garden suite costs. Correct, but it put the largest and most
+  // discouraging number in the flow above a question the reader had not
+  // answered yet. Both are gone; the component renders neither when empty, so
+  // these two assertions ARE the removal.
   const program = GARDEN_SUITE_FINANCING_PROGRAM;
-  assert.match(program.displayAmountLabel, /\$100,000/, 'the headline must state the cap');
-  assert.match(program.fundingHighlights[0]!, /\$100,000/, 'the first highlight must state the cap');
+  assert.equal(program.displayAmountLabel, '', 'the green amount banner must stay removed');
+  assert.deepEqual(program.fundingHighlights, [], 'the three bullets must stay removed');
+  assert.equal(program.fundingStepHeading, 'Project Funding');
+});
+
+test('the garden suite funding step still states the cap, in the two places left', () => {
+  // With the banner and bullets gone, the qualifier survives in exactly two
+  // places: the question's own subtext, and the terms accordion. If either
+  // loses it, the step asks how someone will fund a garden suite while saying
+  // nothing at all about what we lend.
+  const program = GARDEN_SUITE_FINANCING_PROGRAM;
+  const help = program.questions.find((q) => q.key === 'contribution')!.help!;
+  assert.match(help, /\$100,000/, 'the funding question subtext must state the cap');
+  assert.match(help, /optional/i, 'the subtext must say the financing is optional, not the plan');
+  assert.match(help, /gap/i, 'the subtext must frame it as covering a gap');
   assert.match(program.programTerms.join(' '), /capped at \$100,000/i);
-  assert.match(program.fundingGuidance.lead, /\$100,000/);
-  // And the size of the gap, not just the cap — a cap alone reads as generous
-  // until you know what a garden suite costs.
-  assert.match(program.fundingHighlights.join(' '), /\$250,000/);
-  assert.match(program.fundingGuidance.lead, /\$250,000/);
   assert.match(
-    program.questions.find((q) => q.key === 'contribution')!.help!,
-    /\$100,000[\s\S]*\$250,000/,
-    'the funding question must state the cap and the typical cost together'
+    program.programTerms.join(' '),
+    /above the \$100,000 financing cap is arranged by the homeowner/i,
+    'the accordion must keep the condition even though the cost figure is gone'
   );
+});
+
+test('the garden suite funding step never quotes a typical project cost', () => {
+  // The explicit ask: no "$250,000" anywhere on step 3. Checked across every
+  // string the step renders rather than the one field it used to live in, so
+  // reintroducing it in a highlight or the banner fails here too.
+  const program = GARDEN_SUITE_FINANCING_PROGRAM;
+  const stepThree = [
+    program.displayAmountLabel,
+    ...program.fundingHighlights,
+    ...program.programTerms,
+    ...program.questions.filter((q) => q.step === 3).flatMap((q) => [q.label, q.help ?? '']),
+  ].join(' ');
+  assert.doesNotMatch(stepThree, /\$2[0-9]{2},[0-9]{3}/, 'step 3 quotes a typical project cost again');
 });
 
 test('the garden suite flow never claims the build is covered', () => {
