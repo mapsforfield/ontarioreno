@@ -9,6 +9,39 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
+import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
+import { ProjectGallery, type GalleryPhoto } from '../components/ProjectGallery';
+
+/**
+ * Gallery contents.
+ *
+ * Portrait, unlike the basement set, because that is how bathrooms are shot —
+ * they are tall narrow rooms and the useful information (shower, vanity, tile
+ * run) is vertical. The grid is told to use 3/4 tiles for the same reason;
+ * forcing these into the basement page's 3/2 landscape tiles would crop away
+ * the top and bottom of every one.
+ *
+ * Captions stay generic. These came from several sources within the team and
+ * nothing in the repo records which job each one is, so naming a city would be
+ * inventing one — the same rule the basement gallery follows.
+ *
+ * Intrinsic dimensions are recorded so every tile reserves its box before the
+ * image decodes.
+ */
+const BATHROOM_PHOTOS: GalleryPhoto[] = [
+  { src: '/images/bathroom-reno/bathroom-01.webp', alt: 'Finished bathroom renovation with tiled shower', caption: 'Finished bathroom', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-02.webp', alt: 'Renovated bathroom with vanity and mirror', caption: 'Vanity and mirror', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-03.webp', alt: 'Modern bathroom renovation with glass shower enclosure', caption: 'Glass shower enclosure', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-04.webp', alt: 'Bathroom renovation with tiled walls and floor', caption: 'Full tile surround', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-05.webp', alt: 'Finished bathroom with freestanding fixtures', caption: 'Finished bathroom', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-06.webp', alt: 'Renovated bathroom with walk-in shower', caption: 'Walk-in shower', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-07.webp', alt: 'Bathroom renovation with custom tile work', caption: 'Custom tile work', width: 1080, height: 1440 },
+  { src: '/images/bathroom-reno/bathroom-08.webp', alt: 'Completed bathroom renovation interior', caption: 'Completed renovation', width: 1080, height: 1349 },
+  { src: '/images/bathroom-reno/bathroom-09.jpg', alt: 'Finished bathroom with tiled shower and vanity', caption: 'Shower and vanity', width: 1700, height: 2267 },
+  { src: '/images/bathroom-reno/bathroom-10.jpg', alt: 'Renovated bathroom interior', caption: 'Finished bathroom', width: 1700, height: 2267 },
+  { src: '/images/bathroom-reno/bathroom-11.jpg', alt: 'Bathroom renovation with feature tile', caption: 'Feature tile', width: 1578, height: 2048 },
+  { src: '/images/bathroom-reno/bathroom-12.jpg', alt: 'Finished bathroom renovation detail', caption: 'Finished bathroom', width: 1824, height: 2560 },
+];
 
 export default function BathroomRenovations() {
   return (
@@ -46,6 +79,62 @@ export default function BathroomRenovations() {
                 Start Project Review <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Transformation, before the numbers.
+          Same order as the basement guide: a reader arriving from "bathroom
+          renovation cost" is trying to picture the result, and the cost tables
+          below read as a price for something rather than as a bill once they
+          can. */}
+      <section className="border-b border-slate-200 bg-white py-14 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
+              See the difference
+            </p>
+            <h2 className="mt-3 text-3xl font-bold tracking-[-0.02em] text-slate-900 md:text-4xl">
+              From dated bathroom to finished space
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              The same footprint, rebuilt properly — waterproofing, tile and
+              fixtures done once. Drag the handle to compare.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-3xl">
+            {/* This sits inside the first viewport on desktop, which makes it
+                the page's LCP element — so it loads eagerly rather than being
+                deferred. Same lesson as the basement guide. */}
+            <BeforeAfterSlider
+              beforeSrc="/images/bathroom-reno/before-after/pair-1-before.webp"
+              afterSrc="/images/bathroom-reno/before-after/pair-1-after.webp"
+              beforeAlt="Dated bathroom before renovation"
+              afterAlt="Finished bathroom after renovation"
+              width={1080}
+              height={813}
+              loading="eager"
+              attribution="Bathroom renovation, before and after."
+            />
+          </div>
+
+          <div className="mx-auto mt-14 max-w-6xl">
+            <h3 className="text-center text-xl font-bold tracking-[-0.01em] text-slate-900">
+              Finished bathrooms across the GTA
+            </h3>
+            {/* 3/4 tiles: bathrooms are shot portrait and the landscape default
+                would crop the shower and vanity out of frame. */}
+            <ProjectGallery className="mt-6" photos={BATHROOM_PHOTOS} aspect="3/4" />
+          </div>
+
+          <div className="mt-12 flex justify-center">
+            <Link
+              to="/consultation/bathroom"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-7 py-4 font-bold text-white shadow-lg transition hover:bg-[#16325a]"
+            >
+              Book a free in-home consultation <ArrowRight className="h-5 w-5" />
+            </Link>
           </div>
         </div>
       </section>

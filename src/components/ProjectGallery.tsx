@@ -38,11 +38,23 @@ export type GalleryPhoto = {
 export function ProjectGallery({
   photos,
   eagerCount = 0,
+  aspect = '3/2',
   className = '',
 }: {
   photos: GalleryPhoto[];
   /** How many leading tiles to load eagerly. Only above the fold. */
   eagerCount?: number;
+  /**
+   * Tile shape, as a CSS aspect-ratio.
+   *
+   * Defaults to the landscape 3/2 the basement gallery was built around, so
+   * that page is unaffected. Bathrooms are the reason this is a prop: the
+   * photos are shot PORTRAIT, and forcing a 3-by-2 tile crops the top and
+   * bottom off every one of them — which on a bathroom means losing the shower
+   * and the vanity, the two things the photo exists to show. The tile matches
+   * the subject rather than the subject being cut to fit the tile.
+   */
+  aspect?: string;
   className?: string;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -102,7 +114,10 @@ export function ProjectGallery({
               className="group block w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300"
               aria-label={`View larger: ${photo.alt}`}
             >
-              <span className="relative block aspect-[3/2] overflow-hidden">
+              <span
+                className="relative block overflow-hidden"
+                style={{ aspectRatio: aspect }}
+              >
                 <img
                   src={photo.src}
                   alt={photo.alt}
