@@ -371,9 +371,22 @@ export default function PortalLayout() {
         </div>
       </div>
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[17.5rem] border-r border-white/70 bg-[#071525] px-5 py-6 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)] lg:block">
-        <div className="flex h-full flex-col">
-          <div>
+      {/* The sidebar is viewport-height and its content is not. On a laptop
+          with a shorter window — or any browser carrying a couple of extra
+          toolbars — the nav list pushed the profile block off the bottom, and
+          with no overflow anywhere it simply could not be reached: Change
+          password and Sign out were invisible with no way to scroll to them.
+          It went unnoticed because it only appears below roughly 900px of
+          viewport height, and not at all on a tall display.
+
+          Fixed by giving the column a real layout: the header and the profile
+          block hold their size, and the NAV takes the remaining space and
+          scrolls. Sign out is therefore always on screen regardless of window
+          height, which is the right trade — a rep can scroll to find a page,
+          but should never have to hunt for the way out. */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[17.5rem] flex-col overflow-hidden border-r border-white/70 bg-[#071525] px-5 py-6 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)] lg:flex">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0">
             <div className="px-1 pt-1">
               <img src="/logo-sidebar.png" alt="OntarioReno" className="h-11 w-auto" />
             </div>
@@ -396,7 +409,9 @@ export default function PortalLayout() {
             </button>
           </div>
 
-          <nav className="mt-7 space-y-1.5">
+          {/* min-h-0 is required: without it a flex child refuses to shrink
+              below its content and the overflow never engages. */}
+          <nav className="mt-7 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
@@ -416,7 +431,7 @@ export default function PortalLayout() {
             ))}
           </nav>
 
-          <div className="mt-auto rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
+          <div className="mt-4 shrink-0 rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 overflow-hidden rounded-full bg-[#f4c35a] text-sm font-black text-[#071525]">
                 <div className="flex h-full w-full items-center justify-center">
