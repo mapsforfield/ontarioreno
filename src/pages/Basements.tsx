@@ -102,6 +102,10 @@ export default function Basements() {
               beforeLabel="Before"
               afterLabel="After"
               attribution="Basement renovation, before and after."
+              /* This slider sits inside the first viewport on desktop, which
+                 makes it the page's LCP element. Lazy would defer the exact
+                 image the score is measured on. */
+              loading="eager"
             />
           </div>
 
