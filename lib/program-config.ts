@@ -941,14 +941,19 @@ const GARDEN_SUITE_PROJECT_TYPE: Question = {
  */
 const GARDEN_SUITE_CONTRIBUTION: Question = {
   key: 'contribution',
-  label: 'How are you thinking about funding the project?',
-  help: 'Our financing covers up to $100,000. Most Ontario garden suites run $250,000 or more, so the balance is arranged separately — often through home equity.',
+  label: 'How are you planning to fund your garden suite?',
+  // "optional" and "to help cover project gaps" are the two phrases carrying the
+  // honesty now that the cost comparison is gone from this step. Together they
+  // say the financing is a top-up rather than the funding plan, without opening
+  // with a number that stops the reader before they answer anything. The full
+  // conditions stay one tap away in the terms accordion.
+  help: 'Select the option that best fits your situation. We also offer optional financing up to $100,000 to help cover project gaps.',
   routingRelevant: true,
   step: 3,
   options: [
-    { value: 'cash_equity', label: 'Cash, savings or home equity' },
-    { value: 'need_financing', label: 'Home equity plus your financing' },
-    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+    { value: 'cash_equity', label: 'Cash, savings, or home equity' },
+    { value: 'need_financing', label: 'Home equity + optional financing' },
+    { value: 'unsure', label: 'Still exploring / Need guidance' },
   ],
 };
 
@@ -1015,11 +1020,25 @@ const GARDEN_SUITE_FUNDING_GUIDANCE: FundingGuidance = {
   continueLabel: 'Continue',
 };
 
-const GARDEN_SUITE_FUNDING_HIGHLIGHTS = [
-  'Financing available up to $100,000, on approved credit.',
-  'A typical Ontario garden suite runs $250,000 or more, so the balance is arranged separately — usually through home equity.',
-  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
-];
+/**
+ * Empty on purpose.
+ *
+ * Step 3 opened with a green amount banner and three bullets that led with what
+ * a garden suite costs. Correct, but it front-loaded the largest and most
+ * discouraging number in the flow onto the screen where someone is being asked
+ * to answer a question — the reader met "$250,000 or more" before they had told
+ * us anything, and the step read as a warning rather than a question.
+ *
+ * The step now asks its question plainly and carries the qualifier in the
+ * subtext ("optional financing up to $100,000 to help cover project gaps"),
+ * which is what a homeowner actually needs in order to answer it. The loan
+ * conditions live in the terms accordion at the bottom, for anyone who wants
+ * them.
+ *
+ * The component renders neither the banner nor the list when these are empty,
+ * so this is the whole removal.
+ */
+const GARDEN_SUITE_FUNDING_HIGHLIGHTS: string[] = [];
 
 export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
   key: 'garden-suite-financing',
@@ -1029,16 +1048,18 @@ export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
   enabled: true,
   slug: 'garden-suite',
   areaLabel: 'Ontario',
-  // No monthly figure, and deliberately not "from about $X". On the other three
-  // a starting monthly is honest because financing covers the whole job, so the
-  // payment IS the cost of the project. Here it would advertise the small part
-  // of a large number and imply the rest is handled. The CAP is the fact a
-  // homeowner needs in order to decide whether to book.
-  displayAmountLabel: 'financing up to $100,000, on approved credit',
+  // Blank, which removes the green banner at the top of step 3 entirely.
+  //
+  // No monthly figure was ever quoted here: on the other three a starting
+  // monthly is honest because financing covers the whole job, so the payment IS
+  // the cost of the project. Here it would advertise the small part of a large
+  // number. The cap now reaches the reader through the funding question's
+  // subtext and the terms accordion instead of a banner above the question.
+  displayAmountLabel: '',
   fundingHighlights: GARDEN_SUITE_FUNDING_HIGHLIGHTS,
   programTerms: [
     'Financing is a personal open loan, capped at $100,000, and is subject to credit approval.',
-    'A typical Ontario garden suite costs $250,000 or more. Any amount above the financing cap is arranged by the homeowner.',
+    'Any amount above the $100,000 financing cap is arranged by the homeowner.',
     'Up to 40% of financed funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
     'No early payment penalties and no liens registered against the property.',
     'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
@@ -1054,7 +1075,7 @@ export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Garden Suite Consultation',
   pageTitle: 'Garden Suite Consultation | OntarioReno',
-  fundingStepHeading: 'How the financing works',
+  fundingStepHeading: 'Project Funding',
   noteTemplateId: '',
   guideUrl: '',
   guideLabel: '',
