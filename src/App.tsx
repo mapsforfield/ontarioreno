@@ -1,86 +1,88 @@
+import { lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { LazyRoutes } from './components/RouteChunkBoundary';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
-import Home from './pages/Home';
-import GrantsHub from './pages/GrantsHub';
-import GrantLandingPage from './pages/GrantLandingPage';
-import Basements from './pages/Basements';
-import LegalSuites from './pages/LegalSuites';
-import GardenSuitesLanewaySuitesOntario from './pages/GardenSuitesLanewaySuitesOntario';
-import GardenSuiteCostOntario from './pages/GardenSuiteCostOntario';
-import GardenSuitePermitsOntario from './pages/GardenSuitePermitsOntario';
-import LanewaySuiteCostOntario from './pages/LanewaySuiteCostOntario';
-import LanewaySuitePermitsOntario from './pages/LanewaySuitePermitsOntario';
-import KitchenRenovations from './pages/KitchenRenovations';
-import BathroomRenovations from './pages/BathroomRenovations';
-import Costs from './pages/Costs';
-import Match from './pages/Match';
-import Cities from './pages/Cities';
-import Financing from './pages/Financing';
-import HomeEquityRenovationsOntario from './pages/HomeEquityRenovationsOntario';
-import HelocVsRefinanceForRenovations from './pages/HelocVsRefinanceForRenovations';
-import HelocForLegalBasementApartment from './pages/HelocForLegalBasementApartment';
-import GardenSuiteFinancingOntario from './pages/GardenSuiteFinancingOntario';
-import HelocVsRenovationFinancing from './pages/HelocVsRenovationFinancing';
-import PhasedRenovationFinancing from './pages/PhasedRenovationFinancing';
-import GrantsAndIncentivesWithHomeEquity from './pages/GrantsAndIncentivesWithHomeEquity';
-import OpenLoanFinancing from './pages/OpenLoanFinancing';
-import GrantEligibilityCalculator from './pages/GrantEligibilityCalculator';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import HamiltonGrant from './pages/HamiltonGrant';
-import HamiltonBasementGrantAd from './pages/HamiltonBasementGrantAd';
-import HamiltonSecondarySuiteGrant from './pages/HamiltonSecondarySuiteGrant';
-import HamiltonPermitTimeline from './pages/HamiltonPermitTimeline';
-import HamiltonBasementPermitNeed from './pages/HamiltonBasementPermitNeed';
-import OntarioLegalBasementRequirements from './pages/OntarioLegalBasementRequirements';
-import HamiltonPermitDelayAvoidance from './pages/HamiltonPermitDelayAvoidance';
-import HamiltonBasementRenovationCost from './pages/HamiltonBasementRenovationCost';
-import MiltonBasementRenovation from './pages/MiltonBasementRenovation';
-import MiltonBasementRenovationCost from './pages/MiltonBasementRenovationCost';
-import MiltonLegalBasement from './pages/MiltonLegalBasement';
-import MiltonBasementPermit from './pages/MiltonBasementPermit';
-import BurlingtonBasementRenovation from './pages/BurlingtonBasementRenovation';
-import BarrieBasementRenovation from './pages/BarrieBasementRenovation';
-import BurlingtonBasementRenovationCost from './pages/BurlingtonBasementRenovationCost';
-import BurlingtonLegalBasement from './pages/BurlingtonLegalBasement';
-import BurlingtonBasementPermit from './pages/BurlingtonBasementPermit';
-import BurlingtonAruIncentiveProgram from './pages/BurlingtonAruIncentiveProgram';
-import BarrieSecondarySuiteFunding from './pages/BarrieSecondarySuiteFunding';
-import BarrieBasementApartmentPermits from './pages/BarrieBasementApartmentPermits';
-import BarrieGardenSuites from './pages/BarrieGardenSuites';
-import BarrieAruPermitRebate from './pages/BarrieAruPermitRebate';
-import BarrieSecondarySuiteCosts from './pages/BarrieSecondarySuiteCosts';
-import BarrieAruEligibility from './pages/BarrieAruEligibility';
-import StCatharines from './pages/StCatharines';
-import StCatharinesAduGrant from './pages/StCatharinesAduGrant';
-import StCatharinesAduCost from './pages/StCatharinesAduCost';
-import StCatharinesAduPermits from './pages/StCatharinesAduPermits';
-import MississaugaBasementRenovation from './pages/MississaugaBasementRenovation';
-import MississaugaBasementRenovationCost from './pages/MississaugaBasementRenovationCost';
-import MississaugaLegalBasement from './pages/MississaugaLegalBasement';
-import MississaugaBasementPermit from './pages/MississaugaBasementPermit';
-import BramptonBasementRenovation from './pages/BramptonBasementRenovation';
-import BramptonBasementRenovationCost from './pages/BramptonBasementRenovationCost';
-import BramptonLegalBasement from './pages/BramptonLegalBasement';
-import BramptonBasementPermit from './pages/BramptonBasementPermit';
-import AjaxBasementRenovation from './pages/AjaxBasementRenovation';
-import AjaxBasementRenovationCost from './pages/AjaxBasementRenovationCost';
-import AjaxLegalBasement from './pages/AjaxLegalBasement';
-import AjaxBasementPermit from './pages/AjaxBasementPermit';
-import PickeringBasementRenovation from './pages/PickeringBasementRenovation';
-import PickeringBasementRenovationCost from './pages/PickeringBasementRenovationCost';
-import PickeringLegalBasement from './pages/PickeringLegalBasement';
-import PickeringBasementPermit from './pages/PickeringBasementPermit';
-import WhitbyBasementRenovation from './pages/WhitbyBasementRenovation';
-import WhitbyBasementRenovationCost from './pages/WhitbyBasementRenovationCost';
-import WhitbyLegalBasement from './pages/WhitbyLegalBasement';
-import WhitbyBasementPermit from './pages/WhitbyBasementPermit';
-import OshawaBasementRenovation from './pages/OshawaBasementRenovation';
-import OshawaBasementRenovationCost from './pages/OshawaBasementRenovationCost';
-import OshawaLegalBasement from './pages/OshawaLegalBasement';
-import OshawaBasementPermit from './pages/OshawaBasementPermit';
-import ContractorPartners from './pages/ContractorPartners';
+const Home = lazy(() => import('./pages/Home'));
+const GrantsHub = lazy(() => import('./pages/GrantsHub'));
+const GrantLandingPage = lazy(() => import('./pages/GrantLandingPage'));
+const Basements = lazy(() => import('./pages/Basements'));
+const LegalSuites = lazy(() => import('./pages/LegalSuites'));
+const GardenSuitesLanewaySuitesOntario = lazy(() => import('./pages/GardenSuitesLanewaySuitesOntario'));
+const GardenSuiteCostOntario = lazy(() => import('./pages/GardenSuiteCostOntario'));
+const GardenSuitePermitsOntario = lazy(() => import('./pages/GardenSuitePermitsOntario'));
+const LanewaySuiteCostOntario = lazy(() => import('./pages/LanewaySuiteCostOntario'));
+const LanewaySuitePermitsOntario = lazy(() => import('./pages/LanewaySuitePermitsOntario'));
+const KitchenRenovations = lazy(() => import('./pages/KitchenRenovations'));
+const BathroomRenovations = lazy(() => import('./pages/BathroomRenovations'));
+const Costs = lazy(() => import('./pages/Costs'));
+const Match = lazy(() => import('./pages/Match'));
+const Cities = lazy(() => import('./pages/Cities'));
+const Financing = lazy(() => import('./pages/Financing'));
+const HomeEquityRenovationsOntario = lazy(() => import('./pages/HomeEquityRenovationsOntario'));
+const HelocVsRefinanceForRenovations = lazy(() => import('./pages/HelocVsRefinanceForRenovations'));
+const HelocForLegalBasementApartment = lazy(() => import('./pages/HelocForLegalBasementApartment'));
+const GardenSuiteFinancingOntario = lazy(() => import('./pages/GardenSuiteFinancingOntario'));
+const HelocVsRenovationFinancing = lazy(() => import('./pages/HelocVsRenovationFinancing'));
+const PhasedRenovationFinancing = lazy(() => import('./pages/PhasedRenovationFinancing'));
+const GrantsAndIncentivesWithHomeEquity = lazy(() => import('./pages/GrantsAndIncentivesWithHomeEquity'));
+const OpenLoanFinancing = lazy(() => import('./pages/OpenLoanFinancing'));
+const GrantEligibilityCalculator = lazy(() => import('./pages/GrantEligibilityCalculator'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const HamiltonGrant = lazy(() => import('./pages/HamiltonGrant'));
+const HamiltonBasementGrantAd = lazy(() => import('./pages/HamiltonBasementGrantAd'));
+const HamiltonSecondarySuiteGrant = lazy(() => import('./pages/HamiltonSecondarySuiteGrant'));
+const HamiltonPermitTimeline = lazy(() => import('./pages/HamiltonPermitTimeline'));
+const HamiltonBasementPermitNeed = lazy(() => import('./pages/HamiltonBasementPermitNeed'));
+const OntarioLegalBasementRequirements = lazy(() => import('./pages/OntarioLegalBasementRequirements'));
+const HamiltonPermitDelayAvoidance = lazy(() => import('./pages/HamiltonPermitDelayAvoidance'));
+const HamiltonBasementRenovationCost = lazy(() => import('./pages/HamiltonBasementRenovationCost'));
+const MiltonBasementRenovation = lazy(() => import('./pages/MiltonBasementRenovation'));
+const MiltonBasementRenovationCost = lazy(() => import('./pages/MiltonBasementRenovationCost'));
+const MiltonLegalBasement = lazy(() => import('./pages/MiltonLegalBasement'));
+const MiltonBasementPermit = lazy(() => import('./pages/MiltonBasementPermit'));
+const BurlingtonBasementRenovation = lazy(() => import('./pages/BurlingtonBasementRenovation'));
+const BarrieBasementRenovation = lazy(() => import('./pages/BarrieBasementRenovation'));
+const BurlingtonBasementRenovationCost = lazy(() => import('./pages/BurlingtonBasementRenovationCost'));
+const BurlingtonLegalBasement = lazy(() => import('./pages/BurlingtonLegalBasement'));
+const BurlingtonBasementPermit = lazy(() => import('./pages/BurlingtonBasementPermit'));
+const BurlingtonAruIncentiveProgram = lazy(() => import('./pages/BurlingtonAruIncentiveProgram'));
+const BarrieSecondarySuiteFunding = lazy(() => import('./pages/BarrieSecondarySuiteFunding'));
+const BarrieBasementApartmentPermits = lazy(() => import('./pages/BarrieBasementApartmentPermits'));
+const BarrieGardenSuites = lazy(() => import('./pages/BarrieGardenSuites'));
+const BarrieAruPermitRebate = lazy(() => import('./pages/BarrieAruPermitRebate'));
+const BarrieSecondarySuiteCosts = lazy(() => import('./pages/BarrieSecondarySuiteCosts'));
+const BarrieAruEligibility = lazy(() => import('./pages/BarrieAruEligibility'));
+const StCatharines = lazy(() => import('./pages/StCatharines'));
+const StCatharinesAduGrant = lazy(() => import('./pages/StCatharinesAduGrant'));
+const StCatharinesAduCost = lazy(() => import('./pages/StCatharinesAduCost'));
+const StCatharinesAduPermits = lazy(() => import('./pages/StCatharinesAduPermits'));
+const MississaugaBasementRenovation = lazy(() => import('./pages/MississaugaBasementRenovation'));
+const MississaugaBasementRenovationCost = lazy(() => import('./pages/MississaugaBasementRenovationCost'));
+const MississaugaLegalBasement = lazy(() => import('./pages/MississaugaLegalBasement'));
+const MississaugaBasementPermit = lazy(() => import('./pages/MississaugaBasementPermit'));
+const BramptonBasementRenovation = lazy(() => import('./pages/BramptonBasementRenovation'));
+const BramptonBasementRenovationCost = lazy(() => import('./pages/BramptonBasementRenovationCost'));
+const BramptonLegalBasement = lazy(() => import('./pages/BramptonLegalBasement'));
+const BramptonBasementPermit = lazy(() => import('./pages/BramptonBasementPermit'));
+const AjaxBasementRenovation = lazy(() => import('./pages/AjaxBasementRenovation'));
+const AjaxBasementRenovationCost = lazy(() => import('./pages/AjaxBasementRenovationCost'));
+const AjaxLegalBasement = lazy(() => import('./pages/AjaxLegalBasement'));
+const AjaxBasementPermit = lazy(() => import('./pages/AjaxBasementPermit'));
+const PickeringBasementRenovation = lazy(() => import('./pages/PickeringBasementRenovation'));
+const PickeringBasementRenovationCost = lazy(() => import('./pages/PickeringBasementRenovationCost'));
+const PickeringLegalBasement = lazy(() => import('./pages/PickeringLegalBasement'));
+const PickeringBasementPermit = lazy(() => import('./pages/PickeringBasementPermit'));
+const WhitbyBasementRenovation = lazy(() => import('./pages/WhitbyBasementRenovation'));
+const WhitbyBasementRenovationCost = lazy(() => import('./pages/WhitbyBasementRenovationCost'));
+const WhitbyLegalBasement = lazy(() => import('./pages/WhitbyLegalBasement'));
+const WhitbyBasementPermit = lazy(() => import('./pages/WhitbyBasementPermit'));
+const OshawaBasementRenovation = lazy(() => import('./pages/OshawaBasementRenovation'));
+const OshawaBasementRenovationCost = lazy(() => import('./pages/OshawaBasementRenovationCost'));
+const OshawaLegalBasement = lazy(() => import('./pages/OshawaLegalBasement'));
+const OshawaBasementPermit = lazy(() => import('./pages/OshawaBasementPermit'));
+const ContractorPartners = lazy(() => import('./pages/ContractorPartners'));
 import { PortalAuthProvider } from './portal/auth';
 import { PortalGuard } from './portal/components/PortalGuard';
 import { PortalDataProvider } from './portal/data/store';
@@ -103,7 +105,7 @@ import PortalTasks from './portal/pages/PortalTasks';
 import PortalLogin from './portal/pages/PortalLogin';
 import ConsultationReschedule from './portal/pages/ConsultationReschedule';
 import ConsultationCancel from './portal/pages/ConsultationCancel';
-import ConsultationFlow from './pages/ConsultationFlow';
+const ConsultationFlow = lazy(() => import('./pages/ConsultationFlow'));
 
 export default function App() {
   return (
@@ -111,6 +113,7 @@ export default function App() {
       <PortalDataProvider>
         <Router>
           <ScrollToTop />
+          <LazyRoutes>
           <Routes>
           {/* Public homeowner qualification + booking flow. Standalone (outside
               the marketing Layout) so the journey stays focused, and entirely
@@ -280,6 +283,7 @@ export default function App() {
           />
           </Route>
           </Routes>
+          </LazyRoutes>
         </Router>
       </PortalDataProvider>
     </PortalAuthProvider>

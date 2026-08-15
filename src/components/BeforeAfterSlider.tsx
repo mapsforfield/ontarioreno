@@ -96,6 +96,7 @@ export function BeforeAfterSlider({
           width={width}
           height={height}
           loading={loading}
+          fetchPriority={loading === 'eager' ? 'high' : 'auto'}
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -109,6 +110,7 @@ export function BeforeAfterSlider({
             width={width}
             height={height}
             loading={loading}
+            fetchPriority={loading === 'eager' ? 'high' : 'auto'}
             decoding="async"
             className="h-full w-full object-cover"
           />
