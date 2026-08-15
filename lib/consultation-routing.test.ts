@@ -6,8 +6,10 @@ import {
   BATHROOM_FINANCING_PROGRAM,
   DEFAULT_NURTURE_TIMELINES,
   FINANCING_PROGRAMS,
+  GARDEN_SUITE_FINANCING_PROGRAM,
   HAMILTON_PROGRAM,
   KITCHEN_FINANCING_PROGRAM,
+  type ProgramConfig,
   SIMCOE_PROGRAM,
   areaForMunicipality,
   programBySlug,
@@ -17,6 +19,24 @@ import {
 import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
 const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
+
+/**
+ * Every customer-facing string a program shows during the funding step, as one
+ * blob. Used by the claim tests below, which care about what a homeowner reads
+ * rather than which field it happens to live in — a false promise is just as
+ * false in a highlight as in a guidance paragraph.
+ */
+const program_copy = (program: ProgramConfig) =>
+  [
+    program.displayAmountLabel,
+    ...program.fundingHighlights,
+    ...program.programTerms,
+    program.fundingGuidance.lead,
+    program.fundingGuidance.leadEmphasis,
+    program.fundingGuidance.highlight,
+    program.fundingGuidance.closing,
+    ...program.questions.map((q) => q.help ?? ''),
+  ].join(' ');
 /**
  * A LIVE program, used by every routing test below.
  *
@@ -773,12 +793,81 @@ test('no financing offer promises a rate, and every monthly figure is a floor', 
       `${program.slug} funding screen quotes a rate`
     );
     assert.match(program.displayAmountLabel, /on approved credit/i, `${program.slug} headline`);
-    if (/\$\s?\d/.test(program.displayAmountLabel)) {
+    // A MONTHLY figure is a floor and must say so. A CAP is the opposite kind
+    // of number — an upper limit, where "from about" would be actively
+    // misleading — so the rule keys on whether the headline quotes a payment.
+    if (/a month/i.test(program.displayAmountLabel)) {
       assert.match(
         program.displayAmountLabel,
         /from about/i,
-        `${program.slug} states a dollar figure without framing it as a starting point`
+        `${program.slug} states a monthly payment without framing it as a starting point`
       );
     }
+  }
+});
+
+// ─── Garden suite: the capped offer ──────────────────────────────────────────
+//
+// The other three finance the whole build, so "no upfront cost, financed in
+// full" is literally true for them. Garden suite is capped at $100,000 against
+// a project this site's own cost page puts at $250,000–$400,000+. Every
+// reassuring line the other three use is false here, and the failure mode is
+// expensive: a homeowner takes a 45-minute visit believing the loan covers it
+// and meets a $200,000 gap at their kitchen table.
+
+test('the garden suite program is live and reachable', () => {
+  assert.equal(GARDEN_SUITE_FINANCING_PROGRAM.slug, 'garden-suite');
+  assert.equal(programBySlug('garden-suite'), GARDEN_SUITE_FINANCING_PROGRAM);
+  assert.equal(GARDEN_SUITE_FINANCING_PROGRAM.enabled, true);
+  assert.equal(GARDEN_SUITE_FINANCING_PROGRAM.consultationMode, 'in_person');
+});
+
+test('the garden suite flow states the financing cap everywhere it matters', () => {
+  const program = GARDEN_SUITE_FINANCING_PROGRAM;
+  assert.match(program.displayAmountLabel, /\$100,000/, 'the headline must state the cap');
+  assert.match(program.fundingHighlights[0]!, /\$100,000/, 'the first highlight must state the cap');
+  assert.match(program.programTerms.join(' '), /capped at \$100,000/i);
+  assert.match(program.fundingGuidance.lead, /\$100,000/);
+  // And the size of the gap, not just the cap — a cap alone reads as generous
+  // until you know what a garden suite costs.
+  assert.match(program.fundingHighlights.join(' '), /\$250,000/);
+  assert.match(program.fundingGuidance.lead, /\$250,000/);
+  assert.match(
+    program.questions.find((q) => q.key === 'contribution')!.help!,
+    /\$100,000[\s\S]*\$250,000/,
+    'the funding question must state the cap and the typical cost together'
+  );
+});
+
+test('the garden suite flow never claims the build is covered', () => {
+  // The exact sentences that are true on the other three and false here. This
+  // is the test that catches a well-meaning copy-paste from the basement offer.
+  const copy = [
+    program_copy(GARDEN_SUITE_FINANCING_PROGRAM),
+  ].join(' ');
+  for (const claim of [
+    /no upfront cost/i,
+    /financed in full/i,
+    /covers the full cost/i,
+    /nothing to pay before/i,
+    /nothing upfront/i,
+  ]) {
+    assert.doesNotMatch(
+      copy,
+      claim,
+      `the garden suite flow claims ${claim} — it finances up to $100,000 of a $250,000+ build`
+    );
+  }
+});
+
+test('the other three offers still say the build IS covered', () => {
+  // The mirror of the test above: garden suite's caveats must not leak back
+  // into the three programs where "financed in full" is simply true.
+  for (const program of FINANCING_PROGRAMS.filter((p) => p.slug !== 'garden-suite')) {
+    assert.match(
+      program_copy(program),
+      /no upfront cost|covers the full cost|financed in full/i,
+      `${program.slug} stopped saying the build is financed in full`
+    );
   }
 });

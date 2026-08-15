@@ -9,6 +9,7 @@ import {
   MapPinned,
   Timer,
 } from 'lucide-react';
+import { BookConsultationBand } from '../components/BookConsultationCta';
 
 function SectionHeading({
   title,
@@ -85,6 +86,14 @@ export default function GardenSuitesLanewaySuitesOntario() {
               mistakes homeowners make before they start.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+              {/* Added alongside the existing two, never in place of them. */}
+              <Link
+                to="/consultation/garden-suite"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-bold text-[#1B3C6C] shadow-lg transition-all hover:bg-blue-50"
+              >
+                Book a free in-home consultation
+                <ArrowRight className="h-5 w-5" />
+              </Link>
               <Link
                 to="/match"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-4 text-lg font-bold text-white transition-all hover:bg-blue-500"
@@ -534,6 +543,15 @@ export default function GardenSuitesLanewaySuitesOntario() {
           </div>
         </div>
       </section>
+
+      {/* The band states the cap in its body copy. A garden suite is a
+          $250,000+ decision, so "book a free visit" without that context would
+          be selling the visit on a promise the financing cannot keep. */}
+      <BookConsultationBand
+        slug="garden-suite"
+        heading="Find out what your lot will actually allow"
+        body="Servicing, setbacks and access decide a garden suite before the budget does. A consultant walks the yard with you and scopes it properly — financing available up to $100,000 toward the build."
+      />
     </div>
   );
 }

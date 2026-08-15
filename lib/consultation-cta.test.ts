@@ -44,6 +44,7 @@ const GUIDE_PAGES: { page: string; slug: string }[] = [
   { page: 'src/pages/LegalSuites.tsx', slug: 'basement' },
   { page: 'src/pages/KitchenRenovations.tsx', slug: 'kitchen' },
   { page: 'src/pages/BathroomRenovations.tsx', slug: 'bathroom' },
+  { page: 'src/pages/GardenSuitesLanewaySuitesOntario.tsx', slug: 'garden-suite' },
 ];
 
 const SHARED_CTA = 'src/components/BookConsultationCta.tsx';
@@ -68,9 +69,9 @@ test('no guide page points at another project’s form', () => {
   for (const { page, slug } of GUIDE_PAGES) {
     const source = read(page);
     const linked = new Set(
-      [...source.matchAll(/to=\{?`?\/consultation\/([a-z]+)/g)].map((m) => m[1])
+      [...source.matchAll(/to=\{?`?\/consultation\/([a-z-]+)/g)].map((m) => m[1])
     );
-    for (const other of [...source.matchAll(/slug="([a-z]+)"/g)].map((m) => m[1])) {
+    for (const other of [...source.matchAll(/slug="([a-z-]+)"/g)].map((m) => m[1])) {
       linked.add(other);
     }
     linked.delete(slug);
@@ -116,7 +117,7 @@ test('the shared CTA component exists and offers a real booking link', () => {
     'The shared CTA no longer builds a /consultation/<slug> link.',
   );
   // Every slug the component accepts has to be a real, live program.
-  const accepted = [...source.matchAll(/'(basement|bathroom|kitchen)'/g)].map((m) => m[1]);
+  const accepted = [...source.matchAll(/'(basement|bathroom|kitchen|garden-suite)'/g)].map((m) => m[1]);
   assert.ok(accepted.length > 0, 'The ConsultationSlug union lost its values.');
   for (const slug of new Set(accepted)) {
     assert.equal(programBySlug(slug)?.enabled, true, `${slug} is not a live program.`);
