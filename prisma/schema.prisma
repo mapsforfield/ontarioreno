@@ -44,6 +44,7 @@ model User {
   trackerRows          SaleTracker[]
   daysOff              RepDayOff[]
   salesAgreements      SalesAgreement[]
+  dealDocuments        DealDocument[]
   tasks                Task[]
   leads                Lead[]
   interactions         Interaction[]
@@ -152,6 +153,7 @@ model Deal {
   proposals          ProposalHistory[]
   activity           DealActivity[]
   salesAgreements    SalesAgreement[]
+  documents          DealDocument[]
 }
 
 model DealActivity {
@@ -391,6 +393,34 @@ model SaleTracker {
 }
 
 // ─── Sales Agreements ────────────────────────────────────────────────────────
+
+/// Drawings, permits and any other supporting paperwork on a deal.
+///
+/// Deliberately a SEPARATE model from SalesAgreement rather than a `kind`
+/// column on it. The signed agreement is the one document the commission and
+/// invoicing flows read, and widening that table would put permit scans in
+/// front of every query that means "is this deal signed". They also differ in
+/// kind: there is one signed agreement, and there are many drawings.
+///
+/// `category` exists so the same table can hold survey drawings, engineering
+/// stamps or anything else added later without another model.
+model DealDocument {
+  id               String   @id @default(cuid())
+  dealId           String
+  fileName         String
+  url              String
+  /// 'drawings_permits' today. A label, not an enum, so adding a kind is a
+  /// UI change rather than a migration.
+  category         String   @default("drawings_permits")
+  /// Original MIME type, so the viewer can tell a PDF from a photo of a
+  /// stamped drawing — reps photograph permits as often as they scan them.
+  contentType      String   @default("")
+  uploadedByUserId String
+  createdAt        DateTime @default(now())
+
+  deal       Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedByUserId], references: [id])
+}
 
 model SalesAgreement {
   id               String   @id @default(cuid())

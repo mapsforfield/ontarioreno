@@ -226,6 +226,26 @@ export type SalesAgreement = {
   createdAt: string;
 };
 
+/**
+ * Drawings, permits and other supporting paperwork on a deal.
+ *
+ * Separate from SalesAgreement on purpose — see the note on the Prisma model.
+ * There is one signed agreement per deal and many documents, and only the
+ * agreement is read by the commission flow.
+ */
+export type DealDocument = {
+  id: string;
+  dealId: string;
+  fileName: string;
+  url: string;
+  /** 'drawings_permits' today; a label rather than an enum. */
+  category: string;
+  /** Original MIME type — reps photograph permits as often as they scan them. */
+  contentType: string;
+  uploadedByUserId: string;
+  createdAt: string;
+};
+
 export type Household = {
   id: string;
   name: string;
