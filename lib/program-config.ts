@@ -896,17 +896,189 @@ export const KITCHEN_FINANCING_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
+// ─── Garden suite financing ───────────────────────────────────────────────────
+// The odd one out, and the copy below is written around the difference.
+//
+// The other three offers finance the WHOLE build: "no upfront cost, financed in
+// full" is literally true for a basement, a bathroom and a kitchen. Garden
+// suite financing is capped at $100,000, and this site's own cost page puts an
+// Ontario garden suite at $250,000–$400,000+, with most between $260,000 and
+// $350,000. So the financing covers roughly a quarter to a third of a typical
+// project, and the homeowner arranges the rest.
+//
+// That means every reassuring line the other three programs use is FALSE here.
+// Copying BASEMENT_FUNDING_HIGHLIGHTS across would have told a homeowner their
+// $300,000 build has nothing to pay upfront, which is the single most expensive
+// misunderstanding this flow could create: they take a 45-minute visit, get
+// excited, and discover a $200,000 gap at the kitchen table. Nobody wins that
+// conversation.
+//
+// So the cap leads. It is in the headline, it is the first funding highlight,
+// it is in the terms, and the "not sure yet" guidance screen is about the gap
+// rather than about reassurance. A homeowner who books this visit should
+// already know financing is part of the answer and not all of it.
+
+const GARDEN_SUITE_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you planning?',
+  routingRelevant: true,
+  step: 2,
+  options: [
+    { value: 'garden_suite', label: 'Garden suite in the back yard' },
+    { value: 'laneway_suite', label: 'Laneway suite (property backs onto a laneway)' },
+    { value: 'garage_conversion', label: 'Replacing or converting an existing garage' },
+    { value: 'unsure', label: 'Not sure which fits my lot' },
+  ],
+};
+
 /**
- * The three financing offers, as a set.
+ * The funding question, rewritten for a capped offer.
+ *
+ * The other three ask how someone wants to pay, because financing can cover all
+ * of it either way. Here the honest question is how they plan to cover the
+ * BALANCE, and the help text states the gap in plain numbers rather than
+ * leaving them to discover it.
+ */
+const GARDEN_SUITE_CONTRIBUTION: Question = {
+  key: 'contribution',
+  label: 'How are you thinking about funding the project?',
+  help: 'Our financing covers up to $100,000. Most Ontario garden suites run $250,000 or more, so the balance is arranged separately — often through home equity.',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'cash_equity', label: 'Cash, savings or home equity' },
+    { value: 'need_financing', label: 'Home equity plus your financing' },
+    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+  ],
+};
+
+/**
+ * Prep questions — asked AFTER booking, no routing weight.
+ *
+ * Straight from what the guide page says decides feasibility: servicing is the
+ * major filter, then laneway access, then what is already on the spot. A rep
+ * walking into a garden suite visit wants these three before they arrive.
+ */
+const GARDEN_SUITE_PREP_QUESTIONS: Question[] = [
+  {
+    key: 'lotAccess',
+    label: 'How is the back yard reached?',
+    step: 3,
+    options: [
+      { value: 'laneway', label: 'Backs onto a laneway' },
+      { value: 'side_yard', label: 'Side-yard access only' },
+      { value: 'through_house', label: 'Through the house only' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'existingStructure',
+    label: 'What is on that spot now?',
+    step: 3,
+    options: [
+      { value: 'nothing', label: 'Open yard' },
+      { value: 'garage', label: 'A garage' },
+      { value: 'shed', label: 'A shed or outbuilding' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'servicingKnown',
+    label: 'Do you know where water, sewer and hydro run?',
+    step: 3,
+    options: [
+      { value: 'yes', label: 'Yes, we have drawings or know the route' },
+      { value: 'no', label: 'No' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+];
+
+/**
+ * The "not sure yet" screen, doing the opposite job to the other three.
+ *
+ * On a basement this screen removes a fear — "nothing to pay upfront". Here
+ * that would be a lie, so it does the harder and more useful thing: it states
+ * the gap before the homeowner has spent an afternoon on a visit, and reframes
+ * what the visit is FOR. Most people building a garden suite fund it from the
+ * equity the suite itself creates, and that is a real conversation a consultant
+ * can have — but only if nobody arrived believing the loan covered it.
+ */
+const GARDEN_SUITE_FUNDING_GUIDANCE: FundingGuidance = {
+  heading: 'Where the money usually comes from',
+  lead: 'Our financing covers up to $100,000 of the build. A typical Ontario garden suite runs $250,000 or more, so most homeowners cover the balance from home equity.',
+  leadEmphasis: 'Worth knowing before you book.',
+  milestones: ['Feasibility', 'Budget', 'Permit', 'Build'],
+  highlight:
+    'A garden suite adds a rentable unit and value to the property, which is what makes the equity side work for most people. Your consultant will go through the whole picture, not just our part of it.',
+  closing: 'No number is committed to on this call, and nothing is owed for the visit.',
+  continueLabel: 'Continue',
+};
+
+const GARDEN_SUITE_FUNDING_HIGHLIGHTS = [
+  'Financing available up to $100,000, on approved credit.',
+  'A typical Ontario garden suite runs $250,000 or more, so the balance is arranged separately — usually through home equity.',
+  'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
+];
+
+export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
+  key: 'garden-suite-financing',
+  version: 1,
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'garden-suite',
+  areaLabel: 'Ontario',
+  // No monthly figure, and deliberately not "from about $X". On the other three
+  // a starting monthly is honest because financing covers the whole job, so the
+  // payment IS the cost of the project. Here it would advertise the small part
+  // of a large number and imply the rest is handled. The CAP is the fact a
+  // homeowner needs in order to decide whether to book.
+  displayAmountLabel: 'financing up to $100,000, on approved credit',
+  fundingHighlights: GARDEN_SUITE_FUNDING_HIGHLIGHTS,
+  programTerms: [
+    'Financing is a personal open loan, capped at $100,000, and is subject to credit approval.',
+    'A typical Ontario garden suite costs $250,000 or more. Any amount above the financing cap is arranged by the homeowner.',
+    'Up to 40% of financed funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'No early payment penalties and no liens registered against the property.',
+    'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
+  ],
+  whyFreeText:
+    "A garden suite is decided by the lot before it is decided by the budget — servicing, setbacks and access rule out plenty of properties, and no homeowner should pay to find that out. So we scope it properly first: what the yard allows, what the municipality will approve, and what it would realistically cost to build. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: GARDEN_SUITE_FUNDING_GUIDANCE,
+  eligibleProjectTypes: ['garden_suite', 'laneway_suite', 'garage_conversion'],
+  nurtureTimelines: [],
+  questions: [OWNERSHIP, GARDEN_SUITE_PROJECT_TYPE, TIMELINE, GARDEN_SUITE_CONTRIBUTION],
+  prepQuestions: GARDEN_SUITE_PREP_QUESTIONS,
+  // Servicing and setbacks are decided standing in the yard, not on a call.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Garden Suite Consultation',
+  pageTitle: 'Garden Suite Consultation | OntarioReno',
+  fundingStepHeading: 'How the financing works',
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+};
+
+/**
+ * The financing offers, as a set.
  *
  * Exported so the tests can assert across all of them rather than pairwise —
- * the scheduling rules only hold if EVERY offer shares them, and a fourth
+ * the scheduling rules only hold if EVERY offer shares them, and a further
  * offer added without these constants would otherwise ship unnoticed.
+ *
+ * Note that they are NOT uniform in what they promise. Basement, bathroom and
+ * kitchen finance the whole build; garden suite is capped at $100,000 against a
+ * far larger project. Tests that assert on funding COPY have to allow for that
+ * difference — the scheduling rules are what every offer shares.
  */
 export const FINANCING_PROGRAMS: ProgramConfig[] = [
   BASEMENT_FINANCING_PROGRAM,
   BATHROOM_FINANCING_PROGRAM,
   KITCHEN_FINANCING_PROGRAM,
+  GARDEN_SUITE_FINANCING_PROGRAM,
 ];
 
 export const PROGRAMS: ProgramConfig[] = [

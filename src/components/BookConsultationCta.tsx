@@ -19,7 +19,7 @@ import { ArrowRight, CalendarCheck, CheckCircle2 } from 'lucide-react';
  * from the URL, because two different pages (the basement guide and the legal
  * suites guide) both lead to the basement flow.
  */
-export type ConsultationSlug = 'basement' | 'bathroom' | 'kitchen';
+export type ConsultationSlug = 'basement' | 'bathroom' | 'kitchen' | 'garden-suite';
 
 /** Per-page accent, so the band sits inside the page's own palette. */
 type Accent = 'blue' | 'emerald';
