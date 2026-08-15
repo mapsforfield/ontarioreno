@@ -91,6 +91,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(agreements);
     }
 
+    // ── Deal documents (drawings, permits) ──
+    // Same visibility rule as agreements: admins see everything, a rep sees
+    // documents on the deals assigned to them.
+    if (req.query['_resource'] === 'deal_documents') {
+      const where = user.role === 'admin' ? {} : { deal: { assignedRepId: user.id } };
+      const documents = await withSchema(() =>
+        prisma.dealDocument.findMany({ where, orderBy: { createdAt: 'desc' } })
+      );
+      return res.status(200).json(documents);
+    }
+
     // ── Contract Creator presets ──
     // Presets are team-wide: whoever saves one, every rep can start from it.
     // Only the owner (or an admin) may edit or delete it.

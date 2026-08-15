@@ -139,7 +139,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           request: req,
           token: process.env.BLOB_READ_WRITE_TOKEN,
           onBeforeGenerateToken: async () => ({
-            allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+            // Widened for the Drawings/Permits section. The list was PDF/JPEG/PNG
+            // only, which silently rejected the most common real upload on a job
+            // site: a permit photographed on an iPhone, which arrives as HEIC.
+            // Additive — the agreement input still only offers .pdf, so nothing
+            // about that path changes. Deliberately NOT octet-stream: that would
+            // accept literally any file through the same handshake.
+            allowedContentTypes: [
+              'application/pdf',
+              'image/jpeg',
+              'image/png',
+              'image/heic',
+              'image/heif',
+              'image/webp',
+            ],
             maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
             addRandomSuffix: true,
           }),
@@ -326,6 +339,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
       return res.status(201).json(agreement);
+    }
+
+    // ── Deal documents (drawings, permits) ────────────────────────────────
+    // Deliberately separate actions from the agreement ones rather than one
+    // handler with a type flag: the signed agreement is the document the
+    // commission and invoicing flows read, and keeping the paths apart means a
+    // change to document handling can never alter what "signed" means.
+
+    // Short-lived signed URL to view/download a private document
+    if (action === 'deal_document_link') {
+      if (!body.id) return res.status(400).json({ error: 'Missing id.' });
+      const doc = await prisma.dealDocument.findUnique({ where: { id: body.id as string } });
+      if (!doc) return res.status(404).json({ error: 'Not found.' });
+      const docDeal = await prisma.deal.findUnique({
+        where: { id: doc.dealId },
+        select: { assignedRepId: true },
+      });
+      if (user.role !== 'admin' && docDeal?.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden.' });
+      }
+      const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (!rwToken) return res.status(500).json({ error: 'Blob storage not configured.' });
+      try {
+        const pathname = decodeURIComponent(new URL(doc.url).pathname.replace(/^\//, ''));
+        const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+        const signed = await issueSignedToken({
+          token: rwToken,
+          operations: ['get'],
+          validUntil: expiry,
+        });
+        const { presignedUrl } = await presignUrl(signed, {
+          operation: 'get',
+          pathname,
+          access: 'private',
+          validUntil: expiry,
+        });
+        return res.status(200).json({ url: presignedUrl });
+      } catch (err) {
+        console.error('[deals/[id]] deal_document_link failed:', err);
+        return res.status(500).json({ error: 'Could not create download link.' });
+      }
+    }
+
+    // Save an uploaded document URL to the database
+    if (action === 'add_deal_document') {
+      if (!body.url || !body.fileName) return res.status(400).json({ error: 'url and fileName required.' });
+      const doc = await prisma.dealDocument.create({
+        data: {
+          dealId: id,
+          fileName: body.fileName as string,
+          url: body.url as string,
+          category: (body.category as string) || 'drawings_permits',
+          contentType: (body.contentType as string) || '',
+          uploadedByUserId: user.id,
+        },
+      });
+      return res.status(201).json(doc);
+    }
+
+    // Delete a document record (and its blob)
+    if (action === 'delete_deal_document') {
+      if (!body.id) return res.status(400).json({ error: 'Missing id.' });
+      const doc = await prisma.dealDocument.findUnique({ where: { id: body.id as string } });
+      if (!doc) return res.status(404).json({ error: 'Not found.' });
+      const docDeal = await prisma.deal.findUnique({
+        where: { id: doc.dealId },
+        select: { assignedRepId: true },
+      });
+      if (user.role !== 'admin' && docDeal?.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'You can only delete documents on your own deals.' });
+      }
+      await prisma.dealDocument.delete({ where: { id: body.id as string } });
+      const rwToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (rwToken) {
+        await del(doc.url, { token: rwToken }).catch(() => { /* non-critical */ });
+      }
+      return res.status(200).json({ ok: true });
     }
 
     // Delete an agreement record (and its blob)

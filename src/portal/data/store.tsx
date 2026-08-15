@@ -41,6 +41,7 @@ import {
   ProposalHistory,
   RepDayOff,
   SalesAgreement,
+  DealDocument,
   ContractPreset,
   SaleTrackerRow,
   Task,
@@ -86,6 +87,7 @@ type PortalDataState = {
   daysOff: RepDayOff[];
   households: Household[];
   salesAgreements: SalesAgreement[];
+  dealDocuments: DealDocument[];
   contractPresets: ContractPreset[];
   tasks: Task[];
   users: User[];
@@ -225,6 +227,9 @@ type PortalDataContextValue = PortalDataState & {
   fetchTrashedClients: () => Promise<Client[]>;
   addDaysOff: (dates: string[], note: string, targetUserId?: string) => Promise<RepDayOff[]>;
   addSalesAgreement: (dealId: string, fileName: string, url: string, actor?: User) => Promise<SalesAgreement | null>;
+  addDealDocument: (dealId: string, fileName: string, url: string, contentType: string, actor?: User) => Promise<DealDocument | null>;
+  deleteDealDocument: (id: string) => Promise<void>;
+  dealDocumentLink: (id: string) => Promise<string | null>;
   /** Returns a short-lived signed URL for viewing/downloading a private agreement blob. */
   getAgreementLink: (agreementId: string, dealId: string) => Promise<string | null>;
   deleteSalesAgreement: (id: string) => Promise<void>;
@@ -367,6 +372,7 @@ const emptyState: PortalDataState = {
   daysOff: [],
   households: [],
   salesAgreements: [],
+  dealDocuments: [],
   tasks: [],
   commissions: [],
   contractors: [],
@@ -780,13 +786,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Household[]>('/api/appointments?_resource=households'),
       apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
       apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
+      apiCall<DealDocument[]>('/api/deals?_resource=deal_documents'),
       apiCall<Task[]>('/api/auth/tasks'),
       apiCall<Lead[]>('/api/leads'),
       apiCall<Record<string, boolean>>('/api/auth/rep-access'),
       apiCall<NoteTemplate[]>('/api/auth/note-templates'),
       apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
       apiCall<FinancePartner[]>('/api/contractors?_resource=finance_partners'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, tasks, leads, repAccess, noteTemplates, contractPresets, financePartners]) => {
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, contractPresets, financePartners]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -814,6 +821,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         households: households ?? [],
         tasks: tasks ?? [],
         salesAgreements: salesAgreements ?? [],
+        dealDocuments: dealDocuments ?? [],
         trackerRows: trackerRows ?? [],
         defaultCommissionRate: loadDefaultCommissionRate(),
         // A null result means the fetch actually failed (apiCall returns [] only
@@ -1649,6 +1657,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           daysOff: current.daysOff,
           households: current.households,
           salesAgreements: current.salesAgreements,
+          dealDocuments: current.dealDocuments,
           contractPresets: current.contractPresets,
           tasks: current.tasks,
           contractors: current.contractors,
@@ -2725,6 +2734,67 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           });
         }
         return agreement ?? null;
+      },
+
+      // ── Deal documents (drawings, permits) ─────────────────────────────────
+      // Mirrors the agreement mutations rather than sharing them: the two are
+      // deliberately separate paths end to end, so document handling can never
+      // change what "signed" means on a deal.
+
+      addDealDocument: async (dealId, fileName, url, contentType, actor) => {
+        const doc = await apiCall<DealDocument>(`/api/deals/${dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            _action: 'add_deal_document',
+            dealId,
+            fileName,
+            url,
+            contentType,
+            category: 'drawings_permits',
+          }),
+        });
+        if (doc) {
+          setState((current) => {
+            const deal = current.deals.find((d) => d.id === dealId);
+            const label = getDealLabel(deal);
+            return {
+              ...current,
+              dealDocuments: [doc, ...current.dealDocuments],
+              activities: prependActivity(current.activities, actor, {
+                actionLabel: `Drawing/permit attached for ${label}`,
+                actionType: 'document_attached',
+                dealId,
+                entityId: dealId,
+                entityLabel: label,
+                entityType: 'deal',
+              }),
+            };
+          });
+        }
+        return doc ?? null;
+      },
+
+      deleteDealDocument: async (id) => {
+        const doc = state.dealDocuments.find((d) => d.id === id);
+        if (!doc) return;
+        await apiCall(`/api/deals/${doc.dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'delete_deal_document', id }),
+        });
+        setState((current) => ({
+          ...current,
+          dealDocuments: current.dealDocuments.filter((d) => d.id !== id),
+        }));
+      },
+
+      dealDocumentLink: async (id) => {
+        const doc = state.dealDocuments.find((d) => d.id === id);
+        if (!doc) return null;
+        const result = await apiCall<{ url: string }>(`/api/deals/${doc.dealId}`, {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'deal_document_link', id }),
+        });
+        return result?.url ?? null;
       },
 
       deleteSalesAgreement: async (id) => {

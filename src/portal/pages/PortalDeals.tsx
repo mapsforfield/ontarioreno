@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -276,6 +276,10 @@ export default function PortalDeals() {
     calculateHistoricalSalesTotal,
     calculateHistoricalSalesCount,
     salesAgreements,
+    dealDocuments,
+    addDealDocument,
+    deleteDealDocument,
+    dealDocumentLink,
     addSalesAgreement,
     getAgreementLink,
     deleteSalesAgreement,
@@ -507,6 +511,11 @@ export default function PortalDeals() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [agreementUploading, setAgreementUploading] = useState(false);
   const [agreementError, setAgreementError] = useState('');
+  // Progress is a COUNT, not a boolean, because this section takes multiple
+  // files at once. "Uploading 2 of 5" is the difference between a rep waiting
+  // and a rep assuming it hung and clicking again.
+  const [docProgress, setDocProgress] = useState<{ done: number; total: number } | null>(null);
+  const [docError, setDocError] = useState('');
   const [viewingRecommendedContractorId, setViewingRecommendedContractorId] =
     useState<string | null>(null);
   const [isDispatchPanelOpen, setIsDispatchPanelOpen] = useState(false);
@@ -2567,6 +2576,151 @@ OntarioReno Broker Portal`;
                   )}
                 </section>
               )}
+
+              {/* Drawings / Permits — sits ABOVE the signed agreement, because
+                  on a live job these are the files a rep opens most often, and
+                  the agreement is signed once and then rarely touched. */}
+              {!isAddingDeal && selectedDeal && (() => {
+                const docs = dealDocuments.filter((d) => d.dealId === selectedDeal.id);
+                const openDoc = async (docId: string) => {
+                  setDocError('');
+                  // Tab opened synchronously so popup blockers allow it, then
+                  // pointed at the signed URL — same approach as the agreement.
+                  const tab = window.open('about:blank', '_blank');
+                  const url = await dealDocumentLink(docId);
+                  if (url) {
+                    if (tab) tab.location.href = url;
+                    else window.location.href = url;
+                  } else {
+                    tab?.close();
+                    setDocError('Could not open that file. Try again.');
+                  }
+                };
+                const handleDocUpload = async (files: File[]) => {
+                  if (!files.length) return;
+                  setDocError('');
+                  setDocProgress({ done: 0, total: files.length });
+                  const failed: string[] = [];
+                  // Sequential, not Promise.all. A rep on site attaching eight
+                  // permit photos over LTE would saturate the connection pool if
+                  // these all went at once, and a partial failure inside a
+                  // Promise.all is far harder to report usefully than one that
+                  // simply names the files that did not make it.
+                  for (let i = 0; i < files.length; i++) {
+                    const file = files[i]!;
+                    try {
+                      const blob = await upload(
+                        `deal-documents/${selectedDeal.id}/${Date.now()}-${file.name}`,
+                        file,
+                        {
+                          // The store is configured private — public uploads are rejected
+                          access: 'private',
+                          handleUploadUrl: `/api/deals/${selectedDeal.id}`,
+                          contentType: file.type || 'application/octet-stream',
+                        }
+                      );
+                      await addDealDocument(
+                        selectedDeal.id,
+                        file.name,
+                        blob.url,
+                        file.type || '',
+                        currentUser
+                      );
+                    } catch {
+                      failed.push(file.name);
+                    }
+                    setDocProgress({ done: i + 1, total: files.length });
+                  }
+                  setDocProgress(null);
+                  // Names the failures rather than a bare "upload failed", so a
+                  // rep knows exactly which ones to retry.
+                  if (failed.length) {
+                    setDocError(
+                      failed.length === files.length
+                        ? 'None of those uploaded. Check your connection and try again.'
+                        : `Could not upload: ${failed.join(', ')}`
+                    );
+                  }
+                };
+                const uploading = docProgress !== null;
+                return (
+                  <section className="mt-6 rounded-[0.5rem] border border-sky-200 bg-sky-50/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-700">Project Files</p>
+                        <h3 className="mt-1 text-lg font-black text-slate-950">Drawings / Permits</h3>
+                      </div>
+                      <label className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-[0.5rem] border border-sky-300 bg-white px-3 py-2 text-sm font-bold text-sky-800 transition hover:bg-sky-50 ${uploading ? 'pointer-events-none opacity-50' : ''}`}>
+                        <Upload className="h-4 w-4" />
+                        {uploading ? `Uploading ${Math.min(docProgress.done + 1, docProgress.total)} of ${docProgress.total}…` : 'Upload files'}
+                        {/* `multiple` is the whole point of this section. Images
+                            are accepted as well as PDFs — reps photograph a
+                            stamped permit on site far more often than they scan
+                            one, and HEIC covers iPhone. The list matches the
+                            server's allowedContentTypes exactly; advertising a
+                            type the handshake rejects just produces a failure a
+                            rep cannot act on. */}
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,application/pdf,image/jpeg,image/png,image/heic,image/heif,image/webp"
+                          className="sr-only"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            const list = Array.from(e.target.files ?? []);
+                            e.target.value = '';
+                            void handleDocUpload(list);
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {docError && <p className="mt-2 text-sm font-semibold text-red-600">{docError}</p>}
+
+                    {docs.length === 0 ? (
+                      <p className="mt-3 rounded-[0.5rem] border border-dashed border-sky-300 bg-white p-4 text-sm font-semibold text-slate-500">
+                        No drawings or permits attached yet.
+                      </p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {docs.map((doc) => (
+                          <div key={doc.id} className="flex items-center justify-between gap-3 rounded-[0.5rem] border border-sky-200 bg-white px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {doc.contentType.startsWith('image/') ? (
+                                <ImageIcon className="h-4 w-4 shrink-0 text-sky-600" />
+                              ) : (
+                                <FileText className="h-4 w-4 shrink-0 text-sky-600" />
+                              )}
+                              <span className="truncate text-sm font-bold text-slate-800">{doc.fileName}</span>
+                              <span className="shrink-0 text-xs text-slate-400">{new Date(doc.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openDoc(doc.id)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                                title="View / Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                              {canDeleteSelectedDeal && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteDealDocument(doc.id)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
 
               {!isAddingDeal && selectedDeal && (() => {
                 const dealAgreements = salesAgreements.filter((a) => a.dealId === selectedDeal.id);
