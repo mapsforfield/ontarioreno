@@ -267,7 +267,18 @@ export default function PortalCommissions() {
   };
 
   useEffect(() => {
-    if (isAdmin) listInvoices().then(setInvoices).catch(() => {});
+    // Client invoices (Portal → Invoices) share this ledger but have a different
+    // snapshot shape, and would re-render through the commission builder as a
+    // blank commission. They have their own history on their own page.
+    const isCommissionRow = (row: CommissionInvoiceRecord) => {
+      if (!row.snapshot) return true; // predates snapshots — commission by definition
+      try {
+        return (JSON.parse(row.snapshot) as { kind?: string })?.kind !== 'client';
+      } catch {
+        return true;
+      }
+    };
+    if (isAdmin) listInvoices().then((rows) => setInvoices(rows.filter(isCommissionRow))).catch(() => {});
   }, [isAdmin, listInvoices]);
 
   if (!currentUser) return null;

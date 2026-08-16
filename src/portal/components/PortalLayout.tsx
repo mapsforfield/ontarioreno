@@ -11,6 +11,7 @@ import {
   Gauge,
   HandCoins,
   Inbox,
+  ReceiptText,
   LineChart,
   AlertTriangle,
   ListTodo,
@@ -70,6 +71,7 @@ const navItems: NavItem[] = [
   { label: 'Performance', href: '/portal/performance', icon: LineChart, feature: 'analytics' },
   { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, feature: 'workspace' },
   { label: 'Submissions', href: '/portal/submissions', icon: Inbox, adminOnly: true },
+  { label: 'Invoices', href: '/portal/invoices', icon: ReceiptText, adminOnly: true },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },
 ];
 
