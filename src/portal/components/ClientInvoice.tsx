@@ -117,7 +117,10 @@ function prettyDate(iso: string): string {
 }
 
 export function buildClientInvoicePdf(letterhead: string | null, d: ClientInvoiceData): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  // See the note in CommissionInvoice's buildPdf: without `compress` the
+  // letterhead goes in as a raw 24 MB bitmap and the emailed copy is rejected
+  // by the 10 MB attachment limit.
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true });
   if (letterhead) doc.addImage(letterhead, 'PNG', 0, 0, PAGE_W, PAGE_H);
 
   // INVOICE number on the band

@@ -92,7 +92,12 @@ export async function loadLetterhead(): Promise<string | null> {
 }
 
 export function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  // `compress` matters far more than it looks. The letterhead is a 2550 × 3300
+  // PNG, and jsPDF embeds it as a RAW RGB bitmap — 24 MB per invoice — unless
+  // stream compression is on. With it, the same page is under 700 KB, with no
+  // loss of quality. It also keeps the emailed copy under the 10 MB per-file
+  // limit in api/send-email.ts, which an uncompressed invoice silently blew.
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true });
   if (letterhead) doc.addImage(letterhead, 'PNG', 0, 0, PAGE_W, PAGE_H);
 
   // INVOICE number on the band
