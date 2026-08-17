@@ -278,6 +278,15 @@ type PortalDataContextValue = PortalDataState & {
     contacted: boolean,
     note: string
   ) => Promise<Lead | null>;
+  /**
+   * Give a submission the address its form never captured, resolving it through
+   * the same Places path the public flow uses. Returns the updated lead, or an
+   * `error` explaining why the address could not be resolved.
+   */
+  setLeadAddress: (
+    leadId: string,
+    picked: { placeId: string; addressText: string }
+  ) => Promise<{ lead: Lead } | { error: string }>;
   /** Free slots for one lead, computed the same way the homeowner's calendar is. */
   fetchLeadSlots: (leadId: string) => Promise<LeadSlotsPayload>;
   /**
@@ -3770,6 +3779,34 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }));
         }
         return saved;
+      },
+
+      // Not routed through apiCall: that helper logs the response body and
+      // returns null, and here the server's message IS the answer a rep needs —
+      // "pick a more specific address" and "our provider is down" call for
+      // opposite responses and must not both read as a generic failure.
+      setLeadAddress: async (leadId, picked) => {
+        try {
+          const res = await fetch('/api/leads', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ _action: 'set_lead_address', leadId, ...picked }),
+          });
+          const payload = (await res.json().catch(() => null)) as (Lead & { error?: string }) | null;
+          if (!res.ok || !payload || payload.error) {
+            return { error: payload?.error ?? 'Could not save that address.' };
+          }
+          const lead = { ...payload, interactions: payload.interactions ?? [] } as Lead;
+          setState((current) => ({
+            ...current,
+            leads: current.leads.map((l) => (l.id === leadId ? lead : l)),
+          }));
+          try { changePublisher?.(); } catch { /* realtime is best-effort */ }
+          return { lead };
+        } catch {
+          return { error: 'Could not save that address.' };
+        }
       },
 
       fetchLeadSlots: async (leadId) => {
