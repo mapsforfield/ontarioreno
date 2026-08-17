@@ -29,7 +29,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
 import { countUnworkedSubmissions, isUnworkedSubmission } from '../data/submissions';
@@ -757,6 +757,9 @@ export default function PortalSubmissions() {
           appointment={selected.appointmentId ? appointmentById.get(selected.appointmentId) : undefined}
           onClose={() => setSelectedId(null)}
           onApply={applyContacted}
+          onLeadUpdated={(updated) =>
+            setLeads((current) => current.map((l) => (l.id === updated.id ? updated : l)))
+          }
         />
       ) : null}
     </div>
@@ -816,8 +819,9 @@ function NoSlotsReason({ blocked }: { blocked?: SlotBlock }) {
   if (blocked?.reason === 'NO_AREA') {
     return (
       <p className="px-4 py-3 text-sm text-slate-500">
-        This submission never resolved to a service area, so no calendar applies. Check the address
-        above.
+        This submission never resolved to a service area, so no calendar applies. If you have the
+        address now, add it under <span className="font-bold">Contact</span> above — the times
+        appear once it resolves.
       </p>
     );
   }
@@ -837,6 +841,121 @@ function NoSlotsReason({ blocked }: { blocked?: SlotBlock }) {
   );
 }
 
+/**
+ * Give a submission the address the form never captured.
+ *
+ * A homeowner who picks a suggestion with no street number — a locality, a bare
+ * road — resolves to INCOMPLETE_ADDRESS, and the address stored is the empty
+ * string. No address means no scheduling area, which means no calendar, which
+ * means the rep who phoned and got the real address had nowhere to put it and
+ * no way to book. This is that missing input.
+ *
+ * Suggestions come from the flow's OWN endpoint, and the placeId is what gets
+ * saved — the server re-resolves it through the same path a homeowner's address
+ * takes. Free text alone is accepted only where the flow would accept it: when
+ * it matches exactly one real address. We never guess an address a rep will be
+ * driven to, and the coordinates the travel radius depends on always come from
+ * the resolved place, never from anything typed here.
+ */
+function AddressFixer({
+  lead,
+  onSaved,
+}: {
+  lead: Lead;
+  onSaved: (lead: Lead) => void;
+}) {
+  const { setLeadAddress } = usePortalData();
+  const [text, setText] = useState(lead.address || '');
+  const [placeId, setPlaceId] = useState('');
+  const [suggestions, setSuggestions] = useState<Array<{ placeId: string; description: string }>>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const skip = useRef(false);
+
+  useEffect(() => {
+    if (skip.current) { skip.current = false; return; }
+    const q = text.trim();
+    if (q.length < 3) { setSuggestions([]); return; }
+    const timer = window.setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/leads?flow=address_suggest&q=${encodeURIComponent(q)}`);
+        const j = (await r.json()) as { suggestions?: Array<{ placeId: string; description: string }> };
+        setSuggestions(j.suggestions ?? []);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [text]);
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    const result = await setLeadAddress(lead.id, { placeId, addressText: text.trim() });
+    setSaving(false);
+    if ('error' in result) {
+      setError(result.error);
+      return;
+    }
+    showToast({ message: 'Address saved. Times can be loaded now.', variant: 'success' });
+    onSaved(result.lead);
+  };
+
+  return (
+    <div className="space-y-2 rounded-[0.5rem] border border-slate-200 bg-slate-50/70 p-2.5">
+      <div className="relative">
+        <input
+          value={text}
+          onChange={(e) => { setText(e.target.value); setPlaceId(''); setError(''); }}
+          placeholder="Start typing, then pick the address"
+          autoComplete="off"
+          className="w-full rounded-[0.4rem] border border-slate-200 px-2.5 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
+        />
+        {suggestions.length > 0 ? (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-[0.5rem] border border-slate-200 bg-white shadow-lg">
+            {suggestions.map((s) => (
+              <button
+                key={s.placeId}
+                type="button"
+                onMouseDown={() => {
+                  skip.current = true;
+                  setText(s.description);
+                  setPlaceId(s.placeId);
+                  setSuggestions([]);
+                }}
+                className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-[#f6faff]"
+              >
+                {s.description}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {placeId ? (
+        <p className="flex items-center gap-1 text-[0.7rem] font-bold text-emerald-700">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Address picked
+        </p>
+      ) : (
+        <p className="text-[0.7rem] font-semibold text-slate-400">
+          Pick from the list where you can. A typed address is only accepted when it matches
+          exactly one real address.
+        </p>
+      )}
+      {error ? (
+        <p className="text-[0.7rem] font-bold text-red-600">{error}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving || !text.trim()}
+        className="rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+      >
+        {saving ? 'Checking address…' : 'Save address'}
+      </button>
+    </div>
+  );
+}
+
 // ─── Detail drawer ────────────────────────────────────────────────────────────
 
 function SubmissionDrawer({
@@ -844,17 +963,20 @@ function SubmissionDrawer({
   appointment,
   onClose,
   onApply,
+  onLeadUpdated,
 }: {
   lead: Lead;
   appointment?: SubmissionAppointment;
   onClose: () => void;
   onApply: (lead: Lead, contacted: boolean, note: string) => Promise<void>;
+  onLeadUpdated: (lead: Lead) => void;
 }) {
   const [note, setNote] = useState(lead.submissionOutcomeNote ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const contacted = Boolean(lead.submissionContactedAt);
 
   const { fetchLeadSlots, bookLeadVisit } = usePortalData();
+  const [editingAddress, setEditingAddress] = useState(false);
   const [slots, setSlots] = useState<Array<{ date: string; time: string }> | null>(null);
   const [blocked, setBlocked] = useState<SlotBlock | undefined>(undefined);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -959,7 +1081,37 @@ function SubmissionDrawer({
           <Section title="Contact">
             <Field label="Phone" icon={Phone}>{lead.phone || <NotRecorded />}</Field>
             <Field label="Email" icon={Mail}>{lead.email || <NotRecorded />}</Field>
-            <Field label="Address" icon={MapPin}>{lead.address || <NotRecorded />}</Field>
+            <Field label="Address" icon={MapPin}>
+              <span className="inline-flex items-center gap-2">
+                {lead.address || <NotRecorded />}
+                {!lead.deletedAt ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingAddress((v) => !v)}
+                    className="text-[0.7rem] font-black text-[#1B3C6C] hover:underline"
+                  >
+                    {editingAddress ? 'Cancel' : lead.address ? 'Correct' : 'Add address'}
+                  </button>
+                ) : null}
+              </span>
+            </Field>
+            {editingAddress ? (
+              <div className="px-4 pb-3">
+                <AddressFixer
+                  lead={lead}
+                  onSaved={(updated) => {
+                    setEditingAddress(false);
+                    // Drop any times already on screen: they were computed for
+                    // the old area, and offering them against a new address
+                    // would book a rep a drive nobody costed.
+                    setSlots(null);
+                    setBlocked(undefined);
+                    setPicked(null);
+                    onLeadUpdated(updated);
+                  }}
+                />
+              </div>
+            ) : null}
             <Field label="Address state">
               {lead.addressState ? ADDRESS_STATE_LABEL[lead.addressState] ?? lead.addressState : <NotRecorded />}
             </Field>

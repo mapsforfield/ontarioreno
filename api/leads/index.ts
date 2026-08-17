@@ -642,6 +642,93 @@ async function handleCollection(
       }
     }
 
+    /**
+     * Give a submission the address the FORM never got, from the portal.
+     *
+     * The gap this closes: a homeowner who picked a suggestion that carried no
+     * street number (a locality, a bare road) resolves to INCOMPLETE_ADDRESS,
+     * and `resolved.address` — built from streetNumber + route — comes out
+     * empty. The submission is stored with a blank address, no scheduling area
+     * and therefore no calendar, and the rep who phones and gets the real
+     * address has nowhere to put it.
+     *
+     * Resolution goes through the SAME resolveAddress the public flow uses, so
+     * a rep-entered address is held to exactly the standard a homeowner's is:
+     * we still refuse to guess, still standardise through Places, and still
+     * derive the municipality and coordinates from the resolved place rather
+     * than from anything typed here. The travel radius is measured on those
+     * coordinates, so an address taken on faith would quietly distort a rep's
+     * whole day.
+     *
+     * Deliberately NOT touched: `addressResolutionCause`, `routingOutcome`,
+     * `routingReasonCodes` and `needsReview`. Those record what happened when
+     * the homeowner submitted — including a provider outage that operations
+     * alert on afterwards — and rewriting them here would erase the evidence
+     * that this submission ever went wrong.
+     */
+    if (action === 'set_lead_address') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const lead = await withTables(() =>
+        prisma.lead.findUnique({ where: { id: clean(data.leadId) } })
+      );
+      if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+
+      const typed = clean(data.addressText);
+      if (!typed && !clean(data.placeId)) {
+        return res.status(400).json({ error: 'Enter an address first.' });
+      }
+
+      const resolved = await resolveAddress(clean(data.placeId), typed);
+
+      if (resolved.addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') {
+        return res.status(400).json({
+          error: 'That address resolved outside Ontario, so there is no calendar for it.',
+        });
+      }
+      if (!resolved.address) {
+        // Same failure the homeowner hit. Say which one, because "pick a more
+        // specific address" and "our provider is down" need opposite responses.
+        return res.status(400).json({ error: describeCause(resolved.cause) });
+      }
+
+      // Geography means different things to different programs, so ask the
+      // lead's own program — exactly as the public submit path does.
+      const program =
+        programByKey(lead.programKey) ?? programForArea(resolved.area as SchedulingArea | null);
+      const geo = program
+        ? resolveProgramGeography(program, resolved)
+        : { area: resolved.area, addressState: resolved.addressState };
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const trail = `Address added in portal ${stamp} by ${user.name ?? user.email ?? user.id}: ${[
+        resolved.address,
+        resolved.city,
+        resolved.postalCode,
+      ]
+        .filter(Boolean)
+        .join(', ')}`;
+
+      const saved = await withTables(() =>
+        prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            address: resolved.address,
+            city: resolved.city,
+            postalCode: resolved.postalCode,
+            latitude: resolved.latitude,
+            longitude: resolved.longitude,
+            schedulingArea: geo.area,
+            addressState: geo.addressState,
+            resolvedMunicipality: resolved.municipality,
+            notes: [lead.notes, trail].filter(Boolean).join('\n'),
+          },
+          include: leadInclude,
+        })
+      );
+
+      return res.status(200).json(saved);
+    }
+
     if (action === 'import_leads') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       const rows = Array.isArray(data.rows) ? (data.rows as Record<string, unknown>[]) : [];
