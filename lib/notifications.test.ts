@@ -7,6 +7,8 @@ import {
   friendlyDate,
   friendlyTime,
   planBookingNotifications,
+  planLeadWelcomeNotifications,
+  smsLeadWelcome,
   smsBookingConfirmation,
   smsReminder24h,
   smsReminderDayOf,
@@ -322,4 +324,69 @@ test('SMS reports as unconfigured until a Twilio adapter is wired', () => {
     } as NodeJS.ProcessEnv),
     true
   );
+});
+
+// ─── First contact for external (Meta instant form) leads ────────────────────
+// This is an unsolicited text to a real consumer mobile. Everything below is a
+// rule that, broken, either texts somebody twice or texts them something we are
+// not allowed to send.
+
+const WELCOME = {
+  leadId: 'lead-1',
+  name: 'Dennis Mahalingam',
+  phone: '9055550199',
+  bookingUrl: 'https://ontarioreno.ca/consultation/basement',
+};
+
+test('the welcome text greets by first name and carries the booking link', () => {
+  const body = smsLeadWelcome(WELCOME);
+  assert.match(body, /^Hi Dennis,/, 'first name only — the full name reads like a mail merge');
+  assert.ok(body.includes(WELCOME.bookingUrl), 'the link is the whole point of the message');
+  assert.match(body, /reply stop/i, 'an unsolicited first contact must carry an opt-out');
+});
+
+test('a lead with no name still gets a sendable message', () => {
+  const body = smsLeadWelcome({ ...WELCOME, name: '' });
+  assert.match(body, /^Hi, /);
+  assert.ok(!body.includes('undefined'), 'never leak a placeholder into a real send');
+});
+
+test('the welcome text stays inside two SMS segments', () => {
+  // Longer than this and carriers split it, which costs more and can deliver
+  // out of order — a link arriving in the second half of a broken message is a
+  // link nobody taps.
+  assert.ok(
+    smsLeadWelcome(WELCOME).length <= 306,
+    `welcome sms is ${smsLeadWelcome(WELCOME).length} characters`
+  );
+});
+
+test('one text per lead, whatever the sender does', () => {
+  // Meta retries webhooks. The key is the lead id and nothing else, so a
+  // re-post collides on the unique index instead of sending a second text.
+  const a = planLeadWelcomeNotifications(WELCOME);
+  const b = planLeadWelcomeNotifications(WELCOME, new Date(Date.now() + 60_000));
+  assert.equal(a.length, 1);
+  assert.equal(a[0].idempotencyKey, b[0].idempotencyKey);
+  assert.equal(a[0].idempotencyKey, 'lead-1:sms:lead_welcome');
+});
+
+test('no phone means no message, and no failure either', () => {
+  // A lead captured with only an email is somebody to call, not a delivery to
+  // retry. Queueing an unsendable row would show as a failure in the outbox.
+  assert.deepEqual(planLeadWelcomeNotifications({ ...WELCOME, phone: '' }), []);
+  assert.deepEqual(planLeadWelcomeNotifications({ ...WELCOME, phone: '   ' }), []);
+});
+
+test('the welcome never expires and is sent immediately', () => {
+  const [row] = planLeadWelcomeNotifications(WELCOME);
+  assert.equal(row.channel, 'sms');
+  assert.equal(row.kind, 'lead_welcome');
+  assert.equal(row.expiresAt, '', 'its wording is not tied to a date, so it cannot go stale');
+  assert.ok(new Date(row.sendAfter).getTime() <= Date.now() + 1000);
+});
+
+test('the number is normalised the same way every other send is', () => {
+  const [row] = planLeadWelcomeNotifications(WELCOME);
+  assert.equal(toE164(row.recipient), '+19055550199');
 });

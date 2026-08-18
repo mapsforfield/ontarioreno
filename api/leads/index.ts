@@ -36,6 +36,7 @@ import {
 } from '../../lib/public-booking.js';
 import {
   planBookingNotifications,
+  planLeadWelcomeNotifications,
   planSubmissionNotifications,
   smsProviderConfigured,
   type BookingContext,
@@ -358,6 +359,68 @@ async function ringDoorbell() {
   }
 }
 
+/**
+ * Where an external lead is sent to book themselves in.
+ *
+ * Configurable because the ad and the landing page have to agree: a basement ad
+ * pointing at the ADU flow would ask the homeowner questions about a project
+ * they did not enquire about. Defaults to the basement consultation, which is
+ * what the Meta instant forms currently run against.
+ */
+function leadBookingUrl(): string {
+  return (
+    process.env.LEAD_WELCOME_BOOKING_URL ??
+    'https://ontarioreno.ca/consultation/basement'
+  );
+}
+
+/**
+ * Text a brand-new external lead the link that lets them book themselves in.
+ *
+ * Queued through NotificationOutbox like every other message, so it is deduped
+ * on its idempotency key, recorded whether or not it sends, and visible in the
+ * portal afterwards. Then drained INLINE rather than waiting for the cron: the
+ * whole value of this message is that it lands while the homeowner still has
+ * the ad in mind, and a lead that arrives one minute after a cron tick would
+ * otherwise sit for the rest of the interval.
+ *
+ * Every failure path is swallowed. The lead is already saved, and Meta retries
+ * anything that is not a 2xx — turning a Twilio outage into a retry storm that
+ * duplicates leads would cost far more than a missed text.
+ */
+async function sendLeadWelcome(lead: { id: string; name: string; phone: string }) {
+  try {
+    const planned = planLeadWelcomeNotifications({
+      leadId: lead.id,
+      name: lead.name ?? '',
+      phone: lead.phone ?? '',
+      bookingUrl: leadBookingUrl(),
+    });
+    if (planned.length === 0) return; // no phone ⇒ nothing to send, not a failure
+
+    await prisma.notificationOutbox.createMany({
+      data: planned.map((n) => ({
+        leadId: lead.id,
+        channel: n.channel,
+        kind: n.kind,
+        recipient: n.recipient,
+        subject: n.subject,
+        body: n.body,
+        html: n.html ?? '',
+        sendAfter: n.sendAfter,
+        expiresAt: n.expiresAt,
+        idempotencyKey: n.idempotencyKey,
+      })),
+      // The key is the lead id, so a re-posted lead collides here and is
+      // silently dropped rather than texting the homeowner twice.
+      skipDuplicates: true,
+    });
+    await drainOutbox();
+  } catch (err) {
+    console.error('[leads/intake] welcome sms failed:', err);
+  }
+}
+
 // ─── ?intake=1 — token-gated, UNAUTHENTICATED ─────────────────────────────────
 async function handleIntake(req: VercelRequest, res: VercelResponse) {
   const secret = process.env.LEAD_INTAKE_TOKEN;
@@ -411,11 +474,23 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
           name: incoming.name || incoming.email || incoming.phone || 'Website lead',
           assignedRepId: null, // always land unassigned → admin triage
         },
-        select: { id: true },
+        select: { id: true, name: true, phone: true },
       });
-      return { id: created.id, merged: false };
+      return { id: created.id, merged: false, lead: created };
     });
     await ringDoorbell();
+
+    // ── First contact ──
+    //
+    // Only for a NEWLY CREATED lead. A merge means we already knew this person,
+    // so they have already had this text — Meta re-posts the same lead on
+    // webhook retries, and enrichment must never read as a new arrival.
+    //
+    // Best-effort throughout: the lead is committed and a texting problem must
+    // never turn a captured lead into an error the sender will retry.
+    if (!result.merged && result.lead) {
+      await sendLeadWelcome(result.lead);
+    }
     // Merge → 200, create → 201; always ok so the sender never retry-storms.
     return res.status(result.merged ? 200 : 201).json({ ok: true, ...result });
   } catch (err) {
