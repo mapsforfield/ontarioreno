@@ -56,6 +56,10 @@ function mockLeadsApi(): Plugin {
             consultationMode: program.consultationMode,
             pageTitle: program.pageTitle ?? null,
             fundingStepHeading: program.fundingStepHeading ?? null,
+            // Must mirror publicProgramPayload: without it the local preview
+            // renders the address on step 1 while production renders it last,
+            // which makes this mock actively misleading about the real flow.
+            addressPlacement: program.addressPlacement ?? 'first',
             guideUrl: program.guideUrl,
             guideLabel: program.guideLabel,
             smsEnabled: false,
