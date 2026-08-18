@@ -36,6 +36,12 @@ export type BookingRequest = {
   maxBookingsPerRepPerDay: number;
   primaryRepPrimingBookings: number;
   maxSameDayTravelKm: number;
+  /**
+   * Time spent inside the property. Feeds the time-earned travel allowance —
+   * see withinTravelRadius. Optional so a caller that omits it books under the
+   * flat radius exactly as before.
+   */
+  visitMinutes?: number;
   /** Property coordinates, for the same-day travel radius. */
   destination: Coordinates | null;
   /**
@@ -135,6 +141,7 @@ export async function bookSlot(
     maxBookingsPerRepPerDay: request.maxBookingsPerRepPerDay,
     primaryRepPrimingBookings: request.primaryRepPrimingBookings,
     maxSameDayTravelKm: request.maxSameDayTravelKm,
+    visitMinutes: request.visitMinutes,
     destination: request.destination,
     destinationIsRemote: request.remoteConsultation === true,
     nowWallToronto: request.nowWallToronto,
