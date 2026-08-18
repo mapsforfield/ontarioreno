@@ -221,6 +221,95 @@ export function haversineKm(
 const sameCity = (a?: string | null, b?: string | null) =>
   Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
 
+// ─── Time-earned travel allowance ─────────────────────────────────────────────
+//
+// The flat radius alone was costing real bookings. It compared a candidate
+// against EVERY appointment in the rep's day at one fixed distance, taking no
+// account of how much time sat between them — so a single 10:00 booking in
+// Brampton closed that rep's whole calendar to anything more than 10 km away,
+// right through to 20:00, despite the slot grid leaving 75 minutes of driving
+// time between consecutive visits and over four hours between the ends of it.
+//
+// A gap is drivable distance. These constants turn one into the other.
+
+/**
+ * Assumed average door-to-door speed. Deliberately conservative: this is
+ * suburban arterial driving between appointments, not highway cruising, and an
+ * optimistic figure here shows up as a rep arriving late to a homeowner.
+ */
+const AVERAGE_KM_PER_HOUR = 40;
+
+/**
+ * Taken off every gap before it buys any distance — parking, finding the door,
+ * a visit that runs a few minutes long. A gap smaller than this earns nothing.
+ */
+const TRAVEL_BUFFER_MINUTES = 15;
+
+/**
+ * Roads are not straight lines. Distances here are great-circle, so a real
+ * drive runs roughly a third longer; without this, an allowance derived from
+ * driving TIME would quietly authorise about 30% more driving than it claims.
+ */
+const ROAD_DETOUR_FACTOR = 1.3;
+
+/**
+ * Hard ceiling, whatever the gap. Six idle hours are arithmetically worth a
+ * 240 km drive, which is not a working day — past this point the gap has
+ * stopped being spare capacity and started being an empty schedule.
+ */
+const MAX_TRAVEL_ALLOWANCE_KM = 100;
+
+/**
+ * How far apart two of a rep's visits may sit, given the time between them.
+ *
+ * Returns kilometres of REAL ROAD distance. Compare against a great-circle
+ * measurement only after applying ROAD_DETOUR_FACTOR.
+ */
+export function travelAllowanceKm(gapMinutes: number, visitMinutes: number): number {
+  // Start-to-start minus the time actually spent inside the first property.
+  //
+  // Deliberately NOT `durationMinutes` from the stored row: a public booking
+  // writes the 120-minute RESERVATION there, not the 45-minute visit, so using
+  // it would report a zero gap between consecutive slots and this whole
+  // allowance would silently evaluate to nothing.
+  const usable = gapMinutes - visitMinutes - TRAVEL_BUFFER_MINUTES;
+  if (usable <= 0) return 0;
+  return Math.min((usable / 60) * AVERAGE_KM_PER_HOUR, MAX_TRAVEL_ALLOWANCE_KM);
+}
+
+/**
+ * The appointments immediately before and after `startMinutes` in the day.
+ *
+ * Only these constrain a drive. The old rule measured against all of them,
+ * which asked a 16:00 booking to be near a 10:00 one it would never travel
+ * to or from — six hours and another visit lie between them.
+ */
+function adjacentAppointments(
+  sameDayAppointments: BookedAppointment[],
+  startMinutes: number
+): BookedAppointment[] {
+  let before: { at: number; appointment: BookedAppointment } | null = null;
+  let after: { at: number; appointment: BookedAppointment } | null = null;
+
+  for (const appointment of sameDayAppointments) {
+    const at = minutesOfDay(appointment.appointmentTime);
+    // An unparseable time cannot be placed in the day, so it is treated as a
+    // neighbour rather than skipped — dropping it would silently relax the rule.
+    if (at === null) return sameDayAppointments;
+    if (at <= startMinutes) {
+      if (!before || at > before.at) before = { at, appointment };
+    }
+    if (at >= startMinutes) {
+      if (!after || at < after.at) after = { at, appointment };
+    }
+  }
+
+  const neighbours: BookedAppointment[] = [];
+  if (before) neighbours.push(before.appointment);
+  if (after && after.appointment !== before?.appointment) neighbours.push(after.appointment);
+  return neighbours;
+}
+
 /**
  * Would adding this property to a rep's day leave them driving too far between
  * visits?
@@ -235,22 +324,53 @@ const sameCity = (a?: string | null, b?: string | null) =>
  * `destinationIsRemote` means nobody is driving to the new booking, and remote
  * rows are filtered out of the existing day because nobody drove to those
  * either. A rep on a call is wherever they already were.
+ *
+ * ── The time-earned allowance ──
+ * `timing` is optional, and its absence means exactly the old behaviour: flat
+ * `maxKm` against every appointment in the day. Supplied, two things change,
+ * and BOTH only ever loosen — no pair that satisfies the flat radius can be
+ * rejected by the additions, because the flat radius is still checked first and
+ * an allowance can only be granted on top of it:
+ *
+ *   1. Only the time-adjacent appointments are measured. A 10:00 booking has no
+ *      bearing on whether 16:00 and 18:00 are drivable from each other.
+ *   2. A pair further apart than `maxKm` still passes when the gap between them
+ *      pays for the drive. See travelAllowanceKm.
  */
 export function withinTravelRadius(
   destination: Coordinates | null,
   sameDayAppointments: BookedAppointment[],
   maxKm: number,
-  destinationIsRemote = false
+  destinationIsRemote = false,
+  timing?: { startTime: string; visitMinutes: number }
 ): boolean {
   if (destinationIsRemote) return true; // no drive to constrain
   const existing = constrainingAppointments(sameDayAppointments);
   if (existing.length === 0) return true; // a free day imposes no constraint
   if (!destination) return true; // unknown destination ⇒ don't block
 
-  return existing.every((appointment) => {
+  const startMinutes = timing ? minutesOfDay(timing.startTime) : null;
+  // Only narrow to the neighbours when the candidate's place in the day is
+  // actually known. A malformed time falls back to measuring against the whole
+  // day, which is the stricter of the two.
+  const measured =
+    startMinutes === null ? existing : adjacentAppointments(existing, startMinutes);
+
+  return measured.every((appointment) => {
     // Both sides geocoded — measure it.
     if (hasCoords(destination) && hasCoords(appointment)) {
-      return haversineKm(destination, appointment) <= maxKm;
+      const km = haversineKm(destination, appointment);
+      if (km <= maxKm) return true; // the original rule, unchanged
+
+      // Too far for the flat radius. Has the gap earned it?
+      if (startMinutes === null || !timing) return false;
+      const otherStart = minutesOfDay(appointment.appointmentTime);
+      if (otherStart === null) return false;
+      const allowance = travelAllowanceKm(
+        Math.abs(otherStart - startMinutes),
+        timing.visitMinutes
+      );
+      return km * ROAD_DETOUR_FACTOR <= allowance;
     }
     // Otherwise same-city is the best signal available. Never block on missing
     // data alone: an unbookable day is a worse outcome than an occasional drive.
@@ -320,6 +440,14 @@ export type AvailabilityInput = {
   maxBookingsPerRepPerDay: number;
   primaryRepPrimingBookings: number;
   maxSameDayTravelKm: number;
+  /**
+   * Time actually spent inside a property, which is what a gap between two
+   * starts has to cover before any of it is available for driving.
+   *
+   * Optional: a caller that predates the time-earned allowance gets the flat
+   * radius exactly as before, rather than a silently different rule.
+   */
+  visitMinutes?: number;
   /** Where this booking would be. Null when the address wasn't geocoded. */
   destination: Coordinates | null;
   /**
@@ -350,7 +478,7 @@ export function eligibleRepsForSlot(input: AvailabilityInput, date: string, time
   const {
     reps, appointments, daysOff, area, reservationMinutes,
     maxBookingsPerRepPerDay, maxSameDayTravelKm, destination,
-    destinationIsRemote = false,
+    destinationIsRemote = false, visitMinutes,
   } = input;
 
   return reps
@@ -370,8 +498,15 @@ export function eligibleRepsForSlot(input: AvailabilityInput, date: string, time
       if (day.length >= maxBookingsPerRepPerDay) return false;
       if (!repEligibleForArea(day, area)) return false;
       if (collidesWithExisting(time, reservationMinutes, day)) return false;
-      // Keep a rep's day geographically tight.
-      return withinTravelRadius(destination, day, maxSameDayTravelKm);
+      // Keep a rep's day geographically tight — but let a genuine gap in the
+      // day pay for a longer drive, which the flat radius alone refused to do.
+      return withinTravelRadius(
+        destination,
+        day,
+        maxSameDayTravelKm,
+        false,
+        typeof visitMinutes === 'number' ? { startTime: time, visitMinutes } : undefined
+      );
     })
     .map((rep) => rep.id);
 }

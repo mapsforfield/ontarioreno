@@ -318,6 +318,127 @@ test('cancelled bookings release both the cap and the travel anchor', () => {
   assert.equal(withinTravelRadius(BARRIE, day, 10), true, 'a cancelled visit anchors nothing');
 });
 
+// ─── Time-earned travel allowance ────────────────────────────────────────────
+//
+// The flat 10 km radius, applied to every appointment in a day regardless of
+// the hours between them, was refusing bookings a rep could comfortably make: a
+// single 10:00 job closed their whole calendar to anything further than 10 km.
+//
+// The rule now lets a real gap pay for a longer drive, and only measures
+// against the appointments either side in time. The governing safety property
+// is that it may only ever LOOSEN — asserted directly below.
+
+/** Real GTA coordinates, because the distances are the point of these tests. */
+const BRAMPTON = { latitude: 43.6832, longitude: -79.7629, city: 'Brampton' };
+const AJAX = { latitude: 43.8509, longitude: -79.0204, city: 'Ajax' };
+const MISSISSAUGA = { latitude: 43.5890, longitude: -79.6441, city: 'Mississauga' };
+const VISIT = HAMILTON_PROGRAM.visitMinutes; // 45
+
+const timing = (startTime: string) => ({ startTime, visitMinutes: VISIT });
+
+test('Brampton and Ajax are genuinely far apart', () => {
+  const km = haversineKm(BRAMPTON, AJAX);
+  assert.ok(km > 55 && km < 70, `expected ~62 km, got ${km.toFixed(1)}`);
+});
+
+test('the next slot along does not earn a cross-region drive', () => {
+  // 10:00 Brampton → 12:00 Ajax. 75 minutes of gap, 15 of it buffer, leaves an
+  // hour: about 40 km. A ~62 km straight line is ~80 km of road. Refused.
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON }];
+  assert.equal(withinTravelRadius(AJAX, day, 10, false, timing('12:00')), false);
+});
+
+test('a long enough gap does earn it — the case the flat radius was costing us', () => {
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON }];
+  assert.equal(withinTravelRadius(AJAX, day, 10, false, timing('16:00')), true);
+  assert.equal(withinTravelRadius(AJAX, day, 10, false, timing('18:00')), true);
+});
+
+test('a nearby city opens up on the very next slot', () => {
+  // ~14 km: inside the hour's allowance, though well outside the flat 10 km.
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON }];
+  assert.equal(withinTravelRadius(MISSISSAUGA, day, 10, false, timing('12:00')), true);
+  assert.equal(withinTravelRadius(MISSISSAUGA, day, 10), false, 'and was refused before');
+});
+
+test('the ceiling holds however big the gap gets', () => {
+  // Hamilton → Barrie is ~85 km, ~110 km of road: past the 100 km ceiling, so
+  // no amount of empty day makes it a sensible pairing.
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A }];
+  assert.equal(withinTravelRadius(BARRIE, day, 10, false, timing('18:00')), false);
+});
+
+test('only the appointments either side in time are measured', () => {
+  // A 10:00 booking in Barrie says nothing about whether 12:00 and 14:00 in
+  // Hamilton are drivable from each other — the 12:00 one is what 14:00 leaves.
+  const day = [
+    { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BARRIE },
+    { ...appt('rep-a', DATE, '12:00', 'ONTARIO'), ...HAMILTON_A },
+  ];
+  assert.equal(withinTravelRadius(HAMILTON_B, day, 10, false, timing('14:00')), true);
+  assert.equal(
+    withinTravelRadius(HAMILTON_B, day, 10),
+    false,
+    'the old rule measured against Barrie too, and refused'
+  );
+});
+
+test('the allowance can only ever loosen, never tighten', () => {
+  // The safety property. Anything the flat radius accepts must still be
+  // accepted with timing supplied, whatever the gap — including the adjacent
+  // slot, where the earned allowance is at its smallest.
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...HAMILTON_A }];
+  for (const time of ['10:00', '12:00', '14:00', '16:00', '18:00']) {
+    assert.equal(
+      withinTravelRadius(HAMILTON_B, day, 10, false, timing(time)),
+      true,
+      `${time}: a 1.5 km hop is inside the flat radius and must stay bookable`
+    );
+  }
+});
+
+test('omitting the timing reproduces the old rule exactly', () => {
+  const day = [
+    { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON },
+    { ...appt('rep-a', DATE, '12:00', 'ONTARIO'), ...MISSISSAUGA },
+  ];
+  // Every appointment measured, flat 10 km, no allowance — a caller that has
+  // not been updated must not silently get the new behaviour.
+  assert.equal(withinTravelRadius(AJAX, day, 10), false);
+  assert.equal(withinTravelRadius(MISSISSAUGA, day, 10), false);
+});
+
+test('a remote booking is still exempt in both directions', () => {
+  const day = [{ ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON }];
+  // Nobody drives to it, so the gap is irrelevant and it is never refused.
+  assert.equal(withinTravelRadius(BARRIE, day, 10, true, timing('12:00')), true);
+  // And a remote row on the day constrains nothing either.
+  const remoteDay = [
+    { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BARRIE, remoteConsultation: true },
+  ];
+  assert.equal(withinTravelRadius(BRAMPTON, remoteDay, 10, false, timing('12:00')), true);
+});
+
+test('availability offers the later Ajax slots and still refuses the early one', () => {
+  // End to end through eligibleRepsForSlot, with visitMinutes supplied the way
+  // the API now supplies it. Both reps anchored in Brampton at 10:00.
+  const appointments = [
+    { ...appt('rep-a', DATE, '10:00', 'ONTARIO'), ...BRAMPTON },
+    { ...appt('rep-b', DATE, '10:00', 'ONTARIO'), ...BRAMPTON },
+  ];
+  const input = {
+    ...baseInput,
+    area: 'ONTARIO' as const,
+    appointments,
+    destination: AJAX,
+    visitMinutes: VISIT,
+    nowWallToronto: '2026-08-08T09:00',
+  };
+  assert.deepEqual(eligibleRepsForSlot(input, DATE, '12:00'), [], 'too soon after Brampton');
+  assert.ok(eligibleRepsForSlot(input, DATE, '16:00').length > 0, '16:00 is drivable');
+  assert.ok(eligibleRepsForSlot(input, DATE, '18:00').length > 0, '18:00 is drivable');
+});
+
 // ─── ONTARIO is a program bucket, not a place ────────────────────────────────
 // An Ontario-wide program (financing, say) has no municipal boundary, so its
 // bookings must not pin a rep's day to a region. Everything below asserts that
