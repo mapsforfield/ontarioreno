@@ -140,6 +140,16 @@ export type ProgramConfig = {
   whyFreeText: string;
   /** Shown when the funding answer is "unsure". Required: every live program needs one. */
   fundingGuidance: FundingGuidance;
+  /**
+   * Where the property address is asked.
+   *
+   * 'first' (the default, and what every grant flow still does) opens with the
+   * address. 'final' moves it to the last screen, beside the contact details.
+   *
+   * Optional so that leaving it off is the existing behaviour exactly — a
+   * program that has not opted in cannot be changed by this field appearing.
+   */
+  addressPlacement?: 'first' | 'final';
   eligibleProjectTypes: string[];
   /**
    * Timelines that get the guide and a follow-up INSTEAD of a calendar slot.
@@ -465,25 +475,54 @@ const BASEMENT_PROJECT_TYPE: Question = {
   key: 'projectType',
   label: 'What are you planning?',
   routingRelevant: true,
-  step: 2,
+  // Step 1 now, ahead of the address. Asking a stranger who has just clicked an
+  // ad for their home address before anything else was the highest-friction
+  // opening the form could have had — and the one people fumbled, arriving with
+  // a municipality and no street number.
+  step: 1,
   options: [
     { value: 'basement_finish', label: 'Finish an unfinished basement' },
     { value: 'basement_renovation', label: 'Renovate an existing basement' },
-    { value: 'basement_apartment', label: 'Basement apartment or in-law suite' },
-    { value: 'unsure', label: 'Still deciding' },
+    { value: 'garden_laneway_adu', label: 'Garden Suite / Laneway ADU' },
   ],
 };
 
+/**
+ * Carries no routing weight — whether a permit exists changes nothing about
+ * whether we will visit, exactly as with the other property questions. It sits
+ * here rather than in prepQuestions because it is a single tap that makes step
+ * one feel like a real question about their project rather than a formality,
+ * and because the rep genuinely wants it before they walk in.
+ */
+const BASEMENT_PERMIT: Question = {
+  key: 'hasPermit',
+  label: 'Do you currently have a permit?',
+  step: 1,
+  options: [
+    { value: 'yes', label: 'Yes' },
+    { value: 'no', label: 'No' },
+  ],
+};
+
+/**
+ * Step 2, alongside the financing explainer it belongs to.
+ *
+ * The wording deliberately does not assume financing. The screen it sits on
+ * leads with a monthly number, so an unqualified "how are you paying?" read as
+ * a formality with one expected answer — and someone intending to pay cash was
+ * left wondering whether they were on the wrong page. Naming cash as a first-
+ * class answer in the question itself is what keeps the screen honest.
+ */
 const BASEMENT_CONTRIBUTION: Question = {
   key: 'contribution',
-  label: 'How are you thinking about paying for the work?',
-  help: 'Financing covers the full cost with nothing due upfront. Paying cash is fine too.',
+  label: 'Would you like to use the monthly plan, or pay another way?',
+  help: 'Either is fine. The consultation and the quote are the same whichever you choose.',
   routingRelevant: true,
-  step: 3,
+  step: 2,
   options: [
-    { value: 'need_financing', label: "I'd like to use the monthly financing" },
-    { value: 'cash_equity', label: 'Cash / Savings / Existing Home Equity' },
-    { value: 'unsure', label: 'Not sure yet / Need guidance' },
+    { value: 'need_financing', label: 'Use the monthly plan' },
+    { value: 'cash_equity', label: 'Pay by cash, savings or home equity' },
+    { value: 'unsure', label: "I'd like to talk it through" },
   ],
 };
 
@@ -512,9 +551,30 @@ const BASEMENT_FUNDING_GUIDANCE: FundingGuidance = {
   continueLabel: 'Continue',
 };
 
+/**
+ * Ownership asked at the END for this program, with the address it belongs to.
+ * A separate constant rather than a re-step of the shared OWNERSHIP, because
+ * the grant flows still ask it first and one object cannot be on two steps.
+ */
+const BASEMENT_OWNERSHIP: Question = {
+  key: 'ownership',
+  label: 'Do you own this property?',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'yes', label: 'Yes, I own it' },
+    { value: 'no', label: 'No' },
+    { value: 'unsure', label: "It's complicated" },
+  ],
+};
+
 const BASEMENT_FUNDING_HIGHLIGHTS = [
   'No upfront cost — the build is financed in full, on approved credit.',
-  'Up to 40% of funds can be released at signing or project start with your authorization; the remaining 60% after completion.',
+  // Replaces the 40/60 draw schedule. That is a true term and still appears in
+  // the full program terms below, but it describes how the BUILDER gets paid,
+  // which is not what someone deciding whether to book needs to know. When
+  // their own payments start is.
+  'Payments begin only once your basement is finished — and with the current promotion, not for 6 months after that. No payments and no interest for those 6 months.',
   'Open loan: pay it down or pay it off at any time, with no penalty and no lien registered against your property.',
 ];
 
@@ -532,7 +592,11 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // "as low as" is doing real work: $399 is roughly a $42,000 project at the
   // lowest rate on file, and most projects finance higher. Stating it as a
   // starting point rather than a price is what keeps it honest.
-  displayAmountLabel: 'from about $399 a month, on approved credit',
+  // "on approved credit" moved off the headline and into the first highlight
+  // directly beneath it, which is where it already said the same thing. The
+  // qualifier is not weakened — it sits one line down, still above the fold,
+  // still ahead of any question. "from about" is what keeps the number honest.
+  displayAmountLabel: 'from $399 a month',
   fundingHighlights: BASEMENT_FUNDING_HIGHLIGHTS,
   // Four lines, not nine.
   //
@@ -553,27 +617,49 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // the fee lands with the rest of the real numbers in the written quote the
   // consultant walks through. It is not a term someone needs in order to decide
   // whether to book a visit.
+  //
+  // The 6-month promotion IS listed here, unlike the administration fee, for the
+  // opposite reason: it is a claim we make on the highlight above it, so the
+  // terms have to carry it too. Stated as "no payments and no interest" because
+  // that is what it is — a deferral that accrued interest would be a materially
+  // different offer and must never be described this way.
   programTerms: [
     'Financing is a personal open loan and is subject to credit approval.',
     'Up to 40% of funds may be released at signing or project start with your authorization; the remaining 60% after completion.',
+    'Monthly payments begin after the build is complete. Under the current promotion the first 6 months carry no payments and no interest.',
     'No upfront cost, no early payment penalties, and no liens registered against the property.',
     'Your exact rate, term and monthly payment are confirmed in writing before you sign anything.',
   ],
   whyFreeText:
     "Homeowners don't want to pay upfront just to find out what a basement costs, and contractors don't want to spend evenings quoting projects that were never going to happen. We scope the project properly first — measurements, condition, what you actually want — so a builder can price it for real. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
   fundingGuidance: BASEMENT_FUNDING_GUIDANCE,
-  eligibleProjectTypes: ['basement_finish', 'basement_renovation', 'basement_apartment'],
+  // garden_laneway_adu is listed so an ADU lead reaches the calendar like any
+  // other. Omitting it would tag every one of them PROJECT_TYPE_NOT_LISTED and
+  // route them to manual review — the option would appear to work while quietly
+  // sending those homeowners to a queue instead of a booking.
+  // basement_apartment stays for rows captured before the option was retired.
+  eligibleProjectTypes: [
+    'basement_finish',
+    'basement_renovation',
+    'basement_apartment',
+    'garden_laneway_adu',
+  ],
   // Everyone gets the calendar. There is no application deadline to be early
   // for, and someone "just exploring" is usually someone who does not yet know
   // the build is affordable — which is exactly what the visit demonstrates.
   nurtureTimelines: [],
-  questions: [OWNERSHIP, BASEMENT_PROJECT_TYPE, TIMELINE, BASEMENT_CONTRIBUTION],
+  // Ordered by step, and deliberately without TIMELINE: this program never
+  // nurtures on it (nurtureTimelines is []), so it asked a question that could
+  // not change anything, in front of the contact form.
+  questions: [BASEMENT_PROJECT_TYPE, BASEMENT_PERMIT, BASEMENT_CONTRIBUTION, BASEMENT_OWNERSHIP],
+  // Address last, with the contact details. See addressPlacement.
+  addressPlacement: 'final',
   prepQuestions: PREP_QUESTIONS,
   // Nobody prices a basement without standing in it.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Basement Renovation Consultation',
   pageTitle: 'Basement Renovation Consultation | OntarioReno',
-  fundingStepHeading: 'How the monthly financing works',
+  fundingStepHeading: 'How the monthly payment works',
   // No dedicated template yet; the rep's brief still carries every answer.
   noteTemplateId: '',
   guideUrl: '',

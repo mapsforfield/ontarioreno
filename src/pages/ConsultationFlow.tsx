@@ -9,11 +9,27 @@ import { BASEMENT_FINANCING_OFFER } from '../lib/programClosures';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
-//   1  Address + ownership
-//   2  Project type + timing
-//   3  Funding explanation + contribution
-//   4  Contact
-//   →  qualified: calendar → confirm
+// The screens are driven by each question's `step`, so the order is the
+// program's to decide, not this file's. Two shapes exist today:
+//
+//   addressPlacement 'first' (every grant flow)
+//     1  Address + ownership
+//     2  Project type + timing
+//     3  Funding explanation + contribution
+//     4  Contact
+//
+//   addressPlacement 'final' (the financing flows)
+//     1  Project type + permit
+//     2  Funding explanation + contribution
+//     3  Address + ownership + contact, on one screen
+//
+// The address moved because it was the costliest question we had: a stranger who
+// has just clicked an ad is asked for their home address before anything of
+// value has been established, and the ones who push through it frequently pick a
+// suggestion carrying no street number. Everything before it now earns it.
+//
+// An empty step is skipped rather than rendered blank, so a program can leave a
+// step number unused without a dead screen appearing.
 //
 // The backend is unchanged: the server still decides address state, municipality,
 // scheduling area, program, routing outcome and which rep takes the booking. This
@@ -55,6 +71,8 @@ type Program = {
   consultationMode: 'in_person' | 'phone';
   pageTitle: string | null;
   fundingStepHeading: string | null;
+  /** Where the address is asked. Absent on an older payload ⇒ 'first'. */
+  addressPlacement?: 'first' | 'final';
   guideUrl: string;
   guideLabel: string;
   /** False until a Twilio adapter is configured — copy adapts rather than lying. */
@@ -195,7 +213,7 @@ export default function ConsultationFlow() {
    * the submission.
    */
   const continueFromStep1 = async () => {
-    if (placeId || candidate) { setPhase('q2'); return; }
+    if (placeId || candidate) { advancePast(1); return; }
     const q = addressText.trim();
     if (!q) return;
     // The list has done its job once they have moved on; leaving it open floats
@@ -211,11 +229,90 @@ export default function ConsultationFlow() {
     } finally {
       setCheckingAddress(false);
     }
-    setPhase('q2');
+    advancePast(1);
   };
 
   const stepQuestions = (step: 1 | 2 | 3) => (program?.questions ?? []).filter((q) => q.step === step);
   const answered = (step: 1 | 2 | 3) => stepQuestions(step).every((q) => answers[q.key]);
+
+  /** True when the address sits on the last screen rather than the first. */
+  const addressLast = program?.addressPlacement === 'final';
+
+  /**
+   * The step carrying the funding explainer: wherever the contribution question
+   * lives. Derived rather than hardcoded to step 3, so moving that question
+   * between programs cannot separate it from the screen that explains it.
+   */
+  const fundingStep = (program?.questions ?? []).find((q) => q.key === 'contribution')?.step ?? 3;
+
+  /**
+   * Question steps this program actually uses, in order. A step with no
+   * questions is skipped — an empty screen with a Continue button reads as a
+   * bug and lengthens the progress bar for nothing.
+   */
+  const activeSteps = ([1, 2, 3] as const).filter(
+    (s) => stepQuestions(s).length > 0 || (!addressLast && s === 1)
+  );
+  const lastStep = activeSteps[activeSteps.length - 1] ?? 3;
+
+  /**
+   * Funnel instrumentation.
+   *
+   * `ConsultationStart` (page load) and `Lead` (accepted submission) were the
+   * only two events, which showed how many arrived and how many finished and
+   * nothing whatsoever about where the rest went. One custom event per screen
+   * completed turns that into an actual funnel in Ads Manager.
+   *
+   * Custom rather than standard events throughout: these must never be
+   * mistaken for conversions or Meta will optimise toward people who browse
+   * the form rather than people who book.
+   */
+  const trackedSteps = useRef(new Set<string>());
+  const trackStep = (name: string, params?: Record<string, unknown>) => {
+    // Once per session per screen. Going Back and forward again is the same
+    // homeowner on the same visit, and counting it twice would overstate the
+    // step and understate the drop to the next one.
+    if (trackedSteps.current.has(name)) return;
+    trackedSteps.current.add(name);
+    trackCustom(name, { slug: program?.slug, ...params });
+  };
+
+  /** Advance to the next question step, or to contact when there are none left. */
+  const goToStepAfter = (step: 1 | 2 | 3) => {
+    trackStep(`ConsultationStep${step}`, {
+      // What they chose on this screen, so a drop-off can be read against an
+      // answer rather than only against a position in the flow.
+      ...Object.fromEntries(stepQuestions(step).map((q) => [q.key, answers[q.key]])),
+    });
+    // "Not sure" earns the funding explainer before moving on. Checked BEFORE
+    // the next step is resolved: on the grant flows the funding question is the
+    // LAST one, so resolving first would skip the explainer entirely.
+    if (step === fundingStep && answers.contribution === 'unsure') {
+      setPhase('funding');
+      return;
+    }
+    advancePast(step);
+  };
+
+  /** The screen after `step`, with no explainer in between. */
+  const advancePast = (step: 1 | 2 | 3) => {
+    // Also tracked here, not only in goToStepAfter: the address step advances
+    // through its own confirmation path and would otherwise never be counted.
+    // trackStep is idempotent, so the double call costs nothing.
+    trackStep(`ConsultationStep${step}`, {
+      ...Object.fromEntries(stepQuestions(step).map((q) => [q.key, answers[q.key]])),
+    });
+    const next = activeSteps.find((s) => s > step);
+    if (next === undefined) {
+      setPhase('contact');
+      trackStep('ConsultationContactReached');
+      return;
+    }
+    // When the address is asked last, the final question screen IS the contact
+    // screen — reaching it is reaching the contact form.
+    if (addressLast && next === lastStep) trackStep('ConsultationContactReached');
+    setPhase(next === 1 ? 'q1' : next === 2 ? 'q2' : 'q3');
+  };
 
   const submit = async (finalContact: typeof contact) => {
     if (!program) return;
@@ -406,7 +503,21 @@ export default function ConsultationFlow() {
   // The funding explainer shares step 3's marker: it is the same step of the
   // journey, not a new one, and a progress bar that grows for reading a screen
   // makes the flow feel longer than it is.
-  const stepIndex = { q1: 1, q2: 2, q3: 3, funding: 3, contact: 4, calendar: 5, result: 5, closed: 0 }[phase];
+  // Positions in the bar, derived from the steps this program actually uses so
+  // a skipped step does not leave a segment that never fills. The funding
+  // explainer shares its question's marker: it is the same step of the journey,
+  // not a new one, and a bar that grows for reading a screen makes the flow feel
+  // longer than it is.
+  const stepPos = (s: 1 | 2 | 3) => activeSteps.indexOf(s) + 1;
+  // Contact is its own position only when it is its own screen.
+  const contactPos = addressLast ? activeSteps.length : activeSteps.length + 1;
+  const totalSteps = contactPos + 1; // + the calendar
+  const stepIndex = {
+    q1: stepPos(1), q2: stepPos(2), q3: stepPos(3),
+    funding: stepPos(fundingStep as 1 | 2 | 3),
+    contact: contactPos,
+    calendar: totalSteps, result: totalSteps, closed: 0,
+  }[phase];
 
   // What the homeowner is actually booking — stated the same way on the calendar
   // and the confirmation so there is no ambiguity about who goes where.
@@ -546,7 +657,7 @@ export default function ConsultationFlow() {
   // ── Calendar ──
   if (phase === 'calendar') {
     return (
-      <Shell title="Pick a time that suits you" step={stepIndex}>
+      <Shell title="Pick a time that suits you" step={stepIndex} totalSteps={totalSteps}>
         <p className="mb-2 text-sm font-bold text-[#1B3C6C]">{meeting.line}</p>
         {/* Said BEFORE they pick, not after they have booked. Someone choosing a
             time believing a specialist is driving out has been misled by the
@@ -599,145 +710,220 @@ export default function ConsultationFlow() {
   // "Not sure yet" earns one extra screen — the funding explainer — before the
   // contact form. It is a read-and-continue step, never a second question.
   const needsFundingGuidance = answers.contribution === 'unsure';
-  const back = () =>
-    setPhase(
-      phase === 'contact' ? (needsFundingGuidance ? 'funding' : 'q3')
-        : phase === 'funding' ? 'q3'
-          : phase === 'q3' ? 'q2'
-            : 'q1',
-    );
+  /** The screen before `step`, mirroring advancePast. */
+  const stepBefore = (step: 1 | 2 | 3) => {
+    const prior = [...activeSteps].reverse().find((s) => s < step);
+    return prior === 1 ? 'q1' : prior === 2 ? 'q2' : 'q3';
+  };
+  const back = () => {
+    if (phase === 'contact') return setPhase(needsFundingGuidance ? 'funding' : stepBefore(4 as 3));
+    if (phase === 'funding') return setPhase(fundingStep === 1 ? 'q1' : fundingStep === 2 ? 'q2' : 'q3');
+    if (phase === 'q3') return setPhase(needsFundingGuidance && fundingStep < 3 ? 'funding' : stepBefore(3));
+    if (phase === 'q2') return setPhase(stepBefore(2));
+    return setPhase('q1');
+  };
+
+  /**
+   * The address field. One implementation, rendered either on the first screen
+   * or the last — a second copy would be two things to keep in step, and the
+   * Places wiring is the part that must not drift.
+   */
+  const addressField = (
+    <div className="relative">
+      <label className="mb-2 block text-sm font-bold text-slate-700">
+        <MapPin className="mr-1 inline h-4 w-4 text-[#1B3C6C]" /> Property address
+      </label>
+      <input className={inputCls} value={addressText} autoComplete="off" placeholder="Start typing, then pick your address"
+        onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); setCandidate(null); }}
+        // Suggestions are chosen on mousedown, which fires before blur, so
+        // dismissing here cannot steal a pick the homeowner was making.
+        onBlur={() => setSuggestions([])} />
+      {placeId ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+          <Check className="h-3.5 w-3.5" /> Address confirmed
+        </p>
+      ) : addressText.trim().length > 2 ? (
+        // Said here, at the point of failure, rather than four steps later
+        // as an unexplained "a specialist will call you".
+        <p className="mt-2 text-xs font-semibold text-amber-700">
+          Pick your address from the list so we can check availability in your area.
+        </p>
+      ) : null}
+      {suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {suggestions.map((s) => (
+            <button key={s.placeId} type="button"
+              onMouseDown={() => { skip.current = true; setAddressText(s.description); setPlaceId(s.placeId); setSuggestions([]); }}
+              className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-[#f6faff]">
+              {s.description}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  /** Name, phone, email — the same three fields wherever the form ends. */
+  const contactFields = (
+    <>
+      <div>
+        <label className="mb-2 block text-sm font-bold text-slate-700">Your name</label>
+        <input className={inputCls} required value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />
+      </div>
+      <div>
+        <label className="mb-2 block text-sm font-bold text-slate-700">Mobile number</label>
+        <input className={inputCls} type="tel" inputMode="tel" required value={contact.phone}
+          onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+      </div>
+      <div>
+        <label className="mb-2 block text-sm font-bold text-slate-700">
+          Email <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        <input className={inputCls} type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
+      </div>
+    </>
+  );
+
+  const submitFooter = (
+    <>
+      {error && <ErrorNote>{error}</ErrorNote>}
+      <PrimaryButton
+        disabled={busy || !contact.name.trim() || !contact.phone.trim() || (addressLast && !addressText.trim())}
+        type="submit"
+      >
+        {busy ? 'Checking availability…' : 'See available times'}
+      </PrimaryButton>
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
+        <Lock className="h-3.5 w-3.5 shrink-0" />
+        100% Free &amp; No-Obligation. Your information is kept strictly confidential.
+      </p>
+    </>
+  );
+
+  /** The funding explainer panel, shown on whichever step asks about paying. */
+  const fundingPanel = (
+    <>
+      {program.displayAmountLabel && (
+        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-center text-base font-bold text-emerald-800">
+          {program.displayAmountLabel}
+        </p>
+      )}
+      <ul className="space-y-2">
+        {program.fundingHighlights.map((h) => (
+          <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> {h}
+          </li>
+        ))}
+      </ul>
+      {/* The full program terms are no longer opened here. This screen decides
+          whether to BOOK, not whether to sign, and the consultant walks the
+          terms through in person before anything is signed. They remain in the
+          program config and in the written quote — the qualifier that has to
+          travel with the figure ("on approved credit") is in the first
+          highlight above, on the same screen. */}
+    </>
+  );
+
+  /**
+   * The heading for the current screen. A question step takes its title from
+   * its own content: the funding step from the program, the first question
+   * otherwise — which is why moving the address off step 1 also moves "Let's
+   * start with your property" off it.
+   */
+  const titleForStep = (step: 1 | 2 | 3): string => {
+    if (step === fundingStep) {
+      return program.fundingStepHeading ?? `How the ${program.areaLabel} funding works`;
+    }
+    if (step === 1 && !addressLast) return 'Let’s start with your property';
+    if (addressLast && step === lastStep) return 'Where should we send your confirmation?';
+    return stepQuestions(step)[0]?.label ?? 'A few quick questions';
+  };
+  const screenTitle =
+    phase === 'funding'
+      // The reassurance earns the page title here. Repeating it inside the card
+      // under a functional heading gave the screen two titles and left the line
+      // that matters at body weight.
+      ? program.fundingGuidance.heading
+      : phase === 'contact'
+        ? 'Where should we send your confirmation?'
+        : titleForStep(phase === 'q1' ? 1 : phase === 'q2' ? 2 : 3);
+
+  /**
+   * The last screen when the address is asked at the end: whatever questions
+   * that step carries, then the address, then the contact details — one form,
+   * one submit. Merged rather than left as two screens because it is the same
+   * act (telling us who and where you are) and splitting it added a step to a
+   * flow this change exists to shorten.
+   */
+  const mergedFinalScreen = (step: 1 | 2 | 3) => (
+    <form className="space-y-5 text-left" onSubmit={(e) => { e.preventDefault(); void submit(contact); }}>
+      {stepQuestions(step).map((q) => (
+        <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
+      ))}
+      {addressField}
+      {contactFields}
+      {submitFooter}
+    </form>
+  );
+
+  /** One question screen, plus the funding panel when this is that step. */
+  const questionScreen = (step: 1 | 2 | 3) => (
+    addressLast && step === lastStep ? mergedFinalScreen(step) :
+    <div className="space-y-6 text-left">
+      {step === fundingStep && fundingPanel}
+      {step === 1 && !addressLast && addressField}
+      {stepQuestions(step).map((q) => (
+        <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
+      ))}
+      {step === 1 && !addressLast && candidate && (
+        <div className="rounded-xl border border-[#1B3C6C]/25 bg-[#f6faff] p-4">
+          <p className="text-sm font-semibold text-slate-700">Just to confirm — is this your property?</p>
+          <p className="mt-1 text-base font-bold text-[#1B3C6C]">{candidate.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button"
+              onClick={() => {
+                skip.current = true;
+                setAddressText(candidate.description);
+                setPlaceId(candidate.placeId);
+                setCandidate(null);
+                setSuggestions([]);
+                advancePast(1);
+              }}
+              className="rounded-lg bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#16325a]">
+              Yes, that’s it
+            </button>
+            <button type="button" onClick={() => setCandidate(null)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+              Let me fix it
+            </button>
+          </div>
+        </div>
+      )}
+      <PrimaryButton
+        disabled={
+          !answered(step) ||
+          (step === 1 && !addressLast && (!addressText.trim() || checkingAddress))
+        }
+        onClick={step === 1 && !addressLast ? continueFromStep1 : () => goToStepAfter(step)}
+      >
+        {step === 1 && !addressLast && checkingAddress ? 'Checking address…' : 'Continue'}
+      </PrimaryButton>
+    </div>
+  );
 
   return (
     <Shell
-      title={
-        phase === 'q1' ? 'Let’s start with your property'
-          : phase === 'q2' ? 'What are you planning?'
-            : phase === 'q3' ? program.fundingStepHeading ?? `How the ${program.areaLabel} funding works`
-              // The reassurance earns the page title here. Repeating it inside the
-              // card under a functional heading gave the screen two titles and
-              // left the line that matters at body weight.
-              : phase === 'funding' ? program.fundingGuidance.heading
-                : 'Where should we send your confirmation?'
-      }
+      title={screenTitle}
       step={stepIndex}
+      totalSteps={totalSteps}
       onBack={phase === 'q1' ? undefined : back}
     >
       <Helmet><title>{program.pageTitle ?? `${program.areaLabel} Secondary Suite Consultation | OntarioReno`}</title></Helmet>
 
-      {/* Step 1 — address + ownership */}
-      {phase === 'q1' && (
-        <div className="space-y-6 text-left">
-          <div className="relative">
-            <label className="mb-2 block text-sm font-bold text-slate-700">
-              <MapPin className="mr-1 inline h-4 w-4 text-[#1B3C6C]" /> Property address
-            </label>
-            <input className={inputCls} value={addressText} autoComplete="off" placeholder="Start typing, then pick your address"
-              onChange={(e) => { setAddressText(e.target.value); setPlaceId(''); setCandidate(null); }}
-              // Suggestions are chosen on mousedown, which fires before blur, so
-              // dismissing here cannot steal a pick the homeowner was making.
-              onBlur={() => setSuggestions([])} />
-            {placeId ? (
-              <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                <Check className="h-3.5 w-3.5" /> Address confirmed
-              </p>
-            ) : addressText.trim().length > 2 ? (
-              // Said here, at the point of failure, rather than four steps later
-              // as an unexplained "a specialist will call you".
-              <p className="mt-2 text-xs font-semibold text-amber-700">
-                Pick your address from the list so we can check availability in your area.
-                If you don’t, we’ll try to confirm it for you on the next step.
-              </p>
-            ) : null}
-            {suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                {suggestions.map((s) => (
-                  <button key={s.placeId} type="button"
-                    onMouseDown={() => { skip.current = true; setAddressText(s.description); setPlaceId(s.placeId); setSuggestions([]); }}
-                    className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-[#f6faff]">
-                    {s.description}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {stepQuestions(1).map((q) => (
-            <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
-          ))}
-          {candidate && (
-            <div className="rounded-xl border border-[#1B3C6C]/25 bg-[#f6faff] p-4">
-              <p className="text-sm font-semibold text-slate-700">Just to confirm — is this your property?</p>
-              <p className="mt-1 text-base font-bold text-[#1B3C6C]">{candidate.description}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button"
-                  onClick={() => {
-                    skip.current = true;
-                    setAddressText(candidate.description);
-                    setPlaceId(candidate.placeId);
-                    setCandidate(null);
-                    setSuggestions([]);
-                    setPhase('q2');
-                  }}
-                  className="rounded-lg bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#16325a]">
-                  Yes, that’s it
-                </button>
-                <button type="button" onClick={() => setCandidate(null)}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                  Let me fix it
-                </button>
-              </div>
-            </div>
-          )}
-          <PrimaryButton disabled={!addressText.trim() || !answered(1) || checkingAddress} onClick={continueFromStep1}>
-            {checkingAddress ? 'Checking address…' : 'Continue'}
-          </PrimaryButton>
-        </div>
-      )}
+      {phase === 'q1' && questionScreen(1)}
 
-      {/* Step 2 — project + timing */}
-      {phase === 'q2' && (
-        <div className="space-y-6 text-left">
-          {stepQuestions(2).map((q) => (
-            <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
-          ))}
-          <PrimaryButton disabled={!answered(2)} onClick={() => setPhase('q3')}>Continue</PrimaryButton>
-        </div>
-      )}
-
-      {/* Step 3 — funding + contribution */}
-      {phase === 'q3' && (
-        <div className="space-y-6 text-left">
-          {program.displayAmountLabel && (
-            <p className="rounded-xl bg-emerald-50 px-4 py-3 text-center text-base font-bold text-emerald-800">
-              {program.displayAmountLabel}
-            </p>
-          )}
-          <ul className="space-y-2">
-            {program.fundingHighlights.map((h) => (
-              <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> {h}
-              </li>
-            ))}
-          </ul>
-          <Disclosure
-            open={termsOpen}
-            onToggle={() => setTermsOpen((v) => !v)}
-            label="Full program terms"
-            id="full-program-terms"
-            scrollOnMobile
-          >
-            <ul className="space-y-1.5">{program.programTerms.map((t) => <li key={t}>• {t}</li>)}</ul>
-          </Disclosure>
-          {stepQuestions(3).map((q) => (
-            <Choice key={q.key} question={q} value={answers[q.key]} onPick={(v) => setAnswers({ ...answers, [q.key]: v })} />
-          ))}
-          <PrimaryButton
-            disabled={!answered(3)}
-            onClick={() => setPhase(needsFundingGuidance ? 'funding' : 'contact')}
-          >
-            Continue
-          </PrimaryButton>
-        </div>
-      )}
+      {phase === 'q2' && questionScreen(2)}
+      {phase === 'q3' && questionScreen(3)}
 
       {/* Funding guidance — shown only for "Not sure yet / Need guidance".
           One button, forward only: the homeowner is not being asked to judge
@@ -781,38 +967,18 @@ export default function ConsultationFlow() {
             {program.fundingGuidance.highlight}
           </p>
           <p className="text-sm leading-relaxed text-slate-500">{program.fundingGuidance.closing}</p>
-          <PrimaryButton onClick={() => setPhase('contact')}>
+          <PrimaryButton onClick={() => advancePast(fundingStep as 1 | 2 | 3)}>
             {program.fundingGuidance.continueLabel || 'Continue'}
           </PrimaryButton>
         </div>
       )}
 
-      {/* Step 4 — contact, then straight to the calendar */}
+      {/* Contact on its own screen — the shape the grant flows still use, where
+          the address was already collected on step 1. */}
       {phase === 'contact' && (
         <form className="space-y-4 text-left" onSubmit={(e) => { e.preventDefault(); void submit(contact); }}>
-          <div>
-            <label className="mb-2 block text-sm font-bold text-slate-700">Your name</label>
-            <input className={inputCls} required value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-bold text-slate-700">Mobile number</label>
-            <input className={inputCls} type="tel" inputMode="tel" required value={contact.phone}
-              onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-bold text-slate-700">
-              Email <span className="font-normal text-slate-400">(optional)</span>
-            </label>
-            <input className={inputCls} type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
-          </div>
-          {error && <ErrorNote>{error}</ErrorNote>}
-          <PrimaryButton disabled={busy || !contact.name.trim() || !contact.phone.trim()} type="submit">
-            {busy ? 'Checking availability…' : 'See available times'}
-          </PrimaryButton>
-          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
-            <Lock className="h-3.5 w-3.5 shrink-0" />
-            100% Free &amp; No-Obligation. Your information is kept strictly confidential.
-          </p>
+          {contactFields}
+          {submitFooter}
         </form>
       )}
       {debugPanel}
@@ -952,8 +1118,8 @@ function ErrorNote({ children }: { children: React.ReactNode }) {
   return <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{children}</p>;
 }
 
-function Shell({ children, title, step, onBack }: {
-  children: React.ReactNode; title?: string; step?: number; onBack?: () => void;
+function Shell({ children, title, step, totalSteps = 5, onBack }: {
+  children: React.ReactNode; title?: string; step?: number; totalSteps?: number; onBack?: () => void;
 }) {
   return (
     <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-8 sm:items-center sm:py-12">
@@ -964,7 +1130,7 @@ function Shell({ children, title, step, onBack }: {
           </div>
           {step ? (
             <div className="mx-auto mb-5 flex max-w-[220px] gap-1.5">
-              {[1, 2, 3, 4, 5].map((i) => (
+              {Array.from({ length: totalSteps }, (_, n) => n + 1).map((i) => (
                 <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-[#1B3C6C]' : 'bg-slate-200'}`} />
               ))}
             </div>

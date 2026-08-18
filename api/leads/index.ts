@@ -1120,6 +1120,7 @@ function publicProgramPayload(program: ProgramConfig) {
     consultationMode: program.consultationMode,
     pageTitle: program.pageTitle ?? null,
     fundingStepHeading: program.fundingStepHeading ?? null,
+    addressPlacement: program.addressPlacement ?? 'first',
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
     // Told to the client so confirmation copy can't promise a text we cannot

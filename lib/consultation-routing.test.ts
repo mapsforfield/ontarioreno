@@ -462,7 +462,18 @@ test('the basement terms never promise a rate or a payment', () => {
   const terms = BASEMENT_FINANCING_PROGRAM.programTerms.join(' ');
   assert.match(terms, /subject to credit approval/i);
   assert.match(terms, /confirmed in writing before you sign/i);
-  assert.match(BASEMENT_FINANCING_PROGRAM.displayAmountLabel, /on approved credit/i);
+  // The credit qualifier moved OFF the headline and into the first highlight
+  // immediately beneath it — same screen, one line down, still ahead of any
+  // question. What must never happen is the figure appearing with the
+  // qualifier nowhere near it, which is what this now checks.
+  assert.match(
+    [
+      BASEMENT_FINANCING_PROGRAM.displayAmountLabel,
+      BASEMENT_FINANCING_PROGRAM.fundingHighlights[0] ?? '',
+    ].join(' '),
+    /on approved credit/i,
+    'the monthly figure must be qualified where it is shown'
+  );
   assert.equal(
     BASEMENT_FINANCING_PROGRAM.fundingGuidance.highlight.includes('%'),
     false,
@@ -695,9 +706,22 @@ test('every timeline a financing offer asks about reaches the calendar', () => {
   for (const program of FINANCING_PROGRAMS) {
     assert.deepEqual(program.nurtureTimelines, [], `${program.slug} started nurturing`);
     const projectType = program.eligibleProjectTypes[0]!;
-    const timelines = program.questions
-      .find((q) => q.key === 'timeline')!
-      .options.map((o) => o.value);
+    const question = program.questions.find((q) => q.key === 'timeline');
+    // The basement offer stopped asking about timing: it never nurtured on the
+    // answer, so the question sat in front of the contact form unable to change
+    // anything. A program that asks nothing must still book — asserted with the
+    // empty answer the flow would actually send.
+    if (!question) {
+      const r = routeConsultation({
+        addressState: 'ADDRESS_VERIFIED',
+        area: 'ONTARIO',
+        program,
+        answers: { ownership: 'yes', projectType, timeline: '', contribution: 'cash_equity' },
+      });
+      assert.equal(r.outcome, 'DIRECT_CALENDAR', `${program.slug} must book without a timeline`);
+      continue;
+    }
+    const timelines = question.options.map((o) => o.value);
     assert.ok(timelines.length >= 3, `${program.slug} asks about too few timelines`);
     for (const timeline of timelines) {
       const r = routeConsultation({
@@ -715,7 +739,11 @@ test('the shared timeline question is untouched by the kitchen form', () => {
   // Kitchen has its own shorter timeline question. If it were ever pointed back
   // at the shared TIMELINE — or the shared one edited to match — four other
   // live flows would lose an option nobody asked to change.
-  for (const program of [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BASEMENT_FINANCING_PROGRAM, BATHROOM_FINANCING_PROGRAM]) {
+  // BASEMENT_FINANCING_PROGRAM was deliberately removed from this list when it
+  // stopped asking about timing — a visible line in the diff rather than a
+  // question quietly disappearing. The programs below still ask it and still
+  // share one object.
+  for (const program of [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BATHROOM_FINANCING_PROGRAM]) {
     const values = program.questions.find((q) => q.key === 'timeline')!.options.map((o) => o.value);
     assert.deepEqual(
       values,
@@ -794,16 +822,28 @@ test('no financing offer promises a rate, and every monthly figure is a floor', 
     );
     // An empty label means the program renders no amount banner at all, which
     // is a valid choice — there is no claim to qualify.
+    //
+    // The qualifier may sit on the headline itself or in the first highlight
+    // directly under it: both render on the same screen, above every question.
+    // What is guarded is that a monthly figure is never shown without it.
     if (program.displayAmountLabel) {
-      assert.match(program.displayAmountLabel, /on approved credit/i, `${program.slug} headline`);
+      assert.match(
+        [program.displayAmountLabel, program.fundingHighlights[0] ?? ''].join(' '),
+        /on approved credit/i,
+        `${program.slug} headline`
+      );
     }
     // A MONTHLY figure is a floor and must say so. A CAP is the opposite kind
     // of number — an upper limit, where "from about" would be actively
     // misleading — so the rule keys on whether the headline quotes a payment.
+    // "from" is what carries this: it says the number is where the range
+    // starts, not what the job costs. "about" was dropped from the basement
+    // headline as hedging on top of a hedge — the floor framing is the part
+    // that must survive, and a bare "$399 a month" would still fail here.
     if (/a month/i.test(program.displayAmountLabel)) {
       assert.match(
         program.displayAmountLabel,
-        /from about/i,
+        /\bfrom\b/i,
         `${program.slug} states a monthly payment without framing it as a starting point`
       );
     }
