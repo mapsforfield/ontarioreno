@@ -27,6 +27,10 @@ export type NotificationKind =
   // appointment and so could only ever announce a booking — which meant every
   // manual-review, nurture and decline lead was captured silently.
   | 'lead_alert'
+  // First contact with a lead that arrived from an external form (a Meta
+  // instant form), where the homeowner gave us their details and never saw a
+  // calendar. Sent to the HOMEOWNER, unlike lead_alert.
+  | 'lead_welcome'
   // The address provider failed or ran out of budget, so leads are being sent
   // to manual review by our own degradation rather than by their addresses.
   | 'address_provider_alert';
@@ -122,6 +126,32 @@ export function smsBookingConfirmation(c: BookingContext): string {
     return `Hi ${c.name}, your OntarioReno consultation call about ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. A specialist will call you. Need to reschedule? Reply to this text.`;
   }
   return `Hi ${c.name}, your OntarioReno site visit for ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. Need to reschedule? Reply to this text.`;
+}
+
+/**
+ * First contact for a lead that came from an external form.
+ *
+ * One job: get them onto the calendar while they still remember filling the
+ * form in. So it confirms receipt in half a line and spends the rest of the
+ * message on the link — no pitch, no price, nothing to reply to, because every
+ * extra sentence is another reason to put the phone down.
+ *
+ * Deliberately says "no cost and no obligation" rather than "free quote": the
+ * word free appears twice in the ad already, and the objection at this exact
+ * moment is not price, it is whether booking commits them to anything.
+ *
+ * STOP is appended because this is an unsolicited first message to a consumer
+ * mobile — CASL and Twilio's own rules both want the opt-out on the first
+ * contact, not the third.
+ */
+export function smsLeadWelcome(c: LeadWelcomeContext): string {
+  const name = c.name.trim().split(/\s+/)[0] ?? '';
+  const greeting = name ? `Hi ${name}, ` : 'Hi, ';
+  return (
+    `${greeting}thanks for your interest in finishing your basement with OntarioReno. ` +
+    `You can book your free in-home consultation right now — pick any time that suits you here: ${c.bookingUrl} ` +
+    `It takes about a minute, and there's no cost and no obligation. Reply STOP to opt out.`
+  );
 }
 
 export function smsReminder24h(c: ReminderContext): string {
@@ -250,6 +280,52 @@ export function emailTeamAlert(c: BookingContext): { subject: string; body: stri
 }
 
 // ─── Submission alerts ────────────────────────────────────────────────────────
+
+export type LeadWelcomeContext = {
+  leadId: string;
+  name: string;
+  phone: string;
+  /** Absolute URL of the booking flow this lead should land on. */
+  bookingUrl: string;
+};
+
+/**
+ * The one text a new external lead gets, and only ever one.
+ *
+ * Returns nothing without a phone number: a lead captured with only an email is
+ * not a texting failure to be retried, it is a lead somebody has to call.
+ *
+ * ── Why this is not part of planSubmissionNotifications ──
+ * That planner runs on the PUBLIC flow, where the homeowner has just been shown
+ * the calendar. Texting them a link to the screen they are already looking at
+ * is noise at best. This fires only for leads that arrive from outside, where
+ * nobody has seen a calendar yet.
+ *
+ * The key is the lead id and nothing else, so an external form that re-posts a
+ * lead — Meta retries webhooks — cannot produce a second text. Enrichment of an
+ * existing lead never reaches here at all; see handleIntake.
+ */
+export function planLeadWelcomeNotifications(
+  c: LeadWelcomeContext,
+  now: Date = new Date()
+): PlannedNotification[] {
+  if (!c.phone.trim() || !c.bookingUrl.trim()) return [];
+  return [
+    {
+      channel: 'sms',
+      kind: 'lead_welcome',
+      recipient: c.phone,
+      subject: '',
+      body: smsLeadWelcome(c),
+      // Sent immediately, and never expires: unlike a reminder its wording is
+      // not tied to a date, so a delayed send is still true. Late is worse than
+      // prompt here, but it is not wrong.
+      sendAfter: now.toISOString(),
+      expiresAt: '',
+      idempotencyKey: `${c.leadId}:sms:lead_welcome`,
+    },
+  ];
+}
 
 export type SubmissionContext = {
   leadId: string;
