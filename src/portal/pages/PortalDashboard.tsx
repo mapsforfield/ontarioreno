@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
+import { followUpSilenced, lostDealIds } from '../data/followUps';
 import { usePortalData } from '../data/store';
 import { countUnworkedSubmissions } from '../data/submissions';
 import { ConsultationStage } from '../data/types';
@@ -109,16 +110,20 @@ export default function PortalDashboard() {
   const todayAppointments = visibleAppointments.filter(
     (appointment) => appointment.appointmentDate === today
   );
+  // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
+  const lostDeals = lostDealIds(deals);
   const needsAttentionAppointments = visibleAppointments.filter(
     (appointment) =>
       (appointment.status === 'completed' && !appointment.outcomeSubmitted) ||
-      (appointment.nextStep === 'follow_up_required' &&
+      (!followUpSilenced(appointment, lostDeals) &&
+        appointment.nextStep === 'follow_up_required' &&
         appointment.followUpDate &&
         appointment.followUpDate <= today) ||
       (['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
         appointment.nextStep === 'no_action') ||
       (appointment.appointmentDate < today && appointment.status !== 'completed') ||
-      appointment.consultationStage === 'follow_up_required' ||
+      (!followUpSilenced(appointment, lostDeals) &&
+        appointment.consultationStage === 'follow_up_required') ||
       (appointment.consultationStage === 'estimate_requested' &&
         getDaysSince(appointment.updatedAt) > 3) ||
       (appointment.consultationStage === 'contractor_review' &&
@@ -175,6 +180,7 @@ export default function PortalDashboard() {
     });
     visibleAppointments.forEach((a) => {
       if (a.appointmentDate === today) return; // already shown above
+      if (followUpSilenced(a, lostDeals)) return;
       if (a.followUpDate && a.followUpDate <= today && a.status !== 'cancelled' && !(a.status === 'completed' && a.outcomeSubmitted)) {
         items.push({ id: `fu-${a.id}`, kind: 'followup', title: a.customerName || a.title || 'Follow-up', subtitle: a.followUpDate < today ? 'Follow-up · overdue' : 'Follow-up · today', href: '/portal/appointments', state: { openAppointmentId: a.id }, urgent: a.followUpDate < today, sort: a.followUpDate });
       }
