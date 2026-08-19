@@ -37,6 +37,7 @@ import {
 import { sendEmail, EmailAttachment } from '../lib/sendEmail';
 import { getRecommendedContractors } from '../data/recommendations';
 import { formatCurrency, formatDealStatus } from '../data/selectors';
+import { followUpSilenced, lostDealIds } from '../data/followUps';
 import { usePortalData } from '../data/store';
 import {
   Appointment,
@@ -867,6 +868,7 @@ export default function PortalAppointments() {
       return d;
     }
   };
+  const lostDeals = lostDealIds(deals);
   const getAttentionInfo = (appointment: Appointment) => {
     const actions: string[] = [];
     // Events (showroom visit, supplier meeting, etc.) don't have outcome
@@ -887,9 +889,13 @@ export default function PortalAppointments() {
     if (!appointment.assignedRepId) actions.push('No rep assigned');
 
     let followUp: { label: string; overdue: boolean } | null = null;
+    // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
+    // The date itself stays on the consultation record below; only the chip and
+    // the counts it feeds go quiet.
     const hasFollowUp =
-      appointment.nextStep === 'follow_up_required' ||
-      appointment.consultationStage === 'follow_up_required';
+      !followUpSilenced(appointment, lostDeals) &&
+      (appointment.nextStep === 'follow_up_required' ||
+        appointment.consultationStage === 'follow_up_required');
     if (hasFollowUp) {
       const date = appointment.followUpDate;
       if (date) {

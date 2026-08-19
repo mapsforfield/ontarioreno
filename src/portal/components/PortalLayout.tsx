@@ -35,6 +35,7 @@ import type { LucideIcon } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
+import { followUpSilenced, lostDealIds } from '../data/followUps';
 import { usePortalData } from '../data/store';
 import { repCanAccess, featureForPath, type RepFeatureKey } from '../data/repFeatures';
 import { torontoToday } from '../lib/time';
@@ -83,7 +84,7 @@ const contractorNavItems: NavItem[] = [
 
 export default function PortalLayout() {
   const { currentUser, isAdmin, isContractor, logout, updateCurrentUser } = usePortalAuth();
-  const { changeUserPassword, updateUser, getVisibleAppointmentsForUser, loadError, refetch, repAccess } = usePortalData();
+  const { changeUserPassword, updateUser, deals, getVisibleAppointmentsForUser, loadError, refetch, repAccess } = usePortalData();
 
   // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
   const [searchOpen, setSearchOpen] = useState(false);
@@ -106,14 +107,18 @@ export default function PortalLayout() {
   // Needs-attention count for badge on Consultations nav item
   const today = torontoToday();
   const visibleAppointments = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
-  const needsAttentionCount = visibleAppointments.filter(
-    (a) =>
+  // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
+  const lostDeals = lostDealIds(deals);
+  const needsAttentionCount = visibleAppointments.filter((a) => {
+    const quiet = followUpSilenced(a, lostDeals);
+    return (
       (a.status === 'completed' && !a.outcomeSubmitted) ||
-      (a.nextStep === 'follow_up_required' && a.followUpDate && a.followUpDate <= today) ||
+      (!quiet && a.nextStep === 'follow_up_required' && a.followUpDate && a.followUpDate <= today) ||
       (['hot', 'warm'].includes(a.homeownerInterestLevel ?? '') && a.nextStep === 'no_action') ||
       (a.appointmentDate < today && a.status !== 'completed') ||
-      a.consultationStage === 'follow_up_required'
-  ).length;
+      (!quiet && a.consultationStage === 'follow_up_required')
+    );
+  }).length;
   // Push notifications
   const [pushState, setPushState] = useState<'unsupported' | 'default' | 'granted' | 'denied' | 'registering'>('default');
   useEffect(() => {
