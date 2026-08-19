@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { dealMatchesClient } from '../data/clientLinks';
 import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
 import ClientVideos from '../components/ClientVideos';
@@ -109,6 +110,8 @@ export default function PortalClients() {
     purgeClient,
     fetchTrashedClients,
     getAppointmentsForClient,
+    deals,
+    users,
     addHousehold,
     updateHousehold,
     deleteHousehold,
@@ -173,6 +176,57 @@ export default function PortalClients() {
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
   const clientAppointments = selectedClientId ? getAppointmentsForClient(selectedClientId) : [];
+
+  // ── Who owns this client, and who wrote what is on the profile ──────────────
+  //
+  // The panel used to show a name, an address and a rep's internal note with no
+  // indication of whose note it was, which rep the client belonged to, or that
+  // they had ever been visited. Reading someone else's note with no author and
+  // no history is how an admin ends up phoning a client blind.
+  //
+  // None of this is new data on the client record. The rep is derived from the
+  // work attached to the client — the most recent consultation, then the deal —
+  // and the panel labels which one it is showing rather than implying the client
+  // row itself carries an owner.
+  const repName = (userId: string | null | undefined) =>
+    userId ? users.find((u) => u.id === userId)?.name ?? 'Unknown user' : '';
+  const clientDeals = selectedClient
+    ? deals.filter((deal) => dealMatchesClient(deal, selectedClient))
+    : [];
+  const latestAppointment = [...clientAppointments].sort((a, b) =>
+    `${b.appointmentDate}T${b.appointmentTime}`.localeCompare(`${a.appointmentDate}T${a.appointmentTime}`)
+  )[0];
+  const latestDeal = [...clientDeals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const ownership = (() => {
+    if (latestAppointment?.assignedRepId) {
+      return { name: repName(latestAppointment.assignedRepId), via: 'from their consultation' };
+    }
+    if (latestDeal?.assignedRepId) {
+      return { name: repName(latestDeal.assignedRepId), via: 'from their deal' };
+    }
+    if (selectedClient?.createdByUserId) {
+      return { name: repName(selectedClient.createdByUserId), via: 'added this client' };
+    }
+    return null;
+  })();
+  // Who to credit the internal note to. `updatedByUserId` is only set on edits
+  // made after it started being recorded, so older notes fall back to the rep
+  // who ran the consultation the note was synced from — which is who wrote it
+  // in practice. The label says which of the two it is; it never guesses
+  // silently.
+  const noteAuthor = (() => {
+    if (!selectedClient?.internalNotes) return null;
+    if (selectedClient.updatedByUserId) {
+      return { name: repName(selectedClient.updatedByUserId), label: 'Last edited by' };
+    }
+    if (latestAppointment?.assignedRepId) {
+      return { name: repName(latestAppointment.assignedRepId), label: 'Consulting rep' };
+    }
+    if (selectedClient.createdByUserId) {
+      return { name: repName(selectedClient.createdByUserId), label: 'Added by' };
+    }
+    return null;
+  })();
 
   // Possible duplicate while adding a client: same (non-trivial) phone or exact name.
   const normalizePhone = (p: string) => p.replace(/\D/g, '');
@@ -624,9 +678,31 @@ export default function PortalClients() {
                       </div>
                     )}
                   </div>
+                  {ownership && (
+                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-[#c9d9eb] pt-3 text-sm font-semibold text-slate-700">
+                      <UserRound className="h-3.5 w-3.5 text-[#32639b]" />
+                      <span className="font-black text-slate-900">{ownership.name}</span>
+                      <span className="text-xs font-bold text-slate-500">{ownership.via}</span>
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-xs font-semibold text-slate-500">
+                    Added {formatDate(selectedClient.createdAt)}
+                    {/* The creator is already named above when they are the only
+                        person attached to this client — don't say it twice. */}
+                    {selectedClient.createdByUserId && ownership?.via !== 'added this client'
+                      ? ` by ${repName(selectedClient.createdByUserId)}`
+                      : ''}
+                  </p>
                   {selectedClient.internalNotes && (
                     <div className="mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">Internal Notes</p>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">Internal Notes</p>
+                        {noteAuthor && (
+                          <p className="text-xs font-bold text-amber-700">
+                            {noteAuthor.label}: {noteAuthor.name}
+                          </p>
+                        )}
+                      </div>
                       <p className="mt-1.5 text-sm font-semibold text-slate-700 whitespace-pre-wrap">{selectedClient.internalNotes}</p>
                     </div>
                   )}
@@ -651,6 +727,11 @@ export default function PortalClients() {
                               <p className="mt-0.5 text-xs font-semibold text-slate-500">
                                 {apt.appointmentDate}{apt.appointmentTime ? ` · ${apt.appointmentTime}` : ''}{apt.city ? ` · ${apt.city}` : ''}
                               </p>
+                              {apt.assignedRepId && (
+                                <p className="mt-0.5 text-xs font-bold text-[#32639b]">
+                                  Rep: {repName(apt.assignedRepId)}
+                                </p>
+                              )}
                             </div>
                             <span className="shrink-0 rounded-full bg-[#e8f1fb] px-2.5 py-0.5 text-[0.62rem] font-black text-[#1B3C6C]">
                               {apt.status.replace('_', ' ')}
