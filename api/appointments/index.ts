@@ -1326,10 +1326,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (data.postalCode !== undefined) patch.postalCode = data.postalCode;
       if (data.projectTypes !== undefined) patch.projectTypes = data.projectTypes;
       if (data.internalNotes !== undefined) patch.internalNotes = data.internalNotes;
-      const client = await prisma.client.update({
-        where: { id: data.id },
-        data: patch,
-      });
+      // Who touched it last. The client panel shows this beside the internal
+      // note so an admin reading a rep's note knows whose note it is.
+      patch.updatedByUserId = user.id;
+      let client;
+      try {
+        client = await prisma.client.update({ where: { id: data.id }, data: patch });
+      } catch {
+        // Column may predate this deploy on an un-migrated database; the edit
+        // itself must never fail for the sake of the attribution.
+        delete patch.updatedByUserId;
+        client = await prisma.client.update({ where: { id: data.id }, data: patch });
+      }
 
       // ── Notes sync: propagate a client note edit to linked consultations
       // (by clientId or matching email) and their deals (by email). ──

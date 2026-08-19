@@ -205,6 +205,8 @@ export type Client = {
   householdId?: string | null;
   deletedAt?: string | null;
   createdByUserId: string;
+  /** Who last saved the profile. Null on rows written before this was recorded. */
+  updatedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

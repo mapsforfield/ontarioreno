@@ -194,6 +194,11 @@ model Client {
   /// Soft-delete timestamp — non-null means it's in the trash bin.
   deletedAt       DateTime?
   createdByUserId String
+  /// Who last saved this profile, so an admin reading a rep's internal note can
+  /// see whose note it is. Null on every row written before this was added, and
+  /// on rows only ever touched by the notes sync — the client panel falls back
+  /// to the consulting rep and says which it is showing.
+  updatedByUserId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

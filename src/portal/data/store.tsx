@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { usePortalAuth } from '../auth';
+import { appointmentBelongsToClient } from './clientLinks';
 import { showToast } from '../lib/toast';
 import {
   Client,
@@ -2853,8 +2854,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
       // ── Client mutations ────────────────────────────────────────────────────
 
-      getAppointmentsForClient: (clientId) =>
-        state.appointments.filter((a) => a.clientId === clientId),
+      // Consultation history for the client panel. The matching rule (and why
+      // it needs fallbacks at all) lives in clientLinks.ts.
+      getAppointmentsForClient: (clientId) => {
+        const client = state.clients.find((c) => c.id === clientId);
+        if (!client) return state.appointments.filter((a) => a.clientId === clientId);
+        return state.appointments.filter((a) => appointmentBelongsToClient(a, client));
+      },
 
       addClient: async (draft) => {
         const client = await apiCall<Client>('/api/appointments', {
