@@ -146,10 +146,14 @@ export function smsBookingConfirmation(c: BookingContext): string {
  */
 export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const name = c.name.trim().split(/\s+/)[0] ?? '';
-  const opener = name ? `Hi ${name} — OntarioReno here` : 'Hi — OntarioReno here';
+  const greeting = name ? `Hi ${name}, you` : 'Hi, you';
   return (
-    `${opener} about your basement. ` +
-    `You can book your free in-home quote whenever suits you: ${c.bookingUrl} ` +
+    // Their own action first, then who we are, then the link. That is the order
+    // someone reads a text from an unknown number in: "why am I getting this"
+    // is the question that decides whether they read the second sentence, and
+    // naming ourselves before answering it is what gets a message deleted.
+    `${greeting} just asked for a free quote to finish your basement — this is OntarioReno. ` +
+    `You can book your in-home visit whenever suits you: ${c.bookingUrl} ` +
     `Takes a minute. Reply STOP to opt out.`
   );
 }
