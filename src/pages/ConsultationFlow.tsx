@@ -175,6 +175,36 @@ export default function ConsultationFlow() {
   const skip = useRef(false);
 
   useEffect(() => {
+    // The slug can change WITHOUT this component unmounting: the closed screen
+    // links to /consultation/basement, which React Router serves by re-rendering
+    // this same route with a new param. State therefore has to be reset by hand
+    // here, or it carries over from the previous program.
+    //
+    // That is exactly what happened to Hamilton. `phase` was left at 'closed'
+    // from the grant page, so the live basement program loaded into the closed
+    // screen and — having no closure of its own — rendered "We aren't taking
+    // online bookings for Ontario yet." The one CTA on a closed page told every
+    // homeowner who clicked it that the offer we had just sent them to was also
+    // shut. A hard refresh of the same URL always worked, which is why it
+    // survived.
+    //
+    // Clearing `program` first also stops the previous program's screen from
+    // showing under the new slug while the fetch is in flight.
+    setProgram(null);
+    setError('');
+    setPhase('q1');
+    // The rest of the flow's state belongs to the program that was on screen a
+    // moment ago. Answers are keyed by that program's questions, and a lead ref
+    // or a held slot belongs to its booking — none of it may follow the reader
+    // into a different program.
+    setAnswers({});
+    setLeadRef('');
+    setOutcome(null);
+    setReasons([]);
+    setSlots([]);
+    setChosen(null);
+    setBooking(null);
+    setRemote(false);
     fetch(`/api/leads?flow=program&slug=${encodeURIComponent(slug)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p: Program) => {
