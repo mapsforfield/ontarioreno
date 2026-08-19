@@ -340,14 +340,16 @@ const WELCOME = {
 
 test('the welcome text greets by first name and carries the booking link', () => {
   const body = smsLeadWelcome(WELCOME);
-  assert.match(body, /^Hi Dennis,/, 'first name only — the full name reads like a mail merge');
+  assert.match(body, /^Hi Dennis —/, 'first name only — the full name reads like a mail merge');
+  assert.ok(!body.includes('Mahalingam'), 'surname never appears');
+  assert.match(body, /OntarioReno/, 'name ourselves early, or it arrives as an unknown sender');
   assert.ok(body.includes(WELCOME.bookingUrl), 'the link is the whole point of the message');
   assert.match(body, /reply stop/i, 'an unsolicited first contact must carry an opt-out');
 });
 
 test('a lead with no name still gets a sendable message', () => {
   const body = smsLeadWelcome({ ...WELCOME, name: '' });
-  assert.match(body, /^Hi, /);
+  assert.match(body, /^Hi — OntarioReno here/);
   assert.ok(!body.includes('undefined'), 'never leak a placeholder into a real send');
 });
 
