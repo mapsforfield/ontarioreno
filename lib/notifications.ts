@@ -146,11 +146,11 @@ export function smsBookingConfirmation(c: BookingContext): string {
  */
 export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const name = c.name.trim().split(/\s+/)[0] ?? '';
-  const greeting = name ? `Hi ${name}, ` : 'Hi, ';
+  const opener = name ? `Hi ${name} — OntarioReno here` : 'Hi — OntarioReno here';
   return (
-    `${greeting}thanks for your interest in finishing your basement with OntarioReno. ` +
-    `You can book your free in-home consultation right now — pick any time that suits you here: ${c.bookingUrl} ` +
-    `It takes about a minute, and there's no cost and no obligation. Reply STOP to opt out.`
+    `${opener} about your basement. ` +
+    `You can book your free in-home quote whenever suits you: ${c.bookingUrl} ` +
+    `Takes a minute. Reply STOP to opt out.`
   );
 }
 
