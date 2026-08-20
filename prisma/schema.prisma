@@ -668,7 +668,7 @@ model NotificationOutbox {
   channel        String
   /// 'booking_confirmation' | 'reminder_24h' | 'reminder_day_of' | 'team_alert' |
   /// 'nurture_guide' | 'lead_alert' | 'address_provider_alert' |
-  /// 'reply_alert' | 'reschedule_ack'
+  /// 'reply_alert' | 'reschedule_ack' | 'reply_unclear'
   /// 'team_alert' fires on booking and is keyed to an appointment; 'lead_alert'
   /// fires on submission and is keyed to the lead, so non-booking outcomes are
   /// announced too.

@@ -16,6 +16,8 @@ import {
   replyAlertBody,
   replyAlertHtml,
   replyAlertSubject,
+  replyUnclearBody,
+  replyUnclearSubject,
   rescheduleAckSms,
   shouldRelayDownstream,
   verifyTwilioSignature,
@@ -228,14 +230,13 @@ export async function handleInboundSms(
       console.error('[sms-inbound] could not record reply:', err);
     });
 
-  // An unclassifiable reply is logged and nothing more. Guessing at "Friday
-  // instead?" would either move a booking nobody agreed to move, or tell a rep
-  // an appointment is confirmed when it is not.
-  if (intent === 'unknown' || !appointment) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
+  // A reply from a number with no live upcoming appointment is logged and
+  // nothing more — there is nobody to tell and nothing to stamp.
+  if (!appointment) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
 
   const rep = (appointment.assignedRep ?? null) as { name?: string; email?: string } | null;
   const ctx = {
-    intent,
+    intent: intent as Exclude<ReplyIntent, 'unknown'>,
     repName: rep?.name ?? '',
     customerName: String(appointment.customerName ?? '') || 'The homeowner',
     customerPhone: from,
@@ -244,6 +245,48 @@ export async function handleInboundSms(
     address: [appointment.address, appointment.city].filter(Boolean).join(', '),
     rawBody: body,
   } as const;
+
+  // ── An unreadable reply goes straight to the rep, uninterpreted ──
+  // "Cancel", "Running late", "Can we do Friday instead" all land here. We make
+  // no claim about what they mean and change nothing — but silence loses real
+  // messages the night before a visit, so a human sees the words.
+  if (intent === 'unknown') {
+    if (rep?.email) {
+      const unclear = {
+        repName: rep.name ?? '',
+        customerName: ctx.customerName,
+        customerPhone: from,
+        date: ctx.date,
+        time: ctx.time,
+        address: ctx.address,
+        rawBody: body,
+      };
+      await prisma.notificationOutbox
+        .create({
+          data: {
+            appointmentId: appointment.id,
+            channel: 'email',
+            kind: 'reply_unclear',
+            recipient: rep.email,
+            subject: replyUnclearSubject(unclear),
+            body: replyUnclearBody(unclear),
+            html: '',
+            sendAfter: receivedAt,
+            expiresAt: '',
+            idempotencyKey: `${messageSid}:email:reply_unclear`,
+          },
+        })
+        .catch((err: unknown) => console.error('[sms-inbound] could not queue notification:', err));
+      try {
+        await drainOutbox(prisma as never, 25, env);
+      } catch (err) {
+        console.error('[sms-inbound] inline drain failed:', err);
+      }
+    }
+    // Deliberately no smsReplyStatus stamp: we do not know what they meant, and
+    // a chip claiming otherwise is worse than no chip.
+    return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
+  }
 
   // The appointment carries the answer, but its `status` is left alone: a
   // reschedule request is work for a rep, not a change to the booking, and the
