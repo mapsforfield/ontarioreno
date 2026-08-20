@@ -18,7 +18,7 @@ import {
 } from './program-config.ts';
 import { DEFAULT_NOTE_TEMPLATES, findNoteTemplate, parseNoteTemplates } from './note-templates.ts';
 
-const OK = { ownership: 'yes', projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
+const OK = { projectType: 'secondary_suite', timeline: 'asap', contribution: 'cash_equity' };
 
 /**
  * Every customer-facing string a program shows during the funding step, as one
@@ -93,20 +93,15 @@ test('an address resolved from typed text still reaches the calendar', () => {
 test('an inferred address does not rescue an otherwise unqualified lead', () => {
   // Softening the address must not soften anything else: the address is one
   // input, and every other guard has to keep firing exactly as before.
-  const notOwner = routeConsultation({
-    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, ownership: 'no' },
-  });
-  assert.equal(notOwner.outcome, 'DECLINE');
-
   const exploring = routeConsultation({
     ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, timeline: 'exploring' },
   });
   assert.equal(exploring.outcome, 'NURTURE');
 
-  const unsureOwnership = routeConsultation({
-    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, ownership: 'unsure' },
+  const unsureProject = routeConsultation({
+    ...base, addressState: 'ADDRESS_INFERRED', answers: { ...OK, projectType: 'unsure' },
   });
-  assert.equal(unsureOwnership.outcome, 'MANUAL_REVIEW');
+  assert.equal(unsureProject.outcome, 'MANUAL_REVIEW');
 });
 
 test('a typed address that stayed unresolved still goes to a person', () => {
@@ -189,7 +184,8 @@ test('consultation mode is configured, so the meeting type is never ambiguous', 
 });
 
 test('DECLINE is reachable only from certainty', () => {
-  assert.equal(routeConsultation({ ...base, answers: { ...OK, ownership: 'no' } }).outcome, 'DECLINE');
+  // Ownership was the other way in here — it was removed from every flow, so a
+  // resolved address outside the service area is now the only certain decline.
   assert.equal(
     routeConsultation({ ...base, addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA', answers: OK }).outcome,
     'DECLINE'
@@ -198,9 +194,7 @@ test('DECLINE is reachable only from certainty', () => {
 
 test('every uncertain answer goes to manual review, never approval or decline', () => {
   const uncertain = [
-    { ...OK, ownership: 'unsure' },
     { ...OK, projectType: 'unsure' },
-    { ...OK, ownership: '' },
     { ...OK, projectType: '' },
   ];
   for (const answers of uncertain) {
@@ -286,17 +280,23 @@ test('the fast-track case reaches the calendar with a single reason', () => {
   assert.deepEqual(r.reasons, ['ELIGIBLE_FOR_BOOKING']);
 });
 
-test('pre-booking questions are exactly four — no seven-dropdown wall', () => {
+test('pre-booking questions are exactly three — no seven-dropdown wall', () => {
   const keys = HAMILTON_PROGRAM.questions.map((q) => q.key);
-  assert.deepEqual(keys, ['ownership', 'projectType', 'timeline', 'contribution']);
+  // Was four. Ownership was removed from every flow: it lengthened the first
+  // step for everyone to catch the rare renter, and "It's complicated" queued
+  // qualified homeowners for saying something true.
+  assert.deepEqual(keys, ['projectType', 'timeline', 'contribution']);
+  assert.equal(keys.includes('ownership'), false, 'ownership is retired, not hidden');
   // The zero-weight property questions moved out of the pre-booking path.
   const prepKeys = HAMILTON_PROGRAM.prepQuestions.map((q) => q.key);
   assert.deepEqual(prepKeys, ['basementStatus', 'separateEntrance', 'permitStatus']);
   for (const k of prepKeys) assert.equal(keys.includes(k), false, `${k} must not block booking`);
 });
 
-test('questions are grouped into three progressive steps', () => {
-  assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 1).map((q) => q.key), ['ownership']);
+test('questions are grouped into progressive steps', () => {
+  // Step 1 carries no QUESTION any more — it is the address screen. The flow
+  // renders addressField there unconditionally, so it is not a blank screen.
+  assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 1).map((q) => q.key), []);
   assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 2).map((q) => q.key), ['projectType', 'timeline']);
   assert.deepEqual(questionsForStep(HAMILTON_PROGRAM, 3).map((q) => q.key), ['contribution']);
 });
@@ -434,7 +434,7 @@ test('a Toronto basement lead books rather than queueing', () => {
     addressState: geo.addressState,
     area: geo.area,
     program: BASEMENT_FINANCING_PROGRAM,
-    answers: { ownership: 'yes', projectType: 'basement_finish', timeline: 'asap', contribution: 'need_financing' },
+    answers: { projectType: 'basement_finish', timeline: 'asap', contribution: 'need_financing' },
   });
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
   assert.ok(r.reasons.includes('WANTS_FINANCING'));
@@ -502,7 +502,7 @@ test('the basement program books an exploratory lead and tags it', () => {
       addressState: 'ADDRESS_VERIFIED',
       area: 'ONTARIO',
       program: BASEMENT_FINANCING_PROGRAM,
-      answers: { ownership: 'yes', projectType: 'basement_finish', timeline, contribution: 'cash_equity' },
+      answers: { projectType: 'basement_finish', timeline, contribution: 'cash_equity' },
     });
     assert.equal(r.outcome, 'DIRECT_CALENDAR', `${timeline} must reach the calendar`);
     assert.ok(
@@ -557,7 +557,7 @@ test('a Toronto bathroom lead books rather than queueing', () => {
     addressState: geo.addressState,
     area: geo.area,
     program: BATHROOM_FINANCING_PROGRAM,
-    answers: { ownership: 'yes', projectType: 'bathroom_gut', timeline: 'asap', contribution: 'need_financing' },
+    answers: { projectType: 'bathroom_gut', timeline: 'asap', contribution: 'need_financing' },
   });
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
   assert.ok(r.reasons.includes('WANTS_FINANCING'));
@@ -605,21 +605,44 @@ test('the bathroom program books an exploratory lead and tags it', () => {
       addressState: 'ADDRESS_VERIFIED',
       area: 'ONTARIO',
       program: BATHROOM_FINANCING_PROGRAM,
-      answers: { ownership: 'yes', projectType: 'bathroom_refresh', timeline, contribution: 'cash_equity' },
+      answers: { projectType: 'bathroom_refresh', timeline, contribution: 'cash_equity' },
     });
     assert.equal(r.outcome, 'DIRECT_CALENDAR', `${timeline} must reach the calendar`);
   }
 });
 
-test('the bathroom flow asks something on every step', () => {
-  // The flow renders three screens unconditionally; a step with no questions is
-  // a blank screen between an ad click and the calendar.
-  for (const step of [1, 2, 3] as const) {
+/**
+ * A step the flow renders must have something on it.
+ *
+ * The original rule was "every step has a question", which held while every
+ * flow opened with the ownership question. With ownership retired, some steps
+ * carry no question at all — but they are not blank, because the flow drops
+ * empty steps entirely (see activeSteps in ConsultationFlow) and because the
+ * address and contact fields are built into a screen rather than being
+ * questions. So this mirrors what the flow will actually render.
+ *
+ * The failure it still catches is the one that mattered: a screen shown to a
+ * homeowner between an ad click and the calendar with nothing on it.
+ */
+function assertNoBlankScreens(program: ProgramConfig) {
+  const addressLast = program.addressPlacement === 'final';
+  const rendered = ([1, 2, 3] as const).filter(
+    (s) => questionsForStep(program, s).length > 0 || (!addressLast && s === 1)
+  );
+  assert.ok(rendered.length > 0, `${program.slug} renders no screens at all`);
+  for (const step of rendered) {
+    const hasQuestions = questionsForStep(program, step).length > 0;
+    const isAddressScreen = !addressLast && step === 1;
+    const isMergedFinal = addressLast && step === rendered[rendered.length - 1];
     assert.ok(
-      questionsForStep(BATHROOM_FINANCING_PROGRAM, step).length > 0,
-      `step ${step} has no questions`
+      hasQuestions || isAddressScreen || isMergedFinal,
+      `${program.slug} step ${step} would render blank`
     );
   }
+}
+
+test('the bathroom flow never renders a blank screen', () => {
+  assertNoBlankScreens(BATHROOM_FINANCING_PROGRAM);
 });
 
 test('the bathroom prep questions ask about a bathroom', () => {
@@ -654,7 +677,7 @@ test('a Toronto kitchen lead books rather than queueing', () => {
     addressState: geo.addressState,
     area: geo.area,
     program: KITCHEN_FINANCING_PROGRAM,
-    answers: { ownership: 'yes', projectType: 'full_remodel', timeline: 'asap', contribution: 'need_financing' },
+    answers: { projectType: 'full_remodel', timeline: 'asap', contribution: 'need_financing' },
   });
   assert.equal(r.outcome, 'DIRECT_CALENDAR');
   assert.ok(r.reasons.includes('WANTS_FINANCING'));
@@ -716,7 +739,7 @@ test('every timeline a financing offer asks about reaches the calendar', () => {
         addressState: 'ADDRESS_VERIFIED',
         area: 'ONTARIO',
         program,
-        answers: { ownership: 'yes', projectType, timeline: '', contribution: 'cash_equity' },
+        answers: { projectType, timeline: '', contribution: 'cash_equity' },
       });
       assert.equal(r.outcome, 'DIRECT_CALENDAR', `${program.slug} must book without a timeline`);
       continue;
@@ -728,7 +751,7 @@ test('every timeline a financing offer asks about reaches the calendar', () => {
         addressState: 'ADDRESS_VERIFIED',
         area: 'ONTARIO',
         program,
-        answers: { ownership: 'yes', projectType, timeline, contribution: 'cash_equity' },
+        answers: { projectType, timeline, contribution: 'cash_equity' },
       });
       assert.equal(r.outcome, 'DIRECT_CALENDAR', `${program.slug}/${timeline} must reach the calendar`);
     }
@@ -775,15 +798,8 @@ test('the kitchen form asks three project types and three timelines', () => {
   );
 });
 
-test('every financing offer asks something on all three steps', () => {
-  for (const program of FINANCING_PROGRAMS) {
-    for (const step of [1, 2, 3] as const) {
-      assert.ok(
-        questionsForStep(program, step).length > 0,
-        `${program.slug} step ${step} has no questions`
-      );
-    }
-  }
+test('no financing offer renders a blank screen', () => {
+  for (const program of FINANCING_PROGRAMS) assertNoBlankScreens(program);
 });
 
 test('every offered project type is an eligible one, on every offer', () => {

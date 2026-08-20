@@ -358,7 +358,6 @@ export type SubmissionContext = {
   projectScope: string;
   fundingPlan: string;
   timeline: string;
-  ownership: string;
   programLabel: string;
   addressState: string;
   /** AddressResolutionCause, as a string — see lib/address-resolution.ts. */
@@ -403,7 +402,6 @@ export function emailLeadAlert(c: SubmissionContext): { subject: string; body: s
     `Project scope:  ${c.projectScope || 'Not provided'}`,
     `Timeline:       ${c.timeline || 'Not provided'}`,
     `Funding plan:   ${c.fundingPlan || 'Not provided'}`,
-    `Ownership:      ${c.ownership || 'Not provided'}`,
     '',
     `Address state:  ${c.addressState} (${c.addressCause})`,
     `                ${c.addressCauseDetail}`,
