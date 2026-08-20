@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import {
@@ -34,6 +34,7 @@ import {
   SYSTEM_BOOKING_USER_NAME,
   type BookingDeps,
 } from '../../lib/public-booking.js';
+import { planProjectReviewSms } from '../../lib/project-review.js';
 import {
   planBookingNotifications,
   planLeadWelcomeNotifications,
@@ -2023,6 +2024,97 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           .join(', '),
       },
     });
+  }
+
+  // ── Project Review (/match) → create Lead → text the right booking link ──
+  //
+  // The site's main front door has always POSTed to a Google Apps Script that
+  // emails "New Lead Just Came In", and nothing else. Those homeowners existed
+  // in an inbox and nowhere else — no row, no outbox, nothing that could reply
+  // to them. The form now posts here as WELL as to the script: the script is
+  // untouched and still sends that email, this adds the database row and the
+  // text.
+  //
+  // Unauthenticated by design, like the rest of this flow — it is a public form.
+  // It can only ever create a lead and send one templated message to the number
+  // typed into it, and the idempotency key makes a replayed submission a no-op.
+  if (flow === 'project_review' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const name = clean(body.name);
+    const phone = clean(body.phone);
+    const email = normEmail(body.email);
+    const projectType = clean(body.projectType);
+    if (!name || (!phone && !email)) {
+      return res.status(400).json({ error: 'A name and a phone number or email are required.' });
+    }
+
+    // Same field mapping, notes-merging and dedupe as every other intake path,
+    // so a homeowner who came through Meta first and this form second enriches
+    // one lead instead of becoming two.
+    const incoming = importLeadData({
+      ...body,
+      source: 'website_intake',
+      sourceDetail: 'Project Review (/match)',
+    });
+
+    const lead = await withTables(async () => {
+      const existing = await findExistingLead(incoming);
+      if (existing) {
+        const { patch } = mergeLeadPatch(
+          existing as unknown as Record<string, unknown>,
+          incoming,
+          false,
+          false
+        );
+        if (Object.keys(patch).length > 0) {
+          await prisma.lead.update({ where: { id: existing.id }, data: patch });
+        }
+        return { id: existing.id, name: existing.name ?? name, phone: existing.phone ?? phone };
+      }
+      const created = await prisma.lead.create({ data: incoming as never });
+      return { id: created.id, name: created.name ?? name, phone: created.phone ?? phone };
+    });
+
+    // Whether to text, and what — see lib/project-review.ts. "Full home
+    // renovation" and "Not sure yet" get no text on purpose: there is no form
+    // that fits them and the nearest one would be misleading.
+    const plan = planProjectReviewSms({ name, phone, projectType });
+    if (!plan.send) {
+      return res.status(200).json({ ok: true, leadId: lead.id, texted: false, reason: plan.reason });
+    }
+
+    try {
+      await prisma.notificationOutbox.create({
+        data: {
+          leadId: lead.id,
+          channel: 'sms',
+          kind: 'project_review_booking',
+          recipient: phone,
+          subject: '',
+          body: plan.body,
+          html: '',
+          sendAfter: new Date().toISOString(),
+          // Never expires: unlike a reminder, nothing in this wording is tied to
+          // a date, so a late send is still true.
+          expiresAt: '',
+          // Keyed on the lead, so a double-submitted form texts once.
+          idempotencyKey: `${lead.id}:sms:project_review_booking`,
+        },
+      });
+    } catch {
+      // Unique-key collision — this lead has already been texted. Not an error.
+      return res.status(200).json({ ok: true, leadId: lead.id, texted: false, reason: 'already_sent' });
+    }
+
+    // Drained inline rather than on the cron: the whole value of this message is
+    // that it lands while the homeowner is still on the thank-you screen.
+    try {
+      await drainOutbox();
+    } catch (err) {
+      console.error('[leads/project_review] drain failed:', err);
+    }
+
+    return res.status(200).json({ ok: true, leadId: lead.id, texted: true, bookingUrl: plan.bookingUrl });
   }
 
   // ── Submit qualification → route → create Lead ──
