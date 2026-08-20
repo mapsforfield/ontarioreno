@@ -110,6 +110,9 @@ type Store = {
     update: (args: unknown) => Promise<unknown>;
     findUnique: (args: unknown) => Promise<unknown>;
   };
+  activity: {
+    create: (args: unknown) => Promise<unknown>;
+  };
   notificationOutbox: {
     create: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<Record<string, unknown>>>;
@@ -288,9 +291,17 @@ export async function handleInboundSms(
     return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
   }
 
-  // The appointment carries the answer, but its `status` is left alone: a
-  // reschedule request is work for a rep, not a change to the booking, and the
-  // slot stays held until a human moves it.
+  // ── What the answer changes on the appointment ──
+  //
+  // A CONFIRM moves `status` to 'confirmed'. That status already exists in the
+  // portal and means exactly this, and leaving a confirmed visit reading
+  // "Scheduled" made the pill and the chip disagree about the same fact.
+  //
+  // A RESCHEDULE REQUEST does not touch `status`, and there is no status that
+  // would be true: the nearest one, 'rescheduled', claims a new time has been
+  // agreed when nothing has been rebooked. It is work for a rep, not a change
+  // to the booking, and the slot stays held until a human moves it. The amber
+  // chip and the rep's email carry it instead.
   await prisma.appointment
     .update({
       where: { id: appointment.id },
@@ -298,9 +309,43 @@ export async function handleInboundSms(
         smsReplyStatus: REPLY_STATUS[intent],
         smsReplyAt: receivedAt,
         smsReplyBody: body,
+        ...(intent === 'confirm' ? { status: 'confirmed' } : {}),
       },
     })
     .catch((err: unknown) => console.error('[sms-inbound] could not stamp appointment:', err));
+
+  // A status that changes with nothing in the history explaining it is worse
+  // than one that does not change at all — a rep seeing 'Confirmed' has to be
+  // able to find out who confirmed it. The portal writes this row when a rep
+  // uses the dropdown (see store.tsx); the homeowner's text deserves the same
+  // line, attributed to the homeowner rather than to whoever happens to be
+  // looking at it. 'system' as the actor id is the portal's own convention for
+  // an action no user performed.
+  if (intent === 'confirm') {
+    await prisma.activity
+      .create({
+        data: {
+          actorUserId: 'system',
+          actorName: ctx.customerName,
+          actorRole: 'homeowner',
+          actionType: 'consultation_confirmed',
+          actionLabel: `Consultation confirmed by text for ${ctx.customerName}`,
+          entityType: 'appointment',
+          entityId: String(appointment.id),
+          entityLabel: ctx.customerName,
+          dealId: (appointment.dealId as string) || undefined,
+          metadata: {
+            appointmentDate: ctx.date,
+            appointmentTime: ctx.time,
+            assignedRep: rep?.name ?? null,
+            status: 'confirmed',
+            via: 'sms_reply',
+            repliedWith: body,
+          },
+        },
+      })
+      .catch((err: unknown) => console.error('[sms-inbound] could not log activity:', err));
+  }
 
   // ── Outgoing: the rep's email, and the homeowner's acknowledgement ──
   // Both go through the outbox so they inherit its idempotency key, its
