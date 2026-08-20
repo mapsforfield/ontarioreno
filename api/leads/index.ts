@@ -1714,6 +1714,7 @@ async function bookVisitForLead(params: {
     answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
     answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
     answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
+    answerLabel('ownership') ? `Ownership: ${answerLabel('ownership')}` : '',
     lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
   ].filter(Boolean).join('\n');
 
@@ -2274,6 +2275,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       projectScope: submitAnswerLabel('projectType'),
       fundingPlan: submitAnswerLabel('contribution'),
       timeline: submitAnswerLabel('timeline'),
+      ownership: submitAnswerLabel('ownership'),
       programLabel: program.areaLabel,
       addressState: resolved.addressState,
       addressCause: resolved.cause,

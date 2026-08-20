@@ -242,6 +242,19 @@ const SHARED_SCHEDULING: Pick<
   maxSameDayTravelKm: 10,
 };
 
+// ── Step 1: the property ──
+const OWNERSHIP: Question = {
+  key: 'ownership',
+  label: 'Do you own this property?',
+  routingRelevant: true,
+  step: 1,
+  options: [
+    { value: 'yes', label: 'Yes, I own it' },
+    { value: 'no', label: 'No' },
+    { value: 'unsure', label: "It's complicated" },
+  ],
+};
+
 // ── Step 2: the project ──
 const PROJECT_TYPE: Question = {
   key: 'projectType',
@@ -396,7 +409,7 @@ export const HAMILTON_PROGRAM: ProgramConfig = {
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'laneway_suite'],
   // The grant's scarce in-person slots stay near the decision.
   nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
-  questions: [PROJECT_TYPE, TIMELINE, CONTRIBUTION],
+  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE, CONTRIBUTION],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'ADU Grant Consultation',
@@ -433,7 +446,7 @@ export const SIMCOE_PROGRAM: ProgramConfig = {
   },
   eligibleProjectTypes: [],
   nurtureTimelines: DEFAULT_NURTURE_TIMELINES,
-  questions: [PROJECT_TYPE, TIMELINE],
+  questions: [OWNERSHIP, PROJECT_TYPE, TIMELINE],
   prepQuestions: PREP_QUESTIONS,
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'ADU Grant Consultation',
@@ -538,6 +551,23 @@ const BASEMENT_FUNDING_GUIDANCE: FundingGuidance = {
   continueLabel: 'Continue',
 };
 
+/**
+ * Ownership asked at the END for this program, with the address it belongs to.
+ * A separate constant rather than a re-step of the shared OWNERSHIP, because
+ * the grant flows still ask it first and one object cannot be on two steps.
+ */
+const BASEMENT_OWNERSHIP: Question = {
+  key: 'ownership',
+  label: 'Do you own this property?',
+  routingRelevant: true,
+  step: 3,
+  options: [
+    { value: 'yes', label: 'Yes, I own it' },
+    { value: 'no', label: 'No' },
+    { value: 'unsure', label: "It's complicated" },
+  ],
+};
+
 const BASEMENT_FUNDING_HIGHLIGHTS = [
   'No upfront cost — the build is financed in full, on approved credit.',
   // Replaces the 40/60 draw schedule. That is a true term and still appears in
@@ -621,7 +651,7 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // Ordered by step, and deliberately without TIMELINE: this program never
   // nurtures on it (nurtureTimelines is []), so it asked a question that could
   // not change anything, in front of the contact form.
-  questions: [BASEMENT_PROJECT_TYPE, BASEMENT_PERMIT, BASEMENT_CONTRIBUTION],
+  questions: [BASEMENT_PROJECT_TYPE, BASEMENT_PERMIT, BASEMENT_CONTRIBUTION, BASEMENT_OWNERSHIP],
   // Address last, with the contact details. See addressPlacement.
   addressPlacement: 'final',
   prepQuestions: PREP_QUESTIONS,
@@ -775,7 +805,7 @@ export const BATHROOM_FINANCING_PROGRAM: ProgramConfig = {
   // and an exploratory lead is usually someone who has not been shown the build
   // is affordable yet. Everyone gets the calendar.
   nurtureTimelines: [],
-  questions: [BATHROOM_PROJECT_TYPE, TIMELINE, BATHROOM_CONTRIBUTION],
+  questions: [OWNERSHIP, BATHROOM_PROJECT_TYPE, TIMELINE, BATHROOM_CONTRIBUTION],
   prepQuestions: BATHROOM_PREP_QUESTIONS,
   // Nobody prices tile, waterproofing and a plumbing move off a photo.
   consultationMode: 'in_person',
@@ -938,7 +968,7 @@ export const KITCHEN_FINANCING_PROGRAM: ProgramConfig = {
   fundingGuidance: KITCHEN_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['full_remodel', 'cabinets_countertops'],
   nurtureTimelines: [],
-  questions: [KITCHEN_PROJECT_TYPE, KITCHEN_TIMELINE, KITCHEN_CONTRIBUTION],
+  questions: [OWNERSHIP, KITCHEN_PROJECT_TYPE, KITCHEN_TIMELINE, KITCHEN_CONTRIBUTION],
   prepQuestions: KITCHEN_PREP_QUESTIONS,
   // Nobody prices cabinetry and a possible wall removal off a photo.
   consultationMode: 'in_person',
@@ -1125,7 +1155,7 @@ export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
   fundingGuidance: GARDEN_SUITE_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['garden_suite', 'laneway_suite', 'garage_conversion'],
   nurtureTimelines: [],
-  questions: [GARDEN_SUITE_PROJECT_TYPE, TIMELINE, GARDEN_SUITE_CONTRIBUTION],
+  questions: [OWNERSHIP, GARDEN_SUITE_PROJECT_TYPE, TIMELINE, GARDEN_SUITE_CONTRIBUTION],
   prepQuestions: GARDEN_SUITE_PREP_QUESTIONS,
   // Servicing and setbacks are decided standing in the yard, not on a call.
   consultationMode: 'in_person',
