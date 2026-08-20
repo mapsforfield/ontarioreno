@@ -42,7 +42,10 @@ export type NotificationKind =
   | 'reschedule_ack'
   // A reply we could not read, forwarded to the rep verbatim rather than
   // interpreted. "Cancel" and "Running late" land here.
-  | 'reply_unclear';
+  | 'reply_unclear'
+  // A /match "Start Project Review" submission, texted the booking form that
+  // fits what they asked for. See lib/project-review.ts.
+  | 'project_review_booking';
 
 export type PlannedNotification = {
   channel: NotificationChannel;

@@ -466,6 +466,9 @@ export default function Match() {
     };
 
     try {
+      // The Apps Script has always received this form and emails "New Lead Just
+      // Came In". Left exactly as it was — it is the notification the office
+      // actually watches.
       await fetch(
         'https://script.google.com/macros/s/AKfycbyi1JG7OXDwCghiVQb2PaOEME7ZByUa8Mxl3N7xbTCCaL07Bdrx3h01dA4YisDPV_Yw/exec',
         {
@@ -477,6 +480,21 @@ export default function Match() {
           body: JSON.stringify(payload),
         }
       );
+
+      // ADDITIONALLY post to our own API, which creates the Lead and texts the
+      // homeowner the booking form that matches their project type. Fired
+      // alongside rather than instead: this form's leads used to live only in
+      // an inbox, and losing that email to gain a text would be a bad trade.
+      //
+      // Failure here is swallowed on purpose. The submission has already
+      // succeeded as far as the homeowner is concerned — the Apps Script has
+      // it — so an error on our side must not show them a red banner or make
+      // them submit twice.
+      void fetch('/api/leads?flow=project_review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
 
       setSubmitStatus({
         type: 'success',
