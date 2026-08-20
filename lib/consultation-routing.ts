@@ -17,11 +17,14 @@ import type { AddressState, ProgramConfig, SchedulingArea } from './program-conf
 export type RoutingOutcome = 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE';
 
 export type RoutingReason =
+  // Retired with the ownership question — never produced by new routing, kept
+  // so leads routed before the change still render their reason.
   | 'NOT_PROPERTY_OWNER'
   | 'OUTSIDE_ONTARIO'
   | 'ADDRESS_UNVERIFIED'
   | 'MUNICIPALITY_UNRECOGNISED'
   | 'PROGRAM_NOT_ENABLED'
+  /** Retired with the ownership question — see NOT_PROPERTY_OWNER. */
   | 'OWNERSHIP_UNCERTAIN'
   | 'PROJECT_TYPE_UNCERTAIN'
   | 'PROJECT_TYPE_NOT_LISTED'
@@ -51,15 +54,22 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   const { addressState, area, program, answers } = input;
   const reasons: RoutingReason[] = [];
 
-  const ownership = answers.ownership ?? '';
   const projectType = answers.projectType ?? '';
   const timeline = answers.timeline ?? '';
   const contribution = answers.contribution ?? '';
 
   // ── 1. DECLINE — only from certainty ──
-  if (ownership === 'no') {
-    return { outcome: 'DECLINE', reasons: ['NOT_PROPERTY_OWNER'] };
-  }
+  //
+  // Ownership used to be asked and used to decline here. The question was
+  // removed from every program flow: it lengthened the first step for everyone
+  // to catch the rare renter, and the two answers that were not "yes" cost more
+  // than they saved — "It's complicated" sent qualified homeowners (estates,
+  // co-ownership, a spouse on title) to a manual queue for saying something
+  // true. A rep establishes ownership in the first minute of the call anyway.
+  //
+  // NOT_PROPERTY_OWNER and OWNERSHIP_UNCERTAIN are kept in RoutingReason and in
+  // the portal's label map, unused: leads routed before this change still carry
+  // them, and dropping the codes would render their history as raw strings.
   if (addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') {
     return { outcome: 'DECLINE', reasons: ['OUTSIDE_ONTARIO'] };
   }
@@ -76,7 +86,6 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // A recognised area whose program is not live yet (Simcoe at launch) must be
   // reviewed by a person, never declined — we do serve there.
   if (area && (!program || !program.enabled)) reasons.push('PROGRAM_NOT_ENABLED');
-  if (UNCERTAIN.has(ownership)) reasons.push('OWNERSHIP_UNCERTAIN');
   if (UNCERTAIN.has(projectType)) reasons.push('PROJECT_TYPE_UNCERTAIN');
   // No funding answer blocks the calendar — not even "not sure".
   //
