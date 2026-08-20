@@ -279,9 +279,20 @@ export default function ConsultationFlow() {
    * Question steps this program actually uses, in order. A step with no
    * questions is skipped — an empty screen with a Continue button reads as a
    * bug and lengthens the progress bar for nothing.
+   *
+   * Two steps are never empty and so are never skipped, whatever the program
+   * asks: the step carrying the address (1 when it comes first, 3 when it comes
+   * last, where it is merged with the contact fields). Without the step-3 case,
+   * a program whose last step lost its questions would drop that step and slide
+   * the address and contact block up beside whatever the previous screen asks —
+   * which is how removing one question silently merged the funding screen with
+   * the contact form.
    */
   const activeSteps = ([1, 2, 3] as const).filter(
-    (s) => stepQuestions(s).length > 0 || (!addressLast && s === 1)
+    (s) =>
+      stepQuestions(s).length > 0 ||
+      (!addressLast && s === 1) ||
+      (addressLast && s === 3)
   );
   const lastStep = activeSteps[activeSteps.length - 1] ?? 3;
 
