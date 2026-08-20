@@ -55,13 +55,12 @@ test('a null program returns the raw value rather than throwing', () => {
 test('answers come back in the program question order', () => {
   const rows = readableAnswers(hamilton, {
     contribution: 'need_financing',
-    ownership: 'yes',
     projectType: 'garden_suite',
     timeline: 'asap',
   });
   assert.deepEqual(
     rows.map((r) => r.key),
-    ['ownership', 'projectType', 'timeline', 'contribution']
+    ['projectType', 'timeline', 'contribution']
   );
   for (const row of rows) {
     assert.ok(row.questionLabel.length > 0);
@@ -75,14 +74,14 @@ test('question sets differ by program — Simcoe has no contribution question', 
 
   // A Simcoe lead carrying a stray contribution key still shows it, appended
   // rather than silently dropped.
-  const rows = readableAnswers(simcoe, { ownership: 'yes', contribution: 'cash_equity' });
-  assert.deepEqual(rows.map((r) => r.key).sort(), ['contribution', 'ownership']);
+  const rows = readableAnswers(simcoe, { timeline: 'asap', contribution: 'cash_equity' });
+  assert.deepEqual(rows.map((r) => r.key).sort(), ['contribution', 'timeline']);
 });
 
 test('a blank stored answer is reported, not dropped', () => {
   // The submit branch writes every key even when unanswered, so '' is normal —
   // and "not answered" is a different fact from "not asked".
-  const rows = readableAnswers(hamilton, { ownership: 'yes', projectType: '' });
+  const rows = readableAnswers(hamilton, { timeline: 'asap', projectType: '' });
   const projectType = rows.find((r) => r.key === 'projectType');
   assert.ok(projectType, 'blank answer was dropped');
   assert.equal(projectType.value, '');
@@ -98,8 +97,8 @@ test('keys the program no longer asks are kept, labelled by their key', () => {
 });
 
 test('a question the lead never answered is absent, not blank-filled', () => {
-  const rows = readableAnswers(hamilton, { ownership: 'yes' });
-  assert.deepEqual(rows.map((r) => r.key), ['ownership']);
+  const rows = readableAnswers(hamilton, { timeline: 'asap' });
+  assert.deepEqual(rows.map((r) => r.key), ['timeline']);
 });
 
 test('null and empty answer blobs are safe', () => {

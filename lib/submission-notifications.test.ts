@@ -23,7 +23,6 @@ const sub = (over: Partial<SubmissionContext> = {}): SubmissionContext => ({
   projectScope: 'Garage conversion',
   fundingPlan: 'Need financing',
   timeline: 'Within a month',
-  ownership: 'Yes',
   programLabel: 'Hamilton',
   addressState: 'ADDRESS_UNVERIFIED',
   addressCause: 'INCOMPLETE_ADDRESS',
