@@ -94,6 +94,8 @@ function upcomingAppointment() {
     city: 'Brampton',
     dealId: null,
     deletedAt: null,
+    assignedRepId: 'rep-steven',
+    createdByUserId: 'rep-steven',
     assignedRep: { name: 'Steven', email: 'steven@example.com' },
   };
 }
@@ -118,6 +120,10 @@ test('C moves the booking to confirmed and says who confirmed it', async () => {
   assert.equal(activity.actionType, 'consultation_confirmed');
   assert.equal(activity.actorRole, 'homeowner');
   assert.equal(activity.actorName, 'Jay');
+  // Activity has a real foreign key on actorUserId in the live database, so a
+  // sentinel like 'system' is rejected and the row is lost. It must be a real
+  // user; the homeowner is named in actorName and actorRole instead.
+  assert.equal(activity.actorUserId, 'rep-steven');
   assert.match(String(activity.actionLabel), /confirmed by text/);
 });
 

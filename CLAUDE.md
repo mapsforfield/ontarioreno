@@ -201,10 +201,16 @@ counted as a confirmation and told reps something homeowners had not said; the
 fix was to narrow the words AND stop staying silent, not one or the other.
 
 A **confirm** moves `status` to `'confirmed'` and writes an Activity row
-attributed to the homeowner (`actorRole: 'homeowner'`, actor id `'system'` —
-the portal's own convention for an action no user performed). A status that
-changes with nothing in the history explaining it is worse than one that does
-not change at all.
+attributed to the homeowner (`actorRole: 'homeowner'`, `actorName` the
+customer). A status that changes with nothing in the history explaining it is
+worse than one that does not change at all.
+
+`Activity.actorUserId` must be a **real user id** — the live database has a
+foreign key on it even though the generated DDL declares none, so a sentinel
+like `'system'` is rejected and the row is lost to the surrounding catch. Use
+the assigned rep; the homeowner is named in `actorName`/`actorRole`, which is
+what activity views render. Do not check `schema-ddl.generated.js` to decide
+whether a constraint exists.
 
 A **reschedule request** never touches `status`. No status is true there:
 `'rescheduled'` claims a new time has been agreed when nothing has been

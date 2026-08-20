@@ -318,14 +318,20 @@ export async function handleInboundSms(
   // than one that does not change at all — a rep seeing 'Confirmed' has to be
   // able to find out who confirmed it. The portal writes this row when a rep
   // uses the dropdown (see store.tsx); the homeowner's text deserves the same
-  // line, attributed to the homeowner rather than to whoever happens to be
-  // looking at it. 'system' as the actor id is the portal's own convention for
-  // an action no user performed.
+  // line.
+  //
+  // `actorUserId` is the ASSIGNED REP, not a sentinel, because Activity has a
+  // real foreign key on it in the live database — 'system' is rejected there,
+  // and the row was silently lost to the catch below. (The generated DDL
+  // declares no foreign keys, so the schema file is not the place to check
+  // this.) The homeowner is named in actorName and actorRole, which is what
+  // every activity view actually renders, and the label says "by text" so the
+  // rep is not mistaken for the person who confirmed it.
   if (intent === 'confirm') {
     await prisma.activity
       .create({
         data: {
-          actorUserId: 'system',
+          actorUserId: String(appointment.assignedRepId ?? appointment.createdByUserId ?? ''),
           actorName: ctx.customerName,
           actorRole: 'homeowner',
           actionType: 'consultation_confirmed',
