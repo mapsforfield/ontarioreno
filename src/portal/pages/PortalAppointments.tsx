@@ -8,6 +8,7 @@ import {
   Clock,
   Mail,
   MapPin,
+  MessageSquare,
   MoreVertical,
   Paperclip,
   Plus,
@@ -507,6 +508,46 @@ function VirtualChip({ tone }: { tone: 'onColor' | 'onWhite' }) {
   );
 }
 
+/**
+ * Did the homeowner answer the reminder text?
+ *
+ * Its own chip rather than a status colour, for the same reason VirtualChip is:
+ * the status pill is the booking's lifecycle and a homeowner's reply is a
+ * different question. "Reschedule requested" in particular must NOT read as
+ * cancelled — the slot is still held and the rep still owns the call.
+ */
+function ReplyChip({
+  status,
+  body,
+  tone,
+}: {
+  status?: string;
+  body?: string;
+  tone: 'onColor' | 'onWhite';
+}) {
+  if (status !== 'confirmed' && status !== 'reschedule_requested') return null;
+  const confirmed = status === 'confirmed';
+  const onWhite = confirmed
+    ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+    : 'bg-amber-100 text-amber-800 ring-1 ring-amber-200';
+  return (
+    <span
+      title={
+        (confirmed
+          ? 'Homeowner confirmed by text'
+          : 'Homeowner asked to reschedule by text — the slot is still held, call them') +
+        (body ? ` — they wrote: "${body}"` : '')
+      }
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[0.55rem] font-black uppercase tracking-wide ${
+        tone === 'onColor' ? 'bg-white/25 text-white ring-1 ring-white/40' : onWhite
+      }`}
+    >
+      <MessageSquare className="h-2.5 w-2.5" />
+      {confirmed ? 'Confirmed' : 'Wants to move'}
+    </span>
+  );
+}
+
 function fmt12(time: string | undefined): string {
   if (!time) return 'TBD';
   const [h, m] = time.split(':').map(Number);
@@ -556,6 +597,7 @@ function AppointmentPill({
             {time}
           </p>
           {remote && <VirtualChip tone={lightText ? 'onColor' : 'onWhite'} />}
+          <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone={lightText ? 'onColor' : 'onWhite'} />
         </div>
         <p className={`truncate text-[0.7rem] font-black leading-tight ${lightText ? 'text-white' : 'text-slate-800'}`}>
           {name}
@@ -586,6 +628,7 @@ function AppointmentPill({
           <div className="flex items-center gap-1.5">
             <p className="truncate text-sm font-black text-slate-900">{name}</p>
             {remote && <VirtualChip tone="onWhite" />}
+            <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone="onWhite" />
           </div>
           <p className="truncate text-xs text-slate-500">
             {projectType || 'Project type TBD'} · {repName}
@@ -1916,6 +1959,7 @@ export default function PortalAppointments() {
             {appointment.customerName || appointment.title || 'Consultation'}
           </span>
           {isRemoteAppointment(appointment) && <VirtualChip tone="onWhite" />}
+          <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone="onWhite" />
           <span className="hidden shrink-0 text-xs font-semibold text-slate-500 sm:block">
             {appointment.projectType || deal?.projectType || ''}
             {(appointment.projectType || deal?.projectType) && (appointment.city || deal?.city) ? ' / ' : ''}
@@ -2392,6 +2436,7 @@ export default function PortalAppointments() {
                                 {apt.customerName || apt.title || 'Consultation'}
                               </p>
                               {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                              <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums leading-tight text-slate-500">
                               {fmt12(apt.appointmentTime)}
@@ -2531,6 +2576,7 @@ export default function PortalAppointments() {
                                 {apt.customerName || apt.title || 'Consultation'}
                               </p>
                               {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                              <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                               {apt.appointmentDate}
@@ -2711,6 +2757,7 @@ export default function PortalAppointments() {
                                     {apt.customerName || apt.title || 'Consultation'}
                                   </p>
                                   {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                                  <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                                 </div>
                                 <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                                   {fmt12(apt.appointmentTime)}
@@ -2784,6 +2831,7 @@ export default function PortalAppointments() {
                                 {apt.customerName || apt.title || 'Consultation'}
                               </p>
                               {isRemoteAppointment(apt) && <VirtualChip tone="onWhite" />}
+                              <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
                               {apt.appointmentDate}
@@ -3424,6 +3472,7 @@ export default function PortalAppointments() {
                                   'Consultation'}
                               </p>
                               {isRemoteAppointment(appointment) && <VirtualChip tone="onWhite" />}
+                              <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500 leading-tight mt-px">
                               {fmt12(appointment.appointmentTime)}

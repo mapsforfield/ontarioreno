@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.png" },
+    { "source": "/api/sms/inbound", "destination": "/api/appointments?resource=sms-inbound" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

@@ -7,6 +7,7 @@ import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../.
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
+import { handleInboundSms } from '../../lib/sms-inbound.js';
 import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
 import { randomUUID } from 'node:crypto';
 
@@ -188,6 +189,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.query['resource'] === 'grants') {
     return handleGrantsApi(req, res);
+  }
+
+  // ── Twilio inbound SMS webhook (no user auth — verified by Twilio signature) ──
+  // The reminder text asks for 'C' or 'R'; this is what finally reads the answer
+  // and tells the assigned rep. Routed through here rather than its own function
+  // because the project is at Vercel's 12-function cap. Public URL is
+  // /api/sms/inbound via the rewrite in vercel.json.
+  if (req.query['resource'] === 'sms-inbound') {
+    return handleInboundSms(req, res, prisma as never);
   }
 
   // ── Schema reconcile cron (no user auth — verified by CRON_SECRET) ──

@@ -293,6 +293,17 @@ model Appointment {
   syncedAt                 String?
   reminderMinutes          Int      @default(30)
   reminderSentAt           String?
+  /// ─── Homeowner's answer to the reminder text ───────────────────────────────
+  /// '' | 'confirmed' | 'reschedule_requested'. Written by the Twilio inbound
+  /// webhook when the homeowner replies 'C' or 'R'. Deliberately SEPARATE from
+  /// `status`: a reschedule request is something a rep must act on, not a
+  /// change to the booking, and the slot stays held until a human moves it.
+  smsReplyStatus           String   @default("")
+  /// ISO instant of that reply, so the portal can say how fresh it is.
+  smsReplyAt               String?
+  /// Verbatim text they sent. Never paraphrased — a rep reading "R, but Friday
+  /// works" needs the whole sentence, not our classification of it.
+  smsReplyBody             String   @default("")
   createdByUserId          String
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
@@ -656,7 +667,8 @@ model NotificationOutbox {
   /// 'sms' | 'email'
   channel        String
   /// 'booking_confirmation' | 'reminder_24h' | 'reminder_day_of' | 'team_alert' |
-  /// 'nurture_guide' | 'lead_alert' | 'address_provider_alert'
+  /// 'nurture_guide' | 'lead_alert' | 'address_provider_alert' |
+  /// 'reply_alert' | 'reschedule_ack'
   /// 'team_alert' fires on booking and is keyed to an appointment; 'lead_alert'
   /// fires on submission and is keyed to the lead, so non-booking outcomes are
   /// announced too.
@@ -886,4 +898,28 @@ model GrantLandingPage {
 
   @@index([status])
   @@index([programId])
+}
+
+/// ─── Inbound SMS ──────────────────────────────────────────────────────────────
+/// Every reply Twilio delivers to our number, matched or not. Kept as its own
+/// log rather than only stamping the Appointment for two reasons: Twilio retries
+/// a webhook it thinks failed, so `messageSid` is the dedupe key that stops one
+/// reply alerting a rep twice; and a reply we could NOT match to an appointment
+/// is exactly the case worth being able to look up by hand.
+model SmsReply {
+  id            String   @id @default(cuid())
+  /// Twilio's message SID. Unique — this is the idempotency guard.
+  messageSid    String   @unique
+  fromNumber    String   @default("")
+  toNumber      String   @default("")
+  body          String   @default("")
+  /// 'confirm' | 'reschedule' | 'unknown' (see lib/sms-replies.ts)
+  intent        String   @default("unknown")
+  /// Null when no live upcoming appointment matched the sender's number.
+  appointmentId String?
+  receivedAt    String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([appointmentId])
+  @@index([fromNumber])
 }

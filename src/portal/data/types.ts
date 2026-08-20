@@ -186,6 +186,16 @@ export type Appointment = {
   syncedAt?: string;
   reminderMinutes: number;
   reminderSentAt?: string;
+  /**
+   * The homeowner's own answer to the reminder text: '' | 'confirmed' |
+   * 'reschedule_requested'. Written by the Twilio inbound webhook
+   * (lib/sms-inbound.ts) and deliberately separate from `status` — a
+   * reschedule request is work for the rep, not a change to the booking.
+   */
+  smsReplyStatus?: string;
+  smsReplyAt?: string;
+  /** Verbatim, so a rep sees "R, but Friday works" and not just our label. */
+  smsReplyBody?: string;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

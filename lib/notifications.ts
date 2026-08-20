@@ -33,7 +33,13 @@ export type NotificationKind =
   | 'lead_welcome'
   // The address provider failed or ran out of budget, so leads are being sent
   // to manual review by our own degradation rather than by their addresses.
-  | 'address_provider_alert';
+  | 'address_provider_alert'
+  // The homeowner answered the reminder text with 'C' or 'R'. `reply_alert`
+  // goes to the ASSIGNED REP so they know before they drive; `reschedule_ack`
+  // goes back to the homeowner and promises a call, nothing more.
+  // See lib/sms-inbound.ts.
+  | 'reply_alert'
+  | 'reschedule_ack';
 
 export type PlannedNotification = {
   channel: NotificationChannel;
