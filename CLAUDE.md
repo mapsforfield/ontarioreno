@@ -200,7 +200,17 @@ as an answer. Everything else — "Ok", "thanks", "Cancel", "Running late" — i
 counted as a confirmation and told reps something homeowners had not said; the
 fix was to narrow the words AND stop staying silent, not one or the other.
 
-`smsReplyStatus` is separate from `status` on purpose: a reschedule request is
+A **confirm** moves `status` to `'confirmed'` and writes an Activity row
+attributed to the homeowner (`actorRole: 'homeowner'`, actor id `'system'` —
+the portal's own convention for an action no user performed). A status that
+changes with nothing in the history explaining it is worse than one that does
+not change at all.
+
+A **reschedule request** never touches `status`. No status is true there:
+`'rescheduled'` claims a new time has been agreed when nothing has been
+rebooked, and a rep scanning the calendar would read it as handled.
+
+`smsReplyStatus` is still separate from `status`: a reschedule request is
 work for a rep, not a change to the booking, and the slot stays held until a
 human moves it. Guarded by `lib/sms-replies.test.ts`.
 
