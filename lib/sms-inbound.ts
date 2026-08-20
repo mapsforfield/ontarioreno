@@ -17,6 +17,7 @@ import {
   replyAlertHtml,
   replyAlertSubject,
   rescheduleAckSms,
+  shouldRelayDownstream,
   verifyTwilioSignature,
   type ReplyIntent,
 } from './sms-replies.js';
@@ -27,9 +28,57 @@ import { drainOutbox } from './notification-drain.js';
  *  message we send. Returning message TwiML here would bypass all of that. */
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
 
-function twiml(res: VercelResponse, status = 200) {
+function twiml(res: VercelResponse, xml = EMPTY_TWIML, status = 200) {
   res.setHeader('Content-Type', 'text/xml');
-  return res.status(status).send(EMPTY_TWIML);
+  return res.status(status).send(xml);
+}
+
+/** How long the downstream handler gets before we answer Twilio ourselves. */
+const FORWARD_TIMEOUT_MS = 8000;
+
+/**
+ * Pass the request on to the handler that owned this webhook before us.
+ *
+ * A Twilio number has ONE "a message comes in" webhook and OntarioReno's Google
+ * Apps Script already had it — that script is what sends a brand-new lead their
+ * first text. Rather than take the slot, we sit in front and forward everything
+ * untouched, so the script keeps seeing exactly the traffic it always saw.
+ *
+ * Deliberately called BEFORE the signature check and outside every other branch
+ * in this file. First contact with a new lead is older and more valuable than
+ * anything we do here, and it must not be able to break because our token is
+ * misconfigured, our database is down, or we threw. The script never verified
+ * signatures itself — Apps Script cannot read request headers — so forwarding
+ * unverified traffic lowers no bar that was ever raised.
+ *
+ * Returns the script's TwiML if it sent any, so Twilio still acts on it.
+ */
+async function forwardDownstream(
+  params: Record<string, string>,
+  env: NodeJS.ProcessEnv
+): Promise<string | null> {
+  const url = env.SMS_FORWARD_URL;
+  if (!url) return null;
+
+  const timeout = AbortSignal.timeout(FORWARD_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+      signal: timeout,
+      // Apps Script answers with a 302 to googleusercontent; following it is
+      // the only way to see the body.
+      redirect: 'follow',
+    });
+    const text = await r.text().catch(() => '');
+    return shouldRelayDownstream(r.status, text) ? text.trim() : null;
+  } catch (err) {
+    // A dead or slow downstream must not fail the webhook — Twilio would retry
+    // the whole thing and we would process the same reply again.
+    console.error('[sms-inbound] forward to downstream handler failed:', err);
+    return null;
+  }
 }
 
 /**
@@ -95,28 +144,38 @@ export async function handleInboundSms(
   const raw = (req.body ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(raw)) params[k] = typeof v === 'string' ? v : String(v ?? '');
 
+  // ── Downstream first ──
+  // Before anything else, and regardless of what we go on to decide, the Apps
+  // Script that owned this webhook before us sees the request. See
+  // forwardDownstream: first contact with a new lead cannot be allowed to
+  // depend on our correctness.
+  const downstreamTwiml = await forwardDownstream(params, env);
+
   // ── Authenticity ──
-  // This endpoint writes to live appointments and can trigger a text to a real
-  // homeowner, so an unsigned POST is refused outright rather than logged.
+  // Governs OUR actions only — the forward above has already happened. This
+  // endpoint writes to live appointments and can trigger a text to a real
+  // homeowner, so an unsigned POST gets no further than here.
   const signature = (req.headers['x-twilio-signature'] as string) || '';
   const token = env.TWILIO_AUTH_TOKEN ?? '';
   const signed = candidateUrls(req, env).some((url) =>
     verifyTwilioSignature(url, params, token, signature)
   );
   if (!signed) {
-    console.warn('[sms-inbound] rejected: bad or missing Twilio signature');
-    return res.status(403).json({ error: 'Invalid signature.' });
+    console.warn('[sms-inbound] unsigned request — forwarded, but not acted on');
+    // Still answer with the downstream TwiML. Refusing here would discard the
+    // Apps Script's instruction to text a new lead.
+    return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
   }
 
   const messageSid = params.MessageSid || params.SmsSid || '';
   const from = params.From || '';
   const body = params.Body || '';
-  if (!messageSid || !from) return twiml(res);
+  if (!messageSid || !from) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
 
   // Twilio retries a webhook it believes failed. Without this guard a slow
   // response would alert the rep twice and text the homeowner twice.
   const seen = await prisma.smsReply.findUnique({ where: { messageSid } }).catch(() => null);
-  if (seen) return twiml(res);
+  if (seen) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
 
   const intent = classifyReply(body);
   const nowLocal = ontarioNow();
@@ -172,7 +231,7 @@ export async function handleInboundSms(
   // An unclassifiable reply is logged and nothing more. Guessing at "Friday
   // instead?" would either move a booking nobody agreed to move, or tell a rep
   // an appointment is confirmed when it is not.
-  if (intent === 'unknown' || !appointment) return twiml(res);
+  if (intent === 'unknown' || !appointment) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
 
   const rep = (appointment.assignedRep ?? null) as { name?: string; email?: string } | null;
   const ctx = {
@@ -251,5 +310,5 @@ export async function handleInboundSms(
     console.error('[sms-inbound] inline drain failed:', err);
   }
 
-  return twiml(res);
+  return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
 }

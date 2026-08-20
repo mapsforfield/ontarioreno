@@ -174,6 +174,30 @@ re-send with stale dates. Grant closure alerts reuse this path and also deliver
 inline, because the radar runs on GitHub Actions while the drain runs on Vercel
 cron.
 
+### Inbound SMS shares one webhook with the Apps Script
+
+A Twilio number has exactly **one** "a message comes in" webhook, and the Google
+Apps Script that sends every new lead their first text already owned it. So
+`/api/sms/inbound` sits in FRONT and forwards:
+
+1. Every request is POSTed on to `SMS_FORWARD_URL` (the Apps Script) **first**,
+   before the signature check and outside every other branch. First contact with
+   a new lead must not break because our token is misconfigured or our database
+   is down.
+2. If the script answers with TwiML, that TwiML is relayed to Twilio verbatim —
+   it is the instruction to text the lead. Swallowing it breaks first contact as
+   thoroughly as overwriting the webhook URL would have.
+3. Only then do we act on the reply ourselves, and only if the Twilio signature
+   verifies against `TWILIO_WEBHOOK_URL`.
+
+**Never reorder those.** Moving the forward after the signature check, or
+returning our own empty TwiML unconditionally, silently kills lead first
+contact — and nothing in this repo would fail to tell you.
+
+`smsReplyStatus` is separate from `status` on purpose: a reschedule request is
+work for a rep, not a change to the booking, and the slot stays held until a
+human moves it. Guarded by `lib/sms-replies.test.ts`.
+
 ## Schema
 
 `prisma/schema.prisma` is the source of truth. After editing:

@@ -250,3 +250,35 @@ export function verifyTwilioSignature(
   const b = Buffer.from(signature);
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+// ─── Chaining the existing Apps Script handler ────────────────────────────────
+
+/**
+ * Should we hand Twilio the downstream handler's answer instead of our own?
+ *
+ * A Twilio number has exactly ONE "a message comes in" webhook, and this one
+ * was already taken: OntarioReno's Google Apps Script has always answered it,
+ * and that script is what sends a brand-new lead their first text. Taking the
+ * slot outright would have deleted that feature silently.
+ *
+ * So we sit in front and pass every request through. If the script answers with
+ * TwiML — which is how a handler tells Twilio to send a message — that answer is
+ * Twilio's instruction to text the lead, and discarding it in favour of our own
+ * empty response would break first contact just as thoroughly as overwriting
+ * the URL would have. Relay it verbatim.
+ *
+ * Anything that is not TwiML (an Apps Script error page, an HTML redirect, an
+ * empty 200 from a script that uses the REST API instead) is NOT relayed:
+ * Twilio rejects a non-TwiML body, and turning the script's bad day into a
+ * failed webhook would lose OUR reply handling too.
+ */
+export function shouldRelayDownstream(
+  status: number,
+  body: string
+): boolean {
+  if (status < 200 || status >= 300) return false;
+  const trimmed = (body ?? '').trim();
+  if (!trimmed) return false;
+  // TwiML is always a <Response> document, optionally behind an XML prolog.
+  return /^(<\?xml[^>]*\?>\s*)?<Response[\s>]/i.test(trimmed);
+}

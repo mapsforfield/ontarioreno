@@ -8,6 +8,7 @@ import {
   replyAlertBody,
   replyAlertSubject,
   rescheduleAckSms,
+  shouldRelayDownstream,
   verifyTwilioSignature,
 } from './sms-replies.js';
 
@@ -149,4 +150,31 @@ test('only a correctly signed webhook is accepted', () => {
   assert.equal(verifyTwilioSignature(url, { ...params, Body: 'C' }, 'tok', good), false);
   assert.equal(verifyTwilioSignature(url, params, 'tok', ''), false);
   assert.equal(verifyTwilioSignature(url, params, '', good), false);
+});
+
+// ─── Chaining the Apps Script that already owned this webhook ─────────────────
+// A Twilio number has one "a message comes in" slot, and the Apps Script that
+// texts every new lead already had it. We forward to it and relay its answer,
+// so first contact keeps working — these decide when that answer is relayed.
+
+test('TwiML from the downstream handler is relayed to Twilio', () => {
+  // This is the script telling Twilio to text a new lead. Swallowing it would
+  // break first contact exactly as thoroughly as overwriting the webhook URL.
+  assert.equal(
+    shouldRelayDownstream(200, '<?xml version="1.0" encoding="UTF-8"?><Response><Message>Hi!</Message></Response>'),
+    true
+  );
+  assert.equal(shouldRelayDownstream(200, '<Response><Message>Hi</Message></Response>'), true);
+  assert.equal(shouldRelayDownstream(200, '  <Response></Response>  '), true);
+});
+
+test('anything that is not TwiML is never relayed', () => {
+  // Twilio rejects a non-TwiML body, so relaying the script's bad day would
+  // fail the whole webhook and lose our reply handling with it.
+  assert.equal(shouldRelayDownstream(200, '<html><body>Script error</body></html>'), false);
+  assert.equal(shouldRelayDownstream(200, ''), false);
+  assert.equal(shouldRelayDownstream(200, '   '), false);
+  assert.equal(shouldRelayDownstream(200, 'OK'), false);
+  assert.equal(shouldRelayDownstream(500, '<Response></Response>'), false);
+  assert.equal(shouldRelayDownstream(302, '<Response></Response>'), false);
 });
