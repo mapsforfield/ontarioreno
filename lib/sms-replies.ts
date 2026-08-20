@@ -14,24 +14,26 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 export type ReplyIntent = 'confirm' | 'reschedule' | 'unknown';
 
 /**
- * Tokens accepted as an answer, matched against the WHOLE message only.
+ * Tokens accepted as an answer: what the text literally asked for, and nothing
+ * else. Matched against the WHOLE message only.
  *
  * Precision over reach, for the same reason grant closure is (lib/grant-
  * closure.ts): a false 'reschedule' emails a rep to unpick a booking nobody
  * asked to move, and a false 'confirm' tells that rep a no-show is locked in.
  * "Can you come earlier?" contains a c and an r and must match neither — so
  * substring matching is deliberately not used anywhere here.
+ *
+ * These lists once included the polite noise people send — 'ok', 'k', 'yes',
+ * 'sounds good'. They were dropped: a homeowner texting "Ok" after a booking
+ * confirmation is acknowledging the message, not answering a question they
+ * were never asked, and recording that as a confirmation told a rep something
+ * the homeowner had not said. Nothing is lost by the narrowing — a reply we
+ * cannot read is now forwarded to the rep verbatim (replyUnclear* below), so
+ * "yes" reaches a human rather than being interpreted by a machine.
  */
-const CONFIRM_WORDS = new Set([
-  'c', 'confirm', 'confirmed', 'confirms', 'confirming', 'confirm please',
-  'yes', 'y', 'yes please', 'yep', 'yup', 'ok', 'okay', 'k',
-  'sounds good', 'see you then', 'still good',
-]);
+const CONFIRM_WORDS = new Set(['c', 'confirm', 'confirmed']);
 
-const RESCHEDULE_WORDS = new Set([
-  'r', 'reschedule', 'resched', 'rescheduled', 'rescheduling',
-  'reschedule please', 'need to reschedule', 'please reschedule',
-]);
+const RESCHEDULE_WORDS = new Set(['r', 'reschedule', 'rescheduled']);
 
 /**
  * Strip the decoration people put around a one-letter answer — "C.", "*R*",
@@ -205,6 +207,47 @@ export function replyAlertHtml(c: ReplyNotificationContext): string {
     `<table style="width:100%;border-collapse:collapse;">${cells}</table>` +
     `<p style="margin:18px 0 0;color:#475569;">${footer}</p>` +
     `</div></div></body></html>`;
+}
+
+/**
+ * A reply we could not read, forwarded to the rep as-is.
+ *
+ * The alternative was silence, and silence loses real messages: "Cancel",
+ * "Running late", "Can we do Friday instead" all classify as unknown, and the
+ * night before a visit each of those is worth a rep's attention. So we make no
+ * claim about what it means — the subject says it needs reading, the body is
+ * the homeowner's own words, and a person decides.
+ */
+export function replyUnclearSubject(c: {
+  customerName: string;
+  date: string;
+  time: string;
+}): string {
+  return `Text from ${c.customerName} — needs your eyes (${friendlyDate(c.date)} ${friendlyTime(c.time)})`;
+}
+
+export function replyUnclearBody(c: {
+  repName: string;
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  time: string;
+  address: string;
+  rawBody: string;
+}): string {
+  return [
+    `Hi ${c.repName || 'there'},`,
+    '',
+    `${c.customerName} texted back about their appointment, but it was not a 'C' or an 'R' so we have not read anything into it. Nothing has been changed.`,
+    '',
+    `They wrote: "${c.rawBody.trim()}"`,
+    '',
+    `Appointment: ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
+    `Address: ${c.address || 'No address on file'}`,
+    `Phone: ${c.customerPhone}`,
+    '',
+    'Over to you.',
+  ].join('\n');
 }
 
 /**

@@ -7,6 +7,8 @@ import {
   phoneKey,
   replyAlertBody,
   replyAlertSubject,
+  replyUnclearBody,
+  replyUnclearSubject,
   rescheduleAckSms,
   shouldRelayDownstream,
   verifyTwilioSignature,
@@ -33,13 +35,30 @@ test('the decoration people put around a one-letter answer', () => {
   assert.equal(classifyReply('"R"'), 'reschedule');
 });
 
-test('the words people use instead of the letter', () => {
+test('the literal words, and only those', () => {
   assert.equal(classifyReply('Confirmed'), 'confirm');
-  assert.equal(classifyReply('yes'), 'confirm');
-  assert.equal(classifyReply('Ok'), 'confirm');
-  assert.equal(classifyReply('sounds good'), 'confirm');
   assert.equal(classifyReply('Reschedule'), 'reschedule');
-  assert.equal(classifyReply('please reschedule'), 'reschedule');
+  assert.equal(classifyReply('rescheduled'), 'reschedule');
+});
+
+test('polite acknowledgement is NOT an answer', () => {
+  // These all counted as confirmations once. A homeowner texting "Ok" after a
+  // booking confirmation is acknowledging the message, not answering a
+  // question they were never asked — the booking text says "reply to this
+  // text", it does not offer C or R. Recording that as a confirmation told the
+  // rep something the homeowner never said.
+  for (const polite of ['Ok', 'okay', 'K', 'yes', 'yep', 'sure', 'thanks', 'sounds good', 'see you then']) {
+    assert.equal(classifyReply(polite), 'unknown', `${polite} must not classify`);
+  }
+});
+
+test('the thank-you notes people actually send', () => {
+  for (const phrase of [
+    'okay thanks', 'ok thanks', 'Okay thank you', 'Got it thanks',
+    'Perfect thank you', 'no problem', 'Sure thing', 'Great thanks',
+  ]) {
+    assert.equal(classifyReply(phrase), 'unknown', `${phrase} must not classify`);
+  }
 });
 
 test('a sentence that merely CONTAINS c or r is not an answer', () => {
@@ -50,8 +69,18 @@ test('a sentence that merely CONTAINS c or r is not an answer', () => {
   assert.equal(classifyReply('My son will be there instead'), 'unknown');
   assert.equal(classifyReply('confirming that I cannot make it'), 'unknown');
   assert.equal(classifyReply('R but only if Friday works'), 'unknown');
+  assert.equal(classifyReply('I need to reschedule please'), 'unknown');
   assert.equal(classifyReply('STOP'), 'unknown');
   assert.equal(classifyReply(''), 'unknown');
+});
+
+test('the messages that most need a human, and get one', () => {
+  // Unknown does not mean ignored: these are forwarded to the rep verbatim.
+  // Each is worth a rep's attention the night before a visit, and each would
+  // be actively dangerous to interpret by machine.
+  for (const urgent of ['Cancel', 'Running late', 'Can we do Friday instead', 'wrong number']) {
+    assert.equal(classifyReply(urgent), 'unknown', `${urgent} must not be interpreted`);
+  }
 });
 
 // ─── Matching ─────────────────────────────────────────────────────────────────
@@ -177,4 +206,26 @@ test('anything that is not TwiML is never relayed', () => {
   assert.equal(shouldRelayDownstream(200, 'OK'), false);
   assert.equal(shouldRelayDownstream(500, '<Response></Response>'), false);
   assert.equal(shouldRelayDownstream(302, '<Response></Response>'), false);
+});
+
+// ─── Forwarding a reply we could not read ─────────────────────────────────────
+
+test('an unreadable reply is forwarded without a claim about its meaning', () => {
+  const unclear = {
+    repName: 'Steven',
+    customerName: 'Jay',
+    customerPhone: '+14379997504',
+    date: '2026-08-20',
+    time: '18:00',
+    address: '15 Eastway Street, Brampton',
+    rawBody: 'Can we do Friday instead',
+  };
+  const body = replyUnclearBody(unclear);
+  // The homeowner's own words, and an explicit statement that we did nothing.
+  assert.match(body, /They wrote: "Can we do Friday instead"/);
+  assert.match(body, /Nothing has been changed/);
+  // Never asserts what they meant.
+  assert.doesNotMatch(body, /confirmed/i);
+  assert.doesNotMatch(body, /reschedule requested/i);
+  assert.match(replyUnclearSubject(unclear), /needs your eyes/);
 });

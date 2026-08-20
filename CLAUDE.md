@@ -194,6 +194,12 @@ Apps Script that sends every new lead their first text already owned it. So
 returning our own empty TwiML unconditionally, silently kills lead first
 contact — and nothing in this repo would fail to tell you.
 
+Only a literal `C`/`R` (or the words "confirm"/"confirmed"/"reschedule") is read
+as an answer. Everything else — "Ok", "thanks", "Cancel", "Running late" — is
+**forwarded to the rep verbatim and interpreted by nobody**. Polite noise once
+counted as a confirmation and told reps something homeowners had not said; the
+fix was to narrow the words AND stop staying silent, not one or the other.
+
 `smsReplyStatus` is separate from `status` on purpose: a reschedule request is
 work for a rep, not a change to the booking, and the slot stays held until a
 human moves it. Guarded by `lib/sms-replies.test.ts`.

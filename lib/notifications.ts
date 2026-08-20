@@ -39,7 +39,10 @@ export type NotificationKind =
   // goes back to the homeowner and promises a call, nothing more.
   // See lib/sms-inbound.ts.
   | 'reply_alert'
-  | 'reschedule_ack';
+  | 'reschedule_ack'
+  // A reply we could not read, forwarded to the rep verbatim rather than
+  // interpreted. "Cancel" and "Running late" land here.
+  | 'reply_unclear';
 
 export type PlannedNotification = {
   channel: NotificationChannel;
