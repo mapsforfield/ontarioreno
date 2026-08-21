@@ -8,6 +8,12 @@ import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
 import { handleInboundSms } from '../../lib/sms-inbound.js';
+import {
+  followUpDigestWhere,
+  openPipelineWhere,
+  recapAppointmentsWhere,
+  wonDealsWhere,
+} from '../../lib/digest-filters.js';
 import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
 import { randomUUID } from 'node:crypto';
 
@@ -282,13 +288,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Follow-up digest: email each rep their deals due (or overdue) today ──
     let followUpEmailsSent = 0;
     try {
-      const openStatuses = ['new_lead', 'appointment_booked', 'quoted', 'negotiating'];
       const dueDeals = await prisma.deal.findMany({
-        where: {
-          nextFollowUpDate: { lte: today, gt: '' },
-          status: { in: openStatuses },
-          isHistorical: false,
-        },
+        where: followUpDigestWhere(today),
         orderBy: { nextFollowUpDate: 'asc' },
       });
 
@@ -455,19 +456,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await Promise.all([
       prisma.user.findMany({ where: { role: 'rep' }, select: { id: true, name: true } }),
       prisma.deal.findMany({
-        where: { status: 'won', isHistorical: false, updatedAt: { gte: dayAgo } },
+        where: wonDealsWhere(dayAgo),
         select: { homeownerName: true, estimatedJobValue: true, assignedRepId: true },
       }),
       prisma.appointment.findMany({
-        where: { appointmentDate: { gte: yesterdayStr, lte: todayStr } },
+        where: recapAppointmentsWhere(yesterdayStr, todayStr),
         select: { status: true, assignedRepId: true },
       }),
       prisma.deal.findMany({
-        where: {
-          status: { in: ['new_lead', 'contacted', 'appointment_booked', 'quoted', 'negotiating'] },
-          isHistorical: false,
-          deletedAt: null,
-        },
+        where: openPipelineWhere(),
         select: { estimatedJobValue: true },
       }),
       prisma.activity.findMany({
