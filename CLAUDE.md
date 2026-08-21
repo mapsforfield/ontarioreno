@@ -174,6 +174,24 @@ re-send with stale dates. Grant closure alerts reuse this path and also deliver
 inline, because the radar runs on GitHub Actions while the drain runs on Vercel
 cron.
 
+### Internal alerts do not go to info@ontarioreno.ca
+
+`ontarioreno.ca`'s MX points at **the web host**, not Google — `info@` is a
+mailbox there that forwards to Gmail, and that hop is slow and erratic. The
+same booking alert took 1, 40 and 76 minutes on three consecutive bookings
+while Resend, SES and our own outbox all recorded the handoff in under a
+second. A rep was finding out about a booking an hour after the homeowner made
+it.
+
+So `teamInbox()` (api/leads) resolves from `TEAM_INBOX_EMAIL` — a Gmail-hosted
+address with no forwarder in the path — and **not** from `EMAIL_FROM`. Those
+are two different things: the address homeowners see mail come FROM, and the
+address the office reads alerts AT. `archiveInbox()` keeps `EMAIL_FROM`'s
+address copied on every alert as its own outbox row, so the slow hop can never
+hold up the fast one.
+
+Do not re-derive the alert recipient from `EMAIL_FROM`.
+
 ### Inbound SMS shares one webhook with the Apps Script
 
 A Twilio number has exactly **one** "a message comes in" webhook, and the Google

@@ -392,3 +392,33 @@ test('the number is normalised the same way every other send is', () => {
   const [row] = planLeadWelcomeNotifications(WELCOME);
   assert.equal(toE164(row.recipient), '+19055550199');
 });
+
+// ─── Who hears about a booking, and how fast ──────────────────────────────────
+
+test('the booking alert reaches the fast inbox and the archive separately', () => {
+  const planned = planBookingNotifications(
+    ctx({ teamInbox: 'alerts@gmail.com', archiveInbox: 'info@ontarioreno.ca', repEmail: 'rep@example.com' })
+  );
+  const alerts = planned.filter((n) => n.kind === 'team_alert');
+  assert.deepEqual(
+    alerts.map((n) => n.recipient).sort(),
+    ['alerts@gmail.com', 'info@ontarioreno.ca', 'rep@example.com']
+  );
+  // Separate rows, not one CC. info@ontarioreno.ca is a web-host mailbox that
+  // forwards to Gmail, and that hop has taken over an hour — it must not be
+  // able to hold up the copy that arrives in seconds.
+  assert.equal(new Set(alerts.map((n) => n.idempotencyKey)).size, 3);
+});
+
+test('no archive address configured still alerts the team', () => {
+  const alerts = planBookingNotifications(ctx({ teamInbox: 'alerts@gmail.com', repEmail: '' }))
+    .filter((n) => n.kind === 'team_alert');
+  assert.deepEqual(alerts.map((n) => n.recipient), ['alerts@gmail.com']);
+});
+
+test('an archive address equal to the team inbox is not mailed twice', () => {
+  const alerts = planBookingNotifications(
+    ctx({ teamInbox: 'same@example.com', archiveInbox: 'same@example.com', repEmail: '' })
+  ).filter((n) => n.kind === 'team_alert');
+  assert.equal(alerts.length, 1);
+});

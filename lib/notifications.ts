@@ -83,6 +83,16 @@ export type BookingContext = {
   consultationMode: 'in_person' | 'phone';
   /** Business inbox. Always alerted. */
   teamInbox: string;
+  /**
+   * Second copy, for the address of record.
+   *
+   * info@ontarioreno.ca is a mailbox on the web host that forwards to Gmail,
+   * and that forwarding hop is slow and wildly inconsistent — the same booking
+   * alert has taken 1, 40 and 76 minutes to complete it. So the alert goes to a
+   * mailbox Gmail hosts directly, and this keeps the business address copied
+   * for the record rather than dropping it.
+   */
+  archiveInbox?: string;
   /** Assigned rep's address, alerted alongside the business inbox. */
   repEmail?: string;
   repName?: string;
@@ -354,6 +364,8 @@ export type SubmissionContext = {
   /** Routing outcome and reason codes, verbatim. Not re-derived here. */
   outcome: string;
   reasons: string[];
+  /** Second copy for the address of record — see BookingContext.archiveInbox. */
+  archiveInbox?: string;
   /** Readable answer labels where we have them, raw values otherwise. */
   projectScope: string;
   fundingPlan: string;
@@ -462,13 +474,21 @@ export function planSubmissionNotifications(
   if (!c.teamInbox) return planned;
 
   const alert = emailLeadAlert(c);
-  planned.push({
-    channel: 'email', kind: 'lead_alert', recipient: c.teamInbox,
-    subject: alert.subject, body: alert.body,
-    // Never expires: a lead is worth hearing about late.
-    sendAfter: at, expiresAt: '',
-    idempotencyKey: `${c.leadId}:email:lead_alert:${c.teamInbox}`,
-  });
+  // Separate rows rather than a CC, so one slow or bouncing address cannot hold
+  // up the other.
+  const leadRecipients = [c.teamInbox, c.archiveInbox].filter(
+    (address, index, all): address is string =>
+      Boolean(address) && all.indexOf(address) === index
+  );
+  for (const recipient of leadRecipients) {
+    planned.push({
+      channel: 'email', kind: 'lead_alert', recipient,
+      subject: alert.subject, body: alert.body,
+      // Never expires: a lead is worth hearing about late.
+      sendAfter: at, expiresAt: '',
+      idempotencyKey: `${c.leadId}:email:lead_alert:${recipient}`,
+    });
+  }
 
   if (c.providerDegraded) {
     const outage = emailAddressProviderAlert(c);
@@ -606,7 +626,7 @@ export function planBookingNotifications(c: BookingContext): PlannedNotification
   // The business inbox always hears about a booking; the assigned rep gets the
   // same alert so they aren't relying on someone forwarding it. Separate rows
   // rather than a CC, so one bouncing address can't suppress the other.
-  const alerted = [c.teamInbox, c.repEmail].filter(
+  const alerted = [c.teamInbox, c.repEmail, c.archiveInbox].filter(
     (address, index, all): address is string =>
       Boolean(address) && all.indexOf(address) === index
   );
