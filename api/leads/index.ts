@@ -1167,10 +1167,41 @@ const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed', 'rescheduled', 'c
 /** CRM tag applied to leads that bypass the calendar. */
 const NURTURE_TAG = 'Hamilton ADU - Nurture Pipeline';
 
+/** Pull a bare address out of an "Name <addr>" string. */
+function bareAddress(value: string): string {
+  const match = value.match(/<([^\s@>]+@[^\s@>]+\.[^\s@>]+)>/);
+  return match ? match[1] : value.trim();
+}
+
+/**
+ * Where internal alerts actually go.
+ *
+ * This used to be derived from EMAIL_FROM, which conflated two different
+ * things: the address homeowners see mail COME FROM, and the address the
+ * office reads alerts AT. They were the same string, so the alerts went to
+ * info@ontarioreno.ca — a mailbox on the web host (MX: mail.ontarioreno.ca)
+ * that forwards to Gmail. Resend hands the message over in under a second and
+ * the forwarding hop then takes its time: the same booking alert has arrived
+ * 1, 40 and 76 minutes later on three consecutive bookings, which is a rep
+ * finding out about a booking an hour after the homeowner made it.
+ *
+ * So alerts go straight to a Gmail-hosted mailbox, with no forwarder in the
+ * path. Customer-facing mail still comes FROM info@ontarioreno.ca — EMAIL_FROM
+ * is untouched.
+ */
 function teamInbox(): string {
-  const from = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
-  const match = from.match(/<([^\s@>]+@[^\s@>]+\.[^\s@>]+)>/);
-  return match ? match[1] : from.trim();
+  return bareAddress(process.env.TEAM_INBOX_EMAIL ?? 'mapsforfield@gmail.com');
+}
+
+/**
+ * The business address of record, copied on every alert.
+ *
+ * Slow, but it is the archive the business has always had, and losing it to
+ * gain speed would be a bad trade. Sent as its own row, so its forwarding
+ * delay cannot hold up the fast copy.
+ */
+function archiveInbox(): string {
+  return bareAddress(process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>');
 }
 
 /** Deliver whatever is due, via the shared drain (lib/notification-drain.ts). */
@@ -1882,6 +1913,7 @@ async function bookVisitForLead(params: {
           // off this, so it must be the property's answer, not the program's.
           consultationMode: remote ? 'phone' : program.consultationMode,
           teamInbox: teamInbox(),
+          archiveInbox: archiveInbox(),
           repEmail: assignedRep?.email ?? '',
           repName: assignedRep?.name ?? '',
           // Readable answers for the team alert; the label for the customer.
@@ -2280,6 +2312,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       addressCauseDetail: describeCause(resolved.cause),
       providerDegraded,
       teamInbox: teamInbox(),
+      archiveInbox: archiveInbox(),
     };
 
     // Best-effort throughout: the lead is already committed and a notification
