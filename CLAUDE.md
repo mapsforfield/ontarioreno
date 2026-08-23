@@ -85,6 +85,8 @@ that triggered it. Real cases already caught in testing — keep them passing:
 - `"open until funds are exhausted"` — live, not closed
 - `"Launched January 15, 2025"` — a START date, not a deadline
 - `"March 6, 2025 (applications open)"` — also a start date
+- `"Funding is available until the program budget is exhausted, and applications
+  are reviewed on a first-come, first-served basis"` — an allocation RULE, live
 
 That last pair matters: a start date read as a deadline auto-downgraded three
 live programs on the public site before it was caught.
