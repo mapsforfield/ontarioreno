@@ -18,6 +18,12 @@ export type ClosureSignal = {
   kind: ClosureSignalKind;
   /** Short human sentence naming what was found, for the alert and the portal. */
   detail: string;
+  /** How much this finding is worth. Below `medium` it is never reported. */
+  confidence?: ClosureConfidence;
+  /** Which phrase family matched, for closure-language signals. */
+  matchedKind?: string;
+  /** Where the phrase was found — a status banner outranks body copy. */
+  placement?: ClosurePlacement;
 };
 
 /** The only signal allowed to change the public page without a human. */
@@ -27,46 +33,233 @@ export const AUTO_DOWNGRADE_SIGNAL: ClosureSignalKind = 'deadline-passed';
 export const CHECK_STATUS_LABEL = 'Check status';
 
 // ─── Closure language ─────────────────────────────────────────────────────────
-// "closed" alone is far too loose — municipal pages say "closed" about offices,
-// holidays, and road closures. Each pattern below requires program context, so a
-// match is about the PROGRAM's intake, not the building's hours.
-const CLOSURE_PATTERNS: Array<{ kind: string; re: RegExp }> = [
-  { kind: 'no longer accepting', re: /\b(?:no longer|not currently|are not|is not)\s+(?:being\s+)?accept(?:ing|ed)\b[^.]{0,60}/i },
-  // Leading context is captured on purpose: "open until funds are exhausted"
-  // describes a LIVE program, and the negator below can only see it if the
-  // excerpt includes the words in front of the funding term.
-  { kind: 'funding exhausted', re: /[^.]{0,60}\b(?:funding|funds|budget|allocation)\b[^.]{0,40}?\b(?:fully\s+)?(?:exhausted|depleted)\b[^.]{0,40}/i },
-  { kind: 'funding exhausted', re: /[^.]{0,60}\b(?:funding|funds|budget|allocation)\b[^.]{0,40}?\bfully\s+(?:committed|allocated|subscribed)\b[^.]{0,40}/i },
-  { kind: 'fully subscribed', re: /\bfully\s+subscribed\b[^.]{0,60}/i },
-  { kind: 'waitlist', re: /\b(?:wait[\s-]?list(?:ed)?|waiting list)\b[^.]{0,60}/i },
-  // "closed" only when it is clearly the program/intake that closed.
-  { kind: 'closed', re: /\b(?:program|programme|intake|application|applications|submissions|funding|stream|window|round)\s+(?:is |are |has |have |now |currently |been |temporarily )*clos(?:ed|ing)\b[^.]{0,60}/i },
-  { kind: 'closed', re: /\b(?:now|currently|permanently|temporarily)\s+closed\b[^.]{0,60}/i },
-  { kind: 'closed', re: /\bclosed\s+(?:to|for)\s+(?:new\s+)?(?:applications|applicants|intake|submissions)\b[^.]{0,60}/i },
-  { kind: 'closed', re: /\bthis\s+(?:program|programme|intake|funding)\b[^.]{0,80}?\bclosed\b/i },
-  { kind: 'closed', re: /\bapplications?\s+clos(?:ed|es|ing)\b[^.]{0,60}/i },
+// Three safeguards stand between page text and a "closed" flag, because a false
+// positive pulls a live program off the public /grants page:
+//
+//   1. Patterns require an EXPLICIT termination phrase — a program-scoped subject
+//      ("intake", "funding", "applications") bound to a completed state ("is
+//      closed", "has been exhausted"). A bare "closed" or a floating "exhausted"
+//      never matches on its own.
+//   2. Exclusions are tested against the WHOLE SENTENCE around the match, not a
+//      truncated excerpt. This is what the Belleville false positive turned on:
+//      "Funding is available until the program budget is exhausted, and
+//      applications are reviewed on a first-come, first-served basis" is an
+//      allocation RULE, and the disqualifying "until …" sits two words away from
+//      the funding term — far enough that the old excerpt-level check missed it.
+//   3. Findings carry a confidence. Only an explicit phrase, or placement in a
+//      status banner / alert / callout / heading, clears the bar. Suggestive
+//      wording buried in body copy scores low and is dropped, not flagged.
+
+export type ClosureConfidence = 'high' | 'medium' | 'low';
+
+/** Where in the document the phrase was found. Status banners outrank body copy. */
+export type ClosurePlacement = 'prominent' | 'body';
+
+/** Findings below this are dropped rather than raised to a human. */
+export const CLOSURE_CONFIDENCE_THRESHOLD: ClosureConfidence = 'medium';
+
+const CONFIDENCE_RANK: Record<ClosureConfidence, number> = { low: 0, medium: 1, high: 2 };
+
+type ClosurePattern = {
+  kind: string;
+  re: RegExp;
+  /** An unambiguous termination phrase — trustworthy even in generic body copy. */
+  explicit: boolean;
+};
+
+const CLOSURE_PATTERNS: ClosurePattern[] = [
+  // ── Explicit termination phrases ────────────────────────────────────────────
+  // Each binds a program-scoped SUBJECT to a state VERB, so "closed" is never
+  // read off a road closure or "City Hall is closed on statutory holidays".
+  {
+    kind: 'closed',
+    explicit: true,
+    re: /\b(?:the\s+|this\s+)?(?:program|programme|intake|applications?|submissions?|funding|stream|window|round|portal)\s+(?:is|are|was|were|has\s+been|have\s+been)\s+(?:now\s+|currently\s+|permanently\s+|temporarily\s+)?closed\b[^.]{0,60}/i,
+  },
+  {
+    kind: 'closed',
+    explicit: true,
+    re: /\bclosed\s+(?:to|for)\s+(?:new\s+|further\s+|additional\s+)?(?:applications|applicants|intake|submissions|registrations)\b[^.]{0,60}/i,
+  },
+  {
+    kind: 'closed',
+    explicit: true,
+    re: /\bapplications?\s+(?:has\s+|have\s+)?clos(?:ed|es)\b[^.]{0,60}/i,
+  },
+  {
+    kind: 'no longer accepting',
+    explicit: true,
+    re: /\b(?:no\s+longer|not\s+currently|are\s+not|is\s+not|will\s+not\s+be)\s+(?:being\s+)?accept(?:ing|ed)\b[^.]{0,60}/i,
+  },
+  {
+    kind: 'funding exhausted',
+    explicit: true,
+    // "the budget HAS BEEN exhausted" — a completed state. The conditional form
+    // ("until the budget is exhausted") is stripped by the sentence exclusions.
+    re: /\b(?:funding|funds|budget|allocation)\s+(?:for\s+[^.]{0,40}?\s+)?(?:has\s+been|have\s+been|is|are|was|were)\s+(?:now\s+)?(?:fully\s+)?(?:exhausted|depleted|allocated|committed|expended|spent)\b[^.]{0,40}/i,
+  },
+  {
+    kind: 'fully subscribed',
+    explicit: true,
+    re: /\b(?:the\s+|this\s+)?(?:program|programme|intake|round|applications?|funding|stream)\s+(?:is|are|was|were|has\s+been|have\s+been)\s+fully\s+subscribed\b[^.]{0,40}/i,
+  },
+  {
+    kind: 'waitlist',
+    explicit: true,
+    re: /\b(?:applicants?|applications?|homeowners?|residents?)\s+(?:are|is|will\s+be|being)\b[^.]{0,40}?\b(?:wait[\s-]?list(?:ed)?|waiting\s+list)\b[^.]{0,40}/i,
+  },
+
+  // ── Suggestive only ─────────────────────────────────────────────────────────
+  // Real closure wording, but too loose to trust in the middle of body copy.
+  // Flagged ONLY when it appears in a status banner, alert, callout or heading —
+  // somewhere a page STATES its status rather than describes how funds are spent.
+  { kind: 'closed', explicit: false, re: /\b(?:now|currently|permanently|temporarily)\s+closed\b[^.]{0,60}/i },
+  { kind: 'closed', explicit: false, re: /\bclos(?:ed|ing)\b[^.]{0,60}/i },
+  { kind: 'fully subscribed', explicit: false, re: /\bfully\s+subscribed\b[^.]{0,60}/i },
+  { kind: 'waitlist', explicit: false, re: /\b(?:wait[\s-]?list(?:ed)?|waiting\s+list)\b[^.]{0,60}/i },
+  { kind: 'funding exhausted', explicit: false, re: /\b(?:funding|funds|budget)\b[^.]{0,40}?\b(?:exhausted|depleted)\b[^.]{0,40}/i },
 ];
 
-// Phrases that use closure words but mean the program is OPEN, or describe a past
-// round while a new one runs. Checked against the matched excerpt, not the page,
-// so one reassuring sentence elsewhere can't mask a real closure.
+// Phrases that use closure words but describe a LIVE program — an allocation or
+// eligibility RULE, a future closing date, or a past round beside a current one.
+//
+// Tested against the whole sentence, so the disqualifying words need not sit next
+// to the closure term. The conditional branch allows a couple of intervening
+// words ("until the PROGRAM budget", "unless the ANNUAL funding") — pinning it to
+// "until the budget" is exactly the gap the Belleville page fell through.
 const CLOSURE_NEGATORS =
-  /\b(?:will\s+close|closes\s+on|closing\s+date|closes\s+at|until\s+closed|before\s+(?:it\s+)?closes|reopen(?:ed|s|ing)?|has\s+reopened|next\s+intake|previous(?:ly)?\s+closed|last\s+(?:intake|round)\s+closed|open\s+until|until\s+(?:the\s+)?(?:funds|funding|budget)|while\s+funds\s+last|once\s+the|subject\s+to|if\s+(?:the\s+)?funds)\b/i;
+  /\b(?:will\s+close|will\s+be\s+closed|closes\s+on|closing\s+date|closes\s+at|until\s+closed|before\s+(?:it\s+)?closes|reopen(?:ed|s|ing)?|has\s+reopened|next\s+intake|previous(?:ly)?\s+closed|last\s+(?:intake|round)\s+closed|open\s+until|available\s+until|accepted\s+until|(?:until|unless|if|while|once|when|should|provided)\s+(?:the\s+|its\s+|all\s+|any\s+)?(?:\S+\s+){0,2}?(?:funds|funding|budget|allocation|money|dollars)\b|while\s+(?:funds|funding|budget|supplies)\s+last|once\s+the|subject\s+to|if\s+(?:the\s+)?funds|first[\s-]?come|first[\s-]?served|on\s+a\s+first)\b/i;
+
+/** The sentence containing a match, so exclusions see the full clause. */
+function enclosingSentence(text: string, index: number, length: number): string {
+  const from = Math.max(0, index - 400);
+  const before = text.slice(from, index);
+  const startRel = Math.max(
+    before.lastIndexOf('. '), before.lastIndexOf('! '), before.lastIndexOf('? '),
+    before.lastIndexOf('\n'), before.lastIndexOf('•'),
+  );
+  const start = startRel === -1 ? from : from + startRel + 1;
+  const rest = text.slice(index + length, index + length + 400);
+  const endRel = rest.search(/[.!?\n•]/);
+  const end = index + length + (endRel === -1 ? rest.length : endRel + 1);
+  return text.slice(start, end).replace(/\s+/g, ' ').trim();
+}
+
+/** Highest-confidence finding wins when the same phrase family matches twice. */
+function keepStrongest(found: Map<string, ClosureSignal>, signal: ClosureSignal): void {
+  const key = signal.matchedKind ?? signal.detail;
+  const prior = found.get(key);
+  if (prior && CONFIDENCE_RANK[prior.confidence ?? 'medium'] >= CONFIDENCE_RANK[signal.confidence ?? 'medium']) return;
+  found.set(key, signal);
+}
 
 /**
- * Find closure language in page text. Returns every distinct signal found, each
- * carrying the sentence fragment that triggered it so a human can judge it.
+ * Find closure language in a block of text.
+ *
+ * `placement` says where the text came from: 'prominent' for a status banner,
+ * alert, callout or heading; 'body' (the default) for general page copy. Only
+ * explicit termination phrases are trusted in body copy — suggestive wording
+ * there scores 'low' and is dropped.
+ *
+ * Every returned signal carries the fragment that triggered it, so a human can
+ * judge the call.
  */
-export function detectClosureLanguage(text: string): ClosureSignal[] {
+export function detectClosureLanguage(
+  text: string,
+  placement: ClosurePlacement = 'body',
+): ClosureSignal[] {
+  if (!text) return [];
   const found = new Map<string, ClosureSignal>();
-  for (const { kind, re } of CLOSURE_PATTERNS) {
+
+  for (const { kind, re, explicit } of CLOSURE_PATTERNS) {
     const m = text.match(re);
-    if (!m) continue;
+    if (!m || m.index === undefined) continue;
+
+    // Exclusions run against the whole sentence, not the matched fragment.
+    if (CLOSURE_NEGATORS.test(enclosingSentence(text, m.index, m[0].length))) continue;
+
+    // explicit + banner → high · explicit in body, or loose in a banner → medium
+    // loose wording in body copy → low, and low never leaves this function.
+    const confidence: ClosureConfidence =
+      explicit && placement === 'prominent' ? 'high'
+        : explicit || placement === 'prominent' ? 'medium'
+          : 'low';
+    if (CONFIDENCE_RANK[confidence] < CONFIDENCE_RANK[CLOSURE_CONFIDENCE_THRESHOLD]) continue;
+
     const excerpt = m[0].trim().replace(/\s+/g, ' ').slice(0, 160);
-    // A "closes on June 1" style match is a live deadline, not a closure.
-    if (CLOSURE_NEGATORS.test(excerpt)) continue;
-    if (!found.has(kind)) found.set(kind, { kind: 'closure-language', detail: `Page says “${excerpt}” (${kind})` });
+    const where = placement === 'prominent' ? 'Status banner says' : 'Page says';
+    keepStrongest(found, {
+      kind: 'closure-language',
+      matchedKind: kind,
+      confidence,
+      placement,
+      detail: `${where} “${excerpt}” (${kind})`,
+    });
   }
+  return [...found.values()];
+}
+
+// ─── Targeted DOM scoping ─────────────────────────────────────────────────────
+// A program that has actually closed says so where a reader cannot miss it. These
+// are the containers that carry a STATUS rather than describe the rules.
+const PROMINENT_CLASS =
+  /(?:^|[\s"'_-])(?:status|state|alert|banner|callout|notice|badge|message|warning|danger|important|highlight|closed)(?:[\s"'_-]|$)/i;
+
+const BLOCK_TAGS = 'div|section|aside|p|span|strong|em|li|td|th|header';
+
+const stripTags = (html: string): string =>
+  html.replace(/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const attr = (attrs: string, name: string): string =>
+  (attrs.match(new RegExp(`\\b${name}=["']([^"']*)["']`, 'i')) ?? [])[1] ?? '';
+
+/**
+ * Pull the text of status-bearing regions out of raw HTML: headings, elements
+ * whose class/id/role marks them as a status, alert, banner, badge or callout,
+ * and the description/status meta tags.
+ *
+ * Returns '' when there is no HTML to read, which simply means every finding is
+ * judged as body copy — never that something is more certain than it is.
+ */
+export function extractProminentText(html: string): string {
+  if (!html) return '';
+  const parts: string[] = [];
+
+  for (const m of html.matchAll(/<(h[1-3])\b[^>]*>([\s\S]{0,400}?)<\/\1>/gi)) parts.push(stripTags(m[2]));
+
+  for (const m of html.matchAll(/<meta\b[^>]*?(?:name|property)=["'][^"']*(?:description|status)[^"']*["'][^>]*>/gi)) {
+    parts.push(stripTags(attr(m[0], 'content')));
+  }
+
+  for (const m of html.matchAll(new RegExp(`<(${BLOCK_TAGS})\\b([^>]*)>`, 'gi'))) {
+    const attrs = m[2];
+    const role = attr(attrs, 'role');
+    const marked = role === 'alert' || role === 'status'
+      || PROMINENT_CLASS.test(attr(attrs, 'class'))
+      || PROMINENT_CLASS.test(attr(attrs, 'id'));
+    if (!marked || m.index === undefined) continue;
+    // A flat slice rather than true nesting: we only need the wording, and an
+    // over-long slice is trimmed back to the sentence around any match anyway.
+    const from = m.index + m[0].length;
+    parts.push(stripTags(html.slice(from, from + 600)));
+  }
+
+  return parts.filter(Boolean).join('. ').slice(0, 4000);
+}
+
+/**
+ * Closure language across a whole page: status regions first — where a real
+ * closure is announced — then body copy under the stricter explicit-phrase bar.
+ */
+export function detectPageClosureLanguage(text: string, html = ''): ClosureSignal[] {
+  const found = new Map<string, ClosureSignal>();
+  for (const s of detectClosureLanguage(extractProminentText(html), 'prominent')) keepStrongest(found, s);
+  for (const s of detectClosureLanguage(text, 'body')) keepStrongest(found, s);
   return [...found.values()];
 }
 
@@ -234,7 +427,7 @@ export function detectClosureSignals(
     return signals;
   }
 
-  signals.push(...detectClosureLanguage(obs.text));
+  signals.push(...detectPageClosureLanguage(obs.text, obs.html));
 
   if (detectApplicationLinkRemoved(obs.html, program.sourceUrl)) {
     signals.push({ kind: 'link-removed', detail: 'The application link we recorded is gone and the page offers no apply link.' });

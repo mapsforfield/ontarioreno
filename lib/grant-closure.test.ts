@@ -4,6 +4,8 @@ import {
   parseDeadlineDate,
   isDeadlinePassed,
   detectClosureLanguage,
+  detectPageClosureLanguage,
+  extractProminentText,
   detectApplicationLinkRemoved,
   detectClosureSignals,
   shouldAutoDowngrade,
@@ -148,6 +150,101 @@ test('recorded link gone AND no apply link anywhere is a removal', () => {
 test('missing or tiny HTML never manufactures a signal', () => {
   assert.equal(detectApplicationLinkRemoved('', 'https://city.ca/apply'), false);
   assert.equal(detectApplicationLinkRemoved('<p>hi</p>', 'https://city.ca/apply'), false);
+});
+
+// ─── Allocation rules are not closures (the Belleville false positive) ────────
+// Verbatim from the Belleville "New Accessory Dwelling Unit Grant" page. The
+// scanner matched "budget is exhausted" and flagged a LIVE program as closed:
+// the old exclusion required the funding word right after "until the", so
+// "until the PROGRAM budget" — two words apart — slipped straight through.
+const BELLEVILLE =
+  'Funding is available until the program budget is exhausted, and applications ' +
+  'are reviewed on a first-come, first-served basis.';
+
+test('a first-come/first-served allocation rule is not a closure', () => {
+  assert.deepEqual(detectClosureLanguage(BELLEVILLE), []);
+  assert.deepEqual(detectPageClosureLanguage(BELLEVILLE, `<h1>New Accessory Dwelling Unit Grant</h1><p>${BELLEVILLE}</p>`), []);
+});
+
+test('conditional funding language stays live however it is phrased', () => {
+  const live = [
+    'Funding is available until the program budget is exhausted.',
+    'Grants are issued until the annual allocation is exhausted.',
+    'Applications are accepted while the budget lasts.',
+    'Awards continue unless the available funds are depleted.',
+    'The rebate is subject to funding availability.',
+    'Applications are reviewed on a first-come, first-served basis.',
+    'Funding is available until funds are exhausted; apply early.',
+  ];
+  for (const c of live) assert.deepEqual(detectClosureLanguage(c), [], c);
+});
+
+test('a completed exhaustion still fires — the rule change must not blunt it', () => {
+  for (const c of [
+    'The program budget has been fully exhausted for 2026.',
+    'Funding for this stream has been fully allocated.',
+    'The 2026 allocation was depleted in March.',
+  ]) {
+    assert.ok(detectClosureLanguage(c).length > 0, c);
+  }
+});
+
+// ─── Confidence and DOM scoping ───────────────────────────────────────────────
+
+test('loose wording in body copy is dropped, but flagged in a status banner', () => {
+  assert.deepEqual(detectPageClosureLanguage('The application window is closing soon.'), []);
+
+  const banner = '<div class="alert alert-danger">Intake closed</div><p>About the grant.</p>';
+  const signals = detectPageClosureLanguage('About the grant.', banner);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].placement, 'prominent');
+  assert.match(signals[0].detail, /Status banner says/);
+});
+
+test('an explicit phrase in a banner outranks the same phrase in body copy', () => {
+  const html = '<div class="program-status">This program is closed to new applications.</div>';
+  const [signal] = detectPageClosureLanguage('This program is closed to new applications.', html);
+  assert.equal(signal.confidence, 'high');
+  assert.equal(signal.placement, 'prominent');
+});
+
+test('an explicit phrase in body copy alone is medium, and still reported', () => {
+  const [signal] = detectClosureLanguage('We are no longer accepting applications for this grant.');
+  assert.equal(signal.confidence, 'medium');
+  assert.equal(signal.placement, 'body');
+});
+
+test('every reported signal clears the confidence threshold', () => {
+  const signals = detectPageClosureLanguage(
+    'This program is closed.',
+    '<h2>Program closed</h2><span class="badge">Closed</span>',
+  );
+  assert.ok(signals.length > 0);
+  for (const s of signals) assert.notEqual(s.confidence, 'low');
+});
+
+test('status regions are pulled out of headings, badges and meta tags', () => {
+  const html =
+    '<meta name="description" content="The intake is closed."><h1>ADU Grant</h1>' +
+    '<div class="callout"><p>No longer accepting applications.</p></div><p>Body copy here.</p>';
+  const prominent = extractProminentText(html);
+  assert.match(prominent, /intake is closed/);
+  assert.match(prominent, /ADU Grant/);
+  assert.match(prominent, /No longer accepting/);
+});
+
+test('a page with no HTML is judged as body copy, never upgraded', () => {
+  assert.equal(extractProminentText(''), '');
+  assert.deepEqual(detectPageClosureLanguage('The window is closing soon.', ''), []);
+});
+
+test('the Belleville page raises no signals end to end', () => {
+  const signals = detectClosureSignals(
+    { name: 'New Accessory Dwelling Unit Grant', deadline: 'Until program budget exhausted; first-come, first-served', sourceUrl: 'https://belleville.ca/adu/apply-now' },
+    { httpStatus: 200, text: BELLEVILLE, html: APPLY_HTML.padEnd(250, ' ') },
+    NOW,
+  );
+  assert.deepEqual(signals, []);
 });
 
 // ─── Combined ─────────────────────────────────────────────────────────────────
