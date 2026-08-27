@@ -923,3 +923,78 @@ model SmsReply {
   @@index([appointmentId])
   @@index([fromNumber])
 }
+
+/// ─── Text conversations with unbooked leads ───────────────────────────────────
+/// One row per lead we have opened a conversation with. The lead's own record
+/// keeps its status; this is only the state of the TEXT THREAD, so a rep moving
+/// a lead through the pipeline never silently changes what the automation
+/// believes it is waiting for.
+///
+/// `phase` is the single source of truth for what happens on the next inbound
+/// reply — see lib/lead-conversation.ts. The terminal phases (booked, closed,
+/// needs_human) exist so a human who takes over a conversation cannot have the
+/// automation talk over them afterwards.
+model LeadConversation {
+  id        String @id @default(cuid())
+  /// Unique: a lead has at most one text thread. A second would mean two
+  /// different phases disagreeing about what we last asked them.
+  leadId    String @unique
+  /// 'opened' | 'awaiting_time_choice' | 'awaiting_address' | 'booked'
+  /// | 'closed' | 'needs_human'
+  phase     String @default("opened")
+  /// The times we last offered, in the order we offered them, as
+  /// [{date,time}]. The homeowner's "the first one" is meaningless without it,
+  /// and re-deriving it from the calendar later would resolve to a DIFFERENT
+  /// set of open slots than the ones they were actually shown.
+  offeredSlotsJson Json?
+  /// The exact message we last sent them. Given to the classifier so a bare
+  /// "yes" has something to refer to.
+  lastOutbound String @default("")
+  /// Set when a person needs to look, cleared when they have. Drives the
+  /// Conversations page's queue.
+  needsHumanReason String @default("")
+  /// Phone as we matched it, so an inbound can find this row without a join.
+  phoneKey  String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  LeadConversationMessage[]
+
+  @@index([phase])
+  @@index([phoneKey])
+}
+
+/// Every message in one thread, inbound and outbound, plus the drafts that were
+/// never sent. Kept in ONE table rather than reconstructed from SmsReply and
+/// NotificationOutbox: the portal shows a conversation, and a thread stitched
+/// from two logs with different keys and different clocks drifts out of order.
+///
+/// A draft is a row in state 'pending_approval'. Approving it is what moves it
+/// to 'sent' and queues the actual text — nothing here sends on its own, which
+/// is the whole of phase 1.
+model LeadConversationMessage {
+  id             String @id @default(cuid())
+  conversationId String
+  /// 'in' (from the homeowner) | 'out' (from us)
+  direction      String
+  body           String @default("")
+  /// 'received' for inbound. Outbound: 'pending_approval' | 'sent' | 'discarded'.
+  state          String @default("received")
+  /// Which of Michael's templates this draft renders, for outbound rows.
+  templateId     String @default("")
+  /// What the classifier made of an inbound message. Stored verbatim so a bad
+  /// call can be found afterwards rather than inferred from what we replied.
+  intent         String @default("")
+  confident      Boolean @default(false)
+  /// Why this landed on a person, when it did. Empty otherwise.
+  escalationReason String @default("")
+  /// Twilio's SID for inbound rows — the dedupe key against webhook retries.
+  messageSid     String? @unique
+  createdAt      DateTime @default(now())
+
+  conversation LeadConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([state])
+}

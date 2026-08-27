@@ -23,7 +23,7 @@ import {
   TableProperties,
   Trophy,
   UserRound,
-  X,
+  X, MessageSquare
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import {
@@ -71,6 +71,7 @@ const navItems: NavItem[] = [
   { label: 'Financing', href: '/portal/financing', icon: CreditCard, feature: 'financing' },
   { label: 'Performance', href: '/portal/performance', icon: LineChart, feature: 'analytics' },
   { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, feature: 'workspace' },
+  { label: 'Conversations', mobileLabel: 'Texts', href: '/portal/conversations', icon: MessageSquare, adminOnly: true },
   { label: 'Submissions', href: '/portal/submissions', icon: Inbox, adminOnly: true },
   { label: 'Invoices', href: '/portal/invoices', icon: ReceiptText, adminOnly: true },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },

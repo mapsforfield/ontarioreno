@@ -24,6 +24,7 @@ import {
   type ReplyIntent,
 } from './sms-replies.js';
 import { drainOutbox } from './notification-drain.js';
+import { handleLeadReply, type LeadInboundStore } from './lead-inbound.js';
 
 /** Empty TwiML — we answer the homeowner through the outbox, not the webhook
  *  response, so the reply is recorded, deduped and gated like every other
@@ -233,9 +234,27 @@ export async function handleInboundSms(
       console.error('[sms-inbound] could not record reply:', err);
     });
 
-  // A reply from a number with no live upcoming appointment is logged and
-  // nothing more — there is nobody to tell and nothing to stamp.
-  if (!appointment) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
+  // ── A reply from a number with no live upcoming appointment ──
+  // This used to end the request: the row above was written and nobody was
+  // told, so a homeowner who answered our opening text got silence.
+  //
+  // It now runs the lead-conversation branch, which classifies the reply and
+  // writes a DRAFT for a person to approve. Deliberately placed here, after
+  // the downstream forward, after the signature check and after the SmsReply
+  // row: everything above is older and more valuable than this, and
+  // handleLeadReply swallows its own failures so it can never take any of it
+  // down. It returns false whenever the message was not its to handle.
+  if (!appointment) {
+    await handleLeadReply(
+      prisma as LeadInboundStore,
+      { messageSid, from, body },
+      env
+    ).catch((err: unknown) => {
+      console.error('[sms-inbound] lead conversation branch failed:', err);
+      return false;
+    });
+    return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
+  }
 
   const rep = (appointment.assignedRep ?? null) as { name?: string; email?: string } | null;
   const ctx = {
