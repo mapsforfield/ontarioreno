@@ -194,25 +194,41 @@ hold up the fast one.
 
 Do not re-derive the alert recipient from `EMAIL_FROM`.
 
-### Inbound SMS shares one webhook with the Apps Script
+### Inbound SMS forwards to a downstream handler before acting
 
-A Twilio number has exactly **one** "a message comes in" webhook, and the Google
-Apps Script that sends every new lead their first text already owned it. So
-`/api/sms/inbound` sits in FRONT and forwards:
+**Audited August 26, 2026 — the history below is no longer the live situation.
+Read this first.**
 
-1. Every request is POSTed on to `SMS_FORWARD_URL` (the Apps Script) **first**,
-   before the signature check and outside every other branch. First contact with
-   a new lead must not break because our token is misconfigured or our database
-   is down.
-2. If the script answers with TwiML, that TwiML is relayed to Twilio verbatim —
-   it is the instruction to text the lead. Swallowing it breaks first contact as
-   thoroughly as overwriting the webhook URL would have.
+The number's "a message comes in" webhook now points at
+`https://ontarioreno.ca/api/sms/inbound`, i.e. at US. And the Apps Script bound
+to the Meta lead sheet (`scripts/google-sheet-lead-sync.gs`) only POSTs rows to
+`/api/leads?intake=1` — it has no `doPost`, no Twilio, and sends no texts. No
+`doPost` execution appears anywhere in that Google account.
+
+So **nothing outside this repo texts a new lead**. First contact is
+`smsLeadWelcome`, sent by us from the intake endpoint, and it is the only
+opening message a lead receives. `SMS_FORWARD_URL` is still set in Vercel but
+points at something that no longer answers.
+
+This section previously claimed an Apps Script owned the webhook and sent every
+lead their first text. That was true once and drove the design below. It is not
+true now, and believing it costs an afternoon — which is why the correction is
+at the top rather than in a footnote.
+
+The forwarding code is still there and still runs first:
+
+1. Every request is POSTed on to `SMS_FORWARD_URL` **first**, before the
+   signature check and outside every other branch.
+2. If the downstream answers with TwiML, that TwiML is relayed to Twilio
+   verbatim.
 3. Only then do we act on the reply ourselves, and only if the Twilio signature
    verifies against `TWILIO_WEBHOOK_URL`.
 
-**Never reorder those.** Moving the forward after the signature check, or
-returning our own empty TwiML unconditionally, silently kills lead first
-contact — and nothing in this repo would fail to tell you.
+**Do not reorder those, and do not delete the forward** just because nothing
+answers it today. The ordering is free when the URL is dead, and it is the
+whole safety property the moment anything is put back behind it. If you retire
+the forward deliberately, remove `SMS_FORWARD_URL` from Vercel in the same
+change so the two cannot disagree.
 
 Only a literal `C`/`R` (or the words "confirm"/"confirmed"/"reschedule") is read
 as an answer. Everything else — "Ok", "thanks", "Cancel", "Running late" — is

@@ -370,6 +370,16 @@ async function ringDoorbell() {
  * they did not enquire about. Defaults to the basement consultation, which is
  * what the Meta instant forms currently run against.
  */
+/**
+ * Who the first text to a new lead signs itself as.
+ *
+ * The message asks a question, so this must name someone who actually reads the
+ * replies — unbooked leads are handled by hand, not by the portal.
+ */
+function leadWelcomeSender(): string {
+  return process.env.LEAD_WELCOME_SENDER ?? 'Michael';
+}
+
 function leadBookingUrl(): string {
   return (
     process.env.LEAD_WELCOME_BOOKING_URL ??
@@ -398,6 +408,7 @@ async function sendLeadWelcome(lead: { id: string; name: string; phone: string }
       name: lead.name ?? '',
       phone: lead.phone ?? '',
       bookingUrl: leadBookingUrl(),
+      senderName: leadWelcomeSender(),
     });
     if (planned.length === 0) return; // no phone ⇒ nothing to send, not a failure
 
