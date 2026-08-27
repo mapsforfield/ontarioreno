@@ -226,7 +226,7 @@ function todayIso() {
 }
 
 type ValueFilter = 'all' | 'under50' | '50to100' | 'over100';
-type RangeFilter = 'year' | 'quarter' | 'all';
+type RangeFilter = 'month' | 'quarter' | 'year' | 'all';
 
 function isDealInRange(deal: Deal, range: RangeFilter): boolean {
   if (range === 'all') return true;
@@ -237,6 +237,12 @@ function isDealInRange(deal: Deal, range: RangeFilter): boolean {
   const now = new Date();
   if (range === 'year') {
     return updated.getFullYear() === now.getFullYear();
+  }
+  if (range === 'month') {
+    return (
+      updated.getFullYear() === now.getFullYear() &&
+      updated.getMonth() === now.getMonth()
+    );
   }
   // quarter
   const quarter = Math.floor(now.getMonth() / 3);
@@ -1346,7 +1352,7 @@ OntarioReno Broker Portal`;
             const allColumnDeals = filteredDeals.filter(
               (deal) => deal.status === column.status
             );
-            // Won/Lost columns get a Year/Quarter/All toggle; the Won column also
+            // Won/Lost columns get a Month/Quarter/Year/All toggle; the Won column also
             // collapses deals older than 90 days under "All".
             const rangeFiltered = isRangeColumn
               ? allColumnDeals.filter((deal) => isDealInRange(deal, columnRange))
@@ -1407,8 +1413,9 @@ OntarioReno Broker Portal`;
                 {isRangeColumn && allColumnDeals.length > 0 && (
                   <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
                     {([
-                      { label: 'Year', value: 'year' },
+                      { label: 'Month', value: 'month' },
                       { label: 'Quarter', value: 'quarter' },
+                      { label: 'Year', value: 'year' },
                       { label: 'All', value: 'all' },
                     ] as Array<{ label: string; value: RangeFilter }>).map((option) => (
                       <button
