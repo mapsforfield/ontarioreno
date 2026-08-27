@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
+import { mergeNotes } from '../../lib/consultation-notes.js';
 import {
   reminderContextFor,
   resyncAppointmentReminders,
@@ -43,10 +44,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (appointment.dealId) {
           await prisma.deal.update({ where: { id: appointment.dealId }, data: { notes } }).catch(() => {});
         }
+        // The client profile is the homeowner's running history across every
+        // consultation they have ever booked, so this sync MERGES. It used to
+        // overwrite, which is how a repeat customer's new booking wiped out
+        // everything the rep knew from the last one. See lib/consultation-notes.ts.
+        const syncClientNotes = async (where: Record<string, unknown>) => {
+          const existing = await prisma.client.findFirst({ where, select: { id: true, internalNotes: true } });
+          if (!existing) return;
+          const merged = mergeNotes(existing.internalNotes, notes);
+          if (merged === (existing.internalNotes ?? '')) return;
+          await prisma.client.update({ where: { id: existing.id }, data: { internalNotes: merged } });
+        };
         if (appointment.clientId) {
-          await prisma.client.update({ where: { id: appointment.clientId }, data: { internalNotes: notes } }).catch(() => {});
+          await syncClientNotes({ id: appointment.clientId });
         } else if (appointment.email?.trim()) {
-          await prisma.client.updateMany({ where: { email: appointment.email.trim() }, data: { internalNotes: notes } });
+          await syncClientNotes({ email: appointment.email.trim() });
         }
       } catch {
         // notes sync is non-critical

@@ -50,6 +50,7 @@ import {
   TERMINAL_LEAD_STATUSES,
 } from './types';
 import type { LeadSlotsPayload } from '../../../lib/lead-slots';
+import { mergeNotes } from '../../../lib/consultation-notes';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
 type FinancePartnerDraft = Omit<FinancePartner, 'id'>;
@@ -1798,14 +1799,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             appointments: linkedAppointmentIdForNotes
               ? current.appointments.map((a) =>
                   a.id === linkedAppointmentIdForNotes
-                    ? { ...a, internalNotes: updates.notes!, notes: updates.notes!, updatedAt: new Date().toISOString() }
+                    ? { ...a, internalNotes: mergeNotes(a.internalNotes, updates.notes!), notes: mergeNotes(a.notes, updates.notes!), updatedAt: new Date().toISOString() }
                     : a
                 )
               : current.appointments,
             clients: clientIdForNotesSync
               ? current.clients.map((c) =>
                   c.id === clientIdForNotesSync
-                    ? { ...c, internalNotes: updates.notes!, updatedAt: new Date().toISOString() }
+                    ? { ...c, internalNotes: mergeNotes(c.internalNotes, updates.notes!), updatedAt: new Date().toISOString() }
                     : c
                 )
               : current.clients,
@@ -3299,7 +3300,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             clients: capturedClientIdForNotes
               ? current.clients.map((c) =>
                   c.id === capturedClientIdForNotes
-                    ? { ...c, internalNotes: (updates.internalNotes ?? updates.notes ?? c.internalNotes), updatedAt: new Date().toISOString() }
+                    ? { ...c, internalNotes: mergeNotes(c.internalNotes, updates.internalNotes ?? updates.notes ?? c.internalNotes), updatedAt: new Date().toISOString() }
                     : c
                 )
               : current.clients,

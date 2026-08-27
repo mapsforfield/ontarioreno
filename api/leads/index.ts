@@ -51,6 +51,8 @@ import {
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
+import { seedBookingNotes } from '../../lib/consultation-notes.js';
+import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -1748,6 +1750,16 @@ async function bookVisitForLead(params: {
     lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
   ].filter(Boolean).join('\n');
 
+  // A repeat customer keeps what the rep already knows about them. This is a
+  // read-only lookup, done before the transaction and stacked UNDER this
+  // booking's brief: the prep sheet leads with the new job, and the earlier
+  // history sits below it behind a dated divider instead of being replaced.
+  const priorNotes = await priorNotesForHomeowner(prisma, {
+    email: lead.email,
+    phone: lead.phone,
+  });
+  const seededNotes = seedBookingNotes(internalBrief, priorNotes);
+
   const result = await prisma.$transaction(async (tx) => {
     const deps: BookingDeps = {
       // Serialises every booking for this date. Transaction-scoped, so it is
@@ -1822,9 +1834,10 @@ async function bookVisitForLead(params: {
             location: [request.lead.address, request.lead.city].filter(Boolean).join(', '),
             // Same template a rep inserts when booking from the portal.
             customerNotes: request.customerNotes ?? '',
-            // The homeowner's answers, so the rep arrives briefed.
-            internalNotes: internalBrief,
-            notes: internalBrief,
+            // The homeowner's answers, so the rep arrives briefed — plus
+            // whatever was already on file if this is a repeat customer.
+            internalNotes: seededNotes,
+            notes: seededNotes,
             leadId: request.lead.id,
             programKey: request.programKey,
             programVersion: request.programVersion,

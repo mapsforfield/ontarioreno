@@ -15,6 +15,8 @@ import {
   wonDealsWhere,
 } from '../../lib/digest-filters.js';
 import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
+import { mergeNotes, seedBookingNotes } from '../../lib/consultation-notes.js';
+import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
@@ -1351,15 +1353,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (data.internalNotes !== undefined) {
         const notes = String(data.internalNotes ?? '');
         try {
-          await prisma.appointment.updateMany({
+          // Row by row rather than updateMany: a blanket overwrite here is how
+          // one customer's history used to be erased across every one of their
+          // consultations. Anything a row holds that the edit does not carry is
+          // preserved beneath a dated divider.
+          const linked = await prisma.appointment.findMany({
             where: {
               OR: [
                 { clientId: client.id },
                 ...(client.email?.trim() ? [{ email: client.email.trim() }] : []),
               ],
             },
-            data: { internalNotes: notes, notes },
+            select: { id: true, internalNotes: true },
           });
+          for (const row of linked) {
+            const merged = mergeNotes(row.internalNotes, notes);
+            if (merged === (row.internalNotes ?? '')) continue;
+            await prisma.appointment.update({
+              where: { id: row.id },
+              data: { internalNotes: merged, notes: merged },
+            });
+          }
           if (client.email?.trim()) {
             await prisma.deal.updateMany({
               where: { email: client.email.trim() },
@@ -1520,6 +1534,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         location: data.location ?? '',
         notes: data.notes ?? '',
         customerNotes: data.customerNotes ?? '',
+        // Seeded below, once we know whether this homeowner is already on file.
         internalNotes: data.internalNotes ?? '',
         source: data.source ?? 'manual',
         title: data.title ?? null,
@@ -1536,6 +1551,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         leadId: data.leadId || null,
         createdByUserId: user.id,
     };
+    // A repeat customer arrives with their history, not a blank sheet: this
+    // consultation's notes are stacked on top of whatever is already on file
+    // for them. See lib/consultation-notes.ts.
+    const priorNotes = await priorNotesForHomeowner(prisma, {
+      email: appointmentData.email,
+      phone: appointmentData.phone,
+    });
+    if (priorNotes) {
+      appointmentData.internalNotes = seedBookingNotes(
+        String(appointmentData.internalNotes ?? ''),
+        priorNotes
+      );
+      if (!appointmentData.notes) appointmentData.notes = appointmentData.internalNotes;
+    }
+
     let appointment;
     try {
       appointment = await prisma.appointment.create({ data: appointmentData });
