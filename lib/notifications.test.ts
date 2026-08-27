@@ -338,18 +338,51 @@ const WELCOME = {
   bookingUrl: 'https://ontarioreno.ca/consultation/basement',
 };
 
-test('the welcome text greets by first name and carries the booking link', () => {
+test('the welcome text greets by first name and names a real sender', () => {
   const body = smsLeadWelcome(WELCOME);
-  assert.match(body, /^Hi Dennis, you just asked/, 'first name only — the full name reads like a mail merge');
+  assert.match(body, /^Hi Dennis, this is Michael from OntarioReno/, 'first name only — the full name reads like a mail merge');
   assert.ok(!body.includes('Mahalingam'), 'surname never appears');
   assert.match(body, /OntarioReno/, 'name ourselves early, or it arrives as an unknown sender');
-  assert.ok(body.includes(WELCOME.bookingUrl), 'the link is the whole point of the message');
-  assert.match(body, /reply stop/i, 'an unsolicited first contact must carry an opt-out');
+});
+
+test('the welcome text asks one binary question', () => {
+  // The whole reason this message changed: the old one asked for nothing, so a
+  // lead who was interested but not ready to open a calendar had no smaller
+  // step to take. A question that can be answered in one word is that step.
+  const body = smsLeadWelcome(WELCOME);
+  assert.match(body, /weekdays or weekends/i, 'the ask is a reply, not a click');
+  assert.match(body, /\?/, 'it has to actually be a question');
+});
+
+test('the booking link is offered last, as the alternative', () => {
+  // Kept because it costs nothing and serves the lead who would rather
+  // self-serve — but it trails the question rather than replacing it.
+  const body = smsLeadWelcome(WELCOME);
+  assert.ok(body.includes(WELCOME.bookingUrl), 'the link is still there');
+  assert.ok(
+    body.indexOf('weekdays') < body.indexOf(WELCOME.bookingUrl),
+    'the question comes before the link, or the link is the ask again'
+  );
+  assert.ok(body.trim().endsWith(WELCOME.bookingUrl), 'nothing follows the link');
+});
+
+test('the sender name is configurable and never blank', () => {
+  // Whoever this names has to be the person actually reading the replies.
+  assert.match(smsLeadWelcome({ ...WELCOME, senderName: 'Dana' }), /this is Dana from OntarioReno/);
+  assert.match(smsLeadWelcome({ ...WELCOME, senderName: '   ' }), /this is Michael from OntarioReno/);
+});
+
+test('no STOP footer at this volume', () => {
+  // Deliberate: the footer belonged to the bulk sends this replaced. This is a
+  // handful a day from a named sender who replies, and Twilio still honours
+  // STOP at the carrier level whatever the body says. If this ever goes back to
+  // hundreds at a time, the footer comes back with it.
+  assert.ok(!/reply stop/i.test(smsLeadWelcome(WELCOME)));
 });
 
 test('a lead with no name still gets a sendable message', () => {
   const body = smsLeadWelcome({ ...WELCOME, name: '' });
-  assert.match(body, /^Hi, you just asked/);
+  assert.match(body, /^Hi, this is Michael from OntarioReno/);
   assert.ok(!body.includes('undefined'), 'never leak a placeholder into a real send');
 });
 

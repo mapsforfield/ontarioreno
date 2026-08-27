@@ -143,6 +143,9 @@ export function torontoInstant(date: string, time: string): Date {
 
 // ─── Message copy ─────────────────────────────────────────────────────────────
 
+/** Signs the first text to a new lead. See smsLeadWelcome. */
+const DEFAULT_WELCOME_SENDER = 'Michael';
+
 export function smsBookingConfirmation(c: BookingContext): string {
   if (c.consultationMode === 'phone') {
     return `Hi ${c.name}, your OntarioReno consultation call about ${c.propertyAddress} is confirmed for ${friendlyDate(c.date)} at ${friendlyTime(c.time)}. A specialist will call you. Need to reschedule? Reply to this text.`;
@@ -153,30 +156,39 @@ export function smsBookingConfirmation(c: BookingContext): string {
 /**
  * First contact for a lead that came from an external form.
  *
- * One job: get them onto the calendar while they still remember filling the
- * form in. So it confirms receipt in half a line and spends the rest of the
- * message on the link — no pitch, no price, nothing to reply to, because every
- * extra sentence is another reason to put the phone down.
+ * One job: get a REPLY. The previous version spent itself on the booking link
+ * and asked for nothing, so a lead who was interested but not ready to open a
+ * calendar had no smaller step to take and took none.
  *
- * Deliberately says "no cost and no obligation" rather than "free quote": the
- * word free appears twice in the ad already, and the objection at this exact
- * moment is not price, it is whether booking commits them to anything.
+ * So it leads with a named human and one binary question. "Weekdays or
+ * weekends" is answerable in a word, presumes the visit is happening, and its
+ * answer is genuinely useful — but the point is that answering starts a
+ * conversation a person can finish by hand.
  *
- * STOP is appended because this is an unsolicited first message to a consumer
- * mobile — CASL and Twilio's own rules both want the opt-out on the first
- * contact, not the third.
+ * The link stays, last and low-key, as an alternative rather than the ask. It
+ * costs nothing, serves the lead who would rather self-serve, and which one
+ * they use is measurable.
+ *
+ * No STOP footer. That was here because the old message was one of hundreds in
+ * a bulk send; this is a handful a day from a named sender who replies, and the
+ * user has decided the footer is not warranted at that volume. Twilio still
+ * honours STOP at the carrier level regardless of what the body says.
+ *
+ * Whoever `senderName` names must actually see the replies. Unbooked leads text
+ * back to the business number and are handled by hand — nothing in this repo
+ * alerts a rep for a reply from a number with no appointment. (Replies from
+ * BOOKED leads do reach the assigned rep, whatever they say; see
+ * lib/sms-inbound.ts.)
  */
 export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const name = c.name.trim().split(/\s+/)[0] ?? '';
-  const greeting = name ? `Hi ${name}, you` : 'Hi, you';
+  const sender = (c.senderName ?? '').trim() || DEFAULT_WELCOME_SENDER;
+  // "Hi Sarah," or a bare "Hi," — never "Hi undefined,".
+  const greeting = name ? `Hi ${name}, ` : 'Hi, ';
   return (
-    // Their own action first, then who we are, then the link. That is the order
-    // someone reads a text from an unknown number in: "why am I getting this"
-    // is the question that decides whether they read the second sentence, and
-    // naming ourselves before answering it is what gets a message deleted.
-    `${greeting} just asked for a free quote to finish your basement — this is OntarioReno. ` +
-    `You can book your in-home visit whenever suits you: ${c.bookingUrl} ` +
-    `Takes a minute. Reply STOP to opt out.`
+    `${greeting}this is ${sender} from OntarioReno about your basement. ` +
+    `Quick question, are weekdays or weekends better for us to come take a look? ` +
+    `If you prefer to book directly instead please visit: ${c.bookingUrl}`
   );
 }
 
@@ -313,6 +325,12 @@ export type LeadWelcomeContext = {
   phone: string;
   /** Absolute URL of the booking flow this lead should land on. */
   bookingUrl: string;
+  /**
+   * Who the text signs itself as. A real person who actually reads the replies,
+   * because this message asks a question and answering it must reach somebody.
+   * Optional so existing callers keep the default.
+   */
+  senderName?: string;
 };
 
 /**
