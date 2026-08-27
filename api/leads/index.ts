@@ -21,13 +21,19 @@ import {
   type SchedulingArea,
 } from '../../lib/program-config.js';
 import { routeConsultation } from '../../lib/consultation-routing.js';
-import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
 import {
   computeAvailability,
   torontoWallClock,
   type BookedAppointment,
 } from '../../lib/scheduling.js';
 import type { LeadSlotsPayload, SlotBlock } from '../../lib/lead-slots.js';
+import {
+  ACTIVE_APPOINTMENT_STATUSES,
+  BOOKABLE_REP_QUERY,
+  SCHEDULING_APPOINTMENT_SELECT,
+  availableSlotsForLead as sharedAvailableSlotsForLead,
+  leadIsRemote,
+} from '../../lib/lead-availability.js';
 import {
   bookSlot,
   SYSTEM_BOOKING_USER_ID,
@@ -627,6 +633,41 @@ async function handleCollection(
       return res.status(200).json(await availableSlotsForLead(lead));
     }
 
+    // ── Text conversations with unbooked leads ──
+    // The queue behind the Conversations page: every thread, newest activity
+    // first, with its messages. Admin-only — Michael handles these himself,
+    // and a rep seeing half-approved drafts would not know which had been sent.
+    if (req.query['_resource'] === 'conversations') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      return await withTables(async () => {
+        const rows = await prisma.leadConversation.findMany({
+          orderBy: { updatedAt: 'desc' },
+          take: 200,
+          include: { messages: { orderBy: { createdAt: 'asc' } } },
+        });
+        const leadIds = rows.map((r) => r.leadId);
+        const leads = leadIds.length
+          ? await prisma.lead.findMany({
+              where: { id: { in: leadIds } },
+              select: { id: true, name: true, phone: true, city: true, address: true },
+            })
+          : [];
+        const byId = new Map(leads.map((l) => [l.id, l]));
+        return res.status(200).json(
+          rows.map((r) => ({
+            id: r.id,
+            leadId: r.leadId,
+            lead: byId.get(r.leadId) ?? null,
+            phase: r.phase,
+            needsHumanReason: r.needsHumanReason,
+            offeredSlots: r.offeredSlotsJson ?? [],
+            updatedAt: r.updatedAt,
+            messages: r.messages,
+          }))
+        );
+      });
+    }
+
     if (req.query['_resource'] === 'submissions') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       return await withTables(async () => {
@@ -729,6 +770,111 @@ async function handleCollection(
         console.error('[book_lead] failed:', err);
         return res.status(500).json({ error: 'Could not complete the booking.' });
       }
+    }
+
+    /**
+     * Approve a drafted reply, or write one by hand, and send it.
+     *
+     * This is the ONLY path by which a conversation message reaches a
+     * homeowner. Nothing in lib/lead-conversation-runner.ts sends: it writes
+     * drafts, and a person clicking here is what turns a draft into a text.
+     * That is the whole of phase 1, and it is what makes it safe to let a
+     * classifier choose which of Michael's sentences fits.
+     *
+     * `body` may be supplied to replace the draft entirely — an escalated
+     * thread has an EMPTY draft precisely so Michael writes his own.
+     */
+    if (action === 'conversation_send') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      return await withTables(async () => {
+        const messageId = clean(data.messageId);
+        const draft = await prisma.leadConversationMessage.findUnique({
+          where: { id: messageId },
+          include: { conversation: true },
+        });
+        if (!draft) return res.status(404).json({ error: 'Draft not found.' });
+        // Only a pending draft may be sent. Re-sending an already-sent row is
+        // how a homeowner gets the same message twice.
+        if (draft.state !== 'pending_approval') {
+          return res.status(409).json({ error: 'That draft has already been handled.' });
+        }
+        const body = (clean(data.body) || draft.body).trim();
+        if (!body) return res.status(400).json({ error: 'Nothing to send.' });
+
+        const lead = await prisma.lead.findUnique({ where: { id: draft.conversation.leadId } });
+        if (!lead?.phone) return res.status(400).json({ error: 'This lead has no phone number.' });
+
+        await prisma.leadConversationMessage.update({
+          where: { id: messageId },
+          data: { body, state: 'sent' },
+        });
+        // lastOutbound is what gives the classifier a referent for a bare
+        // "yes" on the next inbound, so it has to be what we ACTUALLY sent.
+        await prisma.leadConversation.update({
+          where: { id: draft.conversationId },
+          data: { lastOutbound: body, needsHumanReason: '' },
+        });
+
+        await prisma.notificationOutbox.create({
+          data: {
+            leadId: lead.id,
+            channel: 'sms',
+            kind: 'lead_conversation',
+            recipient: lead.phone,
+            subject: '',
+            body,
+            html: '',
+            sendAfter: new Date().toISOString(),
+            // A conversational reply is true whenever it lands — unlike a
+            // reminder, its wording is not tied to a date.
+            expiresAt: '',
+            // Keyed on the draft row, so a double-click cannot text twice.
+            idempotencyKey: `${messageId}:sms:lead_conversation`,
+          },
+        }).catch((err: unknown) => console.error('[conversation_send] queue failed:', err));
+
+        const delivery = await drainOutbox().catch(() => null);
+        return res.status(200).json({ ok: true, body, delivery });
+      });
+    }
+
+    /** Bin a draft without sending it. The thread stays where it is. */
+    if (action === 'conversation_discard') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      return await withTables(async () => {
+        const messageId = clean(data.messageId);
+        const draft = await prisma.leadConversationMessage.findUnique({ where: { id: messageId } });
+        if (!draft) return res.status(404).json({ error: 'Draft not found.' });
+        if (draft.state !== 'pending_approval') {
+          return res.status(409).json({ error: 'That draft has already been handled.' });
+        }
+        await prisma.leadConversationMessage.update({
+          where: { id: messageId },
+          data: { state: 'discarded' },
+        });
+        return res.status(200).json({ ok: true });
+      });
+    }
+
+    /**
+     * Hand a thread back to the automation, or take it off it.
+     *
+     * Michael's escape hatch in both directions. A thread parked in
+     * needs_human never moves on its own — that is the point — so returning it
+     * to a live phase has to be an explicit act.
+     */
+    if (action === 'conversation_set_phase') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const phase = clean(data.phase);
+      const allowed = ['opened', 'awaiting_time_choice', 'awaiting_address', 'booked', 'closed', 'needs_human'];
+      if (!allowed.includes(phase)) return res.status(400).json({ error: 'Unknown phase.' });
+      return await withTables(async () => {
+        await prisma.leadConversation.update({
+          where: { id: clean(data.conversationId) },
+          data: { phase, ...(phase === 'needs_human' ? {} : { needsHumanReason: '' }) },
+        });
+        return res.status(200).json({ ok: true, phase });
+      });
     }
 
     /**
@@ -1175,7 +1321,7 @@ async function handleCollection(
 // state, scheduling area, program, routing outcome, rep assignment) is made here
 // on the server; the browser only ever submits answers and a chosen time.
 
-const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed', 'rescheduled', 'completed'];
+// ACTIVE_APPOINTMENT_STATUSES is imported from lib/lead-availability.ts.
 
 /** CRM tag applied to leads that bypass the calendar. */
 const NURTURE_TAG = 'Hamilton ADU - Nurture Pipeline';
@@ -1545,39 +1691,12 @@ async function resolveAddress(placeId: string, typed: string): Promise<ResolvedA
   return resolveTypedAddress(typed);
 }
 
-/** Reps eligible for public booking, in assignment order. Names never appear. */
-const BOOKABLE_REP_QUERY = {
-  where: { role: 'rep', active: true, acceptsPublicBooking: true },
-  select: { id: true, bookingPriority: true },
-  orderBy: [{ bookingPriority: 'asc' as const }, { id: 'asc' as const }],
-};
+// BOOKABLE_REP_QUERY, SCHEDULING_APPOINTMENT_SELECT, leadIsRemote and
+// availableSlotsForLead now live in lib/lead-availability.ts — see the import
+// at the top of this file. They moved so the TEXT conversation offers times
+// from the same computation this endpoint does; a second implementation is how
+// two surfaces start offering a rep the same hour.
 
-/** Fields the scheduling rules need from an existing appointment. */
-const SCHEDULING_APPOINTMENT_SELECT = {
-  assignedRepId: true,
-  appointmentDate: true,
-  appointmentTime: true,
-  durationMinutes: true,
-  schedulingArea: true,
-  status: true,
-  latitude: true,
-  longitude: true,
-  city: true,
-  // Without this the rules cannot tell a call from a site visit, and every
-  // remote booking anchors the rep's day again — the exact bug it fixes.
-  remoteConsultation: true,
-};
-
-/**
- * Is this lead's property served remotely?
- *
- * Both name fields are consulted: Places fills `city` for most addresses and
- * `resolvedMunicipality` carries what it actually returned, and a lead that
- * arrived with one of them blank must not quietly fall back to in-person.
- */
-function leadIsRemote(lead: { city?: string | null; resolvedMunicipality?: string | null }): boolean {
-  return isRemoteConsultationCity(lead.city, lead.resolvedMunicipality);
-}
 
 async function loadPublicFlowLead(leadRef: string) {
   if (!leadRef) return null;
@@ -1587,87 +1706,14 @@ async function loadPublicFlowLead(leadRef: string) {
 type FlowLead = NonNullable<Awaited<ReturnType<typeof loadPublicFlowLead>>>;
 
 /**
- * Free slots for this lead's area, honouring the rep day limits, days off and
- * the same-day travel ceiling.
+ * Free slots for this lead's area.
  *
- * Shared by the homeowner's calendar and the portal's, for the same reason the
- * booking itself is shared: a rep offered a time in one place and not the other
- * is a rep who ends up double-booked.
+ * A thin wrapper over lib/lead-availability.ts, kept so every call site in this
+ * file reads the same as it always did. The computation itself moved out so the
+ * text-conversation drafts offer times from exactly this logic.
  */
 async function availableSlotsForLead(lead: FlowLead): Promise<LeadSlotsPayload> {
-  const empty = (blocked: SlotBlock): LeadSlotsPayload => ({ slots: [], visitMinutes: 0, blocked });
-  if (!lead.schedulingArea) return empty({ reason: 'NO_AREA' });
-  // The program the lead was CAPTURED under, falling back to the area's program
-  // for rows written before programKey was reliable. Keying on the lead is what
-  // lets two Ontario-wide programs coexist: they share the ONTARIO area, so
-  // resolving by area alone would hand every one of them the first match.
-  const program =
-    programByKey(lead.programKey) ?? programForArea(lead.schedulingArea as SchedulingArea);
-  if (!program) return empty({ reason: 'NO_AREA' });
-  if (!program.enabled) {
-    return empty(
-      program.closure
-        ? {
-            reason: 'PROGRAM_CLOSED',
-            programName: program.closure.shortName,
-            confirmedOn: program.closure.confirmedOn,
-          }
-        : { reason: 'PROGRAM_NOT_OPEN', programName: program.areaLabel }
-    );
-  }
-
-  const nowWall = torontoWallClock();
-  const remote = leadIsRemote(lead);
-  const reps = await prisma.user.findMany(BOOKABLE_REP_QUERY);
-  const repIds = reps.map((r) => r.id);
-  if (repIds.length === 0) return empty({ reason: 'NO_REPS' });
-
-  const fromDate = nowWall.slice(0, 10);
-  const toDate = new Date(
-    Date.UTC(
-      Number(fromDate.slice(0, 4)),
-      Number(fromDate.slice(5, 7)) - 1,
-      Number(fromDate.slice(8, 10)) + program.bookingHorizonDays + 1
-    )
-  )
-    .toISOString()
-    .slice(0, 10);
-
-  const [appointments, daysOffRows] = await Promise.all([
-    prisma.appointment.findMany({
-      where: {
-        assignedRepId: { in: repIds },
-        appointmentDate: { gte: fromDate, lte: toDate },
-        deletedAt: null,
-        status: { in: ACTIVE_APPOINTMENT_STATUSES },
-      },
-      select: SCHEDULING_APPOINTMENT_SELECT,
-    }),
-    prisma.repDayOff.findMany({
-      where: { userId: { in: repIds }, date: { gte: fromDate, lte: toDate } },
-      select: { userId: true, date: true },
-    }),
-  ]);
-
-  const slots = computeAvailability({
-    reps,
-    appointments: appointments as BookedAppointment[],
-    daysOff: new Set(daysOffRows.map((d) => `${d.userId}|${d.date}`)),
-    area: lead.schedulingArea as SchedulingArea,
-    slotStartTimes: program.slotStartTimes,
-    reservationMinutes: program.reservationMinutes,
-    leadTimeHours: program.leadTimeHours,
-    bookingHorizonDays: program.bookingHorizonDays,
-    maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
-    primaryRepPrimingBookings: program.primaryRepPrimingBookings,
-    maxSameDayTravelKm: program.maxSameDayTravelKm,
-    visitMinutes: program.visitMinutes,
-    destination: { latitude: lead.latitude, longitude: lead.longitude, city: lead.city },
-    destinationIsRemote: remote,
-    nowWallToronto: nowWall,
-  });
-
-  return { slots, visitMinutes: program.visitMinutes, remoteConsultation: remote };
+  return sharedAvailableSlotsForLead(prisma as never, lead);
 }
 
 export type LeadBookingResult =

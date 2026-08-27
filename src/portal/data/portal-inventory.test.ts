@@ -44,6 +44,7 @@ const PORTAL_FEATURES: PortalFeature[] = [
   { navLabel: 'Financing', route: 'financing', page: 'src/portal/pages/PortalFinancing.tsx', component: 'PortalFinancing' },
   { navLabel: 'Performance', route: 'performance', page: 'src/portal/pages/PortalAnalytics.tsx', component: 'PortalAnalytics' },
   { navLabel: 'Call Queue', route: 'workspace', page: 'src/portal/pages/PortalWorkspace.tsx', component: 'PortalWorkspace' },
+  { navLabel: 'Conversations', route: 'conversations', page: 'src/portal/pages/PortalConversations.tsx', component: 'PortalConversations' },
   { navLabel: 'Submissions', route: 'submissions', page: 'src/portal/pages/PortalSubmissions.tsx', component: 'PortalSubmissions' },
   { navLabel: 'Invoices', route: 'invoices', page: 'src/portal/pages/PortalInvoices.tsx', component: 'PortalInvoices' },
   { navLabel: 'Admin', route: 'admin', page: 'src/portal/pages/PortalAdmin.tsx', component: 'PortalAdmin' },

@@ -101,6 +101,7 @@ import ContractorClients from './portal/pages/ContractorClients';
 import PortalFinancing from './portal/pages/PortalFinancing';
 import PortalClients from './portal/pages/PortalClients';
 import PortalSubmissions from './portal/pages/PortalSubmissions';
+import PortalConversations from './portal/pages/PortalConversations';
 import PortalInvoices from './portal/pages/PortalInvoices';
 import PortalTasks from './portal/pages/PortalTasks';
 import PortalLogin from './portal/pages/PortalLogin';
@@ -156,6 +157,7 @@ export default function App() {
                 <Route path="admin" element={<PortalAdmin />} />
                 <Route path="grants" element={<PortalGrants />} />
                 <Route path="submissions" element={<PortalSubmissions />} />
+                <Route path="conversations" element={<PortalConversations />} />
                 <Route path="invoices" element={<PortalInvoices />} />
               </Route>
             </Route>
