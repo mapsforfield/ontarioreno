@@ -725,29 +725,48 @@ export default function Home() {
                   <Calculator className="h-4 w-4" />
                   Renovation financing
                 </div>
+                {/* The number, not just the idea of the number.
+                    This section used to ask "need a clearer path to monthly
+                    financing?" and answer it with two guide pages — a reader
+                    could leave the homepage without ever seeing what a basement
+                    actually costs a month. $399 is the same figure as
+                    BASEMENT_FINANCING_PROGRAM.displayAmountLabel in
+                    lib/program-config.ts and the closed-grant pages' offer:
+                    "from about", never a quoted price, always on approved
+                    credit. Change it in all three or in none. */}
                 <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
-                  Need a clearer path to monthly renovation financing?
+                  A basement from about $399 a month.
                 </h2>
                 <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-                  Explore monthly payment examples, then go deeper into our
-                  open-loan financing guide if you want the full picture on
-                  payment flexibility, faster payoff strategy, and how the math
-                  actually works.
+                  The full cost of the build is financed, so there is nothing to
+                  pay upfront. It is an open loan: pay it down or pay it off
+                  whenever you want, with no penalty and no lien on your home.
                 </p>
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                   <Link
-                    to="/open-loan-financing"
+                    to="/consultation/basement"
                     className={buttonStyles.primary}
                   >
-                    Explore Open Loan Financing <ArrowRight className="w-5 h-5" />
+                    See my monthly payment <ArrowRight className="w-5 h-5" />
                   </Link>
                   <Link
-                    to="/financing"
+                    to="/open-loan-financing"
                     className={buttonStyles.ghostDark}
                   >
-                    View Financing Options
+                    Explore Open Loan Financing
                   </Link>
                 </div>
+                {/* /financing kept reachable — demoted, not removed. */}
+                <p className="mt-5 text-sm text-slate-400">
+                  On approved credit.{' '}
+                  <Link
+                    to="/financing"
+                    className="font-semibold text-blue-200 underline-offset-4 hover:underline"
+                  >
+                    View all financing options
+                  </Link>
+                  .
+                </p>
               </div>
 
               <div className="border-t border-white/10 bg-white/6 px-8 py-10 text-white backdrop-blur-sm md:px-10 lg:border-l lg:border-t-0">
@@ -756,9 +775,9 @@ export default function Home() {
                 </p>
                 <div className="mt-6 space-y-4">
                   {[
+                    'Nothing owed upfront — the build is financed in full',
+                    'Open loan: pay it off early, no penalty, no lien on your home',
                     'See the monthly lens before ruling a project out',
-                    'Understand open-loan flexibility beyond the headline payment',
-                    'Compare financing fit before finalizing scope or budget',
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 w-5 h-5 shrink-0 text-blue-200" />
