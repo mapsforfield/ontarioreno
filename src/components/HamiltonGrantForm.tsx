@@ -1,8 +1,21 @@
 import { useState } from 'react';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { CLOSED_PROGRAM_INTAKE } from '../lib/programClosures';
 
-export default function HamiltonGrantForm() {
+/**
+ * `variant` decides what this form promises, not what it collects.
+ *
+ * 'grant' is the original: a grant eligibility review, for a city still taking
+ * applications. 'closed' keeps every field and the same lead destination, but
+ * reframes the ask around the financing offer, because a closed program cannot
+ * honour a grant application. Default stays 'grant' so an open city page is
+ * untouched.
+ */
+type Props = { variant?: 'grant' | 'closed' };
+
+export default function HamiltonGrantForm({ variant = 'grant' }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isClosed = variant === 'closed';
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -71,7 +84,7 @@ export default function HamiltonGrantForm() {
         `Timeline: ${formData.timeline}`,
         ...basementDetails,
         ...callTimingDetails,
-        `Lead Source: Hamilton Grant Form`,
+        `Lead Source: ${isClosed ? 'Hamilton Basement Financing Form (grant closed)' : 'Hamilton Grant Form'}`,
       ].join(' | '),
     };
 
@@ -90,14 +103,18 @@ export default function HamiltonGrantForm() {
 
       if (typeof window !== 'undefined' && (window as any).fbq) {
         (window as any).fbq('track', 'Lead', {
-          content_name: 'Hamilton Grant Form',
+          content_name: isClosed
+            ? 'Hamilton Basement Financing Form'
+            : 'Hamilton Grant Form',
           value: 1,
           currency: 'CAD',
         });
       }
 
       alert(
-        'You may qualify for up to $40,000. A representative from OntarioReno will be calling you shortly to review your eligibility and next steps. A specialist will call you within the next few hours based on your availability.'
+        isClosed
+          ? CLOSED_PROGRAM_INTAKE.confirmation
+          : 'You may qualify for up to $40,000. A representative from OntarioReno will be calling you shortly to review your eligibility and next steps. A specialist will call you within the next few hours based on your availability.'
       );
 
       setFormData({
@@ -138,35 +155,35 @@ export default function HamiltonGrantForm() {
             <div>
               <div className="flex items-center gap-2 text-[#5694CF] font-bold mb-8">
                 <ShieldCheck className="w-6 h-6" />
-                OntarioReno Eligibility Review
+                {isClosed ? 'OntarioReno Project Review' : 'OntarioReno Eligibility Review'}
               </div>
 
               <h2 className="text-2xl md:text-3xl font-bold leading-tight mb-4">
-                Check If Your Home Qualifies for the $40,000 Hamilton Grant
+                {isClosed
+                  ? CLOSED_PROGRAM_INTAKE.heading
+                  : 'Check If Your Home Qualifies for the $40,000 Hamilton Grant'}
               </h2>
 
               <p className="text-slate-300 text-sm md:text-base leading-relaxed mb-8">
-                Answer a few quick questions and we&apos;ll review your
-                eligibility.
+                {isClosed
+                  ? CLOSED_PROGRAM_INTAKE.subheading
+                  : "Answer a few quick questions and we'll review your eligibility."}
               </p>
 
               <ul className="space-y-4 text-sm text-slate-300">
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Reviewed based on your home and project details</span>
-                </li>
-
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>
-                    Built for Hamilton homeowners exploring funding options
-                  </span>
-                </li>
-
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>No obligation</span>
-                </li>
+                {(isClosed
+                  ? CLOSED_PROGRAM_INTAKE.bullets
+                  : [
+                      'Reviewed based on your home and project details',
+                      'Built for Hamilton homeowners exploring funding options',
+                      'No obligation',
+                    ]
+                ).map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -174,7 +191,9 @@ export default function HamiltonGrantForm() {
           <div className="p-8 md:p-10 lg:w-3/5">
             <form onSubmit={handleSubmit} className="space-y-4">
               <p className="text-[11px] font-medium tracking-[-0.006em] text-slate-500">
-                Quick Eligibility Check — takes about 30 seconds
+                {isClosed
+                  ? CLOSED_PROGRAM_INTAKE.formNote
+                  : 'Quick Eligibility Check — takes about 30 seconds'}
               </p>
 
               <div className="space-y-2">
@@ -448,11 +467,17 @@ export default function HamiltonGrantForm() {
 
               <div className="pt-4">
                 <p className="mb-4 text-sm leading-6 text-slate-500">
-                  Applications are reviewed in real time due to{' '}
-                  <span className="font-semibold text-slate-600">
-                    limited funding
-                  </span>
-                  .
+                  {isClosed ? (
+                    'This is not a grant application — the city’s program is closed to new submissions.'
+                  ) : (
+                    <>
+                      Applications are reviewed in real time due to{' '}
+                      <span className="font-semibold text-slate-600">
+                        limited funding
+                      </span>
+                      .
+                    </>
+                  )}
                   <br />
                   Please be available during your selected time window.
                 </p>
@@ -461,7 +486,11 @@ export default function HamiltonGrantForm() {
                   disabled={isSubmitting}
                   className="w-full rounded-[0.8rem] border border-[#153861] bg-[linear-gradient(180deg,#234b80_0%,#1B3C6C_100%)] py-[0.95rem] text-white font-semibold tracking-[-0.015em] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(27,60,108,0.18)] transition duration-200 hover:border-[#123250] hover:bg-[linear-gradient(180deg,#28548d_0%,#1f4476_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(27,60,108,0.22)] active:bg-[linear-gradient(180deg,#183a63_0%,#16355d_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
                 >
-                  {isSubmitting ? 'Submitting...' : 'Review My Eligibility Now'}
+                  {isSubmitting
+                    ? 'Submitting...'
+                    : isClosed
+                      ? CLOSED_PROGRAM_INTAKE.submitLabel
+                      : 'Review My Eligibility Now'}
                 </button>
               </div>
             </form>

@@ -105,3 +105,43 @@ export const BASEMENT_FINANCING_OFFER = {
   /** Short version for tight spaces. */
   subLabel: "No upfront cost — on approved credit.",
 } as const;
+
+/**
+ * Copy for the intake form and the buttons that lead to it, once a city's grant
+ * has closed.
+ *
+ * The form itself is not the problem — it is a good lead capture and the people
+ * filling it in are real prospects who want a basement. The problem was that it
+ * still asked them to apply for a grant that no longer accepts applications, and
+ * three buttons labelled "Check If I Qualify" walked them into it past the
+ * closure notice. So the form stays and the promise changes: it now qualifies
+ * the reader for the financing offer in `BASEMENT_FINANCING_OFFER`, which is
+ * open, and every button that scrolls to it says so.
+ *
+ * Kept beside the closure so the page, the buttons and the form cannot drift
+ * into telling a homeowner three different things. If Hamilton reopens, pass
+ * `variant="grant"` again and the original wording comes back.
+ */
+export const CLOSED_PROGRAM_INTAKE = {
+  /** Replaces "Check If I Qualify" on a closed program's page. */
+  ctaLabel: "See What My Build Would Cost",
+  /** Replaces the calculator's "Get My Exact Eligibility". */
+  calculatorCtaLabel: "See My Monthly Payment Estimate",
+  heading: "See What Your Basement Build Would Cost a Month",
+  subheading:
+    "The grant is closed, but the build is not. Answer a few quick questions and we'll come back with what your project would cost financed.",
+  bullets: [
+    "Based on your home and project details",
+    "The build is financed in full — nothing upfront",
+    "No obligation",
+  ],
+  submitLabel: "Send My Details",
+  formNote: "Quick project review — takes about 30 seconds",
+  /**
+   * What the reader is told after submitting. It must not name a grant amount:
+   * the old copy promised "up to $40,000" to people applying for a closed
+   * program.
+   */
+  confirmation:
+    "Thanks — your details are in. A specialist from OntarioReno will call you shortly to go over the build and what it would cost a month, based on the availability you gave us.",
+} as const;
