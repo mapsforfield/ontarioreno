@@ -41,6 +41,7 @@ import {
   type BookingDeps,
 } from '../../lib/public-booking.js';
 import { planProjectReviewSms } from '../../lib/project-review.js';
+import { fetchThread, missingFromThread } from '../../lib/twilio-thread-sync.js';
 import {
   planBookingNotifications,
   planLeadWelcomeNotifications,
@@ -835,6 +836,76 @@ async function handleCollection(
 
         const delivery = await drainOutbox().catch(() => null);
         return res.status(200).json({ ok: true, body, delivery });
+      });
+    }
+
+    /**
+     * Reconcile one thread against Twilio's log.
+     *
+     * The gap: a reply typed into the standalone Twilio dashboard never
+     * touched this API, so it left no message row AND left `lastOutbound`
+     * holding the message before it — which is what the classifier is handed
+     * as the referent for the homeowner's next reply. The thread was not just
+     * missing a line, it was reasoning against the wrong question.
+     *
+     * A repair, not a send path. Nothing here texts anybody, and the phase is
+     * deliberately left alone: a hand-sent message is a person taking the
+     * thread over, and guessing a phase from words we did not template is the
+     * one thing this design refuses to do.
+     */
+    if (action === 'conversation_sync') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      return await withTables(async () => {
+        const conversationId = clean(data.conversationId);
+        const convo = await prisma.leadConversation.findUnique({
+          where: { id: conversationId },
+          include: { messages: { orderBy: { createdAt: 'asc' } } },
+        });
+        if (!convo) return res.status(404).json({ error: 'Conversation not found.' });
+
+        const lead = await prisma.lead.findUnique({ where: { id: convo.leadId } });
+        if (!lead?.phone) return res.status(400).json({ error: 'This lead has no phone number.' });
+
+        const remote = await fetchThread(String(lead.phone));
+        const missing = missingFromThread(remote, convo.messages);
+
+        for (const m of missing) {
+          await prisma.leadConversationMessage.create({
+            data: {
+              conversationId: convo.id,
+              direction: m.direction,
+              body: m.body,
+              // Settled on arrival. A synced inbound is one the webhook
+              // missed; classifying it now, against state that has since
+              // moved, would be worse than showing it to a person as-is.
+              state: m.direction === 'out' ? 'sent' : 'received',
+              templateId: m.direction === 'out' ? 'sent_outside_portal' : '',
+              messageSid: m.messageSid,
+            },
+          }).catch((err: unknown) => {
+            // Unique messageSid: two syncs racing is a no-op, not an error.
+            console.error('[conversation_sync] skipped a row:', err);
+          });
+        }
+
+        // lastOutbound has to be what we ACTUALLY said last, wherever it was
+        // typed. This is the whole reason the sync exists.
+        const lastOut = [...convo.messages
+          .filter((m) => m.direction === 'out' && m.state === 'sent')
+          .map((m) => ({ body: m.body, at: m.createdAt.getTime() })),
+          ...missing
+            .filter((m) => m.direction === 'out')
+            .map((m) => ({ body: m.body, at: m.sentAt.getTime() })),
+        ].sort((a, b) => a.at - b.at).at(-1);
+
+        if (lastOut?.body && lastOut.body !== convo.lastOutbound) {
+          await prisma.leadConversation.update({
+            where: { id: convo.id },
+            data: { lastOutbound: lastOut.body },
+          });
+        }
+
+        return res.status(200).json({ ok: true, imported: missing.length });
       });
     }
 
