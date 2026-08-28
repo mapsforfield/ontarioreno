@@ -18,6 +18,10 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import CitySelectorSection from '../components/CitySelectorSection';
 import { buttonStyles } from '../lib/uiStyles';
+import {
+  BASEMENT_FINANCING_OFFER,
+  isGrantCityClosed,
+} from '../lib/programClosures';
 
 const GUIDE_PDF_URL = '/guides/ontario-renovation-cost-guide-2026.pdf';
 const GUIDE_MIN_FILL_TIME_MS = 4000;
@@ -25,41 +29,58 @@ const TURNSTILE_SITE_KEY = '0x4AAAAAAC1T5itPPClMtbD6';
 const GUIDE_ENDPOINT =
   'https://script.google.com/macros/s/AKfycbx01lpcatHsLZzoS_anmr1NhnxV_3D9bgnh0MYmIMpBpbqWYot4rfpGDthUEyqZXRei/exec';
 
+/**
+ * The three programs the homepage features.
+ *
+ * `city` is not decoration: it is matched against CLOSED_GRANT_CITIES so a
+ * closed program cannot be advertised here as fundable. This section used to
+ * lead with "Hamilton currently offers the strongest grant opportunity" and a
+ * gold "Up to $40,000" card three weeks after Hamilton closed, because the
+ * status lived in CURATED_PAGES and the nav and nobody wired the homepage to
+ * either. lib/grant-integrity.test.ts now fails if this drifts again.
+ *
+ * Open programs are listed first — the featured slot belongs to money a reader
+ * can actually apply for.
+ */
 const featuredPrograms = [
   {
-    eyebrow: 'Grant Program',
-    title: 'Hamilton Basement Grant',
-    highlight: 'Up to $40,000',
-    description:
-      'The strongest current funding-focused entry point for legal basement and secondary suite planning.',
-    primaryLabel: 'See My Estimated Grant',
-    primaryHref: '/hamilton-basement-grant',
-    secondaryLabel: 'Full Hamilton Guide',
-    secondaryHref: '/hamilton-grant-guide',
-  },
-  {
-    eyebrow: 'City Guide',
-    title: 'St. Catharines ADU Guides',
-    highlight: 'Grant, cost, and permit path',
-    description:
-      'A complete ADU planning cluster covering funding structure, realistic costs, and legal requirements.',
-    primaryLabel: 'Explore St. Catharines',
-    primaryHref: '/st-catharines',
-    secondaryLabel: 'Grant Guide',
-    secondaryHref: '/st-catharines-adu-grant',
-  },
-  {
-    eyebrow: 'Incentive Guide',
+    city: 'Burlington',
+    eyebrow: 'Incentive Program',
     title: 'Burlington ARU Incentive',
-    highlight: 'Program overview',
+    highlight: 'Up to $95,000',
     description:
-      'Useful for homeowners comparing Burlington incentive support with broader basement and legal-suite planning.',
-    primaryLabel: 'View Burlington Guide',
+      'Burlington is the strongest open incentive for a legal additional residential unit, and the clearest starting point for funding a basement suite today.',
+    primaryLabel: 'View Burlington Program',
     primaryHref: '/burlington-aru-incentive-program',
     secondaryLabel: 'Burlington Cost Guide',
     secondaryHref: '/basement-renovation-cost-burlington',
   },
+  {
+    city: 'Hamilton',
+    eyebrow: 'Grant Program',
+    title: 'Hamilton Basement Grant',
+    highlight: 'Closed to new applications',
+    description:
+      'Hamilton reached its funding capacity on August 6, 2026. The guide stays up as reference for permits, legal-suite requirements, and what the build costs.',
+    primaryLabel: 'Read the Hamilton Guide',
+    primaryHref: '/hamilton-grant-guide',
+    secondaryLabel: 'Build It Financed Instead',
+    secondaryHref: BASEMENT_FINANCING_OFFER.href,
+  },
+  {
+    city: 'St. Catharines',
+    eyebrow: 'City Guide',
+    title: 'St. Catharines ADU Guides',
+    highlight: 'Grant closed — cost and permit path still current',
+    description:
+      'The cash grant is fully committed, but the ADU planning cluster — realistic costs, permits, and legal requirements — is unaffected.',
+    primaryLabel: 'Explore St. Catharines',
+    primaryHref: '/st-catharines',
+    secondaryLabel: 'Cost & Permit Guides',
+    secondaryHref: '/st-catharines-adu-cost',
+  },
 ];
+
 
 const disposableEmailDomains = new Set([
   'mailinator.com',
@@ -621,7 +642,10 @@ export default function Home() {
                 Explore Ontario&apos;s top basement grant and ADU programs
               </h2>
               <p className="mt-4 max-w-2xl text-base md:text-lg text-slate-700 leading-relaxed">
-                Hamilton currently offers the strongest grant opportunity, while St. Catharines and Burlington provide valuable guidance for planning legal basement and secondary suite projects.
+                Burlington&apos;s ARU incentive is the strongest program open to new
+                applications today. Hamilton and St. Catharines have both closed their
+                grants — their guides stay up for permits, costs, and legal-suite
+                requirements, and the build can still be financed in full.
               </p>
           </div>
 
@@ -631,18 +655,35 @@ export default function Home() {
                 key={program.title}
                 className={cn(
                   'flex h-full flex-col rounded-[1.35rem] border p-6 shadow-[0_12px_28px_rgba(15,23,42,0.05)]',
-                  index === 0
+                  // The gold treatment follows the OPEN program, not the first
+                  // slot. It used to mark index 0, which is how a closed grant
+                  // ended up as the highlighted pick of the page.
+                  !isGrantCityClosed(program.city)
                     ? 'border-yellow-200 bg-[linear-gradient(180deg,#fffdf4_0%,#ffffff_100%)]'
                     : 'border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)]'
                 )}
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {program.eyebrow}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {program.eyebrow}
+                  </p>
+                  {isGrantCityClosed(program.city) && (
+                    <span className="inline-flex items-center rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-slate-600">
+                      Closed
+                    </span>
+                  )}
+                </div>
                 <h3 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-slate-900">
                   {program.title}
                 </h3>
-                <p className="mt-2 text-sm font-semibold text-[#1B3C6C]">
+                {/* A closed program's status must never wear the same confident
+                    blue as an open program's dollar figure. */}
+                <p
+                  className={cn(
+                    'mt-2 text-sm font-semibold',
+                    isGrantCityClosed(program.city) ? 'text-slate-500' : 'text-[#1B3C6C]'
+                  )}
+                >
                   {program.highlight}
                 </p>
                 <p className="mt-4 text-sm leading-7 text-slate-600">

@@ -14,6 +14,11 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import StCatharinesGrantCalculator from '../components/StCatharinesGrantCalculator';
+import ProgramClosedNotice from '../components/ProgramClosedNotice';
+import {
+  BASEMENT_FINANCING_OFFER,
+  ST_CATHARINES_ADU_CLOSURE,
+} from '../lib/programClosures';
 import { buttonStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
 
@@ -183,6 +188,9 @@ export default function StCatharinesAduGrant() {
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
+      {/* Above the hero on purpose — the hero leads with $40,000/$80,000. */}
+      <ProgramClosedNotice {...ST_CATHARINES_ADU_CLOSURE} />
+
       <section className="bg-slate-900 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:px-8 lg:py-20">
           <div className="max-w-[52rem]">
@@ -212,31 +220,42 @@ export default function StCatharinesAduGrant() {
             <div className="mt-5 max-w-3xl rounded-[1rem] border border-amber-300/20 bg-amber-500/[0.07] p-4.5">
               <div className="flex items-start gap-3">
                 <CircleAlert className="mt-1 h-5 w-5 shrink-0 text-amber-200" />
+                {/* This was the pre-closure hedge — "a large share has already
+                    been committed". The share is now all of it, and a hedge that
+                    still implies some money is left is worse than no note. */}
                 <p className="text-sm leading-7 text-slate-100">
-                  Status note: funding is limited and first-come, first-served.
-                  City updates indicate a large share of available funds has
-                  already been committed, so homeowners should confirm current
-                  availability and eligibility directly with the City before
-                  planning around grant funding.
+                  Status note: the grant is closed to new applications. The
+                  funding amounts on this page describe how the program worked
+                  while it was open, and are kept for reference — they are not
+                  currently available to new applicants.
                 </p>
               </div>
             </div>
 
+            {/* "Check Eligibility" for a closed grant sent a homeowner to a
+                project review believing funding was on the table. The build is
+                still financeable, so the page keeps converting without
+                advertising money that is gone. */}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
-                to="/match"
+                to={BASEMENT_FINANCING_OFFER.href}
                 className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
               >
-                Check Eligibility
+                {BASEMENT_FINANCING_OFFER.ctaLabel}
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 to="/match"
                 className={cn(buttonStyles.ghostDark, 'w-full sm:w-auto')}
               >
-                Book Assessment
+                Start a Project Review
               </Link>
             </div>
+
+            <p className="mt-3 text-sm font-semibold text-slate-400">
+              St. Catharines&apos; grant is closed — the build can still be financed
+              in full, with no upfront cost.
+            </p>
 
             <p className="mt-4 text-sm text-slate-400">
               Last updated: {lastUpdated}

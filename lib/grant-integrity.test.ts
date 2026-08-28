@@ -113,6 +113,61 @@ test('the nav and the hub agree about which cities are closed', () => {
   }
 });
 
+// ─── The homepage is a status surface too ─────────────────────────────────────
+// Added after the homepage spent three weeks featuring Hamilton's closed
+// $40,000 grant as the gold "strongest grant opportunity" card, with a
+// "See My Estimated Grant" button on it. The hub and the nav were both correct
+// the whole time; the homepage was a third hand-maintained copy that nothing
+// compared against them. It is compared now.
+
+test('the homepage and the hub agree about which cities are closed', () => {
+  const home = read('src/pages/Home.tsx');
+  const closures = read('src/lib/programClosures.ts');
+
+  const listed = closures
+    .slice(closures.indexOf('CLOSED_GRANT_CITIES = ['))
+    .slice(0, closures.slice(closures.indexOf('CLOSED_GRANT_CITIES = [')).indexOf(']'));
+  for (const city of CLOSED_CITIES) {
+    assert.ok(
+      listed.includes(city),
+      `${city} is closed on the /grants hub but missing from CLOSED_GRANT_CITIES, so every marketing page treats it as open.`,
+    );
+  }
+
+  assert.ok(
+    home.includes('isGrantCityClosed'),
+    'The homepage no longer checks closure status, so a closed grant can be featured as fundable again.',
+  );
+  for (const city of CLOSED_CITIES) {
+    assert.ok(
+      new RegExp(`city: '${city}'`).test(home),
+      `The homepage features ${city} without tagging it with a city, so isGrantCityClosed cannot mark it closed.`,
+    );
+  }
+});
+
+test('the homepage does not advertise a closed grant amount or a grant CTA', () => {
+  const home = read('src/pages/Home.tsx');
+  const featured = home.slice(home.indexOf('const featuredPrograms = ['), home.indexOf('const disposableEmailDomains'));
+
+  assert.ok(
+    !/Up to \$40,000/.test(featured),
+    'The homepage advertises "Up to $40,000" again. Hamilton closed on August 6, 2026 — that is money a reader cannot apply for.',
+  );
+  assert.ok(
+    !/See My Estimated Grant/.test(featured),
+    'The homepage offers to estimate a grant for a closed program again.',
+  );
+  // Comments are stripped first: this file's own notes quote the copy being
+  // banned, and a guard that trips on the explanation of why it exists is a
+  // guard people delete.
+  const homeCopy = home.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(
+    !/strongest grant opportunity/.test(homeCopy),
+    'The homepage calls a closed program the strongest grant opportunity again.',
+  );
+});
+
 // ─── No booking for a closed program ──────────────────────────────────────────
 
 const CLOSED_PROGRAM_PAGES = [

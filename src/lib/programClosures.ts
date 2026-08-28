@@ -44,6 +44,42 @@ export const HAMILTON_ADU_CLOSURE: ProgramClosure = {
 };
 
 /**
+ * St. Catharines' ADU grant — the HAF-funded cash grant pool, confirmed
+ * depleted on the same sweep that caught Hamilton.
+ *
+ * It has been marked closed in CURATED_PAGES and in the nav since August 6,
+ * but no page ever rendered a notice for it, so a reader who landed on a
+ * St. Catharines page directly was still told it was fundable.
+ */
+export const ST_CATHARINES_ADU_CLOSURE: ProgramClosure = {
+  program: "St. Catharines' ADU Grant (Housing Accelerator Fund)",
+  shortName: "St. Catharines' ADU grant",
+  city: "St. Catharines",
+  reason:
+    "The Housing Accelerator Fund allocation behind the cash grant has been fully committed, and the city is no longer accepting new grant applications.",
+  sourceUrl: "https://www.stcatharines.ca/en/additional-dwelling-units.aspx",
+  confirmedOn: "August 6, 2026",
+};
+
+/**
+ * The cities whose grants are closed, for CLIENT-side pages.
+ *
+ * `CURATED_PAGES` in `lib/grants.ts` is the real source of truth, but it lives
+ * server-side beside Prisma and cannot be imported into the React bundle. So
+ * this list is hand-maintained in the same way `grantSections` in Navbar.tsx
+ * is — and, like the nav, it is only safe because `lib/grant-integrity.test.ts`
+ * fails the build when it disagrees with the hub.
+ *
+ * Anything on the marketing side that names a city's grant reads this. Adding
+ * a fourth uncompared copy of "is this open?" is what put a closed $40,000
+ * grant on the homepage for three weeks.
+ */
+export const CLOSED_GRANT_CITIES = ["Hamilton", "St. Catharines"] as const;
+
+export const isGrantCityClosed = (city: string): boolean =>
+  (CLOSED_GRANT_CITIES as readonly string[]).includes(city);
+
+/**
  * Where a closed program's traffic goes now.
  *
  * These visitors arrived wanting a finished basement, not paperwork — sending

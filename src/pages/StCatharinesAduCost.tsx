@@ -304,8 +304,8 @@ export default function StCatharinesAduCost() {
       <section className="py-16 md:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionHeading
-            title="How the St. Catharines grant affects cost"
-            description="Grant support can improve project feasibility, but it does not remove the need for a realistic remaining budget."
+            title="How the St. Catharines grant affected cost (closed)"
+            description="The cash grant is closed to new applications as of August 6, 2026. This is kept as reference for how the funding worked, and for anyone already in the program."
           />
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -313,14 +313,14 @@ export default function StCatharinesAduCost() {
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <p className="leading-7 text-slate-700">
-                    Funding may cover up to 70% of eligible costs.
+                    While open, funding covered up to 70% of eligible costs.
                   </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <p className="leading-7 text-slate-700">
-                    Up to $40,000 for interior projects and up to $80,000 for
-                    exterior projects, if eligible.
+                    Caps were $40,000 for interior projects and $80,000 for
+                    exterior projects, where eligible.
                   </p>
                 </div>
                 <div className="flex items-start gap-3">
