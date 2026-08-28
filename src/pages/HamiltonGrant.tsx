@@ -11,7 +11,11 @@ import {
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import ProgramClosedNotice from "../components/ProgramClosedNotice";
-import { BASEMENT_FINANCING_OFFER, HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
+import {
+  BASEMENT_FINANCING_OFFER,
+  CLOSED_PROGRAM_INTAKE,
+  HAMILTON_ADU_CLOSURE,
+} from "../lib/programClosures";
 
 export default function HamiltonGrant() {
   return (
@@ -118,7 +122,7 @@ export default function HamiltonGrant() {
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <FileText className="h-5 w-5 shrink-0" />
-                    <span>Check If I Qualify</span>
+                    <span>{CLOSED_PROGRAM_INTAKE.ctaLabel}</span>
                   </span>
                   <ArrowRight className="ml-auto h-5 w-5 shrink-0 text-white/70" />
                 </a>
@@ -213,7 +217,7 @@ export default function HamiltonGrant() {
                 href="#eligibility-form"
                 className="rounded-xl border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
               >
-                Check If I Qualify
+                {CLOSED_PROGRAM_INTAKE.ctaLabel}
               </a>
 
               <a
@@ -286,7 +290,7 @@ export default function HamiltonGrant() {
               href="#eligibility-form"
               className="inline-flex rounded-xl bg-green-600 px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
             >
-              Get My Exact Eligibility
+              {CLOSED_PROGRAM_INTAKE.calculatorCtaLabel}
             </a>
           </div>
         </div>
@@ -353,7 +357,7 @@ export default function HamiltonGrant() {
       </section>
 
       {/* FORM */}
-      <HamiltonGrantForm />
+      <HamiltonGrantForm variant="closed" />
 
       {/* QUALIFICATIONS */}
       <section className="bg-white">
@@ -423,11 +427,12 @@ export default function HamiltonGrant() {
         <div className="mx-auto max-w-7xl px-6 py-16 md:px-8">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
             <h2 className="text-3xl font-extrabold">
-              Don't Miss Out on Up to $40,000
+              Build the Basement Without the Grant
             </h2>
 
             <p className="mt-4 text-lg text-slate-300">
-              Your eligibility depends on how your project is structured. Check before you build.
+              Hamilton's program is closed to new applications. The build is still
+              financed in full, with nothing owed upfront.
             </p>
 
             <div className="mt-8">
@@ -435,7 +440,7 @@ export default function HamiltonGrant() {
                 href="#eligibility-form"
                 className="inline-flex rounded-xl bg-yellow-400 px-6 py-3 text-sm font-bold text-slate-900"
               >
-                Check If You Qualify
+                {CLOSED_PROGRAM_INTAKE.ctaLabel}
               </a>
             </div>
           </div>

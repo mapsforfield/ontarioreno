@@ -3,7 +3,11 @@ import { ArrowRight, CheckCircle, Home, ShieldCheck, FileText, Wallet } from "lu
 import HamiltonGrantCalculator from "../components/HamiltonGrantCalculator";
 import HamiltonGrantForm from "../components/HamiltonGrantForm";
 import ProgramClosedNotice from "../components/ProgramClosedNotice";
-import { BASEMENT_FINANCING_OFFER, HAMILTON_ADU_CLOSURE } from "../lib/programClosures";
+import {
+  BASEMENT_FINANCING_OFFER,
+  CLOSED_PROGRAM_INTAKE,
+  HAMILTON_ADU_CLOSURE,
+} from "../lib/programClosures";
 
 export default function HamiltonSecondarySuiteGrant() {
     return (
@@ -71,7 +75,7 @@ export default function HamiltonSecondarySuiteGrant() {
                                 href="#eligibility-form"
                                 className="rounded-xl border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
                             >
-                                Check If My Home Qualifies
+                                {CLOSED_PROGRAM_INTAKE.ctaLabel}
                             </a>
 
                             <a
@@ -209,14 +213,14 @@ export default function HamiltonSecondarySuiteGrant() {
                             href="#eligibility-form"
                             className="inline-flex rounded-xl bg-green-600 px-6 py-3 font-bold text-white"
                         >
-                            Get My Exact Eligibility
+                            {CLOSED_PROGRAM_INTAKE.calculatorCtaLabel}
                         </a>
                     </div>
                 </div>
             </section>
 
             {/* FORM */}
-            <HamiltonGrantForm />
+            <HamiltonGrantForm variant="closed" />
 
             {/* INTERNAL LINKING */}
             <section className="bg-white">
@@ -266,7 +270,7 @@ export default function HamiltonSecondarySuiteGrant() {
                             href="#eligibility-form"
                             className="rounded-xl bg-yellow-400 px-8 py-4 font-bold text-slate-900"
                         >
-                            Check If I Qualify
+                            {CLOSED_PROGRAM_INTAKE.ctaLabel}
                         </a>
                     </div>
                 </div>
