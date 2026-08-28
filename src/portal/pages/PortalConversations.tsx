@@ -18,7 +18,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MessageSquare, Send, Trash2, User, AlertTriangle, RefreshCw } from 'lucide-react';
+import {
+  MessageSquare,
+  Send,
+  Trash2,
+  User,
+  AlertTriangle,
+  RefreshCw,
+  CalendarCheck,
+} from 'lucide-react';
 
 type ConversationMessage = {
   id: string;
@@ -62,6 +70,20 @@ const REASON_LABEL: Record<string, string> = {
   NO_SLOTS_AVAILABLE: 'Nothing open to offer them',
 };
 
+/** Why the calendar came back empty, in the words a rep needs. */
+const SLOT_BLOCK_LABEL: Record<string, string> = {
+  NO_AREA: 'No scheduling area on this lead — add the address first.',
+  NO_REPS: 'No rep covers this area.',
+  PROGRAM_CLOSED: 'That program has closed.',
+  PROGRAM_NOT_OPEN: 'That program is not open yet.',
+};
+
+function slotLabel(date: string, time: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  if (!Number.isFinite(d.getTime())) return `${date} ${time}`;
+  return `${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${time}`;
+}
+
 function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return '';
@@ -103,6 +125,140 @@ export default function PortalConversations() {
     () => conversations.find((c) => c.id === selectedId) ?? null,
     [conversations, selectedId]
   );
+
+  /**
+   * Pull anything that was texted from outside the portal into this thread.
+   *
+   * Scoped to ONE conversation on purpose: a sync is two Twilio reads per
+   * thread, and doing all of them on every page load would be hundreds of
+   * calls to answer a question about one lead. Runs when a thread is opened,
+   * which is the moment its completeness actually matters.
+   */
+  const syncThread = useCallback(async (conversationId: string) => {
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _action: 'conversation_sync', conversationId }),
+      });
+      if (!res.ok) return 0;
+      const data = (await res.json().catch(() => ({}))) as { imported?: number };
+      return data.imported ?? 0;
+    } catch {
+      // Twilio being unreachable leaves the thread as it was. The rows the
+      // portal wrote itself are still correct, just possibly incomplete.
+      return 0;
+    }
+  }, []);
+
+  // Opening a thread reconciles it, and reloads only if that changed anything.
+  useEffect(() => {
+    if (!selectedId) return;
+    let cancelled = false;
+    void (async () => {
+      const imported = await syncThread(selectedId);
+      if (imported > 0 && !cancelled) await load();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, syncThread, load]);
+
+  /**
+   * Booking straight from the thread.
+   *
+   * The times we OFFERED come first — a homeowner who said yes said yes to one
+   * of those, and re-deriving from the calendar would show a different set than
+   * the one they were actually shown. The calendar's other open times follow,
+   * for the common case where the thread reached a person before any slot was
+   * offered.
+   *
+   * This posts the same `book_lead` the lead page does. Nothing new can be
+   * booked from here that could not be booked there; it is two clicks fewer.
+   */
+  const [openSlots, setOpenSlots] = useState<Array<{ date: string; time: string }>>([]);
+  const [slotNote, setSlotNote] = useState('');
+  const [booked, setBooked] = useState('');
+
+  useEffect(() => {
+    setBooked('');
+    setSlotNote('');
+    setOpenSlots([]);
+    if (!selected?.leadId || selected.phase === 'booked') return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/leads?_resource=lead_slots&leadId=${encodeURIComponent(selected.leadId)}`,
+          { credentials: 'include' }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          slots?: Array<{ date: string; time: string }>;
+          blocked?: { reason: string };
+        };
+        if (cancelled) return;
+        setOpenSlots(data.slots ?? []);
+        // Why there are none matters: a full calendar and a closed program are
+        // different problems, and the rep should not go looking at the wrong one.
+        if (data.blocked) setSlotNote(SLOT_BLOCK_LABEL[data.blocked.reason] ?? 'No times available.');
+      } catch {
+        // Leave the panel empty rather than wrong. The lead page still books.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.leadId, selected?.phase]);
+
+  /**
+   * Book, then mark the thread booked so the automation stops.
+   *
+   * Notifications are ON, unlike the lead page's default. A booking made here
+   * came out of a text conversation the homeowner is already having with us —
+   * they are expecting the confirmation, and it is what carries the address,
+   * the reference and the reminders.
+   */
+  const bookSlot = async (date: string, time: string) => {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          _action: 'book_lead',
+          leadId: selected.leadId,
+          date,
+          time,
+          notify: true,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; publicReference?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      // The thread is over: leaving it live would let a later reply draft an
+      // offer to someone who already has an appointment.
+      await fetch('/api/leads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          _action: 'conversation_set_phase',
+          conversationId: selected.id,
+          phase: 'booked',
+        }),
+      }).catch(() => null);
+      setBooked(data.publicReference ?? 'booked');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not book that time.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   /** The one draft awaiting a decision on the selected thread, if any. */
   const pendingDraft = useMemo(
@@ -153,7 +309,10 @@ export default function PortalConversations() {
           </p>
         </div>
         <button
-          onClick={() => void load()}
+          onClick={() => void (async () => {
+            if (selectedId) await syncThread(selectedId);
+            await load();
+          })()}
           disabled={loading}
           className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
@@ -266,12 +425,73 @@ export default function PortalConversations() {
                           {m.direction === 'in' && m.intent && (
                             <> · read as {m.intent}{m.confident ? '' : ' (unsure)'}</>
                           )}
+                          {/* Sent from the Twilio dashboard rather than here.
+                              Worth saying: the automation did not choose these
+                              words and did not advance the thread for them. */}
+                          {m.templateId === 'sent_outside_portal' && <> · sent outside the portal</>}
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+
+              {/* ── Book it, from here ──
+                  A confirmed time is the point of the whole thread, and making
+                  Michael leave the conversation to place it is where the reply
+                  he was about to send gets forgotten. */}
+              {selected.phase !== 'booked' && (
+                <div className="mb-3 border border-slate-200 rounded-xl p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
+                    <CalendarCheck className="w-3.5 h-3.5" />
+                    Book a visit
+                  </p>
+                  {booked ? (
+                    <p className="text-sm text-emerald-700">Booked · {booked}</p>
+                  ) : (
+                    <>
+                      {selected.offeredSlots.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 mb-1.5">Times we offered them:</p>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {selected.offeredSlots.map((slot) => (
+                              <button
+                                key={`offered-${slot.date}-${slot.time}`}
+                                onClick={() => void bookSlot(slot.date, slot.time)}
+                                disabled={busy}
+                                className="px-3 py-1.5 text-sm rounded-lg bg-[#1B3C6C] text-white hover:opacity-90 disabled:opacity-50"
+                              >
+                                {slotLabel(slot.date, slot.time)}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {openSlots.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 mb-1.5">Other open times:</p>
+                          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                            {openSlots.slice(0, 12).map((slot) => (
+                              <button
+                                key={`open-${slot.date}-${slot.time}`}
+                                onClick={() => void bookSlot(slot.date, slot.time)}
+                                disabled={busy}
+                                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                {slotLabel(slot.date, slot.time)}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {slotNote && <p className="text-xs text-amber-700">{slotNote}</p>}
+                      {!slotNote && openSlots.length === 0 && selected.offeredSlots.length === 0 && (
+                        <p className="text-xs text-slate-400">No open times on the calendar.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* ── The draft ── */}
               {pendingDraft ? (
