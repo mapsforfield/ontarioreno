@@ -143,8 +143,14 @@ export default function PortalConversations() {
         body: JSON.stringify({ _action: 'conversation_sync', conversationId }),
       });
       if (!res.ok) return 0;
-      const data = (await res.json().catch(() => ({}))) as { imported?: number };
-      return data.imported ?? 0;
+      const data = (await res.json().catch(() => ({}))) as {
+        imported?: number;
+        repaired?: number;
+      };
+      // A restamped row changed nothing about WHICH messages are here, only
+      // about their order — which is the thing the reader was complaining
+      // about, so it has to trigger the reload too.
+      return (data.imported ?? 0) + (data.repaired ?? 0);
     } catch {
       // Twilio being unreachable leaves the thread as it was. The rows the
       // portal wrote itself are still correct, just possibly incomplete.
@@ -179,38 +185,93 @@ export default function PortalConversations() {
    */
   const [openSlots, setOpenSlots] = useState<Array<{ date: string; time: string }>>([]);
   const [slotNote, setSlotNote] = useState('');
+  const [slotBlock, setSlotBlock] = useState('');
   const [booked, setBooked] = useState('');
+
+  const loadSlots = useCallback(async (leadId: string) => {
+    try {
+      const res = await fetch(
+        `/api/leads?_resource=lead_slots&leadId=${encodeURIComponent(leadId)}`,
+        { credentials: 'include' }
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        slots?: Array<{ date: string; time: string }>;
+        blocked?: { reason: string };
+      };
+      setOpenSlots(data.slots ?? []);
+      setSlotBlock(data.blocked?.reason ?? '');
+      // Why there are none matters: a full calendar and a closed program are
+      // different problems, and the rep should not go looking at the wrong one.
+      setSlotNote(
+        data.blocked ? SLOT_BLOCK_LABEL[data.blocked.reason] ?? 'No times available.' : ''
+      );
+    } catch {
+      // Leave the panel empty rather than wrong. The lead page still books.
+    }
+  }, []);
 
   useEffect(() => {
     setBooked('');
     setSlotNote('');
+    setSlotBlock('');
     setOpenSlots([]);
     if (!selected?.leadId || selected.phase === 'booked') return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(
-          `/api/leads?_resource=lead_slots&leadId=${encodeURIComponent(selected.leadId)}`,
-          { credentials: 'include' }
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          slots?: Array<{ date: string; time: string }>;
-          blocked?: { reason: string };
-        };
-        if (cancelled) return;
-        setOpenSlots(data.slots ?? []);
-        // Why there are none matters: a full calendar and a closed program are
-        // different problems, and the rep should not go looking at the wrong one.
-        if (data.blocked) setSlotNote(SLOT_BLOCK_LABEL[data.blocked.reason] ?? 'No times available.');
-      } catch {
-        // Leave the panel empty rather than wrong. The lead page still books.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?.leadId, selected?.phase]);
+    void loadSlots(selected.leadId);
+  }, [selected?.leadId, selected?.phase, loadSlots]);
+
+  /**
+   * The address the homeowner texted, taken off the thread.
+   *
+   * It is on the thread and nowhere else: the classifier reads `gave_address`
+   * and the runner hands the booking to a person, but nothing ever writes the
+   * text onto the lead. So the calendar had no scheduling area for a lead who
+   * had already told us where they live, and the rep retyped it into another
+   * page.
+   *
+   * Prefilled, never auto-saved. "168 wedtbridge avenue" is a real thing a
+   * homeowner types, and the travel radius is measured on whatever this
+   * resolves to — a rep confirming it is the point, not friction. Saving goes
+   * through `set_lead_address`, the same Places resolution the public form
+   * uses; nothing here trusts the typed string.
+   */
+  const textedAddress = useMemo(() => {
+    const said = selected?.messages
+      .filter((m) => m.direction === 'in' && m.intent === 'gave_address' && m.body.trim())
+      .at(-1);
+    return said?.body.trim() ?? '';
+  }, [selected]);
+
+  const [addressDraft, setAddressDraft] = useState('');
+  useEffect(() => {
+    setAddressDraft(textedAddress);
+  }, [textedAddress, selected?.leadId]);
+
+  const saveAddress = async () => {
+    if (!selected?.leadId || !addressDraft.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          _action: 'set_lead_address',
+          leadId: selected.leadId,
+          addressText: addressDraft.trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      await loadSlots(selected.leadId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that address.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   /**
    * Book, then mark the thread booked so the automation stops.
@@ -485,6 +546,37 @@ export default function PortalConversations() {
                         </>
                       )}
                       {slotNote && <p className="text-xs text-amber-700">{slotNote}</p>}
+                      {/* The address is already in the thread. Offering it here
+                          is the difference between one click and retyping the
+                          whole lead into the consultation form. */}
+                      {slotBlock === 'NO_AREA' && (
+                        <div className="mt-2">
+                          <label className="block text-xs text-slate-500 mb-1">
+                            {textedAddress
+                              ? 'They texted this address — check it, then save:'
+                              : 'Property address:'}
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              value={addressDraft}
+                              onChange={(e) => setAddressDraft(e.target.value)}
+                              placeholder="123 Main St, Welland"
+                              className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-slate-200"
+                            />
+                            <button
+                              onClick={() => void saveAddress()}
+                              disabled={busy || !addressDraft.trim()}
+                              className="px-3 py-1.5 text-sm rounded-lg bg-[#1B3C6C] text-white hover:opacity-90 disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            Saved through the same address check the public form uses. Times appear
+                            here once it resolves.
+                          </p>
+                        </div>
+                      )}
                       {!slotNote && openSlots.length === 0 && selected.offeredSlots.length === 0 && (
                         <p className="text-xs text-slate-400">No open times on the calendar.</p>
                       )}
