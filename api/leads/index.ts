@@ -881,11 +881,39 @@ async function handleCollection(
               state: m.direction === 'out' ? 'sent' : 'received',
               templateId: m.direction === 'out' ? 'sent_outside_portal' : '',
               messageSid: m.messageSid,
+              // Twilio's clock, not ours. Defaulting to now() stamped every
+              // imported message with the moment of the sync, so the opener a
+              // lead received first sorted BELOW their reply to it and the
+              // thread read back in an order the conversation never happened
+              // in.
+              createdAt: m.sentAt,
             },
           }).catch((err: unknown) => {
             // Unique messageSid: two syncs racing is a no-op, not an error.
             console.error('[conversation_sync] skipped a row:', err);
           });
+        }
+
+        // Rows imported before the stamp was carried across still hold the
+        // time of THEIR sync rather than the time they were sent. Repairing
+        // them here means opening the thread once puts it back in order; the
+        // alternative is a thread that stays permanently scrambled because the
+        // messages are, correctly, no longer missing.
+        const remoteBySid = new Map(remote.map((m) => [m.messageSid, m] as const));
+        let repaired = 0;
+        for (const local of convo.messages) {
+          if (!local.messageSid) continue;
+          const match = remoteBySid.get(local.messageSid);
+          if (!match) continue;
+          if (Math.abs(match.sentAt.getTime() - local.createdAt.getTime()) < 60_000) continue;
+          const done = await prisma.leadConversationMessage
+            .update({ where: { id: local.id }, data: { createdAt: match.sentAt } })
+            .then(() => true)
+            .catch((err: unknown) => {
+              console.error('[conversation_sync] could not restamp a row:', err);
+              return false;
+            });
+          if (done) repaired += 1;
         }
 
         // lastOutbound has to be what we ACTUALLY said last, wherever it was
@@ -905,7 +933,7 @@ async function handleCollection(
           });
         }
 
-        return res.status(200).json({ ok: true, imported: missing.length });
+        return res.status(200).json({ ok: true, imported: missing.length, repaired });
       });
     }
 
