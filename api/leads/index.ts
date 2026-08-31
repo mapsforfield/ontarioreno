@@ -1501,6 +1501,11 @@ function publicProgramPayload(program: ProgramConfig) {
     pageTitle: program.pageTitle ?? null,
     fundingStepHeading: program.fundingStepHeading ?? null,
     addressPlacement: program.addressPlacement ?? 'first',
+    bookingFlow: program.bookingFlow ?? 'questions_first',
+    // Only the calendar-early flow asks these, and only after the slot is held.
+    // Sent for every program regardless — an unused field is cheaper than a
+    // second payload shape.
+    prepQuestions: program.prepQuestions,
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
     // Told to the client so confirmation copy can't promise a text we cannot
@@ -2380,7 +2385,12 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       answers,
     });
 
-    const needsReview = routing.outcome === 'MANUAL_REVIEW';
+    // A booked lead can still need a person to look at it. On the calendar-early
+    // flow an unresolvable typed address no longer blocks the booking (see
+    // booksWithoutVerifiedAddress), so the flag — not the outcome — is what puts
+    // it in front of a rep before the day is planned around it.
+    const needsReview =
+      routing.outcome === 'MANUAL_REVIEW' || routing.reasons.includes('ADDRESS_UNVERIFIED');
     const isNurture = routing.outcome === 'NURTURE';
     const lead = await withTables(() =>
       prisma.lead.create({
@@ -2568,6 +2578,88 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       program: publicProgramPayload(program),
       offersCalendar: routing.outcome === 'DIRECT_CALENDAR',
     });
+  }
+
+  // ── Availability BEFORE there is a lead ──
+  //
+  // The calendar-early flow shows times as its second screen, which is before
+  // anyone has told us their name, let alone an address. There is no lead to key
+  // on yet, so this answers for the PROGRAM: the same computation, run against a
+  // destination we do not know.
+  //
+  // What that costs is honest and worth naming. With no coordinates the
+  // same-day travel ceiling cannot narrow the list (see travelOk — an unknown
+  // destination does not block), so these times are the widest the calendar can
+  // be. The slot is re-checked at booking against the real lead, and a time that
+  // has since become unreachable comes back as SLOT_UNAVAILABLE with
+  // alternatives, exactly as a slot taken by someone else does.
+  //
+  // Reads nothing about any rep or any homeowner: times only, same as the
+  // lead-keyed version.
+  if (flow === 'availability_preview' && req.method === 'GET') {
+    const program = programBySlug(String(req.query['slug'] ?? ''));
+    if (!program) return res.status(404).json({ error: 'Unknown program.' });
+    if (!program.enabled) return res.status(200).json({ slots: [], visitMinutes: 0 });
+    return res.status(200).json(
+      await availableSlotsForLead({
+        schedulingArea: program.schedulingArea,
+        programKey: program.key,
+      } as FlowLead)
+    );
+  }
+
+  // ── Prep answers, captured AFTER the booking ──
+  //
+  // Deliberately its own endpoint rather than part of submit. The booking is
+  // already committed by the time these are asked; this can fail, be skipped, or
+  // never be called at all, and the appointment stands either way. That is the
+  // whole point of moving the questions here.
+  //
+  // Merges rather than replaces: it must never be able to blank an answer the
+  // homeowner gave earlier in the flow.
+  if (flow === 'prep' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const lead = await loadPublicFlowLead(clean(body.leadRef));
+    if (!lead) return res.status(404).json({ error: 'Session not found.' });
+    const program = programByKey(lead.programKey) ?? programBySlug(clean(body.programSlug));
+    if (!program) return res.status(404).json({ error: 'Unknown program.' });
+
+    const raw = (body.answers ?? {}) as Record<string, unknown>;
+    const incoming: Record<string, string> = {};
+    // Only keys this program actually asks after booking, and only values it
+    // offered — this endpoint is public and unauthenticated, so it may not be a
+    // way to write arbitrary data onto a lead.
+    for (const question of program.prepQuestions) {
+      const value = clean(raw[question.key]);
+      if (!value) continue;
+      if (!question.options.some((o) => o.value === value)) continue;
+      incoming[question.key] = value;
+    }
+    if (Object.keys(incoming).length === 0) return res.status(200).json({ saved: 0 });
+
+    const existing = (lead.answersJson ?? {}) as Record<string, string>;
+    const answers: Record<string, string> = { ...existing, ...incoming };
+
+    // The funding tags routing would have added had these been answered before
+    // booking. The rep's brief reads these, and a lead that asked to talk the
+    // money through should look the same whichever order it was asked in.
+    const reasons = [...(lead.routingReasonCodes ?? [])];
+    if (incoming.contribution === 'need_financing' && !reasons.includes('WANTS_FINANCING')) {
+      reasons.push('WANTS_FINANCING');
+    }
+    if (incoming.contribution === 'unsure' && !reasons.includes('NEEDS_FUNDING_GUIDANCE')) {
+      reasons.push('NEEDS_FUNDING_GUIDANCE');
+    }
+
+    await withTables(() =>
+      prisma.lead.update({
+        where: { id: lead.id },
+        data: { answersJson: answers, routingReasonCodes: reasons },
+      })
+    );
+    // So a rep with the lead open sees the answers arrive.
+    await ringDoorbell();
+    return res.status(200).json({ saved: Object.keys(incoming).length });
   }
 
   // ── Availability ──

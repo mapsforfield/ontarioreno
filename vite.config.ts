@@ -19,9 +19,13 @@ import { routeConsultation } from './lib/consultation-routing'
  * are generated, not real availability.
  */
 function mockLeadsApi(): Plugin {
+  // Uneven on purpose: every day offering the same five times cannot show
+  // whether the "N left" scarcity label renders, which is half of what the
+  // calendar screen is being previewed for.
+  const ALL_TIMES = ['10:00', '12:00', '14:00', '16:00', '18:00']
   const slots = Array.from({ length: 8 }, (_, d) => {
     const date = new Date(Date.now() + (d + 1) * 86_400_000).toISOString().slice(0, 10)
-    return ['10:00', '12:00', '14:00', '16:00', '18:00'].map((time) => ({ date, time }))
+    return ALL_TIMES.slice(0, [2, 5, 1, 4, 5, 3, 5, 2][d]).map((time) => ({ date, time }))
   }).flat()
 
   return {
@@ -60,6 +64,8 @@ function mockLeadsApi(): Plugin {
             // renders the address on step 1 while production renders it last,
             // which makes this mock actively misleading about the real flow.
             addressPlacement: program.addressPlacement ?? 'first',
+            bookingFlow: program.bookingFlow ?? 'questions_first',
+            prepQuestions: program.prepQuestions,
             guideUrl: program.guideUrl,
             guideLabel: program.guideLabel,
             smsEnabled: false,
@@ -67,6 +73,9 @@ function mockLeadsApi(): Plugin {
         }
         if (flow === 'address_resolve') return send({ candidate: null })
         if (flow === 'availability') return send({ slots, visitMinutes: program.visitMinutes })
+        // The calendar-early flow's lead-less calendar.
+        if (flow === 'availability_preview') return send({ slots, visitMinutes: program.visitMinutes })
+        if (flow === 'prep') return send({ saved: 0 })
         if (flow === 'submit') {
           // Mirrors the real router closely enough to exercise the flow: every
           // funding answer books, and only a stated "no" on ownership declines.

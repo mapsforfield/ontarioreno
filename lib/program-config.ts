@@ -172,6 +172,33 @@ export type ProgramConfig = {
   /** Asked after booking. Never blocks the calendar. */
   prepQuestions: Question[];
   /**
+   * Where the calendar sits in the public flow.
+   *
+   * 'questions_first' (the default, and every grant flow) asks the whole
+   * question set, then the contact details, and shows times last.
+   *
+   * 'calendar_early' shows the calendar as the SECOND screen, before we have
+   * asked for anything but the project type — open times are the most
+   * motivating thing on the page and were sitting behind three screens of
+   * questions and a contact form. What remains after the calendar is the
+   * minimum needed to hold the slot; everything else moves to `prepQuestions`,
+   * which are asked after the booking is committed.
+   */
+  bookingFlow?: 'questions_first' | 'calendar_early';
+  /**
+   * Book this homeowner even when their typed address did not resolve.
+   *
+   * Only meaningful alongside 'calendar_early'. There, the homeowner has
+   * already chosen a time before we ever see an address, so refusing the
+   * booking over an address our own lookup could not parse reads as the site
+   * breaking — and the address is not what decides whether we will visit.
+   *
+   * The lead is still flagged for review and still carries ADDRESS_UNVERIFIED,
+   * so a rep confirms the address before the day is planned. It is a change to
+   * what BLOCKS a booking, never to what the rep is told.
+   */
+  booksWithoutVerifiedAddress?: boolean;
+  /**
    * What the booked consultation actually is. Drives the customer-facing wording
    * and the Appointment.appointmentType written at booking, so the homeowner is
    * never unclear about whether someone is coming to the property.
@@ -476,10 +503,17 @@ const BASEMENT_PROJECT_TYPE: Question = {
 
 /**
  * Carries no routing weight — whether a permit exists changes nothing about
- * whether we will visit, exactly as with the other property questions. It sits
- * here rather than in prepQuestions because it is a single tap that makes step
- * one feel like a real question about their project rather than a formality,
- * and because the rep genuinely wants it before they walk in.
+ * whether we will visit, exactly as with the other property questions.
+ *
+ * It used to sit on step 1, in front of the calendar, on the reasoning that one
+ * extra tap made the opening screen feel like a real question. That reasoning
+ * does not survive the calendar moving to step 2: anything asked before the
+ * times are visible is a toll on the way to the only screen that motivates
+ * anyone. The rep still wants the answer, so it is asked after the booking is
+ * committed, where a homeowner who ignores it costs us nothing.
+ *
+ * `step` is unused for a prep question and is kept only so the type is
+ * satisfied.
  */
 const BASEMENT_PERMIT: Question = {
   key: 'hasPermit',
@@ -487,28 +521,33 @@ const BASEMENT_PERMIT: Question = {
   step: 1,
   options: [
     { value: 'yes', label: 'Yes' },
-    { value: 'no', label: 'No' },
+    { value: 'no', label: 'No, or not sure' },
   ],
 };
 
 /**
- * Step 2, alongside the financing explainer it belongs to.
+ * Asked after the booking, not before it.
  *
- * The wording deliberately does not assume financing. The screen it sits on
- * leads with a monthly number, so an unqualified "how are you paying?" read as
- * a formality with one expected answer — and someone intending to pay cash was
- * left wondering whether they were on the wrong page. Naming cash as a first-
- * class answer in the question itself is what keeps the screen honest.
+ * This is the question the financing explainer belonged to, and the pair of
+ * them used to sit on step 2 — a monthly payment quoted to a stranger who had
+ * not yet been shown a single available time. That order asks somebody to
+ * qualify themselves financially before anything of value has been offered,
+ * which is the wrong way round for a cash buyer and worse for a credit-shy one.
+ * Both now sit past the confirmation, where the visit is already booked and the
+ * answer changes nothing about whether we come.
+ *
+ * The wording deliberately does not assume financing. Naming cash as a first-
+ * class answer in the question itself is what keeps it honest.
  */
 const BASEMENT_CONTRIBUTION: Question = {
   key: 'contribution',
-  label: 'Would you like to use the monthly plan, or pay another way?',
+  label: 'How are you thinking of paying?',
   help: 'Either is fine. The consultation and the quote are the same whichever you choose.',
   routingRelevant: true,
   step: 2,
   options: [
-    { value: 'need_financing', label: 'Use the monthly plan' },
-    { value: 'cash_equity', label: 'Pay by cash, savings or home equity' },
+    { value: 'need_financing', label: 'Monthly plan' },
+    { value: 'cash_equity', label: 'Cash, savings or home equity' },
     { value: 'unsure', label: "I'd like to talk it through" },
   ],
 };
@@ -621,10 +660,24 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // Ordered by step, and deliberately without TIMELINE: this program never
   // nurtures on it (nurtureTimelines is []), so it asked a question that could
   // not change anything, in front of the contact form.
-  questions: [BASEMENT_PROJECT_TYPE, BASEMENT_PERMIT, BASEMENT_CONTRIBUTION],
+  // One question before the calendar, and it is the one that tells us what this
+  // person actually wants. The permit and the payment question moved to
+  // prepQuestions — see their definitions above for why.
+  questions: [BASEMENT_PROJECT_TYPE],
   // Address last, with the contact details. See addressPlacement.
   addressPlacement: 'final',
-  prepQuestions: PREP_QUESTIONS,
+  bookingFlow: 'calendar_early',
+  // See booksWithoutVerifiedAddress. The homeowner has picked a time before we
+  // ever see an address here, so a lookup we could not parse must not throw the
+  // booking away.
+  booksWithoutVerifiedAddress: true,
+  // Asked on the confirmation screen, after the slot is held, and skippable.
+  //
+  // Not PREP_QUESTIONS: those three (basement condition, separate entrance,
+  // permit status) are the Hamilton GRANT's eligibility questions and were
+  // never collected on this flow — submit only ever writes keys from
+  // `questions`. Nothing stored is lost by them not being listed here.
+  prepQuestions: [BASEMENT_PERMIT, BASEMENT_CONTRIBUTION],
   // Nobody prices a basement without standing in it.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Basement Renovation Consultation',
