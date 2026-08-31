@@ -35,7 +35,8 @@ import type { LucideIcon } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { usePortalAuth } from '../auth';
-import { followUpSilenced, lostDealIds } from '../data/followUps';
+import { lostDealIds } from '../data/followUps';
+import { countNeedsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
 import { repCanAccess, featureForPath, type RepFeatureKey } from '../data/repFeatures';
 import { torontoToday } from '../lib/time';
@@ -105,21 +106,15 @@ export default function PortalLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Needs-attention count for badge on Consultations nav item
+  // Needs-attention count for badge on Consultations nav item.
+  // The rule itself lives in needsAttention.ts, shared with the dashboard's
+  // "Needs attention" list — this used to be a second hand-written copy that
+  // had drifted, and the badge undercounted as a result.
   const today = torontoToday();
   const visibleAppointments = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
   // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
   const lostDeals = lostDealIds(deals);
-  const needsAttentionCount = visibleAppointments.filter((a) => {
-    const quiet = followUpSilenced(a, lostDeals);
-    return (
-      (a.status === 'completed' && !a.outcomeSubmitted) ||
-      (!quiet && a.nextStep === 'follow_up_required' && a.followUpDate && a.followUpDate <= today) ||
-      (['hot', 'warm'].includes(a.homeownerInterestLevel ?? '') && a.nextStep === 'no_action') ||
-      (a.appointmentDate < today && a.status !== 'completed') ||
-      (!quiet && a.consultationStage === 'follow_up_required')
-    );
-  }).length;
+  const needsAttentionCount = countNeedsAttention(visibleAppointments, { lostDeals, today });
   // Push notifications
   const [pushState, setPushState] = useState<'unsupported' | 'default' | 'granted' | 'denied' | 'registering'>('default');
   useEffect(() => {
