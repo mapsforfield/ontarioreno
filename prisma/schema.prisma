@@ -154,6 +154,11 @@ model Deal {
   activity           DealActivity[]
   salesAgreements    SalesAgreement[]
   documents          DealDocument[]
+
+  @@index([assignedRepId, status])
+  @@index([deletedAt])
+  // The follow-up digest asks for everything due or overdue, every morning.
+  @@index([nextFollowUpDate])
 }
 
 model DealActivity {
@@ -163,6 +168,8 @@ model DealActivity {
   createdAt DateTime @default(now())
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
 }
 
 // ─── Households ──────────────────────────────────────────────────────────────
@@ -205,6 +212,11 @@ model Client {
   household    Household?    @relation(fields: [householdId], references: [id], onDelete: SetNull)
   createdBy    User          @relation(fields: [createdByUserId], references: [id])
   appointments Appointment[]
+
+  @@index([deletedAt])
+  // The other half of the repeat-customer lookup, alongside Appointment.
+  @@index([email])
+  @@index([phone])
 }
 
 // ─── Client media (videos stored in Cloudflare R2; only metadata here) ──────────
@@ -313,6 +325,20 @@ model Appointment {
   assignedRep User        @relation("AssignedRep", fields: [assignedRepId], references: [id])
   contractor  Contractor? @relation(fields: [contractorId], references: [id])
   createdBy   User        @relation("CreatedBy", fields: [createdByUserId], references: [id])
+
+  // The calendar, and everything that reads it. `appointmentDate` alone drives
+  // the morning brief and the reminder check ("what is on today"); paired with
+  // the rep it is the availability question every booking asks — what does this
+  // rep already have on this date.
+  @@index([appointmentDate])
+  @@index([assignedRepId, appointmentDate])
+  // Every list query filters soft-deleted rows out.
+  @@index([deletedAt])
+  @@index([dealId])
+  // priorNotesForHomeowner looks a homeowner up by both on every booking, so a
+  // repeat customer arrives with their history rather than a blank sheet.
+  @@index([email])
+  @@index([phone])
 }
 
 // ─── Commissions ─────────────────────────────────────────────────────────────
@@ -358,6 +384,10 @@ model Activity {
   metadata     Json?
 
   actor User @relation(fields: [actorUserId], references: [id])
+
+  // Always read newest-first, and scoped to a deal from the deal drawer.
+  @@index([createdAt])
+  @@index([dealId])
 }
 
 // ─── Contractor Dispatches ────────────────────────────────────────────────────
@@ -380,6 +410,8 @@ model ContractorDispatch {
   deal       Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contractor Contractor @relation(fields: [contractorId], references: [id])
   sentBy     User       @relation(fields: [sentByUserId], references: [id])
+
+  @@index([dealId, createdAt])
 }
 
 // ─── Sales Tracker ───────────────────────────────────────────────────────────
@@ -406,6 +438,8 @@ model SaleTracker {
   updatedAt       DateTime @updatedAt
 
   rep  User  @relation(fields: [repId], references: [id])
+
+  @@index([repId, sortOrder])
 }
 
 // ─── Sales Agreements ────────────────────────────────────────────────────────
@@ -518,6 +552,8 @@ model ProposalHistory {
   createdAt       DateTime @default(now())
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
 }
 
 // ─── Settings (key/value store for admin config like the business profile) ────
@@ -652,6 +688,9 @@ model Task {
   updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, dueAt])
+  @@index([dueAt])
 }
 
 // ─── Notification outbox ──────────────────────────────────────────────────────

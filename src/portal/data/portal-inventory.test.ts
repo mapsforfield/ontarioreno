@@ -93,10 +93,18 @@ for (const feature of PORTAL_FEATURES) {
       `${feature.page} is empty — the "${feature.navLabel}" page has no content.`,
     );
 
+    // Either form counts as wired up: a static `import X from './...'` or a
+    // `const X = lazy(() => import('./...'))`. The portal pages are lazy so
+    // they stay out of the bundle a homeowner downloads; asserting only the
+    // static form would have made that split look like a deletion.
+    //
     // assert.ok rather than assert.match: a failed match dumps all of App.tsx
     // into the CI log, burying the one line that says what broke.
+    const imported =
+      new RegExp(`import\\s+${feature.component}\\s+from`).test(app) ||
+      new RegExp(`const\\s+${feature.component}\\s*=\\s*lazy\\(`).test(app);
     assert.ok(
-      new RegExp(`import\\s+${feature.component}\\s+from`).test(app),
+      imported,
       `App.tsx no longer imports ${feature.component}. The "${feature.navLabel}" page exists but nothing loads it.`,
     );
 
