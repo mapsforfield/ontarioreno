@@ -134,6 +134,10 @@ export default function App() {
           {/* Public homeowner qualification + booking flow. Standalone (outside
               the marketing Layout) so the journey stays focused, and entirely
               unauthenticated — a homeowner never sees the portal. */}
+          {/* Bare /consultation is the basement flow — see the slug default in
+              ConsultationFlow. It exists for SMS: a shorter link survives a
+              text message better, and this is the offer those texts point at. */}
+          <Route path="/consultation" element={<ConsultationFlow />} />
           <Route path="/consultation/:slug" element={<ConsultationFlow />} />
 
           {/* Public customer-facing consultation pages — no auth required */}

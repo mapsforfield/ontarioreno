@@ -119,7 +119,12 @@ const REASON_TEXT: Record<string, string> = {
 };
 
 export default function ConsultationFlow() {
-  const slug = useParams<{ slug: string }>().slug ?? 'hamilton';
+  // No slug means the bare /consultation route, which is the basement offer —
+  // the short link the SMS campaigns send. Hamilton was the old default here and
+  // was never reachable: until that route existed there was always a slug, and
+  // Hamilton's grant has since closed, so defaulting to it would land a
+  // homeowner on a closed programme.
+  const slug = useParams<{ slug: string }>().slug ?? 'basement';
   const [searchParams] = useSearchParams();
 
   /**
