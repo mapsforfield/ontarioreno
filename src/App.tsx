@@ -83,30 +83,44 @@ const OshawaBasementRenovationCost = lazy(() => import('./pages/OshawaBasementRe
 const OshawaLegalBasement = lazy(() => import('./pages/OshawaLegalBasement'));
 const OshawaBasementPermit = lazy(() => import('./pages/OshawaBasementPermit'));
 const ContractorPartners = lazy(() => import('./pages/ContractorPartners'));
+// ─── Portal ───────────────────────────────────────────────────────────────
+// Split out of the entry bundle, like the marketing pages above.
+//
+// These were static imports, so all twenty of them — the 5,000-line
+// consultations calendar, the deals board, the contract PDF and DOCX writers —
+// were compiled into the one file every visitor downloads. A homeowner landing
+// on a grant page from an ad was parsing the whole broker portal before they
+// saw anything. Nothing here is reachable without logging in, so none of it
+// belongs on that path.
+//
+// The providers below stay static: they wrap the router itself rather than
+// answering to a route, and PortalGuard has to be able to decide before
+// anything loads. LazyRoutes already wraps every route in this file, so the
+// chunk-failure fallback covers these too.
 import { PortalAuthProvider } from './portal/auth';
 import { PortalGuard } from './portal/components/PortalGuard';
 import { PortalDataProvider } from './portal/data/store';
-import PortalLayout from './portal/components/PortalLayout';
-import PortalAdmin from './portal/pages/PortalAdmin';
-import PortalGrants from './portal/pages/PortalGrants';
-import PortalAppointments from './portal/pages/PortalAppointments';
-import PortalAnalytics from './portal/pages/PortalAnalytics';
-import PortalContractors from './portal/pages/PortalContractors';
-import PortalDashboard from './portal/pages/PortalDashboard';
-import PortalContracts from './portal/pages/PortalContracts';
-import PortalDeals from './portal/pages/PortalDeals';
-import PortalWorkspace from './portal/pages/PortalWorkspace';
-import ContractorCalendar from './portal/pages/ContractorCalendar';
-import ContractorClients from './portal/pages/ContractorClients';
-import PortalFinancing from './portal/pages/PortalFinancing';
-import PortalClients from './portal/pages/PortalClients';
-import PortalSubmissions from './portal/pages/PortalSubmissions';
-import PortalConversations from './portal/pages/PortalConversations';
-import PortalInvoices from './portal/pages/PortalInvoices';
-import PortalTasks from './portal/pages/PortalTasks';
-import PortalLogin from './portal/pages/PortalLogin';
-import ConsultationReschedule from './portal/pages/ConsultationReschedule';
-import ConsultationCancel from './portal/pages/ConsultationCancel';
+const PortalLayout = lazy(() => import('./portal/components/PortalLayout'));
+const PortalAdmin = lazy(() => import('./portal/pages/PortalAdmin'));
+const PortalGrants = lazy(() => import('./portal/pages/PortalGrants'));
+const PortalAppointments = lazy(() => import('./portal/pages/PortalAppointments'));
+const PortalAnalytics = lazy(() => import('./portal/pages/PortalAnalytics'));
+const PortalContractors = lazy(() => import('./portal/pages/PortalContractors'));
+const PortalDashboard = lazy(() => import('./portal/pages/PortalDashboard'));
+const PortalContracts = lazy(() => import('./portal/pages/PortalContracts'));
+const PortalDeals = lazy(() => import('./portal/pages/PortalDeals'));
+const PortalWorkspace = lazy(() => import('./portal/pages/PortalWorkspace'));
+const ContractorCalendar = lazy(() => import('./portal/pages/ContractorCalendar'));
+const ContractorClients = lazy(() => import('./portal/pages/ContractorClients'));
+const PortalFinancing = lazy(() => import('./portal/pages/PortalFinancing'));
+const PortalClients = lazy(() => import('./portal/pages/PortalClients'));
+const PortalSubmissions = lazy(() => import('./portal/pages/PortalSubmissions'));
+const PortalConversations = lazy(() => import('./portal/pages/PortalConversations'));
+const PortalInvoices = lazy(() => import('./portal/pages/PortalInvoices'));
+const PortalTasks = lazy(() => import('./portal/pages/PortalTasks'));
+const PortalLogin = lazy(() => import('./portal/pages/PortalLogin'));
+const ConsultationReschedule = lazy(() => import('./portal/pages/ConsultationReschedule'));
+const ConsultationCancel = lazy(() => import('./portal/pages/ConsultationCancel'));
 const ConsultationFlow = lazy(() => import('./pages/ConsultationFlow'));
 
 export default function App() {
