@@ -527,10 +527,25 @@ const EDITABLE = new Set([
   'clientId', 'dealId', 'appointmentId', 'sourceDetail',
 ]);
 
+/**
+ * The signed-in user as `requireAuth` actually returns them.
+ *
+ * `name` and `email` are part of that projection (see AUTH_USER_SELECT in
+ * lib/auth.ts) and are read below to attribute an audit trail. They were
+ * missing from the older `{ id, role }` shape, which typechecked only because
+ * nothing ever compiled this file.
+ */
+type AuthedUser = {
+  id: string;
+  role: string;
+  name?: string | null;
+  email?: string | null;
+};
+
 async function handleById(
   req: VercelRequest,
   res: VercelResponse,
-  user: { id: string; role: string },
+  user: AuthedUser,
   id: string,
 ) {
   const loadOwned = async () => {
@@ -598,7 +613,7 @@ async function handleById(
 async function handleCollection(
   req: VercelRequest,
   res: VercelResponse,
-  user: { id: string; role: string },
+  user: AuthedUser,
 ) {
   if (req.method === 'GET') {
     if (req.query['_resource'] === 'unassigned') {

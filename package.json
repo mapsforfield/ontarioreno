@@ -10,7 +10,7 @@
     "build": "node scripts/generate-schema-ddl.mjs --check && node scripts/apply-schema.mjs && node build-prisma.mjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc --noEmit -p api/tsconfig.json",
     "test": "tsx --test lib/*.test.ts src/portal/data/*.test.ts",
     "sitemap": "node generate-sitemap.js",
     "postinstall": "prisma generate",

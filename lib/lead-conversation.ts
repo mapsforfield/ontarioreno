@@ -196,6 +196,13 @@ export function decideNextAction(
       }
       return { kind: 'escalate', reason: 'INTENT_DOES_NOT_FIT_PHASE' };
   }
+
+  // Every remaining phase is terminal and returned at step 1, so this is
+  // unreachable today. It stays because the alternative — falling out of the
+  // switch with no return — hands `undefined` to the runner, and a phase added
+  // later without a case here would do exactly that. Escalating is the safe
+  // end: a person reads the thread instead of the automation guessing.
+  return { kind: 'escalate', reason: 'NEEDS_A_PERSON' };
 }
 
 /**

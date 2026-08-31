@@ -122,9 +122,15 @@ export function reconcileReminder(
  * be driven by a fake in tests.
  */
 export type ReminderStore = {
+  // `any`, not `unknown`, on the argument. This type exists to describe the
+  // small slice of the client this module needs, so that tests can pass a fake
+  // — but with `unknown` the real PrismaClient does not satisfy it, and every
+  // call site had to launder it through `as never`, which switched off
+  // checking on the argument entirely. `any` here keeps the shape honest and
+  // lets the real client through.
   notificationOutbox: {
-    updateMany: (args: unknown) => Promise<{ count: number }>;
-    upsert: (args: unknown) => Promise<unknown>;
+    updateMany: (args: any) => Promise<{ count: number }>;
+    upsert: (args: any) => Promise<unknown>;
   };
 };
 
