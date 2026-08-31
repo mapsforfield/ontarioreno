@@ -81,7 +81,15 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // and treating it as doubt is what sent qualified homeowners to a queue for
   // the sole offence of not knowing they had to tap the dropdown. Anything less
   // certain than a unique match never reaches this function as INFERRED.
-  if (addressState === 'ADDRESS_UNVERIFIED') reasons.push('ADDRESS_UNVERIFIED');
+  //
+  // A program may opt out of ADDRESS_UNVERIFIED being a BLOCK — see
+  // booksWithoutVerifiedAddress. It is still reported, still tags the lead and
+  // still flags it for review; it just no longer takes the calendar away from
+  // someone who has already chosen a time. Nothing else in this function
+  // changes, and no other program is affected.
+  const addressUnverified = addressState === 'ADDRESS_UNVERIFIED';
+  const addressBlocks = addressUnverified && !program?.booksWithoutVerifiedAddress;
+  if (addressBlocks) reasons.push('ADDRESS_UNVERIFIED');
   if (!area) reasons.push('MUNICIPALITY_UNRECOGNISED');
   // A recognised area whose program is not live yet (Simcoe at launch) must be
   // reviewed by a person, never declined — we do serve there.
@@ -136,6 +144,10 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // knows it needs financing, NEEDS_FUNDING_GUIDANCE has seen the explainer once
   // and expects the numbers walked through in person.
   const booked: RoutingReason[] = ['ELIGIBLE_FOR_BOOKING'];
+  // Carried into the booked reasons rather than dropped: the rep needs to know
+  // the address on this booking was never confirmed before they plan the day
+  // around it.
+  if (addressUnverified) booked.push('ADDRESS_UNVERIFIED');
   if (contribution === 'need_financing') booked.push('WANTS_FINANCING');
   if (contribution === 'unsure') booked.push('NEEDS_FUNDING_GUIDANCE');
   // An early timeline that this program chose to book anyway is TAGGED, never
