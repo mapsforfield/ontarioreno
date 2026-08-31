@@ -679,14 +679,22 @@ export default function PortalDeals() {
     }
     const dealId = state?.openDealId;
     if (dealId && handledNavState.current !== dealId) {
-      handledNavState.current = dealId;
       const dealToOpen = visibleDeals.find((d) => d.id === dealId);
+      // Only count this link as handled once the deal is actually on hand.
+      // It used to be marked handled immediately, so arriving before the deals
+      // finished loading opened the panel over an empty form and then never
+      // filled it in when the data landed — the rep had to back out and tap
+      // again. Invisible on a fast desk connection, reliable on a phone.
+      // `visibleDeals` is in the dependency list for the same reason: this
+      // effect has to get a second chance when the deals arrive.
+      if (!dealToOpen) return;
+      handledNavState.current = dealId;
       setSelectedDealId(dealId);
       setIsAddingDeal(false);
-      if (dealToOpen) openDeal(dealToOpen);
+      openDeal(dealToOpen);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
+  }, [location.state, visibleDeals.length]);
 
   const openAddDeal = () => {
     prefillClientIdRef.current = null;

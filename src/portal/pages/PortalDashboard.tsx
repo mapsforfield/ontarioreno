@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { followUpSilenced, lostDealIds } from '../data/followUps';
+import { needsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
 import { countUnworkedSubmissions } from '../data/submissions';
 import { ConsultationStage } from '../data/types';
@@ -112,23 +113,10 @@ export default function PortalDashboard() {
   );
   // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
   const lostDeals = lostDealIds(deals);
-  const needsAttentionAppointments = visibleAppointments.filter(
-    (appointment) =>
-      (appointment.status === 'completed' && !appointment.outcomeSubmitted) ||
-      (!followUpSilenced(appointment, lostDeals) &&
-        appointment.nextStep === 'follow_up_required' &&
-        appointment.followUpDate &&
-        appointment.followUpDate <= today) ||
-      (['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
-        appointment.nextStep === 'no_action') ||
-      (appointment.appointmentDate < today && appointment.status !== 'completed') ||
-      (!followUpSilenced(appointment, lostDeals) &&
-        appointment.consultationStage === 'follow_up_required') ||
-      (appointment.consultationStage === 'estimate_requested' &&
-        getDaysSince(appointment.updatedAt) > 3) ||
-      (appointment.consultationStage === 'contractor_review' &&
-        getDaysSince(appointment.updatedAt) > 3) ||
-      !appointment.assignedRepId
+  // Shared with the Consultations nav badge — see needsAttention.ts. Keeping
+  // one copy is the point: these two used to disagree.
+  const needsAttentionAppointments = visibleAppointments.filter((appointment) =>
+    needsAttention(appointment, { lostDeals, today })
   );
   const upcomingAppointments = visibleAppointments
     .filter(

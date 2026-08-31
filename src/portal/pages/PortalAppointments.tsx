@@ -577,6 +577,19 @@ function AppointmentPill({
   const name = appointment.customerName || appointment.title || 'Consultation';
   const time = fmt12(appointment.appointmentTime);
   const remote = isRemoteAppointment(appointment);
+  // WHERE. The pill carried the time, the customer, the project and the rep,
+  // but never the place — while the comment below says the pill exists so a rep
+  // scanning a month can tell what they are driving to. That is the one thing
+  // it could not tell them, which is why six rounds of restyling never fixed
+  // the complaint: the problem was never the styling.
+  //
+  // Events read from the address, consultations from the city. That split is
+  // deliberate and load-bearing — events used to inherit a stale client city
+  // and show the wrong place on the map and in list cards. Do not "simplify"
+  // this to appointment.city.
+  const place = isEventType(appointment.appointmentType)
+    ? appointment.address
+    : appointment.city || appointment.address;
 
   // ── Month / Week: compact solid-color pill (Google Calendar style) ──────────
   if (variant === 'compact') {
@@ -602,8 +615,10 @@ function AppointmentPill({
         <p className={`truncate text-[0.7rem] font-black leading-tight ${lightText ? 'text-white' : 'text-slate-800'}`}>
           {name}
         </p>
+        {/* Place first: on a narrow month cell this line truncates, and where
+            the rep is driving is the part that has to survive the cut. */}
         <p className={`truncate text-[0.6rem] font-medium ${lightText ? 'text-white/60' : 'text-slate-500'}`}>
-          {projectType || 'Project TBD'} · {repName}
+          {[place, projectType || 'Project TBD', repName].filter(Boolean).join(' · ')}
         </p>
       </button>
     );
@@ -630,6 +645,12 @@ function AppointmentPill({
             {remote && <VirtualChip tone="onWhite" />}
             <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone="onWhite" />
           </div>
+          {/* The day/list card is what a rep plans a driving day from, and it
+              had no location on it at all. It has the room, so the place gets
+              its own line rather than competing for the truncated one. */}
+          {place && (
+            <p className="truncate text-xs font-semibold text-slate-600">{place}</p>
+          )}
           <p className="truncate text-xs text-slate-500">
             {projectType || 'Project type TBD'} · {repName}
             {contractorName ? ` · ${contractorName}` : ''}
@@ -816,9 +837,15 @@ export default function PortalAppointments() {
     const state = location.state as { openAppointmentId?: string; panelTab?: string; prefillClient?: import('../data/types').Client; fromLeadId?: string } | null;
     const id = state?.openAppointmentId;
     if (id && handledNavState.current !== id) {
-      handledNavState.current = id;
       const apt = visibleAppointments.find((a) => a.id === id);
+      // Only count this link as handled once the consultation is actually on
+      // hand. It used to be marked handled immediately, so tapping a dashboard
+      // item before the consultations finished loading opened nothing at all —
+      // and because the link was already spent, the panel never appeared when
+      // the data landed a moment later. The rep taps, nothing happens, they tap
+      // again. Invisible on a fast desk connection, reliable on a phone.
       if (apt) {
+        handledNavState.current = id;
         openAppointment(apt); // resets to the Prep tab…
         const tab = state?.panelTab;
         if (tab && ['prep', 'details', 'outcome', 'dispatch', 'emails'].includes(tab) && !isEventType(apt.appointmentType)) {
@@ -846,9 +873,12 @@ export default function PortalAppointments() {
       });
       setPanelTab('prep');
     }
-  // openAppointment is stable; visibleAppointments intentionally omitted to run once
+  // openAppointment is stable. The consultation count IS a dependency: the
+  // effect needs a second chance once the consultations finish loading, or a
+  // deep link that arrives first opens nothing. Both branches are guarded by
+  // handledNavState, so re-running is a no-op after the first success.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
+  }, [location.state, visibleAppointments.length]);
 
   const matchesConsultationFilter = (appointment: Appointment) => {
     if (consultationFilter === 'all') return true;
