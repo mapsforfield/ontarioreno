@@ -1,0 +1,55 @@
+name: Notification drain
+
+# Delivers whatever is due in NotificationOutbox — booking confirmations, team
+# alerts, and the 24-hour and day-of reminders homeowners get before a visit.
+#
+# Why this lives on GitHub Actions rather than Vercel: the Hobby plan caps the
+# number of crons, and both of ours are already spent (morning brief, daily
+# recap). The drain was folded inside the morning brief to fit, which made 09:00
+# the only scheduled delivery of the day — and a reminder queued at, say, 18:00
+# expires at midnight, before that next run. Every 24-hour reminder that did go
+# out went out because a rep happened to touch a lead that evening and triggered
+# an inline drain. Delivery should not depend on that.
+#
+# This calls the PRODUCTION endpoint rather than draining the database directly.
+# That is deliberate: `deliveryEnabled()` only sends when VERCEL_ENV is
+# 'production', so a worker running here would have to fake that, and it would
+# need its own copies of the Twilio and Resend credentials. Going through the
+# live endpoint means messages are sent by exactly the code path and environment
+# every other message uses.
+#
+# Two schedules cannot overlap-send: the drain compare-and-sets each row out of
+# 'pending' before handing it to a provider. See lib/notification-drain.ts.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # drain on demand from the Actions tab
+
+# A slow run must not have a second run started on top of it. `cancel-in-progress:
+# false` queues instead, because killing a drain mid-send is what leaves rows to
+# be swept back out of 'sending'.
+concurrency:
+  group: notification-drain
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Deliver what is due
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "CRON_SECRET is not set on this repository — the endpoint would answer 401."
+            exit 1
+          fi
+          # --fail-with-body: a non-2xx fails the job (so a broken drain turns the
+          # Actions tab red) while still printing what the server said.
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://ontarioreno.ca/api/leads?flow=drain"
+          echo
