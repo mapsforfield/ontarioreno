@@ -16,6 +16,7 @@ import {
   type BookedAppointment,
 } from './scheduling.ts';
 import {
+  BASEMENT_FINANCING_PROGRAM,
   BATHROOM_FINANCING_PROGRAM,
   FINANCING_PROGRAMS,
   HAMILTON_PROGRAM,
@@ -696,6 +697,14 @@ test('every financing offer shares one set of scheduling constants', () => {
   // constants would otherwise ship unnoticed. If they ever diverge it is a
   // deliberate act, and it should show up here as a failing test rather than as
   // a rep with two overlapping 10:00 visits.
+  //
+  // bookingHorizonDays was removed from this list deliberately — see the test
+  // below, which asserts what it is actually allowed to do. Every field that
+  // remains here shapes the SHARED DAY: how long a visit occupies, where the
+  // starts fall, how many a rep can take, and how far they may drive between
+  // them. Two offers disagreeing on any of those hands one rep a day the other
+  // believes is legal. How far ahead an offer is willing to look is not in that
+  // class: it decides which dates an offer shows, never what may sit on one.
   const [first, ...rest] = FINANCING_PROGRAMS;
   assert.ok(rest.length >= 2, 'expected basement, bathroom and kitchen');
   for (const program of rest) {
@@ -703,7 +712,6 @@ test('every financing offer shares one set of scheduling constants', () => {
       'visitMinutes',
       'reservationMinutes',
       'leadTimeHours',
-      'bookingHorizonDays',
       'maxBookingsPerRepPerDay',
       'primaryRepPrimingBookings',
       'maxSameDayTravelKm',
@@ -715,6 +723,27 @@ test('every financing offer shares one set of scheduling constants', () => {
       );
     }
     assert.deepEqual(program.slotStartTimes, first.slotStartTimes, `${program.slug} slot starts differ`);
+  }
+});
+
+test('an offer may look further ahead than another without breaking the shared day', () => {
+  // The basement offer books a month out where the others book a fortnight. It
+  // has no application deadline to be early for, its calendar is the first
+  // thing the page shows, and a homeowner planning for next month was being
+  // shown a grid of grey dates with both reps free.
+  //
+  // This is safe precisely because the horizon is not part of the day's
+  // geometry. A date only the basement offer is currently willing to show is a
+  // date with nothing on it; the moment anything is booked there it lands in
+  // the same appointment list every offer is measured against, and the caps,
+  // the starts and the travel radius above — all still shared — apply to it
+  // exactly as they would to any other day.
+  assert.equal(BASEMENT_FINANCING_PROGRAM.bookingHorizonDays, 30);
+  for (const program of FINANCING_PROGRAMS) {
+    assert.ok(
+      program.bookingHorizonDays >= 14,
+      `${program.slug} looks less than a fortnight ahead`
+    );
   }
 });
 

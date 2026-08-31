@@ -689,6 +689,17 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   guideLabel: '',
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
+  // A month, where every other program offers a fortnight. Deliberately AFTER
+  // the spread, so it overrides it for this program and no other.
+  //
+  // The fortnight is right for a grant: those have application windows, and a
+  // slot held four weeks out is a slot the deadline may have made pointless.
+  // This offer has no deadline. Its calendar is the first thing the page shows,
+  // and someone planning a basement for next month was being told — by a grid
+  // of grey dates, with both reps free — that we could not come. That is not a
+  // scheduling constraint, it is a number, and it was costing bookings that
+  // nothing else about the day prevented.
+  bookingHorizonDays: 30,
 };
 
 // ─── Bathroom renovation financing ────────────────────────────────────────────
