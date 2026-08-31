@@ -1067,7 +1067,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         housingStatus?: string; monthlyHousingPayment?: string; employer?: string;
         employmentPosition?: string; employerAddress?: string; status?: string; dlPhotoKey?: string;
         mailingSameAsInstall?: boolean; mailingAddress?: string;
-        documents?: Array<{ label?: string; key?: string }>;
+        // Mirrors FinanceDocument in src/portal/data/types.ts: a section can
+        // hold several files, and the legacy single-file pair is still read so
+        // payloads saved before that keep rendering. The narrower shape this
+        // used to declare did not describe what the code below already reads.
+        documents?: Array<{
+          label?: string;
+          files?: Array<{ key?: string; fileName?: string }>;
+          key?: string;
+          fileName?: string;
+        }>;
       } | null = null;
       try {
         const rows = (await prisma.$queryRawUnsafe('SELECT payload FROM "FinanceApplication" WHERE "appointmentId" = $1', appointmentId)) as Array<{ payload: string }>;

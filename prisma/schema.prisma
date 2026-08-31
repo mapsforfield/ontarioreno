@@ -679,7 +679,11 @@ model NotificationOutbox {
   /// Rendered HTML for email rows. Stored because delivery is deferred, so the
   /// message must survive until the drain runs. Empty for SMS.
   html           String   @default("")
-  /// 'pending' | 'sent' | 'failed' | 'suppressed' | 'blocked'
+  /// 'pending' | 'sending' | 'sent' | 'failed' | 'suppressed' | 'blocked'
+  /// 'sending' is a claim, not an outcome: the drain compare-and-sets a row out
+  /// of 'pending' before it hands anything to a provider, so two drains racing
+  /// for the same row cannot both deliver it. A row left in 'sending' by a run
+  /// that died is swept back to 'pending' after fifteen minutes.
   state          String   @default("pending")
   /// Why a message was not delivered — e.g. non-production environment, or a
   /// channel with no configured provider. Distinguishes "chose not to" from "broke".

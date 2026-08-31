@@ -20,6 +20,10 @@ export type DrainSummary = {
   stale: number;
   /** Reminders carried forward because their visit moved further out. */
   deferred: number;
+  /** Rows another drain had already claimed. Not an error — see `claim` below. */
+  skipped: number;
+  /** Rows recovered from a drain that died mid-send. */
+  requeued: number;
 };
 
 /** Minimal surface of the Prisma client this needs. */
@@ -40,6 +44,8 @@ export type OutboxStore = {
       }>
     >;
     update: (args: unknown) => Promise<unknown>;
+    /** Used for the atomic claim and the stalled-row sweep. */
+    updateMany: (args: unknown) => Promise<{ count: number }>;
   };
   /** Reminders are rebuilt from the appointment at send time, so the drain has
    *  to be able to read one. */
@@ -47,6 +53,14 @@ export type OutboxStore = {
     findUnique: (args: unknown) => Promise<ReminderAppointment | null>;
   };
 };
+
+/**
+ * How long a row may sit in `sending` before a later drain assumes the run that
+ * claimed it died and puts it back. Generous on purpose: requeuing a row that is
+ * genuinely still in flight is the one way this mechanism could cause the double
+ * send it exists to prevent. No provider call here comes close to this.
+ */
+const STALLED_SEND_MS = 15 * 60_000;
 
 /**
  * Deliver everything due. Never throws — a booking must not fail, and a cron must
@@ -65,7 +79,25 @@ export async function drainOutbox(
   const now = new Date().toISOString();
   const summary: DrainSummary = {
     considered: 0, sent: 0, suppressed: 0, blocked: 0, failed: 0, stale: 0, deferred: 0,
+    skipped: 0, requeued: 0,
   };
+
+  // ── Recover anything a dead run was holding ──
+  // A drain that is killed between claiming a row and recording its outcome
+  // leaves that row in `sending`, which no later drain would ever pick up. On
+  // a serverless platform the process being killed mid-request is routine, so
+  // this has to be swept rather than assumed away.
+  summary.requeued = (
+    await prisma.notificationOutbox
+      .updateMany({
+        where: {
+          state: 'sending',
+          updatedAt: { lt: new Date(Date.now() - STALLED_SEND_MS).toISOString() },
+        },
+        data: { state: 'pending', stateReason: 'requeued_after_interrupted_send' },
+      })
+      .catch(() => ({ count: 0 }))
+  ).count;
 
   const due = await prisma.notificationOutbox
     .findMany({
@@ -133,12 +165,36 @@ export async function drainOutbox(
       row.expiresAt = verdict.expiresAt;
     }
 
+    // ── Claim the row before anything is sent ──
+    // This is a compare-and-set: the update only matches while the row is
+    // still `pending`, so of two drains racing for it exactly one gets a
+    // count of 1 and the other gets 0 and moves on. Without it, both read the
+    // same pending row and both deliver — a real homeowner receiving the same
+    // reminder twice. That race was theoretical while the only schedule was
+    // one drain a day; it is not, now that a cron runs every fifteen minutes
+    // alongside the inline drains a dozen portal actions already trigger.
+    //
+    // Placed after the reminder reconcile above so `suppress` and `defer` keep
+    // working exactly as they did: neither sends anything, and recomputing a
+    // verdict twice costs nothing. From here on, a message goes out.
+    const claimed = await prisma.notificationOutbox
+      .updateMany({
+        where: { id: row.id, state: 'pending' },
+        data: { state: 'sending' },
+      })
+      .catch(() => ({ count: 0 }));
+
+    if (claimed.count !== 1) {
+      summary.skipped++;
+      continue;
+    }
+
     // Checked before anything else: a message whose wording has expired must
     // not go out even in an environment that would otherwise deliver it. The
-    // drain cannot run continuously — the platform's cron granularity is daily
-    // — so a reminder can and will be picked up hours after it was due. Sending
-    // it then would tell a homeowner their visit is "tomorrow" on the morning
-    // it is actually happening.
+    // drain runs every fifteen minutes, not continuously, and a run can be
+    // missed — so a reminder can still be picked up well after it was due.
+    // Sending it then would tell a homeowner their visit is "tomorrow" on the
+    // morning it is actually happening.
     if (row.expiresAt && row.expiresAt <= now) {
       state = 'suppressed';
       reason = 'stale_message_window_passed';

@@ -8,11 +8,17 @@
  * the reason a booking fails, so callers get '' back.
  */
 type NotesLookupClient = {
+  // `any`, not `unknown`, on the argument. This type exists to describe the
+  // small slice of the client this module needs, so that tests can pass a fake
+  // — but with `unknown` the real PrismaClient does not satisfy it, and every
+  // call site had to launder it through `as never`, which switched off
+  // checking on the argument entirely. `any` here keeps the shape honest and
+  // lets the real client through.
   client: {
-    findFirst: (args: unknown) => Promise<{ internalNotes: string | null } | null>;
+    findFirst: (args: any) => Promise<{ internalNotes: string | null } | null>;
   };
   appointment: {
-    findFirst: (args: unknown) => Promise<{ internalNotes: string | null; notes: string | null } | null>;
+    findFirst: (args: any) => Promise<{ internalNotes: string | null; notes: string | null } | null>;
   };
 };
 

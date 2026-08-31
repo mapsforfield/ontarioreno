@@ -28,14 +28,29 @@ type Appt = {
   deletedAt?: Date | null;
 };
 
-/** In-memory stand-in so the drain can be driven without a database. */
-function store(rows: Row[], appointments: Appt[] = []) {
+/**
+ * In-memory stand-in so the drain can be driven without a database.
+ *
+ * `states` models the one column the claim depends on. The compare-and-set is
+ * the whole safety property, so a fake that ignored it would let a regression
+ * through silently.
+ */
+function store(
+  rows: Row[],
+  appointments: Appt[] = [],
+  options: { states?: Record<string, string>; claimedAt?: Record<string, string> } = {}
+) {
   const updates: Array<{ id: string; state: string; stateReason: string; data: Record<string, unknown> }> = [];
+  const states: Record<string, string> = { ...options.states };
+  const claimedAt: Record<string, string> = { ...options.claimedAt };
+  for (const r of rows) states[r.id] ??= 'pending';
+
   const prisma: OutboxStore = {
     notificationOutbox: {
-      findMany: async () => rows,
+      findMany: async () => rows.filter((r) => states[r.id] === 'pending'),
       update: async (args: unknown) => {
         const a = args as { where: { id: string }; data: Record<string, unknown> };
+        states[a.where.id] = a.data.state as string;
         updates.push({
           id: a.where.id,
           state: a.data.state as string,
@@ -43,6 +58,29 @@ function store(rows: Row[], appointments: Appt[] = []) {
           data: a.data,
         });
         return null;
+      },
+      updateMany: async (args: unknown) => {
+        const a = args as {
+          where: { id?: string; state?: string; updatedAt?: { lt: string } };
+          data: Record<string, unknown>;
+        };
+        // The claim: one specific row, only while it is still pending.
+        if (a.where.id) {
+          if (states[a.where.id] !== a.where.state) return { count: 0 };
+          states[a.where.id] = a.data.state as string;
+          claimedAt[a.where.id] = new Date().toISOString();
+          return { count: 1 };
+        }
+        // The sweep: every row stuck in `sending` since before the cutoff.
+        const cutoff = a.where.updatedAt?.lt ?? '';
+        let count = 0;
+        for (const id of Object.keys(states)) {
+          if (states[id] !== a.where.state) continue;
+          if (cutoff && (claimedAt[id] ?? '') >= cutoff) continue;
+          states[id] = a.data.state as string;
+          count++;
+        }
+        return { count };
       },
     },
     appointment: {
@@ -52,7 +90,7 @@ function store(rows: Row[], appointments: Appt[] = []) {
       },
     },
   };
-  return { prisma, updates };
+  return { prisma, updates, states };
 }
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
@@ -226,4 +264,68 @@ test('expiry beats environment suppression so counts stay honest', async () => {
 
   assert.equal(summary.stale, 1);
   assert.equal(updates[0]!.stateReason, 'stale_message_window_passed');
+});
+
+// ─── The claim ────────────────────────────────────────────────────────────────
+// Two drains now overlap by design: a cron every fifteen minutes, plus the
+// inline drains a dozen portal actions trigger. Before the claim, both read the
+// same pending row and both delivered it — the same reminder text arriving
+// twice on a real homeowner's phone.
+
+test('a row another drain is already sending is left alone', async () => {
+  const { prisma, updates } = store(
+    [row({ expiresAt: '' })],
+    [],
+    { states: { r1: 'sending' }, claimedAt: { r1: new Date().toISOString() } }
+  );
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.considered, 0, 'a claimed row is not even due');
+  assert.equal(updates.length, 0, 'nothing was delivered or recorded twice');
+});
+
+test('only one of two concurrent drains delivers a row', async () => {
+  const { prisma, updates } = store([row({ expiresAt: '' })]);
+
+  const [first, second] = await Promise.all([
+    drainOutbox(prisma, 25, PRODUCTION),
+    drainOutbox(prisma, 25, PRODUCTION),
+  ]);
+
+  // Whichever won, exactly one outcome was recorded for the row.
+  assert.equal(first.skipped + second.skipped, 1, 'the loser skipped rather than sent');
+  assert.equal(updates.length, 1, 'the message was handed to a provider once');
+});
+
+test('a row left behind by a drain that died is picked back up', async () => {
+  // Serverless processes are killed mid-request routinely. Without the sweep a
+  // row claimed by one of them stays in `sending` forever and the homeowner
+  // simply never hears from us.
+  const longAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+  const { prisma, states } = store(
+    [row({ expiresAt: '' })],
+    [],
+    { states: { r1: 'sending' }, claimedAt: { r1: longAgo } }
+  );
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.requeued, 1);
+  assert.notEqual(states.r1, 'sending', 'it moved on rather than staying stuck');
+});
+
+test('a row claimed moments ago is left to the drain that has it', async () => {
+  // The one way this mechanism could cause the double send it prevents is by
+  // requeuing a message that is still genuinely in flight.
+  const justNow = new Date(Date.now() - 30_000).toISOString();
+  const { prisma } = store(
+    [row({ expiresAt: '' })],
+    [],
+    { states: { r1: 'sending' }, claimedAt: { r1: justNow } }
+  );
+
+  const summary = await drainOutbox(prisma, 25, PRODUCTION);
+
+  assert.equal(summary.requeued, 0);
 });

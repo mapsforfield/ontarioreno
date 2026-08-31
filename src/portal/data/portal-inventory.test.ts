@@ -24,8 +24,12 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const read = (rel: string) => readFileSync(join(repoRoot, rel), 'utf8');
 
 type PortalFeature = {
-  /** Sidebar label exactly as a rep sees it. */
-  navLabel: string;
+  /**
+   * Sidebar label exactly as a rep sees it, or null for a page that is
+   * deliberately reachable by URL only. Null still checks the page and the
+   * route — it only stops asserting a sidebar link that is not meant to exist.
+   */
+  navLabel: string | null;
   /** Route segment under /portal in App.tsx. */
   route: string;
   /** Page component file, repo-relative. */
@@ -48,6 +52,20 @@ const PORTAL_FEATURES: PortalFeature[] = [
   { navLabel: 'Submissions', route: 'submissions', page: 'src/portal/pages/PortalSubmissions.tsx', component: 'PortalSubmissions' },
   { navLabel: 'Invoices', route: 'invoices', page: 'src/portal/pages/PortalInvoices.tsx', component: 'PortalInvoices' },
   { navLabel: 'Admin', route: 'admin', page: 'src/portal/pages/PortalAdmin.tsx', component: 'PortalAdmin' },
+  // Consultations is the biggest page in the portal and was not listed here
+  // until the August 2026 audit — the guard has never covered the calendar the
+  // whole business runs on.
+  { navLabel: 'Consultations', route: 'appointments', page: 'src/portal/pages/PortalAppointments.tsx', component: 'PortalAppointments' },
+  // The contractor accounts' entire portal: two read-only pages behind their
+  // own sidebar (contractorNavItems in PortalLayout).
+  { navLabel: 'Calendar', route: 'cx-calendar', page: 'src/portal/pages/ContractorCalendar.tsx', component: 'ContractorCalendar' },
+  { navLabel: 'Clients', route: 'cx-clients', page: 'src/portal/pages/ContractorClients.tsx', component: 'ContractorClients' },
+  // Grant Radar's admin review queue. Routed and admin-guarded, with no
+  // sidebar link — an admin reaches it by typing the URL. That is the state it
+  // shipped in; listing it with navLabel: null protects the page and the route
+  // without asserting a link that does not exist. If a link is ever added,
+  // change this to 'Grants'.
+  { navLabel: null, route: 'grants', page: 'src/portal/pages/PortalGrants.tsx', component: 'PortalGrants' },
 ];
 
 /** Supporting modules with no route of their own, but a feature dies without them. */
@@ -68,7 +86,7 @@ const app = read('src/App.tsx');
 const layout = read('src/portal/components/PortalLayout.tsx');
 
 for (const feature of PORTAL_FEATURES) {
-  test(`portal feature "${feature.navLabel}" is still wired up`, () => {
+  test(`portal feature "${feature.navLabel ?? feature.route}" is still wired up`, () => {
     const source = read(feature.page);
     assert.ok(
       source.trim().length > 0,
@@ -87,15 +105,17 @@ for (const feature of PORTAL_FEATURES) {
       `App.tsx has no route for /portal/${feature.route} — "${feature.navLabel}" is unreachable by URL.`,
     );
 
-    assert.ok(
-      layout.includes(`href: '/portal/${feature.route}'`),
-      `PortalLayout has no sidebar link to /portal/${feature.route} — reps cannot reach "${feature.navLabel}".`,
-    );
+    if (feature.navLabel !== null) {
+      assert.ok(
+        layout.includes(`href: '/portal/${feature.route}'`),
+        `PortalLayout has no sidebar link to /portal/${feature.route} — reps cannot reach "${feature.navLabel}".`,
+      );
 
-    assert.ok(
-      layout.includes(`label: '${feature.navLabel}'`),
-      `The sidebar label "${feature.navLabel}" is gone from PortalLayout.`,
-    );
+      assert.ok(
+        layout.includes(`label: '${feature.navLabel}'`),
+        `The sidebar label "${feature.navLabel}" is gone from PortalLayout.`,
+      );
+    }
   });
 }
 
