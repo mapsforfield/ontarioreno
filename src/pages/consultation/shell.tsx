@@ -114,9 +114,104 @@ export function ErrorNote({ children }: { children: React.ReactNode }) {
   return <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{children}</p>;
 }
 
-export function Shell({ children, title, step, totalSteps = 5, onBack }: {
+/**
+ * A photo banner seated at the top of the card.
+ *
+ * Optional, and passed by one screen: the basement flow's calendar, which is
+ * the page someone lands on. Everywhere else this is absent and the header
+ * renders exactly as it always has, on the page background above the card.
+ */
+export type ShellBanner = { src: string; alt: string };
+
+export function Shell({ children, title, step, totalSteps = 5, onBack, banner }: {
   children: React.ReactNode; title?: string; step?: number; totalSteps?: number; onBack?: () => void;
+  banner?: ShellBanner;
 }) {
+  const progressBar = step ? (
+    <div className="mx-auto mb-5 flex max-w-[220px] gap-1.5">
+      {Array.from({ length: totalSteps }, (_, n) => n + 1).map((i) => (
+        <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-[#1B3C6C]' : 'bg-slate-200'}`} />
+      ))}
+    </div>
+  ) : null;
+
+  if (banner) {
+    // Banner and card are ONE panel: a single rounded, clipped container with
+    // the photo at the top and the white content below it. The radius therefore
+    // exists in one place and cannot be doubled or mismatched, and there is no
+    // seam to line up because there are no two edges meeting — the white simply
+    // starts where the photo stops.
+    return (
+      <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-6 sm:items-center sm:py-12">
+        <div className="w-full max-w-md">
+          <div className="overflow-hidden rounded-2xl shadow-xl">
+            <div className="relative">
+              <img
+                src={banner.src}
+                alt={banner.alt}
+                // Cropped from the centre at every width. The source is wide and
+                // its whole point is the diagonal seam between the unfinished
+                // half and the finished one — an edge-anchored crop on a phone
+                // shows one half and throws the comparison away.
+                className="h-[168px] w-full object-cover object-center sm:h-[196px]"
+              />
+              {/* Seats the text without washing the photo out. Transparent
+                  across the top third so the finished room still reads, then
+                  deepening to the navy the rest of the page is built from. Tuned
+                  against the bright half — it is the harder of the two, and what
+                  holds there holds over the insulation. */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0f2544]/5 via-[#0f2544]/45 to-[#0f2544]/85" />
+              <div className="absolute inset-x-0 bottom-0 px-5 pb-4 text-center">
+                {/* The real mark, not the navy pill.
+                    The pill exists so the wordmark reads against the pale grey
+                    page everywhere else; on the photo there is no pale grey to
+                    read against, and a navy block sitting on a photograph looks
+                    like something pasted over it. The white logo goes straight
+                    onto the image, with a drop shadow doing the pill's old job
+                    of holding it away from whatever is behind it. */}
+                <img
+                  src="/logo-white.png"
+                  alt="OntarioReno"
+                  className="mx-auto mb-3 h-9 w-auto drop-shadow-lg sm:h-10"
+                />
+                {/* On the photo the unfilled segments need to read against a
+                    dark ground rather than the page's pale grey. */}
+                {step ? (
+                  <div className="mx-auto mb-3 flex max-w-[220px] gap-1.5">
+                    {Array.from({ length: totalSteps }, (_, n) => n + 1).map((i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-white' : 'bg-white/30'}`}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {title && (
+                  <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-sm sm:text-[1.75rem]">
+                    {title}
+                  </h1>
+                )}
+              </div>
+            </div>
+            <div className="relative bg-white p-5 text-center sm:p-6">
+              {onBack && (
+                <button type="button" onClick={onBack}
+                  className="absolute left-4 top-3 flex items-center gap-1 text-xs font-bold text-slate-400 transition hover:text-slate-700">
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </button>
+              )}
+              {onBack && <div className="h-4" />}
+              {children}
+            </div>
+          </div>
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+            <CalendarDays className="h-3.5 w-3.5" /> Free consultation · about 45 minutes
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-8 sm:items-center sm:py-12">
       <div className="w-full max-w-md">
@@ -124,13 +219,7 @@ export function Shell({ children, title, step, totalSteps = 5, onBack }: {
           <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-[#1B3C6C] px-5 py-2">
             <span className="text-xs font-bold uppercase tracking-widest text-white/80">OntarioReno</span>
           </div>
-          {step ? (
-            <div className="mx-auto mb-5 flex max-w-[220px] gap-1.5">
-              {Array.from({ length: totalSteps }, (_, n) => n + 1).map((i) => (
-                <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-[#1B3C6C]' : 'bg-slate-200'}`} />
-              ))}
-            </div>
-          ) : null}
+          {progressBar}
           {title && <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{title}</h1>}
         </div>
         <div className="relative rounded-2xl bg-white p-6 text-center shadow-xl sm:p-7">

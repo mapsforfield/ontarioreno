@@ -39,4 +39,27 @@ export type LeadSlotsPayload = {
    * there is nothing to describe.
    */
   remoteConsultation?: boolean;
+  /**
+   * Every start this program offers, and the floor below which a start is not
+   * offered to anybody.
+   *
+   * Sent so a calendar can draw the times it CANNOT offer as well as the ones
+   * it can. Showing only the free ones made a busy day look like a short one —
+   * a homeowner seeing 10am and 12pm and nothing else reads it as our working
+   * hours, not as the rest of the day being booked.
+   *
+   * The floor is what keeps that honest. A start below `earliestWall` is in the
+   * past or inside the lead-time window; it is not taken, and drawing it as
+   * taken would be telling a homeowner something untrue about how busy we are.
+   * Those are omitted. Anything at or above the floor that is missing from
+   * `slots` is genuinely spoken for.
+   *
+   * Optional: a caller that does not render a grid ignores it entirely.
+   */
+  slotGrid?: {
+    /** The program's fixed daily starts, e.g. ['10:00','12:00',…]. */
+    startTimes: string[];
+    /** "YYYY-MM-DDTHH:MM" Toronto wall clock — the lead-time floor. */
+    earliestWall: string;
+  };
 };

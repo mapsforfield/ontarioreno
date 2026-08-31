@@ -14,7 +14,12 @@
 // Nothing here writes. It is the read half; bookSlot still owns the lock, the
 // conflict check and the insert.
 
-import { computeAvailability, torontoWallClock, type BookedAppointment } from './scheduling.js';
+import {
+  addWallHours,
+  computeAvailability,
+  torontoWallClock,
+  type BookedAppointment,
+} from './scheduling.js';
 import { isRemoteConsultationCity } from './remote-consultation.js';
 import {
   programByKey,
@@ -175,7 +180,17 @@ export async function availableSlotsForLead(
     nowWallToronto: nowWall,
   });
 
-  return { slots, visitMinutes: program.visitMinutes, remoteConsultation: remote };
+  return {
+    slots,
+    visitMinutes: program.visitMinutes,
+    remoteConsultation: remote,
+    // The same two inputs computeAvailability just used, so a calendar can tell
+    // "booked" from "too soon" without guessing. See slotGrid.
+    slotGrid: {
+      startTimes: program.slotStartTimes,
+      earliestWall: addWallHours(nowWall, program.leadTimeHours),
+    },
+  };
 }
 
 /**

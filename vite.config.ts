@@ -23,9 +23,14 @@ function mockLeadsApi(): Plugin {
   // whether the "N left" scarcity label renders, which is half of what the
   // calendar screen is being previewed for.
   const ALL_TIMES = ['10:00', '12:00', '14:00', '16:00', '18:00']
-  const slots = Array.from({ length: 8 }, (_, d) => {
+  // A fortnight, to match bookingHorizonDays — the full-month view is only
+  // worth previewing if there is something past the seven days the row shows.
+  // A zero means a day with nothing open, so the month grid has greyed-out
+  // dates to render as well as blue ones.
+  const OPEN_PER_DAY = [2, 5, 1, 4, 5, 3, 5, 2, 0, 4, 1, 0, 5, 3]
+  const slots = Array.from({ length: OPEN_PER_DAY.length }, (_, d) => {
     const date = new Date(Date.now() + (d + 1) * 86_400_000).toISOString().slice(0, 10)
-    return ALL_TIMES.slice(0, [2, 5, 1, 4, 5, 3, 5, 2][d]).map((time) => ({ date, time }))
+    return ALL_TIMES.slice(0, OPEN_PER_DAY[d]).map((time) => ({ date, time }))
   }).flat()
 
   return {
@@ -72,9 +77,18 @@ function mockLeadsApi(): Plugin {
           })
         }
         if (flow === 'address_resolve') return send({ candidate: null })
-        if (flow === 'availability') return send({ slots, visitMinutes: program.visitMinutes })
+        // The grid the real endpoint sends: every start the program offers, and
+        // the floor below which one is too soon rather than taken. Dated
+        // yesterday here so the preview marks every unbooked start as taken
+        // rather than hiding it — which is the thing being previewed.
+        const slotGrid = {
+          startTimes: program.slotStartTimes,
+          earliestWall: `${new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)}T00:00`,
+        }
+        if (flow === 'availability') return send({ slots, visitMinutes: program.visitMinutes, slotGrid })
         // The calendar-early flow's lead-less calendar.
-        if (flow === 'availability_preview') return send({ slots, visitMinutes: program.visitMinutes })
+        if (flow === 'availability_preview')
+          return send({ slots, visitMinutes: program.visitMinutes, slotGrid })
         if (flow === 'prep') return send({ saved: 0 })
         if (flow === 'submit') {
           // Mirrors the real router closely enough to exercise the flow: every
