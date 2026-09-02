@@ -121,7 +121,7 @@ export type TemplateSpec = {
 // ─────────────────────────────────────────────────────────────────────────────
 const meridian: TemplateSpec = {
   id: 'meridian',
-  name: 'Meridian',
+  name: 'Canadian Reno',
   blurb: 'Traditional legal instrument — serif, roman numerals, no colour',
   font: 'EBGaramond',
   fontFallback: 'times',
@@ -251,7 +251,7 @@ const meridian: TemplateSpec = {
 // ─────────────────────────────────────────────────────────────────────────────
 const vertex: TemplateSpec = {
   id: 'vertex',
-  name: 'Vertex',
+  name: 'LPS',
   blurb: 'Modern branded — colour masthead band, accent headings, striped table',
   font: 'Manrope',
   fontFallback: 'helvetica',
@@ -378,7 +378,7 @@ const vertex: TemplateSpec = {
 // ─────────────────────────────────────────────────────────────────────────────
 const atlas: TemplateSpec = {
   id: 'atlas',
-  name: 'Atlas',
+  name: 'RenoChef',
   blurb: 'Minimal editorial — wide margin rail, tracked labels, lots of white space',
   font: 'Karla',
   fontFallback: 'helvetica',
@@ -505,7 +505,7 @@ const atlas: TemplateSpec = {
 // ─────────────────────────────────────────────────────────────────────────────
 const sterling: TemplateSpec = {
   id: 'sterling',
-  name: 'Sterling',
+  name: 'HN WoodWorking',
   blurb: 'Corporate formal — boxed masthead, 1.1 sub-numbering, grey banded tables',
   font: 'IBMPlexSerif',
   fontFallback: 'times',
@@ -635,7 +635,7 @@ const sterling: TemplateSpec = {
 // ─────────────────────────────────────────────────────────────────────────────
 const harbor: TemplateSpec = {
   id: 'harbor',
-  name: 'Harbor',
+  name: 'Harson',
   blurb: 'Contemporary compact — side tabs, tinted callouts, lettered clauses',
   font: 'Nunito',
   fontFallback: 'helvetica',
