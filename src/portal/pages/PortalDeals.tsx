@@ -3,6 +3,7 @@ import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { dealWonDate } from '../../../lib/deal-won-date';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
@@ -233,22 +234,27 @@ function isDealInRange(deal: Deal, range: RangeFilter): boolean {
   // Pre-portal imports don't carry real win dates (updatedAt = import date),
   // so they only appear under "All" — Year/Quarter is for portal-era deals
   if (deal.isHistorical) return false;
-  const updated = new Date(deal.updatedAt);
+  // For a won deal this is the date it was WON, not the last time anyone
+  // touched it. Reading updatedAt meant editing a note on a deal closed in
+  // March moved it into this month's column. Deals not yet won have no win
+  // date and keep being placed by updatedAt — which is what "active this
+  // month" genuinely means for a deal still in play.
+  const placed = dealWonDate(deal) ?? new Date(deal.updatedAt);
   const now = new Date();
   if (range === 'year') {
-    return updated.getFullYear() === now.getFullYear();
+    return placed.getFullYear() === now.getFullYear();
   }
   if (range === 'month') {
     return (
-      updated.getFullYear() === now.getFullYear() &&
-      updated.getMonth() === now.getMonth()
+      placed.getFullYear() === now.getFullYear() &&
+      placed.getMonth() === now.getMonth()
     );
   }
   // quarter
   const quarter = Math.floor(now.getMonth() / 3);
   return (
-    updated.getFullYear() === now.getFullYear() &&
-    Math.floor(updated.getMonth() / 3) === quarter
+    placed.getFullYear() === now.getFullYear() &&
+    Math.floor(placed.getMonth() / 3) === quarter
   );
 }
 

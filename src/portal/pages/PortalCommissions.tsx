@@ -9,6 +9,12 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { usePortalAuth } from '../auth';
+import { dealWonDate } from '../../../lib/deal-won-date';
+
+/** The year a deal belongs to: when it was won, else its last edit. */
+function dealYear(deal: Deal): number {
+  return (dealWonDate(deal) ?? new Date(deal.updatedAt)).getFullYear();
+}
 import {
   formatCurrency,
   formatDealStatus,
@@ -309,9 +315,11 @@ export default function PortalCommissions() {
       }))
       .filter((row) => row.deal);
 
-    // Years present in the data (by win-date proxy = updatedAt), plus the current
-    // year so it's always selectable even before any deal is won this year.
-    const yearSet = new Set<number>(adminRows.map((r) => new Date(r.deal!.updatedAt).getFullYear()));
+    // Years present in the data, by the date each deal was WON, plus the
+    // current year so it is always selectable even before any deal is won this
+    // year. This read updatedAt until it was the same bug as the WON column:
+    // editing an old deal moved its commission into the current year.
+    const yearSet = new Set<number>(adminRows.map((r) => dealYear(r.deal!)));
     yearSet.add(Number(torontoToday().slice(0, 4)));
     const availableYears = Array.from(yearSet).sort((a, b) => b - a);
 
@@ -320,7 +328,7 @@ export default function PortalCommissions() {
     const filteredRows = adminRows.filter(
       (row) =>
         (statusFilter === 'all' || row.deal!.status === statusFilter) &&
-        (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter) &&
+        (yearFilter === 'all' || dealYear(row.deal!) === yearFilter) &&
         (paymentFilter === 'all' || overallPaymentStatus(row.commission, row.deal!) === paymentFilter)
     );
 
@@ -740,7 +748,7 @@ export default function PortalCommissions() {
     }))
     .filter((row) => row.deal);
 
-  const repYearSet = new Set<number>(repRows.map((r) => new Date(r.deal!.updatedAt).getFullYear()));
+  const repYearSet = new Set<number>(repRows.map((r) => dealYear(r.deal!)));
   repYearSet.add(Number(torontoToday().slice(0, 4)));
   const repAvailableYears = Array.from(repYearSet).sort((a, b) => b - a);
 
