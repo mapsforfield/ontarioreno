@@ -358,6 +358,16 @@ export default function BasementBookingFlow({
           eventId: leadEventId,
           pageUrl: window.location.href,
           programSlug: program.slug,
+          // The ref from an earlier press, when there was one.
+          //
+          // This screen is reachable a second time by design: a slot that goes
+          // while the homeowner is typing sends them back to the times with the
+          // 409 handler below, and Confirm runs this whole function again. The
+          // lead was already created on the first press, so without this the
+          // second press created another one — which is how one homeowner ended
+          // up as four rows in the Submissions log, three of them with no
+          // appointment for a rep to chase.
+          leadRef,
           name: contact.name,
           phone: contact.phone,
           email: '',
@@ -373,6 +383,8 @@ export default function BasementBookingFlow({
       });
       const submitted = await submitRes.json();
       if (!submitRes.ok) throw new Error(submitted?.error ?? 'Something went wrong.');
+      // Held for the retry path above, and used immediately below for the
+      // booking — state is not readable this soon after setting it.
       setLeadRef(submitted.leadRef);
       trackEvent(
         'Lead',

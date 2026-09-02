@@ -365,6 +365,31 @@ export default function ConsultationFlow() {
     setPhase(next === 1 ? 'q1' : next === 2 ? 'q2' : 'q3');
   };
 
+  /**
+   * The open times for a lead. Returns null when they could not be fetched.
+   *
+   * Never throws: the caller has a saved lead by the time it runs, and the one
+   * thing that must not happen is the homeowner being sent back to a form they
+   * have already submitted.
+   */
+  const loadAvailability = async (
+    ref: string
+  ): Promise<{ slots?: Slot[]; remoteConsultation?: boolean } | null> => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(`/api/leads?flow=availability&leadRef=${encodeURIComponent(ref)}`);
+        if (!res.ok) throw new Error(`availability ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        console.warn('[consultation] availability attempt failed', attempt + 1, err);
+        // One short pause, then one retry. A cold serverless start is the
+        // common cause and it clears in well under a second.
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 700));
+      }
+    }
+    return null;
+  };
+
   const submit = async (finalContact: typeof contact) => {
     if (!program) return;
     setBusy(true);
@@ -380,6 +405,9 @@ export default function ConsultationFlow() {
           eventId,
           pageUrl: window.location.href,
           programSlug: program.slug,
+          // The ref from an earlier press, when there was one — so a retry
+          // updates that submission instead of adding another.
+          leadRef,
           name: finalContact.name,
           phone: finalContact.phone,
           email: finalContact.email,
@@ -411,9 +439,16 @@ export default function ConsultationFlow() {
         eventId
       );
       if (j.offersCalendar) {
-        const av = await (await fetch(`/api/leads?flow=availability&leadRef=${encodeURIComponent(j.leadRef)}`)).json();
-        setSlots(av.slots ?? []);
-        setRemote(av.remoteConsultation === true);
+        // The lead is already saved by this point. So a failure fetching the
+        // times must NOT throw back to the contact screen: that put an error
+        // next to a button which had already worked, and homeowners pressed it
+        // again — four times, in one case — each press creating another
+        // submission for a rep to chase. Retry once, then go to the calendar
+        // regardless. With no slots it reads "we'll call to arrange one",
+        // which is true: the submission is captured and the team is alerted.
+        const av = await loadAvailability(j.leadRef);
+        setSlots(av?.slots ?? []);
+        setRemote(av?.remoteConsultation === true);
         setPhase('calendar');
       } else {
         setPhase('result');

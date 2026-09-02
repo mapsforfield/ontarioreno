@@ -56,3 +56,22 @@ export function dealMatchesClient(
   const phone = phoneKey(client.phone);
   return !!phone && phoneKey(deal.phone) === phone;
 }
+
+/**
+ * True when two consultations are the same homeowner.
+ *
+ * Used to carry finance details forward: a rep who books the same customer a
+ * second time was retyping the whole application, because it is stored per
+ * consultation. Same keys as above — the explicit client link first, then the
+ * phone, then the email. Name is still deliberately not matched.
+ */
+export function sameHomeowner(
+  a: Pick<Appointment, 'clientId'> & ContactFields,
+  b: Pick<Appointment, 'clientId'> & ContactFields
+): boolean {
+  if (a.clientId && b.clientId) return a.clientId === b.clientId;
+  const phone = phoneKey(a.phone);
+  if (phone && phoneKey(b.phone) === phone) return true;
+  const email = emailKey(a.email);
+  return !!email && emailKey(b.email) === email;
+}

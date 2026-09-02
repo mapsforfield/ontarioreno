@@ -1,4 +1,5 @@
 import {
+  ArrowUpRight,
   BadgeDollarSign,
   Building2,
   CalendarDays,
@@ -20,6 +21,7 @@ import { usePortalData } from '../data/store';
 import TrashPanel from '../components/TrashPanel';
 import ClientVideos from '../components/ClientVideos';
 import ClientAgreements from '../components/ClientAgreements';
+import ClientFinanceCard from '../components/ClientFinanceCard';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { showToast } from '../lib/toast';
 import type { Client, Household } from '../data/types';
@@ -718,11 +720,19 @@ export default function PortalClients() {
                     {clientAppointments
                       .sort((a, b) => b.appointmentDate.localeCompare(a.appointmentDate))
                       .map((apt) => (
-                        <div key={apt.id} className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-4 py-3">
+                        <button
+                          key={apt.id}
+                          type="button"
+                          onClick={() =>
+                            navigate('/portal/appointments', { state: { openAppointmentId: apt.id } })
+                          }
+                          className="block w-full rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-4 py-3 text-left transition hover:border-[#b8c9dd] hover:bg-[#f1f7ff]"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-black text-slate-900 truncate">
-                                {apt.projectType || apt.customerName || 'Consultation'}
+                              <p className="inline-flex items-center gap-1.5 text-sm font-black text-slate-900">
+                                <span className="truncate">{apt.projectType || apt.customerName || 'Consultation'}</span>
+                                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[#32639b]" />
                               </p>
                               <p className="mt-0.5 text-xs font-semibold text-slate-500">
                                 {apt.appointmentDate}{apt.appointmentTime ? ` · ${apt.appointmentTime}` : ''}{apt.city ? ` · ${apt.city}` : ''}
@@ -740,7 +750,7 @@ export default function PortalClients() {
                           {apt.internalNotes && (
                             <p className="mt-1.5 text-xs font-semibold text-slate-500 line-clamp-2">{apt.internalNotes}</p>
                           )}
-                        </div>
+                        </button>
                       ))}
                   </div>
                 </section>
@@ -751,6 +761,10 @@ export default function PortalClients() {
                   <CalendarDays className="h-7 w-7 text-slate-200" />
                   <p className="mt-2 text-sm font-bold text-slate-400">No consultations yet</p>
                 </div>
+              )}
+
+              {!isCreating && selectedClient && (
+                <ClientFinanceCard appointments={clientAppointments} />
               )}
 
               {!isCreating && selectedClient && <ClientAgreements clientId={selectedClient.id} />}
@@ -1035,12 +1049,20 @@ export default function PortalClients() {
                       </p>
                       <div className="space-y-2">
                         {householdAppointments.map((apt) => (
-                          <div key={apt.id} className="rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-4 py-3">
+                          <button
+                            key={apt.id}
+                            type="button"
+                            onClick={() =>
+                              navigate('/portal/appointments', { state: { openAppointmentId: apt.id } })
+                            }
+                            className="block w-full rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] px-4 py-3 text-left transition hover:border-[#b8c9dd] hover:bg-[#f1f7ff]"
+                          >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-sm font-black text-slate-900 truncate">
-                                    {apt.projectType || apt.customerName || 'Consultation'}
+                                  <p className="inline-flex items-center gap-1.5 text-sm font-black text-slate-900">
+                                    <span className="truncate">{apt.projectType || apt.customerName || 'Consultation'}</span>
+                                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[#32639b]" />
                                   </p>
                                   <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black text-violet-700">
                                     {apt._memberName}
@@ -1054,7 +1076,7 @@ export default function PortalClients() {
                                 {apt.status.replace('_', ' ')}
                               </span>
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </section>

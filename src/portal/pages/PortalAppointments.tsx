@@ -26,6 +26,7 @@ import { usePortalAuth } from '../auth';
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import FinanceTab from '../components/FinanceTab';
+import { sameHomeowner } from '../data/clientLinks';
 import { showToast } from '../lib/toast';
 import { torontoToday, localDateKey } from '../lib/time';
 
@@ -848,7 +849,7 @@ export default function PortalAppointments() {
         handledNavState.current = id;
         openAppointment(apt); // resets to the Prep tab…
         const tab = state?.panelTab;
-        if (tab && ['prep', 'details', 'outcome', 'dispatch', 'emails'].includes(tab) && !isEventType(apt.appointmentType)) {
+        if (tab && ['prep', 'details', 'outcome', 'dispatch', 'emails', 'finance'].includes(tab) && !isEventType(apt.appointmentType)) {
           setPanelTab(tab as 'prep' | 'details' | 'outcome' | 'dispatch' | 'emails' | 'finance'); // …then jump to the relevant one
         }
       }
@@ -911,6 +912,23 @@ export default function PortalAppointments() {
   const selectedAppointment = visibleAppointments.find(
     (appointment) => appointment.id === selectedAppointmentId
   );
+  // This homeowner's other consultations, newest first. The Finance tab reads
+  // them so a repeat customer's application doesn't have to be retyped — the
+  // application is stored per consultation, so a second booking used to open
+  // an empty form.
+  const relatedFinanceAppointments = selectedAppointment
+    ? visibleAppointments
+        .filter((a) => a.id !== selectedAppointment.id && sameHomeowner(a, selectedAppointment))
+        .sort((a, b) =>
+          `${b.appointmentDate}T${b.appointmentTime}`.localeCompare(
+            `${a.appointmentDate}T${a.appointmentTime}`
+          )
+        )
+        .map((a) => ({
+          id: a.id,
+          label: `${a.projectType || 'consultation'} on ${a.appointmentDate}`,
+        }))
+    : [];
   const today = torontoToday();
   const todayAppointments = filteredAppointments.filter(
     (appointment) => appointment.appointmentDate === today
@@ -4532,6 +4550,7 @@ export default function PortalAppointments() {
               {selectedAppointment && panelTab === 'finance' && (
                 <FinanceTab
                   appointmentId={selectedAppointment.id}
+                  relatedAppointments={relatedFinanceAppointments}
                   prefill={{
                     firstName: (form.customerName || '').trim().split(/\s+/)[0] ?? '',
                     lastName: (form.customerName || '').trim().split(/\s+/).slice(1).join(' '),

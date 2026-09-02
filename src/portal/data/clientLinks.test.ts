@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { appointmentBelongsToClient, dealMatchesClient, phoneKey } from './clientLinks.ts';
+import { appointmentBelongsToClient, dealMatchesClient, phoneKey, sameHomeowner } from './clientLinks.ts';
 
 const client = { id: 'c1', phone: '+19056917227', email: 'mighty.mouse@hotmail.com' };
 
@@ -59,4 +59,46 @@ test('deals match the same person the same way', () => {
   assert.equal(dealMatchesClient({ phone: '905 691 7227', email: '' }, client), true);
   assert.equal(dealMatchesClient({ phone: '', email: 'MIGHTY.MOUSE@hotmail.com' }, client), true);
   assert.equal(dealMatchesClient({ phone: '4165550100', email: 'other@x.com' }, client), false);
+});
+
+test('two consultations for the same person are recognised across bookings', () => {
+  assert.equal(
+    sameHomeowner(
+      { clientId: null, phone: '(905) 691 7227', email: '' },
+      { clientId: null, phone: '+19056917227', email: '' }
+    ),
+    true
+  );
+  assert.equal(
+    sameHomeowner(
+      { clientId: null, phone: '', email: ' MIGHTY.MOUSE@hotmail.com ' },
+      { clientId: null, phone: '', email: 'mighty.mouse@hotmail.com' }
+    ),
+    true
+  );
+});
+
+test('two different homeowners never share a finance application', () => {
+  assert.equal(
+    sameHomeowner(
+      { clientId: 'c1', phone: '+19056917227', email: '' },
+      { clientId: 'c2', phone: '+19056917227', email: '' }
+    ),
+    false,
+    'consultations linked to different client profiles are different people'
+  );
+  assert.equal(
+    sameHomeowner(
+      { clientId: null, phone: '+16472274145', email: 'someone@else.com' },
+      { clientId: null, phone: '+19056917227', email: 'mighty.mouse@hotmail.com' }
+    ),
+    false
+  );
+});
+
+test('a blank phone and email match nobody — they would match everyone', () => {
+  assert.equal(
+    sameHomeowner({ clientId: null, phone: '', email: '' }, { clientId: null, phone: '', email: '' }),
+    false
+  );
 });

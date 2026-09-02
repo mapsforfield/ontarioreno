@@ -399,6 +399,38 @@ export type FinancePayload = {
   status: 'draft' | 'submitted' | 'approved' | 'declined';
   documents: FinanceDocument[];
   notes?: string;
+  /** A second applicant on the same application. Absent on every payload saved
+   *  before co-borrowers existed, so always read it defensively. */
+  coBorrower?: CoBorrower;
+};
+
+/** The second applicant on a finance application. Carries its own decision —
+ *  a lender can approve the borrower and decline the co-borrower, or the other
+ *  way round, so one shared status could not tell a rep what happened. */
+export type CoBorrower = {
+  /** False (or absent) means the rep hasn't added a co-borrower to this
+   *  application; the fields below are then not shown and not sent. */
+  enabled: boolean;
+  name: string;
+  birthday: string; // YYYY-MM-DD
+  phone: string;
+  email: string;
+  /** Does the co-borrower live with the borrower? */
+  livesWithBorrower: 'yes' | 'no' | '';
+  maritalStatus: 'married' | 'single' | 'common_law' | 'divorced' | '';
+  /** The co-borrower's OWN address, only when they don't live with the
+   *  borrower. Never the install address. */
+  address: string;
+  incomeWithTaxes: string;
+  /** How the co-borrower is related to the borrower (spouse, friend, …). */
+  relationship: string;
+  employer: string;
+  employmentPosition: string;
+  employerAddress: string;
+  idNumber: string;
+  idExpiry: string; // YYYY-MM-DD
+  idProvince: string;
+  status: 'draft' | 'submitted' | 'approved' | 'declined';
 };
 
 export type ClientVideo = {

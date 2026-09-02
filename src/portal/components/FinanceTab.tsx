@@ -2,7 +2,7 @@ import { Check, FileText, Loader2, Mail, MessageCircle, Save, Send, Upload, X } 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePortalData } from '../data/store';
 import { showToast } from '../lib/toast';
-import type { FinanceDocument, FinanceFile, FinancePayload } from '../data/types';
+import type { CoBorrower, FinanceDocument, FinanceFile, FinancePayload } from '../data/types';
 import AddressAutocomplete from './AddressAutocomplete';
 
 const DEFAULT_DOCS: FinanceDocument[] = [
@@ -14,6 +14,34 @@ const DEFAULT_DOCS: FinanceDocument[] = [
 ];
 
 type Prefill = { firstName?: string; lastName?: string; phone?: string; email?: string; address?: string };
+
+// Co-borrower fields, blank. Payloads saved before co-borrowers existed have no
+// `coBorrower` at all, so every read goes through this.
+function blankCoBorrower(): CoBorrower {
+  return {
+    enabled: false,
+    name: '',
+    birthday: '',
+    phone: '',
+    email: '',
+    livesWithBorrower: '',
+    maritalStatus: '',
+    address: '',
+    incomeWithTaxes: '',
+    relationship: '',
+    employer: '',
+    employmentPosition: '',
+    employerAddress: '',
+    idNumber: '',
+    idExpiry: '',
+    idProvince: '',
+    status: 'draft',
+  };
+}
+
+function coBorrowerOf(payload: Pick<FinancePayload, 'coBorrower'>): CoBorrower {
+  return { ...blankCoBorrower(), ...(payload.coBorrower ?? {}) };
+}
 
 // The finance form keeps a single address string. Prefer Google's own one-line
 // formatted address (already complete); only fall back to composing from the
@@ -45,6 +73,25 @@ function blankPayload(prefill: Prefill): FinancePayload {
     status: 'draft',
     documents: DEFAULT_DOCS,
     notes: '',
+    coBorrower: blankCoBorrower(),
+  };
+}
+
+// What carries forward to a NEW consultation for the same homeowner: who they
+// are, what they earn, who they work for, their licence and any documents
+// already collected — everything the rep would otherwise retype.
+//
+// The lender's decision does NOT carry. An approval belongs to the application
+// it was given on; showing it on a fresh one would tell a rep money is in place
+// that nobody has applied for. Both statuses reset to draft.
+function carryForward(prior: FinancePayload, prefill: Prefill): FinancePayload {
+  const co = coBorrowerOf(prior);
+  return {
+    ...blankPayload(prefill),
+    ...prior,
+    status: 'draft',
+    coBorrower: { ...co, status: 'draft' },
+    documents: mergeDocs(prior.documents),
   };
 }
 
@@ -70,7 +117,19 @@ function mergeDocs(saved: FinanceDocument[] | undefined): FinanceDocument[] {
   });
 }
 
-export default function FinanceTab({ appointmentId, prefill }: { appointmentId: string; prefill: Prefill }) {
+export default function FinanceTab({
+  appointmentId,
+  prefill,
+  relatedAppointments = [],
+}: {
+  appointmentId: string;
+  prefill: Prefill;
+  /** The same homeowner's OTHER consultations, most recent first. When this
+   *  consultation has no finance application of its own yet, the newest one
+   *  found here is loaded in as a starting point — it is not written to this
+   *  consultation until the rep saves. */
+  relatedAppointments?: Array<{ id: string; label: string }>;
+}) {
   const { getFinance, saveFinance, financeUpload, sendFinance, contractors } = usePortalData();
   const [form, setForm] = useState<FinancePayload>(() => blankPayload(prefill));
   const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email');
@@ -79,24 +138,45 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
   const [sendPhone, setSendPhone] = useState('');
   const [sendBusy, setSendBusy] = useState(false);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [carriedFrom, setCarriedFrom] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const dlRef = useRef<HTMLInputElement>(null);
   const docRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // The related list is rebuilt on every render by the parent, so the effect
+  // keys off the ids rather than the array identity.
+  const relatedKey = relatedAppointments.map((a) => a.id).join(',');
+
   const load = useCallback(async () => {
     setLoading(true);
     const { payload, urls: u } = await getFinance(appointmentId);
     if (payload) {
       setForm({ ...blankPayload(prefill), ...payload, documents: mergeDocs(payload.documents) });
-    } else {
-      setForm(blankPayload(prefill));
+      setUrls(u ?? {});
+      setCarriedFrom(null);
+      setLoading(false);
+      return;
     }
+    // Nothing saved here yet — look back through this homeowner's earlier
+    // consultations and start from the most recent application they have.
+    for (const prior of relatedAppointments.slice(0, 8)) {
+      const found = await getFinance(prior.id).catch(() => null);
+      if (found?.payload) {
+        setForm(carryForward(found.payload, prefill));
+        setUrls(found.urls ?? {});
+        setCarriedFrom(prior.label);
+        setLoading(false);
+        return;
+      }
+    }
+    setForm(blankPayload(prefill));
     setUrls(u ?? {});
+    setCarriedFrom(null);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointmentId, getFinance]);
+  }, [appointmentId, getFinance, relatedKey]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -114,6 +194,7 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
     setForm(next);
     const u = await saveFinance(appointmentId, next);
     setUrls((cur) => ({ ...cur, ...u }));
+    setCarriedFrom(null);
   };
 
   const save = async () => {
@@ -121,6 +202,7 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
     try {
       const u = await saveFinance(appointmentId, form);
       setUrls((cur) => ({ ...cur, ...u }));
+      setCarriedFrom(null);
       showToast({ variant: 'success', message: 'Finance info saved' });
     } catch {
       showToast({ variant: 'error', message: 'Could not save. Try again.' });
@@ -244,6 +326,22 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
     </label>
   );
 
+  const co = coBorrowerOf(form);
+  const setCo = <K extends keyof CoBorrower>(key: K, value: CoBorrower[K]) =>
+    setForm((cur) => ({ ...cur, coBorrower: { ...coBorrowerOf(cur), [key]: value } }));
+
+  const coField = (label: string, key: keyof CoBorrower, opts: { type?: string; full?: boolean; placeholder?: string } = {}) => (
+    <label className={`grid gap-1.5 text-sm font-bold text-slate-700 ${opts.full ? 'sm:col-span-2' : ''}`}>
+      {label}
+      <input
+        type={opts.type ?? 'text'}
+        value={String(co[key] ?? '')}
+        placeholder={opts.placeholder}
+        onChange={(e) => setCo(key, e.target.value as CoBorrower[typeof key])}
+      />
+    </label>
+  );
+
   if (loading) {
     return <div className="flex items-center justify-center py-10 text-slate-300"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
@@ -271,6 +369,16 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
           </label>
         </div>
       </section>
+
+      {carriedFrom && (
+        <div className="rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-bold text-amber-900">Carried over from {carriedFrom}</p>
+          <p className="mt-0.5 text-xs font-semibold text-amber-800">
+            Check it over and hit Save to attach it to this consultation. The lender's decision was
+            not carried over &mdash; this starts as a draft.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {field('First name', 'firstName')}
@@ -360,6 +468,104 @@ export default function FinanceTab({ appointmentId, prefill }: { appointmentId: 
           )}
           <input ref={dlRef} type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadDl(f); }} />
         </div>
+      </section>
+
+      {/* Co-borrower — a second applicant with their own lender decision */}
+      <section className="rounded-[0.5rem] border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700">
+            <button
+              type="button"
+              onClick={() => setCo('enabled', !co.enabled)}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${co.enabled ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white' : 'border-slate-300 hover:border-[#1B3C6C]'}`}
+              aria-label="This application has a co-borrower"
+            >
+              {co.enabled && <Check className="h-3 w-3" />}
+            </button>
+            This application has a co-borrower
+          </label>
+          {co.enabled && (
+            <label className="grid gap-1 text-xs font-bold text-slate-600">
+              Co-borrower status
+              <select
+                value={co.status}
+                onChange={(e) => setCo('status', e.target.value as CoBorrower['status'])}
+                className="rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+              >
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="declined">Declined</option>
+              </select>
+            </label>
+          )}
+        </div>
+
+        {co.enabled && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {coField('Name', 'name', { full: true })}
+            {coField('Date of birth', 'birthday', { type: 'date' })}
+            {coField('Phone number', 'phone')}
+            {coField('Email', 'email', { type: 'email' })}
+            {coField('Relationship to borrower', 'relationship', { placeholder: 'e.g. Spouse, Friend' })}
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Does the co-borrower live with the borrower?
+              <select
+                value={co.livesWithBorrower}
+                onChange={(e) => setCo('livesWithBorrower', e.target.value as CoBorrower['livesWithBorrower'])}
+                className="rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+              >
+                <option value="">Select&hellip;</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              Marital status
+              <select
+                value={co.maritalStatus}
+                onChange={(e) => setCo('maritalStatus', e.target.value as CoBorrower['maritalStatus'])}
+                className="rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+              >
+                <option value="">Select&hellip;</option>
+                <option value="married">Married</option>
+                <option value="single">Single</option>
+                <option value="common_law">Common law</option>
+                <option value="divorced">Divorced</option>
+              </select>
+            </label>
+            {/* Their own home address. Not the install address — the lender is
+                checking where this person lives, and a rep who pastes the job
+                site here has answered a different question. */}
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+              Co-borrower&apos;s address (leave blank if the same as the borrower&apos;s)
+              <AddressAutocomplete
+                value={co.address}
+                onChange={(v) => setCo('address', v)}
+                onSelect={(p) => setCo('address', fullAddress(p))}
+                placeholder="Start typing the co-borrower&apos;s home address&hellip;"
+              />
+              <span className="text-xs font-semibold text-slate-400">
+                Where the co-borrower lives &mdash; not the install address.
+              </span>
+            </label>
+            {coField('Income (including taxes)', 'incomeWithTaxes', { placeholder: 'e.g. 66,000' })}
+            {coField('Employer', 'employer')}
+            {coField('Position', 'employmentPosition')}
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
+              Employer&apos;s address
+              <AddressAutocomplete
+                value={co.employerAddress}
+                onChange={(v) => setCo('employerAddress', v)}
+                onSelect={(p) => setCo('employerAddress', fullAddress(p))}
+                placeholder="Start typing the employer&apos;s address&hellip;"
+              />
+            </label>
+            {coField('ID number', 'idNumber')}
+            {coField('ID expiry', 'idExpiry', { type: 'date' })}
+            {coField('ID issuing province', 'idProvince', { placeholder: 'e.g. Ontario' })}
+          </div>
+        )}
       </section>
 
       {/* Approval document checklist */}

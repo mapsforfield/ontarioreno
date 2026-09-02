@@ -60,6 +60,7 @@ import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.j
 import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
 import { seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
+import { isResubmission } from '../../lib/flow-resubmission.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -1817,6 +1818,57 @@ async function resolveAddress(placeId: string, typed: string): Promise<ResolvedA
 // two surfaces start offering a rep the same hour.
 
 
+/**
+ * The homeowner's most recent consultation-flow submission, if they have one.
+ *
+ * Matched on the same keys as findExistingLead — email, then the last 10 digits
+ * of the phone — but scoped to this flow. A Meta lead and a form submission are
+ * two different records of two different acts; only a repeat of THIS form is a
+ * duplicate of it.
+ */
+const PRIOR_SUBMISSION_FIELDS = {
+  id: true,
+  createdAt: true,
+  appointmentId: true,
+  status: true,
+  submissionContactedAt: true,
+  deletedAt: true,
+  notes: true,
+} as const;
+
+/**
+ * One specific submission, by the ref the client was handed when it was
+ * created. Scoped to this flow so a ref cannot be used to reach any other lead.
+ */
+async function loadPriorSubmission(leadRef: string) {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadRef },
+    select: { ...PRIOR_SUBMISSION_FIELDS, source: true },
+  });
+  return lead && lead.source === 'consultation_flow' ? lead : null;
+}
+
+async function findRecentFlowSubmission(phone: string, email: string) {
+  const digits = normPhone(phone);
+  const phoneLast10 = digits.length >= 10 ? digits.slice(-10) : null;
+  const normalized = normEmail(email);
+
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    `SELECT "id" FROM "Lead"
+      WHERE "source" = 'consultation_flow'
+        AND (
+          ($1::text IS NOT NULL AND lower("email") = $1)
+          OR ($2::text IS NOT NULL AND right(regexp_replace("phone", '[^0-9]', '', 'g'), 10) = $2)
+        )
+      ORDER BY "createdAt" DESC
+      LIMIT 1`,
+    normalized || null,
+    phoneLast10,
+  );
+  if (!rows[0]) return null;
+  return prisma.lead.findUnique({ where: { id: rows[0].id }, select: PRIOR_SUBMISSION_FIELDS });
+}
+
 async function loadPublicFlowLead(leadRef: string) {
   if (!leadRef) return null;
   return prisma.lead.findUnique({ where: { id: leadRef } }).catch(() => null);
@@ -2392,9 +2444,7 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     const needsReview =
       routing.outcome === 'MANUAL_REVIEW' || routing.reasons.includes('ADDRESS_UNVERIFIED');
     const isNurture = routing.outcome === 'NURTURE';
-    const lead = await withTables(() =>
-      prisma.lead.create({
-        data: {
+    const leadData = {
           name,
           phone,
           email,
@@ -2424,10 +2474,45 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           notes: [clean(body.notes), isNurture ? `CRM tag: ${NURTURE_TAG}` : '']
             .filter(Boolean)
             .join('\n'),
-        },
-        select: { id: true },
-      })
+    };
+
+    // ── One visit, one row ──
+    //
+    // This flow creates the Lead first and fetches the calendar second, so a
+    // homeowner whose calendar call failed sees an error next to a button that
+    // has already run — and presses it again. Every press used to become
+    // another submission: Kyrsi pressed four times and a rep had three rows to
+    // chase for an appointment that already existed.
+    //
+    // A repeat inside the window updates the row it is repeating instead. What
+    // makes that safe rather than lossy is that the NEWER answers win: someone
+    // who went back and changed an answer (nurture → books a slot, which the
+    // audit also found) gets their row corrected, not a second one.
+    //
+    // lib/flow-resubmission.ts owns when this applies, and refuses the moment
+    // the earlier row has been booked, worked, or trashed.
+    //
+    // The client sends back the leadRef it already holds, which is the exact
+    // answer where there is one: it survives a homeowner correcting the phone
+    // number they typed, which matching on the phone number cannot. The
+    // phone/email lookup stays as the fallback for a client that sent none.
+    const claimedRef = clean(body.leadRef);
+    const priorSubmission = await withTables(() =>
+      claimedRef ? loadPriorSubmission(claimedRef) : findRecentFlowSubmission(phone, email)
     );
+    const reuse = priorSubmission && isResubmission(priorSubmission, new Date());
+
+    const lead = reuse
+      ? await withTables(() =>
+          prisma.lead.update({
+            where: { id: priorSubmission.id },
+            // Notes are merged, not replaced: the earlier press may have
+            // carried the typed-address note that this one does not.
+            data: { ...leadData, notes: mergeNotes(priorSubmission.notes, leadData.notes) },
+            select: { id: true },
+          })
+        )
+      : await withTables(() => prisma.lead.create({ data: leadData, select: { id: true } }));
 
     // Nurture leads get the guide by email instead of a live consultation slot.
     if (isNurture && email && program.guideUrl) {
