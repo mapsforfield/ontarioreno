@@ -1067,6 +1067,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         housingStatus?: string; monthlyHousingPayment?: string; employer?: string;
         employmentPosition?: string; employerAddress?: string; status?: string; dlPhotoKey?: string;
         mailingSameAsInstall?: boolean; mailingAddress?: string;
+        // Mirrors CoBorrower in src/portal/data/types.ts. Absent on every
+        // application saved before co-borrowers existed.
+        coBorrower?: {
+          enabled?: boolean; name?: string; birthday?: string; phone?: string; email?: string;
+          livesWithBorrower?: string; maritalStatus?: string; address?: string;
+          incomeWithTaxes?: string; relationship?: string; employer?: string;
+          employmentPosition?: string; employerAddress?: string; idNumber?: string;
+          idExpiry?: string; idProvince?: string; status?: string;
+        };
         // Mirrors FinanceDocument in src/portal/data/types.ts: a section can
         // hold several files, and the legacy single-file pair is still read so
         // payloads saved before that keep rendering. The narrower shape this
@@ -1106,6 +1115,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         payload.employmentPosition ? `Position: ${payload.employmentPosition}` : '',
         payload.employerAddress ? `Employer address: ${payload.employerAddress}` : '',
       ].filter(Boolean);
+      // A co-borrower is a second applicant the lender has to assess, so the
+      // send-in has to carry their details too — a rep who filled them in and
+      // then found them missing from the email would type them again by hand.
+      const co = payload.coBorrower;
+      if (co?.enabled) {
+        const marital = { married: 'Married', single: 'Single', common_law: 'Common law', divorced: 'Divorced' }[co.maritalStatus ?? ''] ?? '';
+        lines.push(
+          '',
+          '— Co-borrower —',
+          ...[
+            co.name ? `Name: ${co.name}` : '',
+            co.birthday ? `DOB: ${co.birthday}` : '',
+            co.phone ? `Phone: ${co.phone}` : '',
+            co.email ? `Email: ${co.email}` : '',
+            co.relationship ? `Relationship to borrower: ${co.relationship}` : '',
+            co.livesWithBorrower ? `Lives with the borrower: ${co.livesWithBorrower === 'yes' ? 'Yes' : 'No'}` : '',
+            marital ? `Marital status: ${marital}` : '',
+            // Labelled explicitly: this is where the co-borrower lives, never
+            // the install address.
+            co.address ? `Co-borrower address (not the install address): ${co.address}` : '',
+            co.incomeWithTaxes ? `Income (incl. taxes): ${co.incomeWithTaxes}` : '',
+            co.employer ? `Employer: ${co.employer}` : '',
+            co.employmentPosition ? `Position: ${co.employmentPosition}` : '',
+            co.employerAddress ? `Employer address: ${co.employerAddress}` : '',
+            co.idNumber ? `ID number: ${co.idNumber}` : '',
+            co.idExpiry ? `ID expiry: ${co.idExpiry}` : '',
+            co.idProvince ? `ID issuing province: ${co.idProvince}` : '',
+          ].filter(Boolean),
+        );
+      }
+
       const fileLines: string[] = [];
       if (payload.dlPhotoKey) fileLines.push(`Driver's licence (front): ${presignGetUrl(payload.dlPhotoKey, 7 * 24 * 3600)}`);
       // A section can hold several files (e.g. 6 months of statements), so emit
