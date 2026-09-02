@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Rocket, TrendingUp } from 'lucide-react';
 import { usePortalAuth } from '../auth';
+import { wonInMonth } from '../../../lib/deal-won-date';
 import { usePortalData } from '../data/store';
 import { formatCurrency } from '../data/selectors';
 import { torontoToday, torontoDateKey } from '../lib/time';
@@ -37,11 +38,11 @@ export default function EarningPotentialCard() {
 
     // This month's real closes (portal activity only, in Ontario time).
     const monthPrefix = torontoToday().slice(0, 7);
+    // Counted on the date the deal was WON. This used to read updatedAt, so any
+    // edit to an older won deal added it to this month's total and told the rep
+    // they had closed something they closed in March. See lib/deal-won-date.ts.
     const monthWon = base.filter(
-      (d) =>
-        d.status === 'won' &&
-        !d.isHistorical &&
-        torontoDateKey(new Date(d.updatedAt)).slice(0, 7) === monthPrefix
+      (d) => d.status === 'won' && !d.isHistorical && wonInMonth(d, monthPrefix, torontoDateKey)
     );
     const monthCount = monthWon.length;
     const monthValue = monthWon.reduce((s, d) => s + d.estimatedJobValue, 0);

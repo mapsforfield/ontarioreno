@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
+import { nextWonAt } from '../../lib/deal-won-date.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { del, issueSignedToken, presignUrl } from '@vercel/blob';
@@ -33,6 +34,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     void _act; void _ca; void _ua; void _id; void _p; void _d;
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
+
+    // ── Stamp the win date ──
+    // updatedAt cannot answer "when was this won" — it moves on every edit, so
+    // touching a deal closed months ago used to drag it into this month's WON
+    // column and into the rep's earnings figure. See lib/deal-won-date.ts.
+    try {
+      const before = await prisma.deal.findUnique({ where: { id }, select: { status: true } });
+      if (before) {
+        const stamp = nextWonAt(before.status, safeData.status as string | undefined, new Date());
+        if (stamp !== undefined) safeData.wonAt = stamp;
+      }
+    } catch {
+      // Best-effort: a deal edit must not fail because the win date could not
+      // be stamped. The fallback to updatedAt still applies.
+    }
+
     try {
       const includeRels = {
         activity: { orderBy: { createdAt: 'desc' as const } },

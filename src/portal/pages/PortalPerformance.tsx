@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { usePortalAuth } from '../auth';
+import { dealWonDate } from '../../../lib/deal-won-date';
 import { formatCurrency } from '../data/selectors';
 import { commissionableValue, usePortalData } from '../data/store';
 import { Appointment, Commission, Deal, ProposalHistory, User } from '../data/types';
@@ -73,7 +74,9 @@ function calculateAvgDaysToClose(wonDeals: Deal[]) {
   if (wonDeals.length === 0) return 0;
   const totalDays = wonDeals.reduce((total, deal) => {
     const created = new Date(deal.createdAt).getTime();
-    const closed = new Date(deal.updatedAt).getTime();
+    // The date it was won. updatedAt is the last edit of any kind, so a note
+    // added months later used to inflate this rep's average days-to-close.
+    const closed = (dealWonDate(deal) ?? new Date(deal.updatedAt)).getTime();
     return total + Math.max(Math.round((closed - created) / 86_400_000), 0);
   }, 0);
   return Math.round(totalDays / wonDeals.length);
@@ -143,7 +146,9 @@ function buildRepPerformance({
     const deal = deals.find((candidate) => candidate.id === commission.dealId);
     return (
       commission.repId === rep.id &&
-      Boolean(deal && isInDateRange(deal.updatedAt, range))
+      // Placed on the win date, so a rep's commissions stay in the period they
+      // actually closed in rather than moving with the last edit.
+      Boolean(deal && isInDateRange((dealWonDate(deal) ?? new Date(deal.updatedAt)).toISOString(), range))
     );
   });
   const openDeals = repDeals.filter((deal) =>

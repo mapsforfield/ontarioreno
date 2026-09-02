@@ -310,6 +310,11 @@ export type Deal = {
   isHistorical?: boolean;
   /** Sequential commission-invoice number, assigned on first invoice generation. */
   invoiceNumber?: number | null;
+  /** When the deal was WON — set on the transition into 'won', cleared on the
+   *  way out. Null on deals won before the column existed. Read it through
+   *  lib/deal-won-date.ts, never updatedAt: updatedAt moves on every edit, so
+   *  it used to re-date old wins into the current month. */
+  wonAt?: string | null;
   activity: DealActivity[];
   createdAt: string;
   updatedAt: string;

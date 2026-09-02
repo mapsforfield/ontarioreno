@@ -142,6 +142,18 @@ model Deal {
   /// Sequential commission-invoice number, assigned once when the admin first
   /// generates the invoice for this deal (starts at 4044).
   invoiceNumber        Int?
+  /// When this deal was actually WON — set on the transition into 'won', and
+  /// cleared if it ever moves back out.
+  ///
+  /// Not the same thing as updatedAt, which is what the month/quarter/year
+  /// filters used to read. Any edit at all — a note, a contractor, a phone
+  /// number — bumps updatedAt, so touching a deal closed in March moved it
+  /// into this month's WON column and into the earnings figure on the
+  /// dashboard. A rep saw their month grow because they tidied a record.
+  ///
+  /// Null on deals won before this column existed; scripts/deal-won-date-backfill.ts
+  /// recovers those from the status-change entry in the Activity log.
+  wonAt                DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
