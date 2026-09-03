@@ -35,7 +35,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAdmin } from './auth.js';
 import {
-  conversationKey,
+  conversationQueryUrls,
   mergeMessagesBySid,
   normalizeMedia,
   normalizeMessage,
@@ -112,6 +112,51 @@ async function fetchMessagesForNumber(
   return mergeMessagesBySid([...sent, ...received]);
 }
 
+/**
+ * One conversation, asked of Twilio directly.
+ *
+ * Opening a thread used to filter the FULL message log for the number, which
+ * meant that on any instance without a warm cache — the normal case on
+ * serverless, where instances come and go and several run at once — clicking a
+ * conversation walked up to 5 pages x 1000 messages x 2 directions before it
+ * could pick out the dozen messages actually in that thread. It worked at a few
+ * hundred messages and degraded as the log grew; at ~4,000 it started timing
+ * out, and a timed-out thread is one that never opens.
+ *
+ * Twilio can filter on an exact To/From pair, so ask for the pair. Two small
+ * requests, no full walk, and no dependence on a cache that may not exist —
+ * which also means a message that arrived seconds ago is in the response,
+ * rather than missing until some cached list expires.
+ *
+ * `limit` is per direction. 200 is far past what a rep scrolls while still
+ * being one page from Twilio.
+ */
+async function fetchConversation(
+  ourNumber: string,
+  contact: string,
+  limit = 200
+): Promise<DashboardMessage[]> {
+  const creds = credentials();
+  if (!creds) return [];
+
+  const read = async (url: string): Promise<DashboardMessage[]> => {
+    const payload = await twilioGet<{ messages?: Array<Record<string, unknown>> }>(
+      url,
+      creds.auth
+    );
+    return (payload?.messages ?? []).map(normalizeMessage);
+  };
+
+  const [outbound, inbound] = await Promise.all(
+    conversationQueryUrls(base(creds.accountSid), ourNumber, contact, limit).map(read)
+  );
+
+  // Oldest first — the order the thread renders in.
+  return mergeMessagesBySid([...outbound, ...inbound]).sort(
+    (a, b) => new Date(a.dateSent ?? 0).getTime() - new Date(b.dateSent ?? 0).getTime()
+  );
+}
+
 function cachedMessages(activeNumber: string, maxAgeMs = MESSAGE_CACHE_MS) {
   const hit = messageCache.get(activeNumber);
   if (!hit) return null;
@@ -119,25 +164,41 @@ function cachedMessages(activeNumber: string, maxAgeMs = MESSAGE_CACHE_MS) {
   return hit.messages;
 }
 
+/**
+ * Attach media links, at most MEDIA_LOOKUP_CONCURRENCY lookups at a time.
+ *
+ * This used to be an unbounded Promise.all: a thread where twenty homeowners
+ * had sent photos opened twenty simultaneous Twilio requests, which is how you
+ * get rate-limited on the one request path a rep is waiting on. Six at a time
+ * is quick and stays well inside Twilio's limits.
+ */
+const MEDIA_LOOKUP_CONCURRENCY = 6;
+
 async function enrichWithMedia(messages: DashboardMessage[]): Promise<DashboardMessage[]> {
   const creds = credentials();
   if (!creds) return messages;
 
-  return Promise.all(
-    messages.map(async (m) => {
-      if (!m.numMedia) return m;
-      const cached = mediaCache.get(m.sid);
-      if (cached) return { ...m, media: cached };
+  const out: DashboardMessage[] = [];
+  for (let i = 0; i < messages.length; i += MEDIA_LOOKUP_CONCURRENCY) {
+    const batch = await Promise.all(
+      messages.slice(i, i + MEDIA_LOOKUP_CONCURRENCY).map(async (m) => {
+        if (!m.numMedia) return m;
+        const cached = mediaCache.get(m.sid);
+        if (cached) return { ...m, media: cached };
 
-      const payload = await twilioGet<{ media_list?: Array<Record<string, unknown>> }>(
-        `${base(creds.accountSid)}/Messages/${m.sid}/Media.json?PageSize=10`,
-        creds.auth
-      );
-      const media = normalizeMedia(m.sid, payload?.media_list ?? []);
-      mediaCache.set(m.sid, media);
-      return { ...m, media };
-    })
-  );
+        const payload = await twilioGet<{ media_list?: Array<Record<string, unknown>> }>(
+          `${base(creds.accountSid)}/Messages/${m.sid}/Media.json?PageSize=10`,
+          creds.auth
+        );
+        const media = normalizeMedia(m.sid, payload?.media_list ?? []);
+        mediaCache.set(m.sid, media);
+        return { ...m, media };
+      })
+    );
+    out.push(...batch);
+  }
+
+  return out;
 }
 
 export async function handleTwilioDashboard(req: VercelRequest, res: VercelResponse) {
@@ -244,16 +305,7 @@ export async function handleTwilioDashboard(req: VercelRequest, res: VercelRespo
         return;
       }
 
-      let messages = cachedMessages(activeNumber, 5 * 60 * 1000);
-      if (!messages) {
-        messages = await fetchMessagesForNumber(activeNumber);
-        messageCache.set(activeNumber, { timestamp: Date.now(), messages });
-      }
-
-      const thread = messages
-        .filter((m) => conversationKey(m, activeNumber) === contact)
-        .sort((a, b) => new Date(a.dateSent ?? 0).getTime() - new Date(b.dateSent ?? 0).getTime());
-
+      const thread = await fetchConversation(activeNumber, contact);
       const enriched = await enrichWithMedia(thread);
       res.json({ contact, total: enriched.length, messages: enriched });
       return;
