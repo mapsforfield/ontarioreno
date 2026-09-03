@@ -8,6 +8,7 @@ import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
 import { handleInboundSms } from '../../lib/sms-inbound.js';
+import { handleTwilioDashboard } from '../../lib/twilio-dashboard-api.js';
 import {
   followUpDigestWhere,
   openPipelineWhere,
@@ -206,6 +207,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // /api/sms/inbound via the rewrite in vercel.json.
   if (req.query['resource'] === 'sms-inbound') {
     return handleInboundSms(req, res, prisma as never);
+  }
+
+  // ── Twilio message dashboard (admin only — it does its own requireAdmin) ──
+  // The SMS dashboard that used to run on one office machine at 127.0.0.1:3000.
+  // Here for the same reason as the webhook above: the 12-function cap. Public
+  // URL is /api/twilio via the rewrite in vercel.json, and the dashboard's own
+  // selector is `twilioResource` because `resource` is spent getting here.
+  if (req.query['resource'] === 'twilio') {
+    return handleTwilioDashboard(req, res);
   }
 
   // ── Schema reconcile cron (no user auth — verified by CRON_SECRET) ──

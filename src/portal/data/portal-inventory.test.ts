@@ -69,8 +69,9 @@ const PORTAL_FEATURES: PortalFeature[] = [
   // The Twilio SMS dashboard, moved off the office desktop. Admin-guarded,
   // reached from the Admin page's card grid, deliberately without a sidebar
   // link. The page itself is a frame — the UI lives in
-  // public/portal-twilio-dashboard.html and the data in api/twilio/index.ts,
-  // both listed in REQUIRED_MODULES below so neither half can go missing.
+  // public/portal-twilio-dashboard.html and the data in
+  // lib/twilio-dashboard-api.ts, both listed in REQUIRED_MODULES below so
+  // neither half can go missing.
   { navLabel: null, route: 'messages', page: 'src/portal/pages/PortalMessages.tsx', component: 'PortalMessages' },
 ];
 
@@ -89,7 +90,7 @@ const REQUIRED_MODULES = [
   // Both halves of the framed Twilio dashboard. Neither has a route of its
   // own, and /portal/messages is an empty box without them.
   'public/portal-twilio-dashboard.html',
-  'api/twilio/index.ts',
+  'lib/twilio-dashboard-api.ts',
 ];
 
 const app = read('src/App.tsx');

@@ -5,6 +5,16 @@
 // only at 127.0.0.1:3000. Same endpoints, same response shapes — the browser
 // half is `public/portal-twilio-dashboard.html`, framed by /portal/messages.
 //
+// A lib module rather than api/twilio/index.ts, and routed through
+// api/appointments, because the project is at Vercel's 12-function cap — the
+// same reason the inbound-SMS webhook lives there. Its own function built fine
+// and then failed at "Deploying outputs" as the 13th. The public URL is
+// /api/twilio via the rewrite in vercel.json.
+//
+// The dashboard's own selector is `twilioResource`, NOT `resource`: the rewrite
+// spends `resource=twilio` to get here, so a second `resource` in the query
+// would collide with it.
+//
 // Two deliberate differences from the local version:
 //
 //   1. Every request requires an ADMIN portal session. The local app had no
@@ -23,14 +33,14 @@
 // own every automated message.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAdmin } from '../../lib/auth.js';
+import { requireAdmin } from './auth.js';
 import {
   conversationKey,
   mergeMessagesBySid,
   normalizeMedia,
   normalizeMessage,
   type DashboardMessage,
-} from '../../lib/twilio-dashboard.js';
+} from './twilio-dashboard.js';
 
 const MAX_PAGES = 5; // 5 x 1000 messages per direction
 const PAGE_SIZE = 1000;
@@ -130,7 +140,7 @@ async function enrichWithMedia(messages: DashboardMessage[]): Promise<DashboardM
   );
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleTwilioDashboard(req: VercelRequest, res: VercelResponse) {
   const user = await requireAdmin(req, res);
   if (!user) return;
 
@@ -140,7 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const resource = String(req.query.resource ?? '');
+  const resource = String(req.query.twilioResource ?? '');
 
   // The dashboard polls; never let a proxy hand it a stale thread.
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');

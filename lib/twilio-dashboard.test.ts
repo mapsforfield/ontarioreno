@@ -154,7 +154,7 @@ test('attachments are served through our own proxy, never Twilio directly', () =
   assert.equal(media[0].contentType, 'image/jpeg');
   // A raw api.twilio.com URL here would leave a homeowner's photo readable by
   // anyone who ever saw the link, with no portal session required.
-  assert.ok(media[0].url.startsWith('/api/twilio?resource=media'));
+  assert.ok(media[0].url.startsWith('/api/twilio?twilioResource=media'));
   assert.ok(!media[0].url.includes('api.twilio.com'));
 });
 

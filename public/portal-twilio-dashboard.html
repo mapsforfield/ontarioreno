@@ -1717,7 +1717,7 @@
           contact: activeConversation.contact
         });
 
-        const res = await fetch(`/api/twilio?resource=thread&${query.toString()}`, {
+        const res = await fetch(`/api/twilio?twilioResource=thread&${query.toString()}`, {
           cache: "no-store"
         });
         const data = await res.json();
@@ -1744,7 +1744,7 @@
 
     async function loadPhoneNumbers() {
       try {
-        const res = await fetch("/api/twilio?resource=phone-numbers");
+        const res = await fetch("/api/twilio?twilioResource=phone-numbers");
 
         // An expired portal session is the one failure worth naming: the page
         // otherwise just sits empty and looks like Twilio is down.
@@ -1796,7 +1796,7 @@
           query.set("incremental", "1");
         }
 
-        const res = await fetch(`/api/twilio?resource=messages&${query.toString()}`, {
+        const res = await fetch(`/api/twilio?twilioResource=messages&${query.toString()}`, {
           cache: "no-store"
         });
         const data = await res.json();
@@ -1891,7 +1891,7 @@
       try {
         setStatus("Sending...");
         sendBtn.disabled = true;
-        const res = await fetch("/api/twilio?resource=send", {
+        const res = await fetch("/api/twilio?twilioResource=send", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

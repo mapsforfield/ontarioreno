@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.png" },
     { "source": "/api/sms/inbound", "destination": "/api/appointments?resource=sms-inbound" },
+    { "source": "/api/twilio", "destination": "/api/appointments?resource=twilio" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -20,7 +21,6 @@
   ],
   "functions": {
     "api/appointments/index.ts": { "maxDuration": 60 },
-    "api/twilio/index.ts": { "maxDuration": 60 },
     "api/deals/index.ts": { "maxDuration": 120 }
   },
   "crons": [

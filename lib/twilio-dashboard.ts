@@ -83,10 +83,14 @@ export function conversationKey(m: DashboardMessage, activeNumber: string): stri
  * account's basic auth: an `<img src>` cannot carry that header, and Twilio's
  * alternative — a public media URL — would leave a homeowner's photo readable
  * by anyone who ever saw the link.
+ *
+ * `twilioResource`, not `resource`: /api/twilio is a rewrite that spends
+ * `resource=twilio` reaching api/appointments, so a second `resource` here
+ * would collide with it.
  */
 export function mediaProxyUrl(messageSid: string, mediaSid: string): string {
   return (
-    `/api/twilio?resource=media&messageSid=${encodeURIComponent(messageSid)}` +
+    `/api/twilio?twilioResource=media&messageSid=${encodeURIComponent(messageSid)}` +
     `&mediaSid=${encodeURIComponent(mediaSid)}`
   );
 }
