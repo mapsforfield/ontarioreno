@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { newEventId, trackCustom, trackEvent } from '../../lib/pixel';
+import { nearestSlots } from '../../../lib/slot-suggestions';
 import {
   AddToCalendar,
   Choice,
@@ -123,6 +124,18 @@ export default function BasementBookingFlow({
   /** Which month the full view is showing, as 'YYYY-MM'. */
   const [monthCursor, setMonthCursor] = useState('');
   const [chosen, setChosen] = useState<Slot | null>(null);
+  /**
+   * The address-aware re-check, run on the details screen.
+   *
+   * 'idle'     nothing to check yet — no address, or no time chosen
+   * 'checking' in flight; Confirm waits rather than booking on a stale answer
+   * 'ok'       the chosen time survived the real check, or could not be located
+   * 'moved'    it did not, and `swaps` holds the nearest times that did
+   */
+  const [recheck, setRecheck] = useState<'idle' | 'checking' | 'ok' | 'moved'>('idle');
+  const [swaps, setSwaps] = useState<Slot[]>([]);
+  /** True once a swap has been taken, so the chip can say what happened. */
+  const [swapped, setSwapped] = useState(false);
   const [remote, setRemote] = useState(false);
   const [booking, setBooking] = useState<
     { publicReference: string; date: string; time: string; propertyAddress?: string } | null
@@ -200,6 +213,106 @@ export default function BasementBookingFlow({
     }, 250);
     return () => window.clearTimeout(timer.current);
   }, [addressText]);
+
+  /**
+   * ── The address-aware re-check ──
+   *
+   * The calendar on screen 1 is computed before anyone has said where they
+   * live, so it cannot apply the same-day travel rules and shows the widest
+   * possible list. That was being read as a promise: a homeowner picked a time,
+   * spent two more screens on it, and was told at the final press that the slot
+   * had "just been taken" — when nothing had been taken. It was never reachable
+   * from their property, and on a busy day neither was anything else.
+   *
+   * So the moment the address is known — one screen BEFORE the booking — we ask
+   * again with it. A time that survives costs the homeowner nothing and they
+   * never learn this ran. A time that does not is swapped here, with the
+   * nearest real times one tap away, while they still have everything else
+   * filled in.
+   *
+   * The answer is cached against the address so taking a suggestion re-validates
+   * locally instead of spending another address lookup.
+   */
+  const locatedFor = useRef<{ key: string; slots: Slot[] } | null>(null);
+  const recheckTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (phase !== 'lock' || !chosen) return;
+    const typed = addressText.trim();
+    // Not enough to look up yet. Confirm stays enabled: an address we cannot
+    // check is not an address we refuse to book.
+    if (!placeId && typed.length < 6) {
+      setRecheck('idle');
+      return;
+    }
+    const key = placeId || typed.toLowerCase();
+
+    // Already answered for this address — validate the pick against it without
+    // another round trip.
+    const cached = locatedFor.current;
+    if (cached && cached.key === key) {
+      const free = cached.slots.some((s) => s.date === chosen.date && s.time === chosen.time);
+      setSwaps(free ? [] : nearestSlots(cached.slots, chosen));
+      setRecheck(free ? 'ok' : 'moved');
+      return;
+    }
+
+    let live = true;
+    setRecheck('checking');
+    // A picked suggestion is final, so check it at once. Typed text is still
+    // being edited, so wait for the typing to stop.
+    const delay = placeId ? 0 : 700;
+    window.clearTimeout(recheckTimer.current);
+    recheckTimer.current = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ flow: 'availability_preview', slug: program.slug });
+        if (placeId) params.set('placeId', placeId);
+        if (typed) params.set('address', typed);
+        const r = await fetch(`/api/leads?${params.toString()}`);
+        if (!r.ok) throw new Error(String(r.status));
+        const payload: { slots?: Slot[]; located?: boolean; slotGrid?: typeof slotGrid } =
+          await r.json();
+        if (!live) return;
+        // Nothing could be resolved from what they typed, so this answer is no
+        // better than the one we already had. Say nothing and let them book.
+        if (!payload.located) {
+          setRecheck('ok');
+          return;
+        }
+        const real = payload.slots ?? [];
+        locatedFor.current = { key, slots: real };
+        // The calendar behind them is now the true one, so going Back shows
+        // what can actually be booked rather than the wider guess.
+        setSlots(real);
+        if (payload.slotGrid) setSlotGrid(payload.slotGrid);
+        const free = real.some((s) => s.date === chosen.date && s.time === chosen.time);
+        setSwaps(free ? [] : nearestSlots(real, chosen));
+        setRecheck(free ? 'ok' : 'moved');
+        if (!free) trackStep('ConsultationSlotRecheckMoved');
+      } catch {
+        // Our check failed, not their booking. Fall through to Confirm, which
+        // still re-checks server-side and handles a 409 properly.
+        if (live) setRecheck('ok');
+      }
+    }, delay);
+
+    return () => {
+      live = false;
+      window.clearTimeout(recheckTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, placeId, addressText, chosen?.date, chosen?.time, program.slug]);
+
+  /** Take one of the offered times, in place, without leaving the screen. */
+  const takeSwap = (slot: Slot) => {
+    setChosen(slot);
+    setDay(slot.date);
+    setSwaps([]);
+    setSwapped(true);
+    setRecheck('ok');
+    setError('');
+    trackCustom('ConsultationSlotSwapped', { slug: program.slug });
+  };
 
   /** Every open day in order, each with its remaining times. */
   const days = useMemo(() => {
@@ -414,16 +527,39 @@ export default function BasementBookingFlow({
       });
       const booked = await bookRes.json();
       if (bookRes.status === 409 && booked?.code === 'SLOT_UNAVAILABLE') {
-        // The preview calendar could not know about the property, so a slot can
-        // legitimately disappear between choosing it and booking it. Send them
-        // back to the times with the server's alternatives rather than to an
-        // apology.
-        setSlots(
-          booked.alternatives?.length ? booked.alternatives : slots.filter((s) => s.time !== chosen.time)
-        );
+        // The re-check above should have caught this already, so reaching here
+        // means either a genuine race with another homeowner or an address we
+        // could not resolve until submit did it. Either way the honest list is
+        // the LEAD-KEYED one, which now exists — the old fallback filtered the
+        // unlocated preview instead, and handed the homeowner a fresh set of
+        // times that could fail for exactly the same reason, over and over.
+        //
+        // `alternatives` from the 409 is same-day only, so it is used as a
+        // backstop rather than the answer.
+        let real: Slot[] = [];
+        try {
+          const av = await fetch(
+            `/api/leads?flow=availability&leadRef=${encodeURIComponent(submitted.leadRef)}`
+          );
+          if (av.ok) real = ((await av.json()).slots ?? []) as Slot[];
+        } catch {
+          // Falls through to the alternatives below.
+        }
+        if (real.length === 0) real = (booked.alternatives ?? []) as Slot[];
+
+        setSlots(real);
+        locatedFor.current = null;
+        if (real.length > 0) {
+          // Stay put and offer the swap, exactly as the earlier check does.
+          // Sending them back to the calendar was a screen change charged for
+          // something they did nothing wrong to cause.
+          setSwaps(nearestSlots(real, chosen));
+          setRecheck('moved');
+          return;
+        }
         setChosen(null);
         setPhase('time');
-        setError('That time was just taken. Please choose another.');
+        setError('That time has just gone. Please choose another.');
         return;
       }
       if (!bookRes.ok) throw new Error(booked?.error ?? 'We could not complete the booking.');
@@ -788,10 +924,79 @@ export default function BasementBookingFlow({
             void confirm();
           }}
         >
-          {chosen && (
+          {/* The slot they are holding — and, when the address ruled it out,
+              the swap. Deliberately in the same place on the screen and in the
+              same shape: the homeowner reads one line about their appointment,
+              which either confirms or offers, and never a red error about a
+              step they completed correctly. */}
+          {chosen && recheck !== 'moved' && (
             <p className="rounded-xl bg-[#f2f7ff] px-4 py-3 text-sm font-bold text-[#1B3C6C]">
               {fmtDate(chosen.date)} at {fmtTime(chosen.time)}
+              {swapped && (
+                <span className="mt-1 block text-xs font-semibold text-emerald-700">
+                  <Check className="mr-1 inline h-3.5 w-3.5" />
+                  Updated for your address
+                </span>
+              )}
+              {recheck === 'checking' && (
+                <span className="mt-1 block text-xs font-semibold text-slate-500">
+                  <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
+                  Checking this time for your address…
+                </span>
+              )}
             </p>
+          )}
+
+          {chosen && recheck === 'moved' && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+              <p className="text-sm font-bold text-slate-900">
+                {fmtTime(chosen.time)} on {dayPart(chosen.date, { weekday: 'long' })} is already
+                taken near you
+              </p>
+              {swaps.length > 0 ? (
+                <>
+                  {/* One tap and they are back on track. No screen change, no
+                      re-entry, no scrolling to find the calendar again — the
+                      nearest times to what they already asked for, in the place
+                      they are already looking. */}
+                  <p className="mt-1 text-xs font-semibold text-slate-600">
+                    Closest times we can get to you — tap one to keep your booking:
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    {swaps.map((s) => (
+                      <button
+                        key={`${s.date}T${s.time}`}
+                        type="button"
+                        onClick={() => takeSwap(s)}
+                        className="flex w-full items-center justify-between rounded-xl border-2 border-[#1B3C6C] bg-white px-4 py-3 text-left text-sm font-bold text-[#1B3C6C] transition hover:bg-[#f2f7ff]"
+                      >
+                        <span>
+                          {dayPart(s.date, { weekday: 'long', month: 'short', day: 'numeric' })} at{' '}
+                          {fmtTime(s.time)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 text-xs font-semibold text-slate-600">
+                  Pick another time and we will hold it for you.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setChosen(null);
+                  setRecheck('idle');
+                  setSwaps([]);
+                  setPhase('time');
+                }}
+                className="mt-3 text-xs font-bold text-[#1B3C6C] underline"
+              >
+                See all available times
+              </button>
+            </div>
           )}
           <div>
             <label className="mb-2 block text-sm font-bold text-slate-700">Your name</label>
@@ -872,11 +1077,29 @@ export default function BasementBookingFlow({
           </div>
 
           {error && <ErrorNote>{error}</ErrorNote>}
+          {/* Blocked only while a time is known to be gone, or while the check
+              that would tell us is still running. Every other state books —
+              an address we could not resolve, a check that errored, no address
+              lookup at all. The server re-checks regardless; this button must
+              never be the reason a real booking is refused. */}
           <PrimaryButton
-            disabled={busy || !contact.name.trim() || !phoneOk(contact.phone) || !addressText.trim()}
+            disabled={
+              busy ||
+              recheck === 'checking' ||
+              recheck === 'moved' ||
+              !contact.name.trim() ||
+              !phoneOk(contact.phone) ||
+              !addressText.trim()
+            }
             type="submit"
           >
-            {busy ? 'Confirming…' : 'Confirm my consultation'}
+            {busy
+              ? 'Confirming…'
+              : recheck === 'checking'
+                ? 'Checking your time…'
+                : recheck === 'moved'
+                  ? 'Pick a time above'
+                  : 'Confirm my consultation'}
           </PrimaryButton>
           <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
             <Lock className="h-3.5 w-3.5 shrink-0" />

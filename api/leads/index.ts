@@ -2241,6 +2241,11 @@ const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
   // several times over.
   address_resolve: { limit: 15, windowMs: 10 * 60_000 },
   availability: { limit: 120, windowMs: 10 * 60_000 },
+  // Same read as `availability`, but the located form spends a Places call —
+  // so it sits nearer address_resolve than nearer availability. The calendar
+  // itself fetches this once on arrival and once more when an address is
+  // entered; thirty covers a homeowner correcting the address several times.
+  availability_preview: { limit: 30, windowMs: 10 * 60_000 },
   submit: { limit: 10, windowMs: 60 * 60_000 },
   book: { limit: 10, windowMs: 60 * 60_000 },
 };
@@ -2681,16 +2686,61 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
   //
   // Reads nothing about any rep or any homeowner: times only, same as the
   // lead-keyed version.
+  //
+  // ── Once the address IS known, ask again ──
+  //
+  // `placeId` / `address` are optional, and supplying them is what turns this
+  // from the widest possible calendar into the true one. It is the same
+  // computation either way; the only difference is whether the travel radius
+  // has coordinates to measure against.
+  //
+  // This exists because the unlocated answer above was being read as a promise.
+  // A homeowner picked Sunday 10am from it, typed their address two screens
+  // later, and was told at the last press that the time had "just been taken" —
+  // when nothing had been taken: the slot was never reachable from their
+  // property, and neither was any other time that day. The flow asks for the
+  // address one screen BEFORE it books, so that is the moment to find out,
+  // while a different time still costs one tap instead of a lost booking.
+  //
+  // Never blocks on a bad address: anything that fails to resolve falls through
+  // to the program-wide answer, exactly as before. An unverifiable address is
+  // already allowed to book here — it must not be able to empty the calendar.
   if (flow === 'availability_preview' && req.method === 'GET') {
     const program = programBySlug(String(req.query['slug'] ?? ''));
     if (!program) return res.status(404).json({ error: 'Unknown program.' });
     if (!program.enabled) return res.status(200).json({ slots: [], visitMinutes: 0 });
-    return res.status(200).json(
-      await availableSlotsForLead({
-        schedulingArea: program.schedulingArea,
-        programKey: program.key,
-      } as FlowLead)
-    );
+
+    const previewPlaceId = clean(req.query['placeId']);
+    const previewAddress = clean(req.query['address']);
+    let located: ResolvedAddress | null = null;
+    if (previewPlaceId || previewAddress) {
+      located = await resolveAddress(previewPlaceId, previewAddress).catch(() => null);
+    }
+    // Coordinates are what the travel radius needs; an area we could not map is
+    // no reason to withhold times.
+    const useLocated = located?.latitude != null && located?.longitude != null;
+
+    // The SAME area submit would store for this address — through
+    // resolveProgramGeography, not the raw municipality — so the preview and
+    // the booking cannot disagree about which day-lock applies.
+    const previewArea =
+      useLocated && located
+        ? resolveProgramGeography(program, located).area ?? program.schedulingArea
+        : program.schedulingArea;
+
+    const payload = await availableSlotsForLead({
+      schedulingArea: previewArea,
+      programKey: program.key,
+      city: useLocated ? located?.city : null,
+      resolvedMunicipality: useLocated ? located?.municipality : null,
+      latitude: useLocated ? located?.latitude : null,
+      longitude: useLocated ? located?.longitude : null,
+    } as FlowLead);
+
+    // Says whether the times above were measured against the property. The
+    // calendar shows a located answer as final and an unlocated one as
+    // provisional; without this it cannot tell them apart.
+    return res.status(200).json({ ...payload, located: useLocated === true });
   }
 
   // ── Prep answers, captured AFTER the booking ──

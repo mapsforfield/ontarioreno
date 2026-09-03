@@ -86,9 +86,19 @@ function mockLeadsApi(): Plugin {
           earliestWall: `${new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)}T00:00`,
         }
         if (flow === 'availability') return send({ slots, visitMinutes: program.visitMinutes, slotGrid })
-        // The calendar-early flow's lead-less calendar.
-        if (flow === 'availability_preview')
-          return send({ slots, visitMinutes: program.visitMinutes, slotGrid })
+        // The calendar-early flow's lead-less calendar — and, once an address
+        // is supplied, the narrower answer the travel radius gives.
+        //
+        // The narrowing is fabricated (localhost has no Places key and no
+        // appointments), but the SHAPE is the real one: a located answer is a
+        // subset of the unlocated one, and it is what makes the swap card on
+        // the details screen reachable in a local preview at all.
+        if (flow === 'availability_preview') {
+          const located = Boolean(params.get('placeId') || params.get('address'))
+          if (!located) return send({ slots, visitMinutes: program.visitMinutes, slotGrid, located: false })
+          const narrowed = slots.filter((s) => s.time >= '14:00')
+          return send({ slots: narrowed, visitMinutes: program.visitMinutes, slotGrid, located: true })
+        }
         if (flow === 'prep') return send({ saved: 0 })
         if (flow === 'submit') {
           // Mirrors the real router closely enough to exercise the flow: every
