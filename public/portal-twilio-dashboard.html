@@ -1083,6 +1083,34 @@
     const AUTO_REFRESH_MS = 10000; // 10 seconds
     // ============================================
 
+    // ─── Repaint only when the markup actually changed ───────────────────
+    //
+    // Every poll used to rewrite innerHTML wholesale, changed or not. That is
+    // what made the window flash: replacing the markup destroys and recreates
+    // every node, so each <img> in a thread re-fetched and blinked, the
+    // sidebar lost its scroll position, and the thread snapped to the bottom —
+    // ten seconds later, again, forever.
+    //
+    // Nothing has changed on the vast majority of polls, so the cheapest fix is
+    // to notice that. Building the HTML string is fast; it is handing it to the
+    // DOM that costs. Compare first, write only on a difference.
+    //
+    // Returns whether it actually repainted, so callers can skip re-binding
+    // listeners and re-scrolling too. Listeners that survive a skipped repaint
+    // stay correct because they re-read `conversations` at click time from the
+    // element's data attributes rather than closing over a snapshot.
+    const lastPainted = new WeakMap();
+    function paint(el, html) {
+      if (lastPainted.get(el) === html) return false;
+      lastPainted.set(el, html);
+      el.innerHTML = html;
+      return true;
+    }
+
+    // Which thread the body currently shows, so switching conversations can
+    // jump to the newest message while a background refresh does not.
+    let paintedThreadContact = null;
+
     let allMessages = [];
     let conversations = [];
     let activeConversation = null;
@@ -1472,7 +1500,7 @@
         : "";
 
       return `
-        <div class="conversation-item ${activeClass}${unreadClass}${actionClass}" data-contact="${escapeHtml(conv.contact)}">
+        <div class="conversation-item ${activeClass}${unreadClass}${actionClass}" data-contact="${escapeHtml(conv.contact)}" data-last-sid="${escapeHtml(conv.lastSid)}">
           ${doneButton}
           <div class="conversation-top">
             <div class="conversation-name">
@@ -1523,13 +1551,13 @@
     function renderUnreadDrawer(unreadConversations, search = "") {
       if (!unreadConversations.length) {
         unreadDrawerEl.classList.add("hidden");
-        unreadDrawerEl.innerHTML = "";
+        paint(unreadDrawerEl, "");
         return;
       }
 
       unreadDrawerEl.classList.remove("hidden");
       unreadDrawerEl.classList.toggle("collapsed", unreadDrawerCollapsed);
-      unreadDrawerEl.innerHTML = `
+      const unreadHtml = `
         <button id="unreadDrawerToggle" class="drawer-toggle" type="button">
           <span class="drawer-title">Unread new messages <span class="drawer-count">${unreadConversations.length}</span></span>
           <span class="drawer-chevron">▾</span>
@@ -1538,6 +1566,8 @@
           ${unreadConversations.map((conv) => renderConversationCard(conv, search)).join("")}
         </div>
       `;
+
+      if (!paint(unreadDrawerEl, unreadHtml)) return;
 
       unreadDrawerEl.querySelector("#unreadDrawerToggle").addEventListener("click", () => {
         unreadDrawerCollapsed = !unreadDrawerCollapsed;
@@ -1554,13 +1584,13 @@
     function renderResponsesDrawer(responseConversations, search = "") {
       if (!responseConversations.length) {
         responsesDrawerEl.classList.add("hidden");
-        responsesDrawerEl.innerHTML = "";
+        paint(responsesDrawerEl, "");
         return;
       }
 
       responsesDrawerEl.classList.remove("hidden");
       responsesDrawerEl.classList.toggle("collapsed", responsesDrawerCollapsed);
-      responsesDrawerEl.innerHTML = `
+      const responsesHtml = `
         <div class="drawer-header">
           <button id="responsesDrawerToggle" class="drawer-toggle" type="button">
             <span class="drawer-title">Responses waiting <span class="drawer-count">${responseConversations.length}</span></span>
@@ -1574,6 +1604,11 @@
           ${responseConversations.map((conv) => renderConversationCard(conv, search, { showDoneAction: true })).join("")}
         </div>
       `;
+
+      // Every card carries its last SID, so identical markup means identical
+      // underlying rows — the "Mark all done" closure below cannot go stale
+      // behind a skipped repaint.
+      if (!paint(responsesDrawerEl, responsesHtml)) return;
 
       responsesDrawerEl.querySelector("#markResponsesDoneBtn").addEventListener("click", (event) => {
         event.preventDefault();
@@ -1610,7 +1645,7 @@
       if (!filtered.length) {
         renderResponsesDrawer([], search);
         renderUnreadDrawer([], search);
-        conversationListEl.innerHTML = `<div class="search-empty">No conversations match your search.</div>`;
+        paint(conversationListEl, `<div class="search-empty">No conversations match your search.</div>`);
         return;
       }
 
@@ -1627,11 +1662,15 @@
       renderResponsesDrawer(responseConversations, search);
       renderUnreadDrawer(unreadConversations, search);
 
-      conversationListEl.innerHTML = `
+      const listHtml = `
         ${regularConversations.length ? `<div class="section-heading">All conversations</div>${regularConversations.map((conv) => renderConversationCard(conv, search)).join("")}` : `<div class="search-empty">Everything currently in view is already surfaced above.</div>`}
       `;
 
-      bindConversationClicks(conversationListEl);
+      // Skipping the write also keeps the sidebar's scroll position, which a
+      // wholesale rewrite reset to the top every ten seconds.
+      if (paint(conversationListEl, listHtml)) {
+        bindConversationClicks(conversationListEl);
+      }
     }
 
     function renderActiveConversation() {
@@ -1640,7 +1679,8 @@
         threadSubtitleEl.textContent = "Choose a thread from the left";
         threadAvatarEl.textContent = "?";
         threadBadgeEl.classList.add("hidden");
-        threadBodyEl.innerHTML = `<div class="thread-empty">Select a conversation to view your message history, recent replies, and attachments.</div>`;
+        paint(threadBodyEl, `<div class="thread-empty">Select a conversation to view your message history, recent replies, and attachments.</div>`);
+        paintedThreadContact = null;
         return;
       }
 
@@ -1654,7 +1694,7 @@
       const activeNumber = fromNumberEl.value;
       const threadItems = buildThreadItems(activeConversation.messages);
 
-      threadBodyEl.innerHTML = threadItems
+      const threadHtml = threadItems
         .map((item) => {
           if (item.type === "separator") {
             return `<div class="${item.className || "date-separator"}">${escapeHtml(item.label)}</div>`;
@@ -1699,11 +1739,26 @@
         })
         .join("");
 
+      // Measured BEFORE the repaint, because painting changes both numbers.
+      //
+      // The old code jumped to the newest message on every poll. Scroll up to
+      // re-read what a homeowner said earlier and ten seconds later you were
+      // back at the bottom — so this now follows the conversation only when the
+      // rep was already at the bottom, or just opened a different thread.
+      const contactChanged = paintedThreadContact !== activeConversation.contact;
+      const wasAtBottom =
+        threadBodyEl.scrollHeight - threadBodyEl.scrollTop - threadBodyEl.clientHeight < 120;
+      paintedThreadContact = activeConversation.contact;
+
+      if (!paint(threadBodyEl, threadHtml)) return;
+
       threadBodyEl.querySelectorAll(".media-thumb[data-media-url]").forEach((img) => {
         img.addEventListener("click", () => openMediaModal(img.getAttribute("data-media-url")));
       });
 
-      threadBodyEl.scrollTop = threadBodyEl.scrollHeight;
+      if (contactChanged || wasAtBottom) {
+        threadBodyEl.scrollTop = threadBodyEl.scrollHeight;
+      }
     }
 
     async function hydrateActiveConversation(activeNumber, { silent = true } = {}) {
