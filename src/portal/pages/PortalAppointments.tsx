@@ -27,6 +27,7 @@ import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import FinanceTab from '../components/FinanceTab';
 import { sameHomeowner } from '../data/clientLinks';
+import { visibilityPartnerIds } from '../data/repVisibility';
 import { showToast } from '../lib/toast';
 import { torontoToday, localDateKey } from '../lib/time';
 
@@ -741,6 +742,11 @@ export default function PortalAppointments() {
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
+  // Paired reps (repVisibility.ts) open on THEIR OWN work and choose to bring
+  // the other in. Default 'mine' rather than 'all' is the whole request: the
+  // point is knowing when your partner is in someone's kitchen, not working
+  // out of a shared calendar.
+  const [pairScope, setPairScope] = useState<string>('mine');
   const [calendarContractorFilter, setCalendarContractorFilter] = useState<string>('all');
 
   // ── Days off panel ──
@@ -825,6 +831,13 @@ export default function PortalAppointments() {
   if (!currentUser) return null;
 
   const activeReps = users.filter((user) => user.role === 'rep' && user.active);
+  // Empty for every rep who is not explicitly paired, which is the default and
+  // hides the control entirely — there is nothing for them to choose between.
+  const partnerIds = currentUser ? visibilityPartnerIds(currentUser, users) : [];
+  const partners = partnerIds
+    .map((id) => users.find((u) => u.id === id))
+    .filter((u): u is NonNullable<typeof u> => !!u);
+  const showPairScope = !isAdmin && partners.length > 0;
   const visibleAppointments = getVisibleAppointmentsForUser(currentUser).sort(
     (first, second) =>
       `${first.appointmentDate}T${first.appointmentTime}`.localeCompare(
@@ -900,9 +913,21 @@ export default function PortalAppointments() {
     }
     return appointment.consultationStage === consultationFilter;
   };
-  const filteredAppointments = visibleAppointments.filter(
-    matchesConsultationFilter
-  );
+  // Note the split, and keep it: `visibleAppointments` stays WIDE so a
+  // consultation can be opened from a client profile — including one still
+  // assigned to the rep who transferred the customer over, which is the bug
+  // that started this. `filteredAppointments` is what the calendar and the
+  // agendas COUNT AND LIST, and that is narrowed to the rep's own work unless
+  // they ask for more. Collapsing the two would either re-break the client
+  // profile or fill a rep's day with someone else's visits.
+  const inPairScope = (appointment: Appointment) => {
+    if (!showPairScope || pairScope === 'all') return true;
+    if (pairScope === 'mine') return appointment.assignedRepId === currentUser.id;
+    return appointment.assignedRepId === pairScope;
+  };
+  const filteredAppointments = visibleAppointments
+    .filter(inPairScope)
+    .filter(matchesConsultationFilter);
   // Calendar-specific filters: rep (admin only) + contractor (everyone).
   const calendarAppointments = filteredAppointments.filter((a) => {
     if (isAdmin && calendarRepFilter !== 'all' && a.assignedRepId !== calendarRepFilter) return false;
@@ -3229,6 +3254,23 @@ export default function PortalAppointments() {
                 {activeReps.map((rep) => (
                   <option key={rep.id} value={rep.id}>{rep.name}</option>
                 ))}
+              </select>
+            )}
+            {/* Partner filter — only for reps explicitly paired in repVisibility */}
+            {showPairScope && (
+              <select
+                value={pairScope}
+                onChange={(e) => setPairScope(e.target.value)}
+                aria-label="Whose consultations to show"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#b8c9dd] focus:outline-none focus:ring-2 focus:ring-[#32639b]/30"
+              >
+                <option value="mine">My consultations</option>
+                {partners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>{partner.name}&rsquo;s only</option>
+                ))}
+                <option value="all">
+                  Mine + {partners.map((p) => p.name).join(' + ')}
+                </option>
               </select>
             )}
             {/* Contractor filter — everyone */}
