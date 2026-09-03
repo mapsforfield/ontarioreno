@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   conversationKey,
+  conversationQueryUrls,
   mediaProxyUrl,
   mergeMessagesBySid,
   normalizeMedia,
@@ -163,4 +164,51 @@ test('sids are escaped into the media URL', () => {
 
   assert.ok(url.includes('messageSid=SM%26evil%3D1'));
   assert.ok(url.includes('mediaSid=ME%202'));
+});
+
+// ─── Opening a conversation ─────────────────────────────────────────────────
+//
+// The regression these exist for: opening a thread used to filter the FULL
+// message log for our number. On a serverless instance without a warm cache
+// that walked thousands of messages to find the dozen in the thread — fine at
+// a few hundred, a timeout at several thousand, and a timed-out thread is one
+// that never opens.
+
+const ACCOUNT_BASE = 'https://api.twilio.com/2010-04-01/Accounts/AC123';
+
+test('a conversation is two queries, each pinning both ends of the pair', () => {
+  const [outbound, inbound] = conversationQueryUrls(ACCOUNT_BASE, OUR_NUMBER, '+14375804198');
+
+  // Every query must constrain BOTH numbers. A query carrying only From or
+  // only To is a walk of the whole log wearing a conversation's clothes.
+  for (const url of [outbound, inbound]) {
+    const params = new URL(url).searchParams;
+    assert.ok(params.get('From'), `no From in ${url}`);
+    assert.ok(params.get('To'), `no To in ${url}`);
+  }
+
+  // Twilio has no "either direction" filter, so the pair is asked both ways.
+  assert.equal(new URL(outbound).searchParams.get('From'), OUR_NUMBER);
+  assert.equal(new URL(outbound).searchParams.get('To'), '+14375804198');
+  assert.equal(new URL(inbound).searchParams.get('From'), '+14375804198');
+  assert.equal(new URL(inbound).searchParams.get('To'), OUR_NUMBER);
+});
+
+test('a conversation lookup is one page, not a paginated walk', () => {
+  const urls = conversationQueryUrls(ACCOUNT_BASE, OUR_NUMBER, '+14375804198');
+
+  for (const url of urls) {
+    const size = Number(new URL(url).searchParams.get('PageSize'));
+    // Comfortably more than a rep scrolls, and still a single request. The
+    // old path fetched up to 5 pages of 1000 per direction before filtering.
+    assert.ok(size > 0 && size <= 1000, `implausible PageSize ${size}`);
+  }
+});
+
+test('phone numbers are escaped into the query', () => {
+  // A leading + is significant in a query string, where it decodes to a space.
+  const [outbound] = conversationQueryUrls(ACCOUNT_BASE, OUR_NUMBER, '+14375804198');
+
+  assert.ok(outbound.includes('%2B'), 'the + in an E.164 number must be encoded');
+  assert.equal(new URL(outbound).searchParams.get('From'), OUR_NUMBER);
 });

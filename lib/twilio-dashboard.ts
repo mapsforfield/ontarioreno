@@ -95,6 +95,34 @@ export function mediaProxyUrl(messageSid: string, mediaSid: string): string {
   );
 }
 
+/**
+ * The two Twilio queries that make up one conversation.
+ *
+ * Both halves pin BOTH ends of the pair. That is the whole point: opening a
+ * thread once filtered the full message log for our number, so on any instance
+ * without a warm cache it walked thousands of messages to find the dozen in
+ * the thread — fine at a few hundred messages, a timeout at several thousand.
+ *
+ * Twilio has no "either direction" query, hence two. If either one ever loses
+ * its `To` or its `From`, it stops being a conversation lookup and becomes a
+ * log walk again, which is what the tests on this guard against.
+ */
+export function conversationQueryUrls(
+  accountBase: string,
+  ourNumber: string,
+  contact: string,
+  limit = 200
+): [string, string] {
+  const build = (params: Record<string, string>) =>
+    `${accountBase}/Messages.json?` +
+    new URLSearchParams({ ...params, PageSize: String(limit) });
+
+  return [
+    build({ From: ourNumber, To: contact }),
+    build({ From: contact, To: ourNumber }),
+  ];
+}
+
 /** A raw REST media row into the shape the UI renders. */
 export function normalizeMedia(
   messageSid: string,

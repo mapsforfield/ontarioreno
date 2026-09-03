@@ -1904,7 +1904,7 @@
       }
     }
 
-    async function hydrateActiveConversation(activeNumber, { silent = true } = {}) {
+    async function hydrateActiveConversation(activeNumber) {
       if (!activeConversation || !activeNumber || isHydratingThread) return;
 
       try {
@@ -1918,10 +1918,23 @@
         const res = await fetch(`/api/twilio?twilioResource=thread&${query.toString()}`, {
           cache: "no-store"
         });
+
+        // Check the status before parsing. A timeout or a 500 answers with an
+        // HTML error page, so res.json() threw a SyntaxError that landed in the
+        // silent catch below — the thread simply never opened and said nothing
+        // about why. Whatever goes wrong, the rep should be told.
+        if (!res.ok) {
+          throw new Error(
+            res.status === 401 || res.status === 403
+              ? "Your portal session has expired. Reload the page and sign in again."
+              : `Could not load this conversation (error ${res.status}). Try again.`
+          );
+        }
+
         const data = await res.json();
 
         if (!data || !Array.isArray(data.messages)) {
-          throw new Error("Invalid thread response");
+          throw new Error("Could not load this conversation. Try again.");
         }
 
         const refreshedConversation = conversations.find((conv) => conv.contact === activeConversation.contact);
@@ -1932,9 +1945,10 @@
         activeConversation = refreshedConversation;
         renderActiveConversation();
       } catch (err) {
-        if (!silent) {
-          setStatus("Loaded list, but failed to hydrate thread media.", true);
-        }
+        // Reported even on a background refresh. Staying quiet here is what
+        // made a failure look like the dashboard glitching rather than like
+        // something that had gone wrong and could be retried.
+        setStatus(err.message || "Could not load this conversation.", true);
       } finally {
         isHydratingThread = false;
       }
