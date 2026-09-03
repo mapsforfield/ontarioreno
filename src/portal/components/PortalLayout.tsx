@@ -114,7 +114,15 @@ export default function PortalLayout() {
   const visibleAppointments = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
   // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
   const lostDeals = lostDealIds(deals);
-  const needsAttentionCount = countNeedsAttention(visibleAppointments, { lostDeals, today });
+  // Deliberately NOT everything visible. Since repVisibility.ts, a rep can see
+  // a paired colleague's consultations and the history of a customer
+  // transferred to them — but this badge means "you have something to do", and
+  // an outcome Keven has not logged is not Steven's to log. Counting what is
+  // merely visible would nag each of them with the other's work.
+  const attentionAppointments = currentUser?.role === 'admin'
+    ? visibleAppointments
+    : visibleAppointments.filter((a) => a.assignedRepId === currentUser?.id);
+  const needsAttentionCount = countNeedsAttention(attentionAppointments, { lostDeals, today });
   // Push notifications
   const [pushState, setPushState] = useState<'unsupported' | 'default' | 'granted' | 'denied' | 'registering'>('default');
   useEffect(() => {

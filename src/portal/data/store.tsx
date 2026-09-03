@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { usePortalAuth } from '../auth';
 import { appointmentBelongsToClient } from './clientLinks';
+import { visibleAppointmentsFor } from './repVisibility';
 import { showToast } from '../lib/toast';
 import {
   Client,
@@ -1006,12 +1007,16 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         (dispatch) => dispatch.consultationId === consultationId
       );
 
+    // A rep's own consultations, plus the two deliberate exceptions in
+    // repVisibility.ts: homeowners transferred to them (so the history comes
+    // with the customer) and any rep they are explicitly paired with.
+    //
+    // Called from several components per render, so the per-pass work — who
+    // your partners are, which homeowners you are responsible for — is built
+    // once here and reused across every row, rather than recomputed per
+    // appointment.
     const getVisibleAppointmentsForUser = (user: User) =>
-      user.role === 'admin'
-        ? state.appointments
-        : state.appointments.filter(
-            (appointment) => appointment.assignedRepId === user.id
-          );
+      visibleAppointmentsFor(user, state.appointments, state.deals, state.users);
 
     const getLeadQueue = (user: User) => {
       const mine =
