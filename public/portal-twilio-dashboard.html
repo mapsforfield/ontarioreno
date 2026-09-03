@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<!--
+  The Twilio SMS dashboard, framed by /portal/messages (admin only).
+
+  This is a copy of the standalone local dashboard that used to run on one
+  office machine at 127.0.0.1:3000. It is kept as a self-contained HTML page,
+  rather than rewritten as a React portal page, so the UI a rep already knows
+  did not have to be re-derived — the only edits are the four API calls, which
+  now point at /api/twilio (see api/twilio/index.ts).
+
+  Nothing here is secret: every call is authorized server-side by the portal
+  session cookie, so loading this file without an admin session shows an empty
+  shell and nothing else.
+-->
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OntarioReno Messages</title>
+  <style>
+    :root {
+      --bg-app: linear-gradient(180deg, #e7edf3 0%, #dde7ef 100%);
+      --bg-panel: rgba(255, 255, 255, 0.78);
+      --bg-panel-strong: rgba(255, 255, 255, 0.92);
+      --bg-sidebar: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(240, 244, 248, 0.96) 100%);
+      --bg-thread: linear-gradient(180deg, #eef3f7 0%, #e5edf4 100%);
+      --bg-input: rgba(255, 255, 255, 0.9);
+      --text-main: #16202b;
+      --text-soft: #5b6b7c;
+      --text-faint: #7e8c99;
+      --line-soft: rgba(146, 165, 185, 0.22);
+      --line-strong: rgba(120, 145, 170, 0.34);
+      --blue: #1668c7;
+      --blue-strong: #0f5cb6;
+      --blue-soft: #e3f0ff;
+      --blue-glow: rgba(22, 104, 199, 0.18);
+      --green: #0f766e;
+      --shadow-panel: 0 18px 40px rgba(34, 53, 77, 0.12);
+      --shadow-soft: 0 10px 24px rgba(35, 52, 70, 0.08);
+      --shadow-bubble: 0 8px 18px rgba(23, 37, 51, 0.08);
+      --radius-panel: 24px;
+      --radius-card: 18px;
+      --radius-pill: 999px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background: var(--bg-app);
+      color: var(--text-main);
+    }
+
+    .app {
+      height: 100vh;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      background: var(--bg-sidebar);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-panel);
+      box-shadow: var(--shadow-panel);
+      backdrop-filter: blur(18px);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 22px 18px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      background:
+        radial-gradient(circle at top right, rgba(22, 104, 199, 0.08), transparent 42%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 252, 0.9) 100%);
+    }
+
+    .sidebar-title {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin: 0 0 14px;
+    }
+
+    .from-select,
+    .search-input,
+    .composer-input,
+    .composer-textarea {
+      width: 100%;
+      border: 1px solid rgba(135, 155, 176, 0.28);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      outline: none;
+      background: var(--bg-input);
+      color: var(--text-main);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .from-select:focus,
+    .search-input:focus,
+    .composer-input:focus,
+    .composer-textarea:focus {
+      border-color: rgba(22, 104, 199, 0.45);
+      box-shadow: 0 0 0 4px rgba(22, 104, 199, 0.12);
+    }
+
+    .search-wrap {
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.6);
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .search-field {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .clear-search-btn {
+      border: 1px solid rgba(135, 155, 176, 0.22);
+      background: rgba(255, 255, 255, 0.84);
+      color: var(--text-soft);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s ease, transform 0.18s ease;
+    }
+
+    .clear-search-btn:hover {
+      background: rgba(255, 255, 255, 0.96);
+      transform: translateY(-1px);
+    }
+
+    .conversation-list {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      padding: 8px;
+      background: transparent;
+    }
+
+    .sidebar-top-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 0 0 auto;
+      min-height: 88px;
+      max-height: 65%;
+      overflow: auto;
+      padding: 10px 12px 4px;
+      background: rgba(255, 255, 255, 0.42);
+    }
+
+    .sidebar-bottom-panel {
+      flex: 1 1 auto;
+      min-height: 120px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-resizer {
+      flex: 0 0 14px;
+      position: relative;
+      cursor: row-resize;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(214, 225, 238, 0.18) 100%);
+      border-top: 1px solid rgba(140, 158, 177, 0.12);
+      border-bottom: 1px solid rgba(140, 158, 177, 0.12);
+    }
+
+    .sidebar-resizer::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 42px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(122, 142, 165, 0.46);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.42);
+    }
+
+    .sidebar.sidebar-resizing {
+      user-select: none;
+      cursor: row-resize;
+    }
+
+    .drawer-wrap {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 0;
+      border-bottom: none;
+      background: transparent;
+    }
+
+    .drawer-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid rgba(22, 104, 199, 0.14);
+      background: linear-gradient(180deg, rgba(235, 244, 255, 0.96) 0%, rgba(226, 238, 253, 0.96) 100%);
+      color: #0f4d9a;
+      border-radius: 16px;
+      padding: 11px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(22, 104, 199, 0.08);
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drawer-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drawer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .drawer-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(22, 104, 199, 0.12);
+      color: var(--blue-strong);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .drawer-action-btn {
+      border: 1px solid rgba(22, 104, 199, 0.12);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--blue-strong);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s ease, transform 0.18s ease;
+    }
+
+    .drawer-action-btn:hover {
+      background: rgba(255, 255, 255, 0.94);
+      transform: translateY(-1px);
+    }
+
+    .drawer-chevron {
+      font-size: 12px;
+      transition: transform 0.18s ease;
+    }
+
+    .drawer-wrap.collapsed .drawer-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .drawer-list {
+      margin-top: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .section-heading {
+      padding: 10px 14px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+
+    .conversation-item {
+      position: relative;
+      margin: 6px 0;
+      padding: 14px 14px 13px;
+      border: 1px solid transparent;
+      border-radius: 18px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.44);
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .conversation-item.with-action {
+      padding-top: 42px;
+    }
+
+    .conversation-action-btn {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: 1px solid rgba(22, 104, 199, 0.14);
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--blue-strong);
+      border-radius: 10px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s ease, transform 0.18s ease;
+    }
+
+    .conversation-action-btn:hover {
+      background: rgba(255, 255, 255, 1);
+      transform: translateY(-1px);
+    }
+
+    .conversation-item.unread {
+      background: linear-gradient(180deg, rgba(230, 241, 255, 0.96) 0%, rgba(220, 235, 253, 0.96) 100%);
+      border-color: rgba(22, 104, 199, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+    }
+
+    .conversation-item.unread .conversation-name,
+    .conversation-item.unread .conversation-preview {
+      color: #0f3f7a;
+      font-weight: 700;
+    }
+
+    .conversation-item:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.76);
+      border-color: rgba(137, 157, 178, 0.2);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .conversation-item.active {
+      background: linear-gradient(180deg, rgba(21, 88, 171, 0.96) 0%, rgba(16, 79, 160, 0.96) 100%);
+      border-color: rgba(8, 57, 120, 0.26);
+      box-shadow: 0 16px 28px rgba(16, 79, 160, 0.22);
+    }
+
+    .conversation-item.active .conversation-name,
+    .conversation-item.active .conversation-time,
+    .conversation-item.active .conversation-preview {
+      color: #fff;
+    }
+
+    .conversation-item.active .unread-indicator {
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .conversation-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .conversation-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: -0.01em;
+    }
+
+    .conversation-number {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conversation-time {
+      font-size: 12px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    .conversation-preview {
+      font-size: 13px;
+      color: var(--text-soft);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.35;
+      min-height: 2.7em;
+    }
+
+    .conversation-item.active .conversation-number {
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .preview-tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 7px;
+      margin-right: 6px;
+      background: rgba(22, 104, 199, 0.1);
+      color: var(--blue-strong);
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
+    .conversation-item.active .preview-tag {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    mark {
+      background: rgba(255, 235, 59, 0.46);
+      color: inherit;
+      border-radius: 4px;
+      padding: 0 2px;
+    }
+
+    .unread-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+      margin-left: 8px;
+      box-shadow: 0 0 0 5px rgba(22, 104, 199, 0.12);
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-panel);
+      box-shadow: var(--shadow-panel);
+      overflow: hidden;
+      background: var(--bg-panel);
+      backdrop-filter: blur(18px);
+    }
+
+    .thread-header {
+      background:
+        radial-gradient(circle at top left, rgba(22, 104, 199, 0.08), transparent 30%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 247, 250, 0.9) 100%);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 72px;
+    }
+
+    .thread-header-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .thread-header-copy {
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #edf4fb 0%, #cfdceb 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #37506d;
+      flex-shrink: 0;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 18px rgba(30, 58, 84, 0.12);
+    }
+
+    .thread-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .thread-subtitle {
+      font-size: 13px;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    .thread-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(22, 104, 199, 0.1);
+      color: var(--blue-strong);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    }
+
+    .sync-btn {
+      border: 1px solid rgba(22, 104, 199, 0.16);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--blue-strong);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 10px 20px rgba(35, 52, 70, 0.08);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .sync-btn:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 14px 24px rgba(35, 52, 70, 0.12);
+    }
+
+    .thread-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 24px 22px 18px;
+      background:
+        radial-gradient(circle at top right, rgba(255, 255, 255, 0.48), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(22, 104, 199, 0.05), transparent 24%),
+        var(--bg-thread);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .empty-thread {
+      margin: auto;
+      text-align: center;
+      color: var(--text-soft);
+      font-size: 15px;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 72%;
+      animation: messageFadeIn 0.22s ease;
+    }
+
+    .msg-row.inbound {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .msg-row.outbound {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .msg-row.inbound .msg-time,
+    .msg-row.inbound .direction-label {
+      text-align: left;
+    }
+
+    .msg-row.outbound .msg-time,
+    .msg-row.outbound .direction-label {
+      text-align: right;
+    }
+
+    .msg-time {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-bottom: 5px;
+      padding: 0 4px;
+    }
+
+    .direction-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      padding: 0 4px;
+    }
+
+    .msg-row.inbound .direction-label {
+      color: #6b7f94;
+    }
+
+    .msg-row.outbound .direction-label {
+      color: var(--blue-strong);
+    }
+
+    .bubble {
+      padding: 13px 15px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.45;
+      word-break: break-word;
+      box-shadow: var(--shadow-bubble);
+      border: 1px solid rgba(150, 168, 188, 0.15);
+    }
+
+    .message-text {
+      white-space: pre-wrap;
+    }
+
+    .message-text a {
+      color: inherit;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+      font-weight: 700;
+    }
+
+    .bubble.inbound {
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--text-main);
+      border-top-left-radius: 7px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), var(--shadow-bubble);
+    }
+
+    .bubble.outbound {
+      background: linear-gradient(180deg, #1973d2 0%, #125eb5 100%);
+      color: white;
+      border-top-right-radius: 7px;
+      border-color: rgba(10, 70, 139, 0.18);
+      box-shadow: 0 12px 24px rgba(18, 94, 181, 0.22);
+    }
+
+    .date-separator,
+    .new-separator {
+      align-self: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text-soft);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(140, 158, 177, 0.18);
+      box-shadow: 0 8px 16px rgba(35, 52, 70, 0.06);
+    }
+
+    .new-separator {
+      color: var(--blue-strong);
+      background: rgba(232, 241, 255, 0.9);
+    }
+
+    .media-card {
+      margin-top: 10px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 10px 18px rgba(20, 34, 48, 0.12);
+      max-width: 280px;
+    }
+
+    .media-thumb {
+      width: 100%;
+      display: block;
+      cursor: zoom-in;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .attachment-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.14);
+      color: inherit;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .composer {
+      border-top: 1px solid var(--line-soft);
+      background:
+        linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(244, 247, 250, 0.98) 100%);
+      padding: 16px 18px 18px;
+    }
+
+    .composer-top {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      margin-bottom: 10px;
+    }
+
+    .composer-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .composer-textarea {
+      min-height: 72px;
+      resize: vertical;
+      flex: 1;
+      font-family: inherit;
+    }
+
+    .composer-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    .send-btn,
+    .refresh-btn {
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #1973d2 0%, #125eb5 100%);
+      color: white;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      min-width: 90px;
+      box-shadow: 0 12px 22px rgba(18, 94, 181, 0.22);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    }
+
+    .send-btn:disabled,
+    .sync-btn:disabled {
+      cursor: wait;
+      opacity: 0.72;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .send-btn:hover,
+    .refresh-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.02);
+      box-shadow: 0 16px 28px rgba(18, 94, 181, 0.28);
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      min-height: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(140, 158, 177, 0.14);
+      box-shadow: 0 8px 14px rgba(35, 52, 70, 0.06);
+    }
+
+    .muted {
+      color: var(--text-soft);
+    }
+
+    .status:empty {
+      display: none;
+    }
+
+    .status.error {
+      color: #b42318 !important;
+      background: rgba(254, 242, 242, 0.96);
+      border-color: rgba(220, 38, 38, 0.14);
+    }
+
+    .status.success {
+      color: #166534 !important;
+      background: rgba(240, 253, 244, 0.96);
+      border-color: rgba(22, 101, 52, 0.12);
+    }
+
+    .search-empty,
+    .thread-empty {
+      margin: auto;
+      text-align: center;
+      color: var(--text-soft);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 300px;
+      padding: 22px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.58);
+      border: 1px solid rgba(140, 158, 177, 0.14);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .media-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 18, 26, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      z-index: 1000;
+      backdrop-filter: blur(6px);
+    }
+
+    .media-modal-card {
+      max-width: min(92vw, 1080px);
+      max-height: 88vh;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 30px 50px rgba(0, 0, 0, 0.28);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .media-modal-card img {
+      display: block;
+      max-width: 100%;
+      max-height: 88vh;
+    }
+
+    @keyframes messageFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 auto;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: var(--bg-panel-strong);
+      color: var(--text-main);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        height: auto;
+        overflow: auto;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+        padding: 10px;
+        overflow: visible;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(86vw, 340px);
+        z-index: 60;
+        border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+        transform: translateX(-102%);
+        transition: transform 0.24s ease;
+      }
+
+      .sidebar.sidebar-open {
+        transform: translateX(0);
+      }
+
+      .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(15, 23, 42, 0.42);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.24s ease;
+      }
+
+      .sidebar-backdrop.sidebar-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .menu-btn {
+        display: inline-flex;
+      }
+
+      .sidebar-resizer {
+        display: none;
+      }
+
+      .composer-top {
+        grid-template-columns: 1fr;
+      }
+
+      .thread-header {
+        align-items: flex-start;
+      }
+
+      .msg-row {
+        max-width: 88%;
+      }
+
+      .main {
+        border-radius: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Messages</div>
+        <select id="fromNumber" class="from-select">
+          <option value="">Loading Twilio numbers...</option>
+        </select>
+      </div>
+
+      <div class="search-wrap">
+        <div class="search-field">
+          <input id="searchInput" class="search-input" placeholder="Filter contacts or messages" />
+          <button id="clearSearchBtn" class="clear-search-btn hidden" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="sidebar-body">
+        <div id="sidebarTopPanel" class="sidebar-top-panel">
+          <div id="responsesDrawer" class="drawer-wrap hidden"></div>
+          <div id="unreadDrawer" class="drawer-wrap hidden"></div>
+        </div>
+        <div id="sidebarResizer" class="sidebar-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize sidebar sections"></div>
+        <div class="sidebar-bottom-panel">
+          <div id="conversationList" class="conversation-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="thread-header">
+        <div class="thread-header-main">
+          <button id="menuBtn" class="menu-btn" type="button" aria-label="Show conversations" aria-expanded="false">&#9776;</button>
+          <div class="avatar" id="threadAvatar">?</div>
+          <div class="thread-header-copy">
+            <div class="thread-title"><span id="threadTitle">No conversation selected</span><span id="threadBadge" class="thread-badge hidden">0</span></div>
+            <div class="thread-subtitle" id="threadSubtitle">Choose a thread from the left</div>
+          </div>
+        </div>
+        <button id="refreshBtn" class="sync-btn" type="button">Sync</button>
+      </div>
+
+      <div id="threadBody" class="thread-body">
+        <div class="empty-thread">Select a conversation to view messages.</div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-top">
+          <input id="toNumber" class="composer-input" placeholder="Recipient number" />
+        </div>
+
+        <div class="composer-row">
+          <textarea id="messageBody" class="composer-textarea" placeholder="Enter your message..."></textarea>
+          <button id="sendBtn" class="send-btn" type="button">Send</button>
+        </div>
+
+        <div class="composer-hint">Press <strong>Enter</strong> to send. Use <strong>Shift + Enter</strong> for a new line.</div>
+        <div id="status" class="status muted"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="mediaModal" class="media-modal hidden" role="dialog" aria-modal="true" aria-label="Attachment preview">
+    <div class="media-modal-card">
+      <img id="mediaModalImage" alt="Expanded attachment" />
+    </div>
+  </div>
+
+  <script>
+    const fromNumberEl = document.getElementById("fromNumber");
+    const searchInputEl = document.getElementById("searchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+    const sidebarTopPanelEl = document.getElementById("sidebarTopPanel");
+    const sidebarResizerEl = document.getElementById("sidebarResizer");
+    const responsesDrawerEl = document.getElementById("responsesDrawer");
+    const unreadDrawerEl = document.getElementById("unreadDrawer");
+    const conversationListEl = document.getElementById("conversationList");
+    const threadBodyEl = document.getElementById("threadBody");
+    const threadTitleEl = document.getElementById("threadTitle");
+    const threadSubtitleEl = document.getElementById("threadSubtitle");
+    const threadAvatarEl = document.getElementById("threadAvatar");
+    const threadBadgeEl = document.getElementById("threadBadge");
+    const toNumberEl = document.getElementById("toNumber");
+    const messageBodyEl = document.getElementById("messageBody");
+    const sendBtn = document.getElementById("sendBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const statusEl = document.getElementById("status");
+    const mediaModalEl = document.getElementById("mediaModal");
+    const mediaModalImageEl = document.getElementById("mediaModalImage");
+    const SHOW_DIRECTION_DEBUG_LABELS = false;
+
+    // ===== NEW STATE (ADD THIS EXACTLY HERE) =====
+    const unreadMap = JSON.parse(localStorage.getItem("unreadMap") || "{}");
+    const responsesDoneMap = JSON.parse(localStorage.getItem("responsesDoneMap") || "{}");
+    let responsesDrawerCollapsed = JSON.parse(localStorage.getItem("responsesDrawerCollapsed") || "false");
+    let unreadDrawerCollapsed = JSON.parse(localStorage.getItem("unreadDrawerCollapsed") || "false");
+    let sidebarTopHeight = Number(localStorage.getItem("sidebarTopHeight") || "0");
+
+    let previousLastMessageSidByContact = {};
+    let isInitialLoad = true;
+
+    const AUTO_REFRESH_MS = 10000; // 10 seconds
+    // ============================================
+
+    let allMessages = [];
+    let conversations = [];
+    let activeConversation = null;
+    let isLoadingMessages = false;
+    let isHydratingThread = false;
+    let isResizingSidebar = false;
+    let audioContext = null;
+
+    function applySidebarSplitHeight() {
+      if (!sidebarTopPanelEl) return;
+
+      if (!sidebarTopHeight || Number.isNaN(sidebarTopHeight)) {
+        sidebarTopPanelEl.style.flexBasis = "";
+        return;
+      }
+
+      const sidebarRect = sidebarTopPanelEl.parentElement.getBoundingClientRect();
+      const maxHeight = Math.max(140, Math.floor(sidebarRect.height * 0.65));
+      const minHeight = 88;
+      const clampedHeight = Math.max(minHeight, Math.min(sidebarTopHeight, maxHeight));
+      sidebarTopHeight = clampedHeight;
+      sidebarTopPanelEl.style.flexBasis = `${clampedHeight}px`;
+    }
+
+    function ensureAudioContext() {
+      if (!audioContext) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          return null;
+        }
+
+        audioContext = new AudioContextClass();
+      }
+
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(() => {});
+      }
+
+      return audioContext;
+    }
+
+    function playIncomingDing() {
+      const context = ensureAudioContext();
+      if (!context) return;
+
+      const now = context.currentTime;
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, now);
+      oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.3);
+    }
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.classList.remove("error", "success", "muted");
+      if (!text) return;
+      statusEl.classList.add(isError ? "error" : "success");
+    }
+
+    function clearStatus() {
+      statusEl.textContent = "";
+      statusEl.classList.remove("error", "success");
+      statusEl.classList.add("muted");
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d)) return "";
+      return d.toLocaleString();
+    }
+
+    function isSameDay(a, b) {
+      return a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+    }
+
+    function formatSidebarTime(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d)) return "";
+      const now = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+
+      if (isSameDay(d, now)) {
+        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      }
+
+      if (isSameDay(d, yesterday)) {
+        return "Yesterday";
+      }
+
+      if (d.getFullYear() === now.getFullYear()) {
+        return d.toLocaleDateString([], { month: "short", day: "numeric" });
+      }
+
+      return d.toLocaleDateString();
+    }
+
+    function formatThreadTimestamp(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d)) return "";
+      const now = new Date();
+
+      if (isSameDay(d, now)) {
+        return d.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      }
+
+      return d.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    }
+
+    function formatDateSeparator(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d)) return "";
+      const now = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+
+      if (isSameDay(d, now)) return "Today";
+      if (isSameDay(d, yesterday)) return "Yesterday";
+
+      return d.toLocaleDateString([], {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+      });
+    }
+
+    function formatPhoneNumber(number) {
+      if (!number) return "";
+      const normalized = String(number).trim();
+      const digits = normalized.replace(/\D/g, "");
+
+      if (digits.length === 11 && digits.startsWith("1")) {
+        return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+      }
+
+      if (digits.length === 10) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      }
+
+      return normalized;
+    }
+
+    function formatCompactCount(count, singular, plural = `${singular}s`) {
+      return `${count} ${count === 1 ? singular : plural}`;
+    }
+
+    function getMessagePreview(msg, activeNumber) {
+      if (!msg) return "";
+      const hasImage = Array.isArray(msg.media) && msg.media.some((item) => (item.contentType || "").startsWith("image/"));
+      const hasMedia = Array.isArray(msg.media) && msg.media.length > 0;
+      const prefix = hasImage ? `<span class="preview-tag">Photo</span>` : hasMedia ? `<span class="preview-tag">MMS</span>` : "";
+      const body = escapeHtml((msg.body || "").replace(/\s+/g, " ").trim());
+      const fallback = msg.from === activeNumber ? "Sent a message" : "New message";
+      return `${prefix}${body || fallback}`;
+    }
+
+    function escapeRegex(value) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function highlightMatch(text, query) {
+      const safeText = escapeHtml(text || "");
+      if (!query) return safeText;
+      const regex = new RegExp(`(${escapeRegex(query)})`, "ig");
+      return safeText.replace(regex, "<mark>$1</mark>");
+    }
+
+    function linkifyMessageBody(text) {
+      return escapeHtml(text || "").replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" target="_blank" rel="noreferrer">$1</a>'
+      );
+    }
+
+    function updateSearchUi() {
+      clearSearchBtn.classList.toggle("hidden", !searchInputEl.value.trim());
+    }
+
+    function buildThreadItems(messages) {
+      const items = [];
+      let lastDateKey = "";
+
+      messages.forEach((msg, index) => {
+        const msgDate = new Date(msg.dateSent);
+        const dateKey = isNaN(msgDate) ? "" : msgDate.toDateString();
+
+        if (dateKey && dateKey !== lastDateKey) {
+          items.push({
+            type: "separator",
+            label: formatDateSeparator(msg.dateSent),
+            key: `date-${dateKey}`
+          });
+          lastDateKey = dateKey;
+        }
+
+        if (index === messages.length - 1 && messages.length >= 6) {
+          items.push({
+            type: "separator",
+            label: "Latest",
+            className: "new-separator",
+            key: `latest-${msg.sid}`
+          });
+        }
+
+        items.push({
+          type: "message",
+          message: msg
+        });
+      });
+
+      return items;
+    }
+
+    function openMediaModal(url) {
+      mediaModalImageEl.src = url;
+      mediaModalEl.classList.remove("hidden");
+    }
+
+    function closeMediaModal() {
+      mediaModalEl.classList.add("hidden");
+      mediaModalImageEl.src = "";
+    }
+
+    function setSidebarTopHeightFromPointer(clientY) {
+      const sidebarBodyRect = sidebarTopPanelEl.parentElement.getBoundingClientRect();
+      const resizerHeight = sidebarResizerEl.getBoundingClientRect().height || 14;
+      const minHeight = 88;
+      const maxHeight = Math.max(140, Math.floor(sidebarBodyRect.height * 0.65));
+      const rawHeight = clientY - sidebarBodyRect.top;
+      sidebarTopHeight = Math.max(minHeight, Math.min(rawHeight - (resizerHeight / 2), maxHeight));
+      localStorage.setItem("sidebarTopHeight", String(Math.round(sidebarTopHeight)));
+      applySidebarSplitHeight();
+    }
+
+    function stopSidebarResize() {
+      if (!isResizingSidebar) return;
+      isResizingSidebar = false;
+      document.querySelector(".sidebar")?.classList.remove("sidebar-resizing");
+    }
+
+    function startSidebarResize(event) {
+      event.preventDefault();
+      isResizingSidebar = true;
+      document.querySelector(".sidebar")?.classList.add("sidebar-resizing");
+    }
+
+    function getConversationKey(msg, activeNumber) {
+      return msg.from === activeNumber ? msg.to : msg.from;
+    }
+
+    function sortMessagesNewestFirst(messages) {
+      return [...messages].sort(
+        (a, b) => new Date(b.dateSent) - new Date(a.dateSent)
+      );
+    }
+
+    function mergeMessages(existingMessages, incomingMessages) {
+      const mergedMap = new Map();
+
+      existingMessages.forEach((msg) => {
+        mergedMap.set(msg.sid, msg);
+      });
+
+      incomingMessages.forEach((msg) => {
+        mergedMap.set(msg.sid, msg);
+      });
+
+      return sortMessagesNewestFirst([...mergedMap.values()]);
+    }
+
+    function buildConversations(messages, activeNumber) {
+      const map = {};
+
+      messages.forEach((msg) => {
+        const contact = getConversationKey(msg, activeNumber);
+        if (!map[contact]) {
+          map[contact] = [];
+        }
+        map[contact].push(msg);
+      });
+
+      const built = Object.keys(map).map((contact) => {
+        const msgs = map[contact].sort(
+          (a, b) => new Date(a.dateSent) - new Date(b.dateSent)
+        );
+        const last = msgs[msgs.length - 1];
+        const lastIsInbound = last && last.from !== activeNumber;
+
+        return {
+          contact,
+          messages: msgs,
+          lastMessage: last?.body || "",
+          lastPreview: getMessagePreview(last, activeNumber),
+          lastDate: last?.dateSent || null,
+          lastSid: last?.sid || "",
+          unread: !!unreadMap[contact],
+          lastIsInbound
+        };
+      });
+
+      built.sort((a, b) => {
+        if (a.unread && !b.unread) return -1;
+        if (!a.unread && b.unread) return 1;
+
+        return new Date(b.lastDate) - new Date(a.lastDate);
+      });
+
+      return built;
+    }
+
+    function persistResponsesDoneMap() {
+      localStorage.setItem("responsesDoneMap", JSON.stringify(responsesDoneMap));
+    }
+
+    function syncResponsesDoneMapState(conversationItems) {
+      const validContacts = new Set(conversationItems.map((conv) => conv.contact));
+      let changed = false;
+
+      Object.keys(responsesDoneMap).forEach((contact) => {
+        const conv = conversationItems.find((item) => item.contact === contact);
+        if (!validContacts.has(contact) || !conv || !conv.lastIsInbound) {
+          delete responsesDoneMap[contact];
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        persistResponsesDoneMap();
+      }
+    }
+
+    function markResponseDone(conv) {
+      responsesDoneMap[conv.contact] = conv.lastSid;
+      persistResponsesDoneMap();
+      renderConversationList();
+    }
+
+    function renderConversationCard(conv, search = "", options = {}) {
+      const { showDoneAction = false } = options;
+      const activeClass =
+        activeConversation && activeConversation.contact === conv.contact
+          ? "active"
+          : "";
+
+      const unreadClass = conv.unread ? " unread" : "";
+      const unreadDot = conv.unread
+        ? `<span class="unread-indicator"></span>`
+        : "";
+      const actionClass = showDoneAction ? " with-action" : "";
+      const doneButton = showDoneAction
+        ? `<button class="conversation-action-btn" type="button" data-done-contact="${escapeHtml(conv.contact)}">Done</button>`
+        : "";
+
+      return `
+        <div class="conversation-item ${activeClass}${unreadClass}${actionClass}" data-contact="${escapeHtml(conv.contact)}">
+          ${doneButton}
+          <div class="conversation-top">
+            <div class="conversation-name">
+              ${highlightMatch(formatPhoneNumber(conv.contact), search)}
+              ${unreadDot}
+            </div>
+            <div class="conversation-time">${formatSidebarTime(conv.lastDate)}</div>
+          </div>
+          <div class="conversation-number">${escapeHtml(conv.contact)}</div>
+          <div class="conversation-preview">${conv.lastPreview || ""}</div>
+        </div>
+      `;
+    }
+
+    function bindConversationClicks(scope = document) {
+      scope.querySelectorAll(".conversation-item[data-contact]").forEach((el) => {
+        el.addEventListener("click", () => {
+          const contact = el.getAttribute("data-contact");
+          const found = conversations.find((c) => c.contact === contact);
+          if (found) {
+            activeConversation = found;
+            toNumberEl.value = found.contact;
+
+            delete unreadMap[found.contact];
+            localStorage.setItem("unreadMap", JSON.stringify(unreadMap));
+
+            renderConversationList();
+            renderActiveConversation();
+            hydrateActiveConversation(fromNumberEl.value);
+            closeSidebar();
+          }
+        });
+      });
+
+      scope.querySelectorAll(".conversation-action-btn[data-done-contact]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const contact = button.getAttribute("data-done-contact");
+          const found = conversations.find((c) => c.contact === contact);
+          if (found) {
+            markResponseDone(found);
+          }
+        });
+      });
+    }
+
+    function renderUnreadDrawer(unreadConversations, search = "") {
+      if (!unreadConversations.length) {
+        unreadDrawerEl.classList.add("hidden");
+        unreadDrawerEl.innerHTML = "";
+        return;
+      }
+
+      unreadDrawerEl.classList.remove("hidden");
+      unreadDrawerEl.classList.toggle("collapsed", unreadDrawerCollapsed);
+      unreadDrawerEl.innerHTML = `
+        <button id="unreadDrawerToggle" class="drawer-toggle" type="button">
+          <span class="drawer-title">Unread new messages <span class="drawer-count">${unreadConversations.length}</span></span>
+          <span class="drawer-chevron">▾</span>
+        </button>
+        <div class="drawer-list ${unreadDrawerCollapsed ? "hidden" : ""}">
+          ${unreadConversations.map((conv) => renderConversationCard(conv, search)).join("")}
+        </div>
+      `;
+
+      unreadDrawerEl.querySelector("#unreadDrawerToggle").addEventListener("click", () => {
+        unreadDrawerCollapsed = !unreadDrawerCollapsed;
+        localStorage.setItem("unreadDrawerCollapsed", JSON.stringify(unreadDrawerCollapsed));
+        renderConversationList();
+      });
+
+      const drawerList = unreadDrawerEl.querySelector(".drawer-list");
+      if (drawerList) {
+        bindConversationClicks(drawerList);
+      }
+    }
+
+    function renderResponsesDrawer(responseConversations, search = "") {
+      if (!responseConversations.length) {
+        responsesDrawerEl.classList.add("hidden");
+        responsesDrawerEl.innerHTML = "";
+        return;
+      }
+
+      responsesDrawerEl.classList.remove("hidden");
+      responsesDrawerEl.classList.toggle("collapsed", responsesDrawerCollapsed);
+      responsesDrawerEl.innerHTML = `
+        <div class="drawer-header">
+          <button id="responsesDrawerToggle" class="drawer-toggle" type="button">
+            <span class="drawer-title">Responses waiting <span class="drawer-count">${responseConversations.length}</span></span>
+            <span class="drawer-chevron">▾</span>
+          </button>
+          <span class="drawer-actions">
+            <button id="markResponsesDoneBtn" class="drawer-action-btn" type="button">Mark all done</button>
+          </span>
+        </div>
+        <div class="drawer-list ${responsesDrawerCollapsed ? "hidden" : ""}">
+          ${responseConversations.map((conv) => renderConversationCard(conv, search, { showDoneAction: true })).join("")}
+        </div>
+      `;
+
+      responsesDrawerEl.querySelector("#markResponsesDoneBtn").addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        responseConversations.forEach((conv) => {
+          responsesDoneMap[conv.contact] = conv.lastSid;
+        });
+
+        persistResponsesDoneMap();
+        renderConversationList();
+      });
+
+      responsesDrawerEl.querySelector("#responsesDrawerToggle").addEventListener("click", () => {
+        responsesDrawerCollapsed = !responsesDrawerCollapsed;
+        localStorage.setItem("responsesDrawerCollapsed", JSON.stringify(responsesDrawerCollapsed));
+        renderConversationList();
+      });
+
+      const drawerList = responsesDrawerEl.querySelector(".drawer-list");
+      if (drawerList) {
+        bindConversationClicks(drawerList);
+      }
+    }
+
+    function renderConversationList() {
+      const search = searchInputEl.value.trim().toLowerCase();
+      syncResponsesDoneMapState(conversations);
+      const filtered = conversations.filter((conv) =>
+        conv.contact.toLowerCase().includes(search) ||
+        conv.lastMessage.toLowerCase().includes(search)
+      );
+
+      if (!filtered.length) {
+        renderResponsesDrawer([], search);
+        renderUnreadDrawer([], search);
+        conversationListEl.innerHTML = `<div class="search-empty">No conversations match your search.</div>`;
+        return;
+      }
+
+      const responseConversations = filtered.filter((conv) =>
+        conv.lastIsInbound && responsesDoneMap[conv.contact] !== conv.lastSid
+      );
+      const unreadConversations = filtered.filter((conv) => conv.unread);
+      const featuredContacts = new Set([
+        ...responseConversations.map((conv) => conv.contact),
+        ...unreadConversations.map((conv) => conv.contact)
+      ]);
+      const regularConversations = filtered.filter((conv) => !featuredContacts.has(conv.contact));
+
+      renderResponsesDrawer(responseConversations, search);
+      renderUnreadDrawer(unreadConversations, search);
+
+      conversationListEl.innerHTML = `
+        ${regularConversations.length ? `<div class="section-heading">All conversations</div>${regularConversations.map((conv) => renderConversationCard(conv, search)).join("")}` : `<div class="search-empty">Everything currently in view is already surfaced above.</div>`}
+      `;
+
+      bindConversationClicks(conversationListEl);
+    }
+
+    function renderActiveConversation() {
+      if (!activeConversation) {
+        threadTitleEl.textContent = "No conversation selected";
+        threadSubtitleEl.textContent = "Choose a thread from the left";
+        threadAvatarEl.textContent = "?";
+        threadBadgeEl.classList.add("hidden");
+        threadBodyEl.innerHTML = `<div class="thread-empty">Select a conversation to view your message history, recent replies, and attachments.</div>`;
+        return;
+      }
+
+      const lastMessage = activeConversation.messages[activeConversation.messages.length - 1];
+      threadTitleEl.textContent = formatPhoneNumber(activeConversation.contact);
+      threadSubtitleEl.textContent = `${formatCompactCount(activeConversation.messages.length, "message")} • Last activity ${formatThreadTimestamp(lastMessage?.dateSent)}`;
+      threadAvatarEl.textContent = activeConversation.contact.replace("+", "").slice(-2) || "?";
+      threadBadgeEl.textContent = formatCompactCount(activeConversation.messages.length, "msg");
+      threadBadgeEl.classList.remove("hidden");
+
+      const activeNumber = fromNumberEl.value;
+      const threadItems = buildThreadItems(activeConversation.messages);
+
+      threadBodyEl.innerHTML = threadItems
+        .map((item) => {
+          if (item.type === "separator") {
+            return `<div class="${item.className || "date-separator"}">${escapeHtml(item.label)}</div>`;
+          }
+
+          const msg = item.message;
+          const outbound = msg.from === activeNumber;
+          const directionLabel = SHOW_DIRECTION_DEBUG_LABELS
+            ? `<div class="direction-label">${outbound ? "Sent" : "Inbound"}</div>`
+            : "";
+
+          const mediaHtml = Array.isArray(msg.media) && msg.media.length
+            ? msg.media.map((item) => {
+              if ((item.contentType || "").startsWith("image/")) {
+                return `
+              <div class="media-card">
+                <img
+                  src="${item.url}"
+                  alt="MMS image"
+                  class="media-thumb"
+                  data-media-url="${item.url}"
+                />
+              </div>
+            `;
+              }
+
+              return `
+              <a href="${item.url}" target="_blank" class="attachment-link" style="color:${outbound ? "#fff" : "#2563eb"};">
+                View attachment
+              </a>
+          `;
+            }).join("")
+            : "";
+
+          return `
+      <div class="msg-row ${outbound ? "outbound" : "inbound"}">
+        ${directionLabel}
+        <div class="msg-time">${formatThreadTimestamp(msg.dateSent)}</div>
+        <div class="bubble ${outbound ? "outbound" : "inbound"}">${msg.body ? `<div class="message-text">${linkifyMessageBody(msg.body)}</div>` : ""}${mediaHtml}</div>
+      </div>
+    `;
+        })
+        .join("");
+
+      threadBodyEl.querySelectorAll(".media-thumb[data-media-url]").forEach((img) => {
+        img.addEventListener("click", () => openMediaModal(img.getAttribute("data-media-url")));
+      });
+
+      threadBodyEl.scrollTop = threadBodyEl.scrollHeight;
+    }
+
+    async function hydrateActiveConversation(activeNumber, { silent = true } = {}) {
+      if (!activeConversation || !activeNumber || isHydratingThread) return;
+
+      try {
+        isHydratingThread = true;
+
+        const query = new URLSearchParams({
+          activeNumber,
+          contact: activeConversation.contact
+        });
+
+        const res = await fetch(`/api/twilio?twilioResource=thread&${query.toString()}`, {
+          cache: "no-store"
+        });
+        const data = await res.json();
+
+        if (!data || !Array.isArray(data.messages)) {
+          throw new Error("Invalid thread response");
+        }
+
+        const refreshedConversation = conversations.find((conv) => conv.contact === activeConversation.contact);
+        if (!refreshedConversation) return;
+
+        refreshedConversation.messages = data.messages;
+        refreshedConversation.lastMessage = data.messages[data.messages.length - 1]?.body || refreshedConversation.lastMessage;
+        activeConversation = refreshedConversation;
+        renderActiveConversation();
+      } catch (err) {
+        if (!silent) {
+          setStatus("Loaded list, but failed to hydrate thread media.", true);
+        }
+      } finally {
+        isHydratingThread = false;
+      }
+    }
+
+    async function loadPhoneNumbers() {
+      try {
+        const res = await fetch("/api/twilio?twilioResource=phone-numbers");
+
+        // An expired portal session is the one failure worth naming: the page
+        // otherwise just sits empty and looks like Twilio is down.
+        if (res.status === 401 || res.status === 403) {
+          fromNumberEl.innerHTML = `<option value="">Sign in to the portal as an admin</option>`;
+          setStatus("Your portal session has expired. Reload the portal and sign in again.", true);
+          return;
+        }
+
+        const data = await res.json();
+
+        fromNumberEl.innerHTML = "";
+
+        if (!Array.isArray(data) || data.length === 0) {
+          fromNumberEl.innerHTML = `<option value="">No Twilio numbers found</option>`;
+          return;
+        }
+
+        data.forEach((n) => {
+          const option = document.createElement("option");
+          option.value = n.phoneNumber;
+          option.textContent = formatPhoneNumber(n.phoneNumber);
+          fromNumberEl.appendChild(option);
+        });
+
+        await loadMessages();
+      } catch (err) {
+        setStatus("Failed to load Twilio numbers.", true);
+      }
+    }
+
+    async function loadMessages(silent = false) {
+      const activeNumber = fromNumberEl.value;
+      if (!activeNumber || isLoadingMessages) return;
+
+      try {
+        isLoadingMessages = true;
+        refreshBtn.disabled = true;
+
+        if (!silent) {
+          setStatus("Loading messages...");
+        }
+
+        const query = new URLSearchParams({
+          activeNumber
+        });
+
+        if (silent && allMessages.length > 0) {
+          query.set("incremental", "1");
+        }
+
+        const res = await fetch(`/api/twilio?twilioResource=messages&${query.toString()}`, {
+          cache: "no-store"
+        });
+        const data = await res.json();
+
+        if (!data || !Array.isArray(data.messages)) {
+          throw new Error("Invalid messages response");
+        }
+
+        allMessages = data.incremental
+          ? mergeMessages(allMessages, data.messages)
+          : sortMessagesNewestFirst(data.messages);
+        const newConversations = buildConversations(allMessages, activeNumber);
+        let shouldPlayDing = false;
+
+        // detect new inbound replies
+        if (!isInitialLoad) {
+          newConversations.forEach((conv) => {
+            const prevSid = previousLastMessageSidByContact[conv.contact];
+            const currentLast = conv.messages[conv.messages.length - 1];
+
+            const isNewLastMessage = currentLast && currentLast.sid !== prevSid;
+            const isInbound = currentLast && currentLast.from !== activeNumber;
+            const isCurrentlyOpen =
+              activeConversation && activeConversation.contact === conv.contact;
+
+            if (isNewLastMessage && isInbound && !isCurrentlyOpen) {
+              unreadMap[conv.contact] = true;
+              unreadDrawerCollapsed = false;
+              localStorage.setItem("unreadDrawerCollapsed", JSON.stringify(unreadDrawerCollapsed));
+              shouldPlayDing = true;
+            }
+          });
+
+          localStorage.setItem("unreadMap", JSON.stringify(unreadMap));
+        }
+
+        // refresh previous last sid map
+        previousLastMessageSidByContact = {};
+        newConversations.forEach((conv) => {
+          previousLastMessageSidByContact[conv.contact] = conv.lastSid;
+        });
+
+        conversations = buildConversations(allMessages, activeNumber);
+
+        if (activeConversation) {
+          const refreshed = conversations.find((c) => c.contact === activeConversation.contact);
+          activeConversation = refreshed || conversations[0] || null;
+        } else {
+          activeConversation = conversations[0] || null;
+        }
+
+        if (activeConversation) {
+          toNumberEl.value = activeConversation.contact;
+        }
+
+        renderConversationList();
+        renderActiveConversation();
+        if (activeConversation) {
+          hydrateActiveConversation(activeNumber);
+        }
+
+        if (shouldPlayDing) {
+          playIncomingDing();
+        }
+
+        const uniqueCount = conversations.length;
+        if (!silent) {
+          setStatus(`Synced ${data.total} items across ${uniqueCount} contacts.`);
+        }
+
+        isInitialLoad = false;
+      } catch (err) {
+        if (!silent) {
+          setStatus("Failed to load messages.", true);
+        }
+      } finally {
+        isLoadingMessages = false;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", async () => {
+      const from = fromNumberEl.value.trim();
+      const to = toNumberEl.value.trim();
+      const body = messageBodyEl.value.trim();
+
+      if (!from || !to || !body) {
+        setStatus("Fill in sender, recipient, and message.", true);
+        return;
+      }
+
+      try {
+        setStatus("Sending...");
+        sendBtn.disabled = true;
+        const res = await fetch("/api/twilio?twilioResource=send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ from, to, body })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to send message");
+        }
+
+        messageBodyEl.value = "";
+        autoResizeComposer();
+        await loadMessages();
+        setStatus("Message sent.");
+      } catch (err) {
+        setStatus(err.message || "Failed to send message", true);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
+
+    refreshBtn.addEventListener("click", () => loadMessages(false));
+
+    fromNumberEl.addEventListener("change", () => {
+      activeConversation = null;
+      previousLastMessageSidByContact = {};
+      isInitialLoad = true;
+      loadMessages(false);
+    });
+
+    function autoResizeComposer() {
+      messageBodyEl.style.height = "auto";
+      messageBodyEl.style.height = `${Math.min(messageBodyEl.scrollHeight, 180)}px`;
+    }
+
+    searchInputEl.addEventListener("input", () => {
+      updateSearchUi();
+      renderConversationList();
+    });
+    clearSearchBtn.addEventListener("click", () => {
+      searchInputEl.value = "";
+      updateSearchUi();
+      renderConversationList();
+      searchInputEl.focus();
+    });
+    messageBodyEl.addEventListener("input", autoResizeComposer);
+    messageBodyEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        if (!sendBtn.disabled) {
+          sendBtn.click();
+        }
+      }
+    });
+    mediaModalEl.addEventListener("click", (event) => {
+      if (event.target === mediaModalEl) {
+        closeMediaModal();
+      }
+    });
+    sidebarResizerEl.addEventListener("mousedown", startSidebarResize);
+    document.addEventListener("mousemove", (event) => {
+      if (!isResizingSidebar) return;
+      setSidebarTopHeightFromPointer(event.clientY);
+    });
+    document.addEventListener("mouseup", stopSidebarResize);
+    window.addEventListener("resize", applySidebarSplitHeight);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !mediaModalEl.classList.contains("hidden")) {
+        closeMediaModal();
+      }
+      if (event.key === "Escape") {
+        stopSidebarResize();
+      }
+    });
+    document.addEventListener("click", ensureAudioContext, { passive: true });
+    document.addEventListener("keydown", ensureAudioContext, { passive: true });
+
+    updateSearchUi();
+    autoResizeComposer();
+    applySidebarSplitHeight();
+    loadPhoneNumbers();
+
+    // Auto-poll every 10 seconds — but only while someone is actually looking.
+    //
+    // On localhost this loop was free. Hosted, every tick costs a serverless
+    // invocation, a Neon query to authorize it, and two Twilio API calls. A tab
+    // left open on a back monitor overnight is ~8,600 of each by morning, for a
+    // thread nobody is reading. Pausing on `hidden` makes an idle tab cost
+    // nothing, and the refresh on `visible` means the first thing a rep sees
+    // when they come back is current rather than however stale the tab went.
+    setInterval(() => {
+      if (fromNumberEl.value && document.visibilityState === "visible") {
+        loadMessages(true);
+      }
+    }, AUTO_REFRESH_MS);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && fromNumberEl.value) {
+        loadMessages(true);
+      }
+    });
+
+    const sidebarEl = document.querySelector(".sidebar");
+    const sidebarBackdropEl = document.getElementById("sidebarBackdrop");
+    const menuBtnEl = document.getElementById("menuBtn");
+
+    function setSidebarOpen(open) {
+      sidebarEl?.classList.toggle("sidebar-open", open);
+      sidebarBackdropEl?.classList.toggle("sidebar-open", open);
+      menuBtnEl?.setAttribute("aria-expanded", String(open));
+    }
+
+    function closeSidebar() {
+      setSidebarOpen(false);
+    }
+
+    menuBtnEl?.addEventListener("click", () => {
+      setSidebarOpen(!sidebarEl?.classList.contains("sidebar-open"));
+    });
+
+    sidebarBackdropEl?.addEventListener("click", closeSidebar);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeSidebar();
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 900) closeSidebar();
+    });
+  </script>
+</body>
+
+</html>

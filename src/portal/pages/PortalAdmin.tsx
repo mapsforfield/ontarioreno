@@ -2,6 +2,7 @@ import {
   BriefcaseBusiness,
   Building2,
   HandCoins,
+  MessageSquare,
   Plus,
   Radar,
   Users,
@@ -83,6 +84,12 @@ const sections = [
     description: 'Track active government renovation & ADU grant programs across Ontario.',
     href: '/portal/grants',
     icon: Radar,
+  },
+  {
+    title: 'Twilio Messages',
+    description: 'Read and reply to SMS on the company numbers from anywhere.',
+    href: '/portal/messages',
+    icon: MessageSquare,
   },
 ];
 

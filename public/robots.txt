@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
 
+# The admin SMS dashboard's page shell. It is a real static file rather than a
+# SPA route, so a crawler can fetch it — it renders empty without an admin
+# session, but an empty "OntarioReno Messages" page has no business in search
+# results. Nothing else about the site's indexing changes.
+Disallow: /portal-twilio-dashboard.html
+
 Sitemap: https://ontarioreno.ca/sitemap.xml

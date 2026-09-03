@@ -66,6 +66,13 @@ const PORTAL_FEATURES: PortalFeature[] = [
   // without asserting a link that does not exist. If a link is ever added,
   // change this to 'Grants'.
   { navLabel: null, route: 'grants', page: 'src/portal/pages/PortalGrants.tsx', component: 'PortalGrants' },
+  // The Twilio SMS dashboard, moved off the office desktop. Admin-guarded,
+  // reached from the Admin page's card grid, deliberately without a sidebar
+  // link. The page itself is a frame — the UI lives in
+  // public/portal-twilio-dashboard.html and the data in
+  // lib/twilio-dashboard-api.ts, both listed in REQUIRED_MODULES below so
+  // neither half can go missing.
+  { navLabel: null, route: 'messages', page: 'src/portal/pages/PortalMessages.tsx', component: 'PortalMessages' },
 ];
 
 /** Supporting modules with no route of their own, but a feature dies without them. */
@@ -80,6 +87,10 @@ const REQUIRED_MODULES = [
   // so it has no route of its own to protect it.
   'src/portal/components/CommissionInvoice.tsx',
   'src/portal/components/ClientInvoice.tsx',
+  // Both halves of the framed Twilio dashboard. Neither has a route of its
+  // own, and /portal/messages is an empty box without them.
+  'public/portal-twilio-dashboard.html',
+  'lib/twilio-dashboard-api.ts',
 ];
 
 const app = read('src/App.tsx');
