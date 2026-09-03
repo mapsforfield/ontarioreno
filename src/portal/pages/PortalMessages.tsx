@@ -17,22 +17,29 @@
 
 export default function PortalMessages() {
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
+    // 100dvh, not 100vh: on mobile Safari 100vh is the height WITHOUT the
+    // browser's own chrome, so the composer ended up under the address bar.
+    // The subtraction covers the portal's fixed mobile header and bottom nav.
+    <div className="flex h-[calc(100dvh-19rem)] min-h-[24rem] flex-col gap-2 lg:h-[calc(100vh-9rem)] lg:gap-3">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
           Admin
         </p>
-        <h1 className="text-2xl font-semibold text-slate-900">Twilio Messages</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-slate-900 lg:text-2xl">Twilio Messages</h1>
+        {/* Orientation for a first visit, not something a rep re-reads daily —
+            on a phone that is three lines of screen the thread needs more. */}
+        <p className="hidden text-sm text-slate-500 lg:block">
           Read and reply to SMS on the company numbers. Sends here are hand-typed
           and go straight to Twilio — they are not part of any automated sequence.
         </p>
       </div>
 
+      {/* Edge-to-edge on a phone: the page gutters already inset it, and a
+          second rounded border inside them costs line length in every bubble. */}
       <iframe
         src="/portal-twilio-dashboard.html"
         title="Twilio Messages"
-        className="min-h-0 w-full flex-1 rounded-xl border border-slate-200 bg-white shadow-sm"
+        className="-mx-4 min-h-0 w-[calc(100%+2rem)] flex-1 border-y border-slate-200 bg-white sm:mx-0 sm:w-full sm:rounded-xl sm:border sm:shadow-sm"
       />
     </div>
   );

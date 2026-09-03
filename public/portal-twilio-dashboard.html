@@ -16,7 +16,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>OntarioReno Messages</title>
   <style>
     :root {
@@ -973,6 +973,149 @@
 
       .main {
         border-radius: 20px;
+      }
+    }
+
+    /* ─── Phones ───────────────────────────────────────────────────────────
+       The 900px block above is really a tablet layout: it moves the sidebar
+       into a drawer but leaves the desktop header alone. On a phone that
+       header cost about 180px before a single message was visible — a 46px
+       avatar, a 20px title set to flex-wrap so the number broke onto two
+       lines, the count badge dropping below it, and a subtitle repeating the
+       same count in words.
+
+       So: shrink the furniture, never the message. Bubbles get wider and the
+       text stays at a readable size; everything competing with them gets
+       smaller or goes away. */
+    @media (max-width: 640px) {
+      .app {
+        padding: 0;
+      }
+
+      /* Edge-to-edge: rounded corners and side padding cost ~20px of line
+         length on a 390px screen, which is a word per line in every bubble. */
+      .main {
+        border-radius: 0;
+      }
+
+      .thread-header {
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        min-height: 0;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+
+      .thread-header-main {
+        gap: 10px;
+      }
+
+      .avatar {
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
+        box-shadow: none;
+      }
+
+      /* nowrap + ellipsis: a wrapped phone number was the single biggest
+         waste of header height. */
+      .thread-title {
+        font-size: 16px;
+        gap: 8px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* The badge says "4 msgs" and the subtitle underneath says
+         "4 messages" — on a phone one of them is just noise. */
+      .thread-badge {
+        display: none;
+      }
+
+      .thread-subtitle {
+        font-size: 11px;
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sync-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 10px;
+        box-shadow: none;
+        min-height: 40px;
+      }
+
+      .thread-body {
+        padding: 12px 10px;
+        gap: 10px;
+      }
+
+      /* Wider bubbles, unchanged type size. */
+      .msg-row {
+        max-width: 94%;
+      }
+
+      .bubble {
+        padding: 10px 13px;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      .msg-time {
+        font-size: 10px;
+      }
+
+      .composer {
+        padding: 10px;
+        gap: 8px;
+      }
+
+      /* 16px keeps iOS from zooming the whole page when the field is focused —
+         below that Safari scales in and the rep has to pinch back out after
+         every reply. */
+      .composer-input,
+      .composer-textarea {
+        font-size: 16px;
+        padding: 11px 12px;
+      }
+
+      .composer-textarea {
+        min-height: 46px;
+      }
+
+      /* A thumb-sized Send, and the hint line is desktop advice anyway. */
+      .send-btn {
+        min-height: 46px;
+        min-width: 76px;
+        padding: 0 16px;
+      }
+
+      .composer-hint {
+        display: none;
+      }
+
+      /* 44px is the smallest target a thumb hits reliably, and this one opens
+         the conversation list — the most-tapped control on the page. */
+      .menu-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+      }
+
+      /* Full-width drawer — 86vw left a dead strip that swallowed taps. */
+      .sidebar {
+        width: min(94vw, 380px);
+      }
+
+      .conversation-item {
+        padding: 11px 12px;
       }
     }
   </style>
