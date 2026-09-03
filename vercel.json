@@ -20,6 +20,7 @@
   ],
   "functions": {
     "api/appointments/index.ts": { "maxDuration": 60 },
+    "api/twilio/index.ts": { "maxDuration": 60 },
     "api/deals/index.ts": { "maxDuration": 120 }
   },
   "crons": [

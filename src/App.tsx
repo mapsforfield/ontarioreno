@@ -117,6 +117,7 @@ const PortalClients = lazy(() => import('./portal/pages/PortalClients'));
 const PortalSubmissions = lazy(() => import('./portal/pages/PortalSubmissions'));
 const PortalConversations = lazy(() => import('./portal/pages/PortalConversations'));
 const PortalInvoices = lazy(() => import('./portal/pages/PortalInvoices'));
+const PortalMessages = lazy(() => import('./portal/pages/PortalMessages'));
 const PortalTasks = lazy(() => import('./portal/pages/PortalTasks'));
 const PortalLogin = lazy(() => import('./portal/pages/PortalLogin'));
 const ConsultationReschedule = lazy(() => import('./portal/pages/ConsultationReschedule'));
@@ -177,6 +178,9 @@ export default function App() {
                 <Route path="submissions" element={<PortalSubmissions />} />
                 <Route path="conversations" element={<PortalConversations />} />
                 <Route path="invoices" element={<PortalInvoices />} />
+                {/* Twilio SMS dashboard. Admin-only, no sidebar link — reached
+                    from the Admin page or by URL. */}
+                <Route path="messages" element={<PortalMessages />} />
               </Route>
             </Route>
           </Route>
