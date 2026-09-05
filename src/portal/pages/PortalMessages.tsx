@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 /**
  * Twilio Messages — the SMS dashboard, reachable from anywhere.
  *
@@ -16,6 +18,12 @@
  */
 
 export default function PortalMessages() {
+  // Remounting the frame is the whole recovery path when iOS kills its render
+  // process ("A problem repeatedly occurred"). Reps were closing and reopening
+  // the portal page to get back in; a button that reloads just the frame does
+  // the same thing without losing the portal session around it.
+  const [frameKey, setFrameKey] = useState(0);
+
   return (
     // 100dvh, not 100vh: on mobile Safari 100vh is the height WITHOUT the
     // browser's own chrome, so the composer ended up under the address bar.
@@ -25,7 +33,16 @@ export default function PortalMessages() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
           Admin
         </p>
-        <h1 className="text-xl font-semibold text-slate-900 lg:text-2xl">Twilio Messages</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-900 lg:text-2xl">Twilio Messages</h1>
+          <button
+            type="button"
+            onClick={() => setFrameKey((key) => key + 1)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            Reload
+          </button>
+        </div>
         {/* Orientation for a first visit, not something a rep re-reads daily —
             on a phone that is three lines of screen the thread needs more. */}
         <p className="hidden text-sm text-slate-500 lg:block">
@@ -37,6 +54,7 @@ export default function PortalMessages() {
       {/* Edge-to-edge on a phone: the page gutters already inset it, and a
           second rounded border inside them costs line length in every bubble. */}
       <iframe
+        key={frameKey}
         src="/portal-twilio-dashboard.html"
         title="Twilio Messages"
         className="-mx-4 min-h-0 w-[calc(100%+2rem)] flex-1 border-y border-slate-200 bg-white sm:mx-0 sm:w-full sm:rounded-xl sm:border sm:shadow-sm"

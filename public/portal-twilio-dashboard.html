@@ -303,6 +303,19 @@
       padding-right: 2px;
     }
 
+    .load-earlier-btn {
+      align-self: center;
+      margin-bottom: 4px;
+      border: 1px solid rgba(22, 104, 199, 0.16);
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--blue-strong);
+      border-radius: 999px;
+      padding: 9px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     .section-heading {
       padding: 10px 14px 4px;
       font-size: 11px;
@@ -959,6 +972,51 @@
         display: none;
       }
 
+      /* One scroller, not four.
+         On desktop the sidebar is a fixed-height split: a drawer panel on top
+         of the conversation list, each scrolling on its own, with a resizer
+         between them. On a phone that same structure put three nested scroll
+         containers inside a fixed-position drawer - a flick landed in
+         whichever one the thumb happened to be over, the drawer panel was
+         pinned to whatever pixel height was saved from a desktop session, and
+         momentum scrolling fought the container underneath it.
+
+         Here the sidebar body is the only thing that scrolls. The drawers and
+         the conversation list grow to their natural height inside it, so a
+         drag anywhere in the sidebar moves the whole list, once. */
+      .sidebar-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+
+      .sidebar-top-panel {
+        flex: 0 0 auto;
+        max-height: none;
+        overflow: visible;
+      }
+
+      .drawer-wrap {
+        flex: 0 0 auto;
+      }
+
+      .drawer-list {
+        overflow: visible;
+        min-height: 0;
+        flex: 0 0 auto;
+      }
+
+      .sidebar-bottom-panel {
+        flex: 0 0 auto;
+        min-height: 0;
+        overflow: visible;
+      }
+
+      .conversation-list {
+        overflow: visible;
+        flex: 0 0 auto;
+      }
+
       .composer-top {
         grid-template-columns: 1fr;
       }
@@ -1224,6 +1282,22 @@
     let isInitialLoad = true;
 
     const AUTO_REFRESH_MS = 10000; // 10 seconds
+
+    // Ceilings on what the tab holds in memory and what it paints.
+    //
+    // Both of these used to be unbounded, and that is what made the page die
+    // on a phone with "A problem repeatedly occurred": every ten seconds the
+    // incremental poll merged more messages into an array nothing ever
+    // trimmed, and opening a long thread painted every bubble it had ever
+    // seen, MMS images included, in one innerHTML write. iOS kills the tab
+    // when the render process runs out of memory, which is why it looked
+    // random - it depended on how long the tab had been open, not on the
+    // conversation.
+    //
+    // The newest 3,000 messages are far more than the dashboard shows, and a
+    // thread opens on its most recent 150 with everything older one tap away.
+    const MAX_CACHED_MESSAGES = 3000;
+    const THREAD_RENDER_LIMIT = 150;
     // ============================================
 
     // ─── Repaint only when the markup actually changed ───────────────────
@@ -1256,14 +1330,34 @@
 
     let allMessages = [];
     let conversations = [];
+
+    // How many of the open thread's messages are painted. Grows only when the
+    // rep asks for older ones, and resets when a different thread is opened.
+    let threadRenderLimit = THREAD_RENDER_LIMIT;
+
+    // Which contact `threadRenderLimit` currently counts for.
+    let threadLimitContact = null;
     let activeConversation = null;
     let isLoadingMessages = false;
     let isHydratingThread = false;
     let isResizingSidebar = false;
     let audioContext = null;
 
+    // Below this the sidebar scrolls as one column and the split does not exist.
+    // Kept in step with the 900px media query above.
+    const SIDEBAR_SPLIT_MIN_WIDTH = 901;
+
     function applySidebarSplitHeight() {
       if (!sidebarTopPanelEl) return;
+
+      // A height dragged on a desktop monitor is meaningless on a phone, and
+      // applying it there is what squeezed the drawers into a ~90px box that
+      // was almost impossible to scroll. The value stays in localStorage for
+      // the next desktop session; it just is not used here.
+      if (window.innerWidth < SIDEBAR_SPLIT_MIN_WIDTH) {
+        sidebarTopPanelEl.style.flexBasis = "";
+        return;
+      }
 
       if (!sidebarTopHeight || Number.isNaN(sidebarTopHeight)) {
         sidebarTopPanelEl.style.flexBasis = "";
@@ -1556,7 +1650,8 @@
         mergedMap.set(msg.sid, msg);
       });
 
-      return sortMessagesNewestFirst([...mergedMap.values()]);
+      // Newest first, so the trim drops the oldest.
+      return sortMessagesNewestFirst([...mergedMap.values()]).slice(0, MAX_CACHED_MESSAGES);
     }
 
     function buildConversations(messages, activeNumber) {
@@ -1835,7 +1930,23 @@
       threadBadgeEl.classList.remove("hidden");
 
       const activeNumber = fromNumberEl.value;
-      const threadItems = buildThreadItems(activeConversation.messages);
+
+      // A different thread starts at the bottom of its own history again.
+      if (threadLimitContact !== activeConversation.contact) {
+        threadLimitContact = activeConversation.contact;
+        threadRenderLimit = THREAD_RENDER_LIMIT;
+      }
+
+      const totalMessages = activeConversation.messages.length;
+      const hiddenCount = Math.max(0, totalMessages - threadRenderLimit);
+      const visibleMessages = hiddenCount
+        ? activeConversation.messages.slice(-threadRenderLimit)
+        : activeConversation.messages;
+      const threadItems = buildThreadItems(visibleMessages);
+
+      const earlierHtml = hiddenCount
+        ? `<button id="loadEarlierBtn" class="load-earlier-btn" type="button">Show ${hiddenCount > THREAD_RENDER_LIMIT ? THREAD_RENDER_LIMIT : hiddenCount} earlier ${hiddenCount === 1 ? "message" : "messages"} (${hiddenCount} older)</button>`
+        : "";
 
       const threadHtml = threadItems
         .map((item) => {
@@ -1858,6 +1969,8 @@
                   src="${item.url}"
                   alt="MMS image"
                   class="media-thumb"
+                  loading="lazy"
+                  decoding="async"
                   data-media-url="${item.url}"
                 />
               </div>
@@ -1893,10 +2006,21 @@
         threadBodyEl.scrollHeight - threadBodyEl.scrollTop - threadBodyEl.clientHeight < 120;
       paintedThreadContact = activeConversation.contact;
 
-      if (!paint(threadBodyEl, threadHtml)) return;
+      if (!paint(threadBodyEl, earlierHtml + threadHtml)) return;
 
       threadBodyEl.querySelectorAll(".media-thumb[data-media-url]").forEach((img) => {
         img.addEventListener("click", () => openMediaModal(img.getAttribute("data-media-url")));
+      });
+
+      // Reveal older messages in place, keeping the reading position: the
+      // first bubble that was already on screen stays where it was rather
+      // than being pushed down by everything that loaded above it.
+      threadBodyEl.querySelector("#loadEarlierBtn")?.addEventListener("click", () => {
+        const heightBefore = threadBodyEl.scrollHeight;
+        const scrollBefore = threadBodyEl.scrollTop;
+        threadRenderLimit += THREAD_RENDER_LIMIT;
+        renderActiveConversation();
+        threadBodyEl.scrollTop = scrollBefore + (threadBodyEl.scrollHeight - heightBefore);
       });
 
       if (contactChanged || wasAtBottom) {
@@ -2019,7 +2143,7 @@
 
         allMessages = data.incremental
           ? mergeMessages(allMessages, data.messages)
-          : sortMessagesNewestFirst(data.messages);
+          : sortMessagesNewestFirst(data.messages).slice(0, MAX_CACHED_MESSAGES);
         const newConversations = buildConversations(allMessages, activeNumber);
         let shouldPlayDing = false;
 
@@ -2051,7 +2175,10 @@
           previousLastMessageSidByContact[conv.contact] = conv.lastSid;
         });
 
-        conversations = buildConversations(allMessages, activeNumber);
+        // Built once. This used to call buildConversations a second time on
+        // the same array, which on every ten-second poll re-sorted every
+        // thread for a result identical to the one already in hand.
+        conversations = newConversations;
 
         if (activeConversation) {
           const refreshed = conversations.find((c) => c.contact === activeConversation.contact);
