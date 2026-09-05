@@ -741,6 +741,12 @@ export default function PortalAppointments() {
     noteTemplates,
   } = usePortalData();
   const [calendarView, setCalendarView] = useState<CalendarView>('month');
+  // Days whose "+N more" has been opened. Expanding grows the cell in place;
+  // it used to swap the whole board for the day view, which is a heavy answer
+  // to "what else is on Saturday" — you lost the month you were reading and
+  // had to navigate back. The day view is still one click away, on the cell's
+  // own date header.
+  const [expandedDayKeys, setExpandedDayKeys] = useState<string[]>([]);
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
   // Paired reps (repVisibility.ts) open on THEIR OWN work and choose to bring
   // the other in. Default 'mine' rather than 'all' is the whole request: the
@@ -2252,6 +2258,18 @@ export default function PortalAppointments() {
       setPanelTab('prep');
     };
 
+    const isExpanded = expandedDayKeys.includes(dateKey);
+    const collapsedLimit = compact ? 3 : 6;
+    const visibleAppointments = isExpanded
+      ? appointments
+      : appointments.slice(0, collapsedLimit);
+    const hiddenCount = appointments.length - visibleAppointments.length;
+
+    const openDayView = () => {
+      setCursorDate(date);
+      setCalendarView('day');
+    };
+
     return (
       <article
         key={dateKey}
@@ -2262,8 +2280,15 @@ export default function PortalAppointments() {
           isOutsideMonth && calendarView === 'month' ? 'opacity-55' : ''
         }`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        <div
+          className="flex items-center justify-between gap-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            openDayView();
+          }}
+          title="Open this day"
+        >
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500 hover:text-[#1B3C6C]">
             {new Intl.DateTimeFormat('en-CA', {
               day: 'numeric',
               weekday: compact ? 'short' : 'long',
@@ -2293,7 +2318,7 @@ export default function PortalAppointments() {
           </div>
         </div>
         <div className={`${compact ? 'mt-2 space-y-2.5' : 'mt-3 space-y-3'}`}>
-          {appointments.slice(0, compact ? 3 : 6).map((appointment) => (
+          {visibleAppointments.map((appointment) => (
             <span key={appointment.id} onClick={(e) => e.stopPropagation()}>
               <AppointmentPill
                 appointment={appointment}
@@ -2313,30 +2338,20 @@ export default function PortalAppointments() {
               + New consultation
             </p>
           )}
-          {!compact && appointments.length > 6 && (
+          {(hiddenCount > 0 || isExpanded) && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setCursorDate(date);
-                setCalendarView('day');
+                setExpandedDayKeys((keys) =>
+                  keys.includes(dateKey)
+                    ? keys.filter((key) => key !== dateKey)
+                    : [...keys, dateKey]
+                );
               }}
               className="text-xs font-bold text-[#1B3C6C] hover:underline"
             >
-              +{appointments.length - 6} more
-            </button>
-          )}
-          {compact && appointments.length > 3 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCursorDate(date);
-                setCalendarView('day');
-              }}
-              className="text-xs font-bold text-[#1B3C6C] hover:underline"
-            >
-              +{appointments.length - 3} more
+              {isExpanded ? 'Show less' : `+${hiddenCount} more`}
             </button>
           )}
         </div>
