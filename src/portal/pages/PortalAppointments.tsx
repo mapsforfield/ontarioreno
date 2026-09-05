@@ -744,8 +744,11 @@ export default function PortalAppointments() {
   // Days whose "+N more" has been opened. Expanding grows the cell in place;
   // it used to swap the whole board for the day view, which is a heavy answer
   // to "what else is on Saturday" — you lost the month you were reading and
-  // had to navigate back. The day view is still one click away, on the cell's
-  // own date header.
+  // had to navigate back.
+  //
+  // The two remaining actions on a cell split by where you click: empty space
+  // in the body opens that day, and the date text ("FRI 4") books a new
+  // consultation on it.
   const [expandedDayKeys, setExpandedDayKeys] = useState<string[]>([]);
   const [calendarRepFilter, setCalendarRepFilter] = useState<string>('all');
   // Paired reps (repVisibility.ts) open on THEIR OWN work and choose to bring
@@ -2273,7 +2276,7 @@ export default function PortalAppointments() {
     return (
       <article
         key={dateKey}
-        onClick={openNewForDate}
+        onClick={openDayView}
         className={`cursor-pointer rounded-[0.5rem] border border-slate-200 bg-white transition hover:border-[#b8c9dd] hover:bg-[#f6faff] ${
           compact ? 'min-h-20 p-2' : 'min-h-32 p-3'
         } ${
@@ -2284,9 +2287,9 @@ export default function PortalAppointments() {
           className="flex items-center justify-between gap-2"
           onClick={(e) => {
             e.stopPropagation();
-            openDayView();
+            openNewForDate();
           }}
-          title="Open this day"
+          title="Book a consultation on this date"
         >
           <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500 hover:text-[#1B3C6C]">
             {new Intl.DateTimeFormat('en-CA', {
@@ -2334,7 +2337,13 @@ export default function PortalAppointments() {
             </span>
           ))}
           {appointments.length === 0 && !compact && (
-            <p className="rounded-[0.5rem] border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-400">
+            <p
+              onClick={(e) => {
+                e.stopPropagation();
+                openNewForDate();
+              }}
+              className="rounded-[0.5rem] border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-400 hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+            >
               + New consultation
             </p>
           )}
