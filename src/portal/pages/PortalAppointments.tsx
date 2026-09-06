@@ -4125,6 +4125,43 @@ export default function PortalAppointments() {
                     ⚠ This rep has marked {form.appointmentDate} as a day off.
                   </div>
                 )}
+                {/* ── An open "Wants to move" request, and the way to close it ──
+                    The chip on the calendar pill is read-only (it lives inside a
+                    button, so it cannot carry one of its own), and the rule in
+                    lib/sms-reply-resolution.ts only clears the flag when a rep
+                    changes the status or the date. That covers the usual path,
+                    but not the rep who phoned, settled it, and is leaving the
+                    booking exactly as it stands — the case this whole thing came
+                    from. So the request gets a row of its own here, next to the
+                    status they came to change, quoting what the homeowner
+                    actually wrote so the rep knows what they are closing. */}
+                {selectedAppointment?.smsReplyStatus === 'reschedule_requested' && (
+                  <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-amber-900">
+                        Homeowner asked to reschedule by text
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-amber-800">
+                        {selectedAppointment.smsReplyBody
+                          ? `They wrote: "${selectedAppointment.smsReplyBody}"`
+                          : 'The slot is still held — the move has not happened yet.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateAppointment(
+                          selectedAppointment.id,
+                          { smsReplyStatus: '' },
+                          currentUser
+                        )
+                      }
+                      className="shrink-0 rounded-full bg-amber-600 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-white transition hover:bg-amber-700"
+                    >
+                      Mark handled
+                    </button>
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Status
                   <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>

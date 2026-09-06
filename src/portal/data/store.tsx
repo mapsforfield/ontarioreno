@@ -52,6 +52,7 @@ import {
 } from './types';
 import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 import { mergeNotes } from '../../../lib/consultation-notes';
+import { resolvesRescheduleRequest } from '../../../lib/sms-reply-resolution';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
 type FinancePartnerDraft = Omit<FinancePartner, 'id'>;
@@ -3049,6 +3050,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 ...updates,
                 id: previousAppointment.id,
                 updatedAt: new Date().toISOString(),
+                // The server clears an answered "Wants to move" flag on the same
+                // rule (see lib/sms-reply-resolution.ts), but the PATCH response
+                // is not read back into state — without this the rep who just
+                // resolved it keeps looking at the amber chip until a reload,
+                // which is exactly the complaint. Same predicate, so the two
+                // cannot drift.
+                ...(resolvesRescheduleRequest(previousAppointment, updates as Record<string, unknown>)
+                  ? { smsReplyStatus: '' }
+                  : {}),
               }
             : undefined;
           const deal = current.deals.find(
@@ -3133,6 +3143,21 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           ) {
             actionType = 'consultation_internal_notes_updated';
             actionLabel = `Internal notes updated for ${entityLabel}`;
+          }
+
+          // Closing an open "wants to move" request is its own line in the
+          // history, not a generic edit: the amber flag coming down is the one
+          // visible thing that changed, and a rep looking back needs to see who
+          // decided it was handled. The server writes the same row when the
+          // flag is cleared by a status or date change instead.
+          if (
+            previousAppointment &&
+            nextAppointment &&
+            previousAppointment.smsReplyStatus === 'reschedule_requested' &&
+            nextAppointment.smsReplyStatus !== 'reschedule_requested'
+          ) {
+            actionType = 'consultation_reschedule_request_resolved';
+            actionLabel = `Reschedule request resolved for ${entityLabel}`;
           }
 
           if (
