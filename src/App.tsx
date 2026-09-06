@@ -13,7 +13,14 @@ const GardenSuiteCostOntario = lazy(() => import('./pages/GardenSuiteCostOntario
 const GardenSuitePermitsOntario = lazy(() => import('./pages/GardenSuitePermitsOntario'));
 const LanewaySuiteCostOntario = lazy(() => import('./pages/LanewaySuiteCostOntario'));
 const LanewaySuitePermitsOntario = lazy(() => import('./pages/LanewaySuitePermitsOntario'));
+/*
+ * The kitchen page. Same arrangement as the bathroom pair above:
+ * `KitchenRenovationsNext` is live, `KitchenRenovations` is the previous
+ * cost-guide build kept unrouted as the rollback. Do not delete it without
+ * saying so first.
+ */
 const KitchenRenovations = lazy(() => import('./pages/KitchenRenovations'));
+const KitchenRenovationsNext = lazy(() => import('./pages/KitchenRenovationsNext'));
 /*
  * The bathroom page.
  *
@@ -225,7 +232,7 @@ export default function App() {
             path="laneway-suite-permits-ontario"
             element={<LanewaySuitePermitsOntario />}
           />
-          <Route path="kitchen-renovations" element={<KitchenRenovations />} />
+          <Route path="kitchen-renovations" element={<KitchenRenovationsNext />} />
           <Route path="bathroom-renovations" element={<BathroomRenovationsNext />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-type MarqueePhoto = { src: string; alt: string };
+type MarqueePhoto = { src: string; alt: string; srcSet?: string };
 
 /**
  * A photo row that drifts continuously left, and never reaches an end.
@@ -27,10 +27,21 @@ type MarqueePhoto = { src: string; alt: string };
 export function PhotoMarquee({
   photos,
   speed = 22,
+  heading,
+  aspect = 'aspect-[3/4]',
+  tileWidth = 'w-[74vw] max-w-[300px]',
 }: {
   photos: MarqueePhoto[];
   /** Pixels per second. Slow enough to read as drift, not as a slideshow. */
   speed?: number;
+  heading: string;
+  /**
+   * Tile shape. Bathrooms are shot portrait and keep the 3:4 default; kitchens
+   * are wide rooms, and a 3:4 tile crops off the run of cabinetry the
+   * photograph exists to show.
+   */
+  aspect?: string;
+  tileWidth?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
@@ -90,7 +101,7 @@ export function PhotoMarquee({
       <div className="mx-auto flex max-w-7xl items-end justify-between gap-6 px-4 sm:px-6 lg:px-8">
         <div>
           <h2 className="text-2xl font-bold tracking-[-0.025em] text-slate-900">
-            More finished bathrooms
+            {heading}
           </h2>
           <p className="mt-2 text-sm text-slate-500">
             {photos.length} more completed projects.
@@ -134,16 +145,16 @@ export function PhotoMarquee({
           <figure
             key={`${photo.src}-${i}`}
             aria-hidden={i >= photos.length ? true : undefined}
-            className="m-0 w-[74vw] max-w-[300px] shrink-0 overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm"
+            className={`m-0 ${tileWidth} shrink-0 overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm`}
           >
             <img
               src={photo.src}
+              srcSet={photo.srcSet}
+              sizes="(min-width: 640px) 380px, 74vw"
               alt={i >= photos.length ? '' : photo.alt}
-              width={1080}
-              height={1440}
               loading="lazy"
               decoding="async"
-              className="aspect-[3/4] w-full object-cover"
+              className={`${aspect} w-full object-cover`}
             />
           </figure>
         ))}

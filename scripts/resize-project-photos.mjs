@@ -25,13 +25,16 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, dirname, basename, extname } from 'node:path';
 import sharp from 'sharp';
 
-const ROOTS = ['public/Bathroom'];
+const ROOTS = ['public/Bathroom', 'public/Kitchen'];
 
 /** Display widths. 1600 covers the lead frame on a 2x desktop; 800 the thumbs. */
 const WIDTHS = [800, 1600];
 
 /** Skip anything we generated on a previous run. */
 const VARIANT = /-(\d+)w\.webp$/;
+
+/** Already-built variants are left alone, so re-running is cheap and safe. */
+const { existsSync } = await import('node:fs');
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -57,6 +60,8 @@ for (const root of ROOTS) {
       if (meta.width <= width) continue;
 
       const out = join(dirname(file), `${stem}-${width}w.webp`);
+      if (existsSync(out)) continue;
+
       await sharp(file)
         .resize({ width, kernel: 'lanczos3', withoutEnlargement: true })
         .webp({ quality: 82, effort: 5 })
