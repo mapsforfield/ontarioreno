@@ -14,7 +14,17 @@ const GardenSuitePermitsOntario = lazy(() => import('./pages/GardenSuitePermitsO
 const LanewaySuiteCostOntario = lazy(() => import('./pages/LanewaySuiteCostOntario'));
 const LanewaySuitePermitsOntario = lazy(() => import('./pages/LanewaySuitePermitsOntario'));
 const KitchenRenovations = lazy(() => import('./pages/KitchenRenovations'));
+/*
+ * The bathroom page.
+ *
+ * `BathroomRenovationsNext` is the live one. `BathroomRenovations` is the
+ * previous cost-guide build, kept on disk deliberately: it is the rollback if
+ * the new page underperforms, and it is the only remaining record of the copy
+ * that page carried. It is no longer routed. Do not delete it without saying
+ * so first.
+ */
 const BathroomRenovations = lazy(() => import('./pages/BathroomRenovations'));
+const BathroomRenovationsNext = lazy(() => import('./pages/BathroomRenovationsNext'));
 const Costs = lazy(() => import('./pages/Costs'));
 const Match = lazy(() => import('./pages/Match'));
 const Cities = lazy(() => import('./pages/Cities'));
@@ -216,7 +226,7 @@ export default function App() {
             element={<LanewaySuitePermitsOntario />}
           />
           <Route path="kitchen-renovations" element={<KitchenRenovations />} />
-          <Route path="bathroom-renovations" element={<BathroomRenovations />} />
+          <Route path="bathroom-renovations" element={<BathroomRenovationsNext />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
           <Route path="cities" element={<Cities />} />

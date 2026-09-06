@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Preview — OntarioReno</title>
+<style>
+  /* A review harness, not a page. It loads the REAL routes at real viewport
+     widths, so what you see is the actual components at the actual
+     breakpoints. The desktop frame renders at a true 1440px and is scaled to
+     fit your screen with a transform — the layout still thinks it is 1440
+     wide, so nothing about the breakpoints is faked. Nothing here ships. */
+  :root{
+    --ink:#0f172a; --ink-2:#475569; --line:#e2e8f0; --blue:#1B3C6C;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 18px 38px rgba(15,23,42,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e8edf3;color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1560px;margin:0 auto;padding:24px 20px 70px}
+  h1{margin:0 0 6px;font-size:1.3rem;letter-spacing:-.02em}
+  .sub{margin:0 0 20px;color:var(--ink-2);font-size:.88rem;line-height:1.6;max-width:78ch}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .bar b{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-2);margin-right:2px}
+  button{border:1px solid var(--line);background:#fff;border-radius:.95rem;
+    padding:9px 15px;font:700 .8rem/1 inherit;color:var(--blue);cursor:pointer}
+  button[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:#fff}
+  .bars{display:flex;flex-direction:column;gap:10px;margin-bottom:26px}
+
+  .cap{margin:0 0 10px;font:800 .7rem/1 inherit;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--blue)}
+  section.block{margin-bottom:40px}
+  .hint{margin:10px 0 0;font-size:.76rem;color:var(--ink-2);line-height:1.55}
+
+  /* ---- desktop frame: real 1440, scaled to fit ---- */
+  .mac{background:#0f172a;border-radius:14px;padding:0;overflow:hidden;
+    box-shadow:var(--shadow);width:100%}
+  .chrome{height:34px;display:flex;align-items:center;gap:7px;padding:0 13px;background:#1e293b}
+  .chrome i{width:11px;height:11px;border-radius:50%;background:#475569;display:block}
+  .chrome span{margin-left:10px;font:600 .72rem/1 inherit;color:#94a3b8}
+  .viewport{position:relative;overflow:hidden;background:#f8fafc}
+  .viewport iframe{width:1440px;height:900px;border:0;display:block;
+    transform-origin:top left;background:#f8fafc}
+
+  /* ---- phones ---- */
+  .rack{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .phone{width:412px;height:844px;background:#0f172a;border-radius:44px;padding:11px;
+    box-shadow:var(--shadow);position:relative}
+  .phone::after{content:"";position:absolute;top:20px;left:50%;transform:translateX(-50%);
+    width:104px;height:22px;border-radius:99px;background:#0f172a;z-index:3}
+  .screen{width:100%;height:100%;border-radius:34px;overflow:hidden;background:#f8fafc;
+    display:flex;justify-content:center}
+  .screen iframe{width:390px;height:822px;border:0;display:block;background:#f8fafc}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Preview</h1>
+  <p class="sub">The real routes at real widths — desktop renders at a true 1440px (scaled to fit your screen, so the breakpoints are genuine), phones at 390&nbsp;&times;&nbsp;822. Scroll inside any frame. Use the buttons to change what each row is showing.</p>
+
+  <div class="bars">
+    <div class="bar">
+      <b>Desktop</b>
+      <button data-r="d" data-u="/bathroom-renovations-next" aria-pressed="true">Bathroom (new)</button>
+      <button data-r="d" data-u="/bathroom-renovations">Bathroom (live)</button>
+      <button data-r="d" data-u="/kitchen-renovations">Kitchen</button>
+      <button data-r="d" data-u="/basements">Basements</button>
+    </div>
+    <div class="bar">
+      <b>Left phone</b>
+      <button data-r="a" data-u="/bathroom-renovations-next" aria-pressed="true">Bathroom (new)</button>
+      <button data-r="a" data-u="/bathroom-renovations">Bathroom (live)</button>
+      <button data-r="a" data-u="/kitchen-renovations">Kitchen</button>
+      <button data-r="a" data-u="/basements">Basements</button>
+    </div>
+  </div>
+
+  <section class="block">
+    <p class="cap" id="capD">Desktop — 1440px — Bathroom (new)</p>
+    <div class="mac">
+      <div class="chrome"><i></i><i></i><i></i><span id="urlD">ontarioreno.ca/bathroom-renovations-next</span></div>
+      <div class="viewport" id="vp"><iframe id="d" src="/bathroom-renovations-next" title="Desktop preview"></iframe></div>
+    </div>
+    <p class="hint">Full 1440px layout: two-column dossiers with the photos sticky, the drawer opening as a side panel, and the arrow buttons on the photo row.</p>
+  </section>
+
+  <section class="block">
+    <p class="cap">Mobile — 390px</p>
+    <div class="rack">
+      <div>
+        <p class="hint" style="margin:0 0 8px" id="capA">Bathroom (new)</p>
+        <div class="phone"><div class="screen"><iframe id="a" src="/bathroom-renovations-next" title="Phone A"></iframe></div></div>
+      </div>
+      <div>
+        <p class="hint" style="margin:0 0 8px">Bathroom (live, for comparison)</p>
+        <div class="phone"><div class="screen"><iframe id="b" src="/bathroom-renovations" title="Phone B"></iframe></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  var LABEL = {
+    '/bathroom-renovations-next': 'Bathroom (new)',
+    '/bathroom-renovations': 'Bathroom (live)',
+    '/kitchen-renovations': 'Kitchen',
+    '/basements': 'Basements'
+  };
+
+  /* Scale the 1440px desktop frame down to whatever room the page has, and
+     shrink its container to match so there is no dead space beneath it. */
+  function fitDesktop() {
+    var vp = document.getElementById('vp');
+    var scale = Math.min(1, vp.clientWidth / 1440);
+    var f = document.getElementById('d');
+    f.style.transform = 'scale(' + scale + ')';
+    vp.style.height = Math.round(900 * scale) + 'px';
+  }
+  window.addEventListener('resize', fitDesktop);
+  fitDesktop();
+
+  document.querySelectorAll('button[data-r]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var row = btn.getAttribute('data-r');
+      var url = btn.getAttribute('data-u');
+      document.getElementById(row === 'd' ? 'd' : 'a').src = url;
+      if (row === 'd') {
+        document.getElementById('capD').textContent = 'Desktop — 1440px — ' + (LABEL[url] || url);
+        document.getElementById('urlD').textContent = 'ontarioreno.ca' + url;
+        fitDesktop();
+      } else {
+        document.getElementById('capA').textContent = LABEL[url] || url;
+      }
+      document.querySelectorAll('button[data-r="' + row + '"]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b === btn);
+      });
+    });
+  });
+</script>
+</body>
+</html>
