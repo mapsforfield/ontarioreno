@@ -3145,6 +3145,21 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             actionLabel = `Internal notes updated for ${entityLabel}`;
           }
 
+          // Closing an open "wants to move" request is its own line in the
+          // history, not a generic edit: the amber flag coming down is the one
+          // visible thing that changed, and a rep looking back needs to see who
+          // decided it was handled. The server writes the same row when the
+          // flag is cleared by a status or date change instead.
+          if (
+            previousAppointment &&
+            nextAppointment &&
+            previousAppointment.smsReplyStatus === 'reschedule_requested' &&
+            nextAppointment.smsReplyStatus !== 'reschedule_requested'
+          ) {
+            actionType = 'consultation_reschedule_request_resolved';
+            actionLabel = `Reschedule request resolved for ${entityLabel}`;
+          }
+
           if (
             previousAppointment &&
             nextAppointment &&

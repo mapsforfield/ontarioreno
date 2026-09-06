@@ -49,38 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data,
     });
 
-    // A flag that changes with nothing in the history explaining it is worse
-    // than one that does not change at all — the same rule the inbound handler
-    // follows when a homeowner's text moves the status. Here the actor is the
-    // real, signed-in rep, which is also what Activity's foreign key on
-    // actorUserId requires.
-    if (rescheduleResolved) {
-      const label = appointment.customerName || appointment.title || 'Consultation';
-      await prisma.activity
-        .create({
-          data: {
-            actorUserId: user.id,
-            actorName: user.name,
-            actorRole: user.role,
-            actionType: 'consultation_reschedule_request_resolved',
-            actionLabel: `Reschedule request resolved for ${label}`,
-            entityType: 'appointment',
-            entityId: appointment.id,
-            entityLabel: label,
-            dealId: appointment.dealId || undefined,
-            metadata: {
-              repliedWith: before?.smsReplyBody ?? '',
-              repliedAt: before?.smsReplyAt ?? null,
-              status: appointment.status,
-              appointmentDate: appointment.appointmentDate,
-              appointmentTime: appointment.appointmentTime,
-            },
-          },
-        })
-        .catch((err: unknown) =>
-          console.error('[appointments/patch] could not log reschedule resolution:', err)
-        );
-    }
+    // The Activity row for this is written by the portal store, which already
+    // logs every rep edit and can label the resolution the moment it happens —
+    // see updateAppointment() in src/portal/data/store.tsx. Writing one here
+    // too would put two rows in the history for one decision.
 
     // ── Notes sync: propagate a note edit to the linked deal and client ──
     if (data.internalNotes !== undefined || data.notes !== undefined) {
