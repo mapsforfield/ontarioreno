@@ -6,6 +6,7 @@ import { CostDrawer } from '../components/project/CostDrawer';
 import { PhotoMarquee } from '../components/project/PhotoMarquee';
 import { ProjectDossierCompact } from '../components/project/ProjectDossierCompact';
 import { BATHROOM_PROJECTS } from '../data/projects/bathroom';
+import { BATHROOM_COST_TABS } from '../data/projects/costContent';
 
 /**
  * The bathroom page, served at /bathroom-renovations.
@@ -213,7 +214,7 @@ export default function BathroomRenovationsNext() {
               drift stops the moment anyone touches, hovers or tabs into it.
               See PhotoMarquee for the seamless-loop mechanics. ---- */}
       <section className="border-t border-slate-200/80 bg-white py-12 lg:py-16">
-        <PhotoMarquee photos={MORE_PHOTOS} />
+        <PhotoMarquee photos={MORE_PHOTOS} heading="More finished bathrooms" />
       </section>
 
       {/* ---- Costs again, at the bottom.
@@ -293,6 +294,7 @@ export default function BathroomRenovationsNext() {
         open={costsOpen}
         onClose={() => setCostsOpen(false)}
         openerRef={costsButtonRef}
+        tabs={BATHROOM_COST_TABS}
       />
     </div>
   );
