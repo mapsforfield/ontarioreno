@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { mergeNotes } from '../../lib/consultation-notes.js';
+import { resolvesRescheduleRequest } from '../../lib/sms-reply-resolution.js';
 import {
   reminderContextFor,
   resyncAppointmentReminders,
@@ -32,10 +33,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Fetch before-state so we can detect what changed
     const before = await prisma.appointment.findUnique({ where: { id } });
 
+    // ── Take the "Wants to move" chip down once a rep has answered it ──
+    // See lib/sms-reply-resolution.ts. The chip is driven by smsReplyStatus,
+    // which is deliberately not the booking's `status` — but nothing used to
+    // clear it either, so a rep who phoned the homeowner, settled it and set
+    // the status by hand kept the amber badge forever. This runs server-side so
+    // it holds for every surface that saves an appointment, not just the
+    // details panel. Only the open-work flag comes down: smsReplyBody and
+    // smsReplyAt stay, because what the homeowner wrote is history.
+    const rescheduleResolved = resolvesRescheduleRequest(before, data);
+    if (rescheduleResolved) data.smsReplyStatus = '';
+
     const appointment = await prisma.appointment.update({
       where: { id },
       data,
     });
+
+    // A flag that changes with nothing in the history explaining it is worse
+    // than one that does not change at all — the same rule the inbound handler
+    // follows when a homeowner's text moves the status. Here the actor is the
+    // real, signed-in rep, which is also what Activity's foreign key on
+    // actorUserId requires.
+    if (rescheduleResolved) {
+      const label = appointment.customerName || appointment.title || 'Consultation';
+      await prisma.activity
+        .create({
+          data: {
+            actorUserId: user.id,
+            actorName: user.name,
+            actorRole: user.role,
+            actionType: 'consultation_reschedule_request_resolved',
+            actionLabel: `Reschedule request resolved for ${label}`,
+            entityType: 'appointment',
+            entityId: appointment.id,
+            entityLabel: label,
+            dealId: appointment.dealId || undefined,
+            metadata: {
+              repliedWith: before?.smsReplyBody ?? '',
+              repliedAt: before?.smsReplyAt ?? null,
+              status: appointment.status,
+              appointmentDate: appointment.appointmentDate,
+              appointmentTime: appointment.appointmentTime,
+            },
+          },
+        })
+        .catch((err: unknown) =>
+          console.error('[appointments/patch] could not log reschedule resolution:', err)
+        );
+    }
 
     // ── Notes sync: propagate a note edit to the linked deal and client ──
     if (data.internalNotes !== undefined || data.notes !== undefined) {
