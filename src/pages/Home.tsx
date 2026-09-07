@@ -232,6 +232,126 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Financing first, then the hubs.
+
+          Both of these sit above the fold-adjacent fold for a reason, and
+          this is the order that reflects how a homeowner actually decides.
+          "Can I afford this at all?" comes before "which room?" — someone
+          who has quietly written the project off on price never gets as far
+          as picking a trade. The monthly figure is the thing most likely to
+          keep them on the page.
+
+          The figure itself is governed: see the note inside the band. */}
+      {/* The number IS the section — compactly.
+
+          Five versions preceded this. The first three fixed the CONTAINER
+          rather than the content: a dark card floating on white (which read as
+          a rendering fault, since its gradient started at the hero's exact
+          colour with a white strip between them), a plain white band (three
+          tonal grounds in a row), then a dark band flush with the hero
+          (structurally right, still mostly empty).
+
+          The content fix was making the FIGURE the subject — it had been buried
+          mid-sentence at body size. The last fix is size: at 120px type and
+          16-unit padding the block ran 798px tall for a number, a sentence, a
+          button and three facts. It now runs about half that. The figure is
+          still the largest thing in it, which is all the emphasis it needed;
+          the rest was padding pretending to be design.
+
+          Two columns are explicit rather than space-between, which is what left
+          a dead void down the middle at 1440px.
+
+          $399 is the same figure as BASEMENT_FINANCING_PROGRAM.displayAmountLabel
+          in lib/program-config.ts and the closed-grant pages' offer: never a
+          quoted price, always on approved credit. The qualifier reads "Starting
+          from" rather than the "from about" used by displayAmountLabel and the
+          closed-grant pages. Both say the same thing — it is a FLOOR — and
+          lib/consultation-routing.test.ts still enforces "from about" plus "on
+          approved credit" on the consultation labels, which are untouched. */}
+      <section className="bg-slate-50 px-4 py-12 sm:px-6 lg:px-8 lg:py-14">
+        {/* A hairline, not a card. No shadow, deliberately — a shadow is what
+            made an earlier version float off the page. */}
+        <div className="mx-auto max-w-7xl rounded-[1.25rem] border border-[#1B3C6C]/20 bg-white px-6 py-8 sm:px-8 lg:px-10 lg:py-9">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+            Renovation financing
+          </p>
+
+          <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-14">
+            <div>
+              {/* THE QUALIFIER STAYS WELDED TO THE FIGURE. A bare "$399/month"
+                  set large is a quoted price, and the consultant is the one who
+                  has to walk it back. The sentence runs continuously across the
+                  size change, so the floor is stated before the reader reaches
+                  the number. */}
+              <p className="text-base font-semibold text-slate-500">Starting from</p>
+              <p className="mt-0.5 flex items-baseline gap-2.5">
+                <span className="text-[3.5rem] font-bold leading-[0.9] tracking-[-0.045em] text-[#1B3C6C] sm:text-[4.25rem] lg:text-[5rem]">
+                  $399
+                </span>
+                <span className="text-lg font-semibold text-slate-500">/month</span>
+              </p>
+              <h2 className="mt-3 max-w-[28ch] text-xl font-bold leading-[1.25] tracking-[-0.02em] text-slate-900 sm:text-2xl">
+                for a finished basement, financed in full
+              </h2>
+            </div>
+
+            <div>
+              <p className="max-w-[42ch] text-base leading-7 text-slate-600">
+                Nothing is paid upfront. It is an open loan — pay it down or clear
+                it whenever you want, with no penalty and no lien on your home.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-5">
+                <Link
+                  to="/consultation/basement"
+                  data-analytics="financing-cta"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-3.5 font-bold text-white shadow-sm transition-colors hover:bg-[#16325a]"
+                >
+                  See my monthly payment
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                {/* Both financing routes stay reachable — demoted to links, not
+                    removed. One filled button per section. */}
+                <Link
+                  to="/open-loan-financing"
+                  className="text-sm font-semibold text-[#1B3C6C] underline underline-offset-4 hover:text-[#16325a]"
+                >
+                  Open Loan financing
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* The terms as three facts on a rule, not a boxed widget. The panel
+              this replaced repeated the paragraph beside it almost word for
+              word, on a wash that was invisible against its own background. */}
+          <dl className="mt-8 grid gap-x-10 gap-y-4 border-t border-[#1B3C6C]/15 pt-6 sm:grid-cols-3">
+            {[
+              ['Due upfront', '$0'],
+              ['Loan type', 'Open — repay early, no penalty'],
+              ['Secured against your home', 'No lien'],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  {label}
+                </dt>
+                <dd className="mt-1 text-base font-bold text-slate-900">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="mt-6 text-sm text-slate-500">
+            On approved credit.{' '}
+            <Link
+              to="/financing"
+              className="font-semibold text-[#1B3C6C] underline underline-offset-4"
+            >
+              View all financing options
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
+
       {/* Moved directly under the hero.
 
           This section routes a homeowner to the trade they came for, and it
@@ -496,85 +616,6 @@ export default function Home() {
                 <h3 className="text-xl font-bold text-slate-900 mb-3">Project Review & Next-Step Guidance</h3>
                 <p className="text-slate-600 leading-relaxed">
                   Get project guidance, understand your next steps, and move forward with the right renovation path.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-[2.15rem] border border-slate-900/10 bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] shadow-[0_28px_80px_rgba(15,23,42,0.20)]">
-            <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_360px]">
-              <div className="px-8 py-10 text-white md:px-10 md:py-12">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-4 py-2 text-sm font-semibold text-blue-200">
-                  <Calculator className="h-4 w-4" />
-                  Renovation financing
-                </div>
-                {/* The number, not just the idea of the number.
-                    This section used to ask "need a clearer path to monthly
-                    financing?" and answer it with two guide pages — a reader
-                    could leave the homepage without ever seeing what a basement
-                    actually costs a month. $399 is the same figure as
-                    BASEMENT_FINANCING_PROGRAM.displayAmountLabel in
-                    lib/program-config.ts and the closed-grant pages' offer:
-                    "from about", never a quoted price, always on approved
-                    credit. Change it in all three or in none. */}
-                <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
-                  A basement from about $399 a month.
-                </h2>
-                <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-                  The full cost of the build is financed, so there is nothing to
-                  pay upfront. It is an open loan: pay it down or pay it off
-                  whenever you want, with no penalty and no lien on your home.
-                </p>
-                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                  <Link
-                    to="/consultation/basement"
-                    className={buttonStyles.primary}
-                  >
-                    See my monthly payment <ArrowRight className="w-5 h-5" />
-                  </Link>
-                  <Link
-                    to="/open-loan-financing"
-                    className={buttonStyles.ghostDark}
-                  >
-                    Explore Open Loan Financing
-                  </Link>
-                </div>
-                {/* /financing kept reachable — demoted, not removed. */}
-                <p className="mt-5 text-sm text-slate-400">
-                  On approved credit.{' '}
-                  <Link
-                    to="/financing"
-                    className="font-semibold text-blue-200 underline-offset-4 hover:underline"
-                  >
-                    View all financing options
-                  </Link>
-                  .
-                </p>
-              </div>
-
-              <div className="border-t border-white/10 bg-white/6 px-8 py-10 text-white backdrop-blur-sm md:px-10 lg:border-l lg:border-t-0">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
-                  Why it matters
-                </p>
-                <div className="mt-6 space-y-4">
-                  {[
-                    'Nothing owed upfront — the build is financed in full',
-                    'Open loan: pay it off early, no penalty, no lien on your home',
-                    'See the monthly lens before ruling a project out',
-                  ].map((item) => (
-                    <div key={item} className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 w-5 h-5 shrink-0 text-blue-200" />
-                      <p className="text-sm leading-7 text-slate-200">{item}</p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-6 text-sm leading-7 text-slate-300">
-                  This is the easiest way to understand whether financing changes
-                  what feels realistic for your renovation.
                 </p>
               </div>
             </div>
