@@ -1289,21 +1289,43 @@ export type GeographyInput = {
  * municipal boundary. So the area becomes ONTARIO and an address that was only
  * unverified BECAUSE of the unmapped municipality is promoted to verified.
  *
+ * A program that BOOKS WITHOUT A VERIFIED ADDRESS goes one step further: an
+ * address we could not parse at all still keeps the ONTARIO area. That looks
+ * like a loosening and is really the same rule stated honestly — an Ontario-wide
+ * offer's area was never derived from the address, so failing to read the
+ * address cannot tell us the area is unknown. Withholding it did not express
+ * doubt about geography; it just took the calendar away.
+ *
+ * Two real homeowners paid for that gap. Both reached the calendar-early flow,
+ * chose a day and a time, typed their address in their own words, and were told
+ * a specialist would call them instead — the exact person that flow exists to
+ * keep. Their leads read MANUAL_REVIEW / MUNICIPALITY_UNRECOGNISED with the
+ * cause INCOMPLETE_ADDRESS.
+ *
+ * The address is still not trusted: the state stays as it came, the lead is
+ * still flagged for review, and a rep still confirms where they are going. What
+ * changes is only whether the booking survives.
+ *
  * What it deliberately does not do:
- *   - rescue an address outside Ontario. That decline is still a decline.
- *   - rescue an incomplete address, ambiguous typed text, or a provider outage.
- *     Those are doubt about the ADDRESS, which no program's geography can fix.
+ *   - rescue an address outside Ontario. That decline is still a decline, and it
+ *     is checked before any of this.
+ *   - rescue an unparseable address for any program that has not opted in. A
+ *     grant is gated on the municipality, so there the doubt is real.
  *   - upgrade ADDRESS_INFERRED to ADDRESS_VERIFIED. Inferred is already
  *     schedulable and the weaker provenance stays on the record.
  */
 export function resolveProgramGeography(
-  program: Pick<ProgramConfig, 'geography'>,
+  program: Pick<ProgramConfig, 'geography' | 'booksWithoutVerifiedAddress'>,
   resolved: GeographyInput
 ): { area: SchedulingArea | null; addressState: AddressState } {
   const { area, addressState, cause } = resolved;
   if (program.geography !== 'ontario_wide') return { area, addressState };
   if (addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') return { area, addressState };
-  if (!ADDRESS_USABLE_CAUSES.has(cause)) return { area, addressState };
+  // An unreadable address keeps the area only where the program has said a
+  // booking may survive one. Everywhere else this is still doubt.
+  if (!ADDRESS_USABLE_CAUSES.has(cause) && !program.booksWithoutVerifiedAddress) {
+    return { area, addressState };
+  }
 
   return {
     area: 'ONTARIO',
