@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
+import { CostGuideCapture } from '../components/CostGuideCapture';
 
 export default function Costs() {
   const [revealPosition, setRevealPosition] = useState(58);
@@ -39,7 +40,16 @@ export default function Costs() {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen py-10 md:py-14">
+    /* A fragment, not a single padded wrapper.
+
+       The page body keeps its own padding; the cost-guide band below is a
+       full-bleed section and must NOT live inside that padding. When it did,
+       the band's top edge butted straight into the "Start Project Review"
+       button with no breathing room, and its bottom left a 56px strip of
+       page background stranded between the band and the footer. Both were the
+       same mistake: a full-width band rendered as if it were content. */
+    <>
+      <div className="bg-slate-50 min-h-screen pt-10 md:pt-14 pb-20 md:pb-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero */}
         <section className="mx-auto mb-16 max-w-[1320px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -641,8 +651,25 @@ export default function Costs() {
           >
             Start Project Review <ArrowRight className="w-5 h-5 ml-2" />
           </Link>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* The cost guide, on the page that is the reason to want it.
+
+          This page walks a homeowner through cost tables for every room and
+          never once offered them the PDF that collects it — while the home
+          page, where a visitor is far less committed, offered it twice. The
+          most qualified reader on the site was the only one not asked.
+
+          Same component as the home page, deliberately: it owns a Turnstile
+          widget, a honeypot, a minimum-fill-time check and the POST, and a
+          second copy of that would drift into a silently broken form.
+
+          It sits OUTSIDE the padded page body above, so it runs edge to edge
+          and closes the page flush against the footer — the same way it does
+          on the home page. */}
+      <CostGuideCapture />
+    </>
   );
 }
