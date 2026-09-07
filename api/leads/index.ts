@@ -772,7 +772,24 @@ async function handleCollection(
           bookedVia: 'portal_admin',
           createdByUserId: user.id,
         });
-        if (!result.ok) return res.status(result.status).json(result.payload);
+        if (!result.ok) {
+        // The homeowner chose a day and a time and did not get them.
+        //
+        // Until this flag existed, that lead sat in the list looking like any
+        // other — DIRECT_CALENDAR, no appointment, nothing saying anyone should
+        // ring. One of them was found four days later only because somebody
+        // went looking, and by then he had been waiting since the evening he
+        // picked his slot. A booking that fails is the strongest call-back
+        // signal we get: they were ready.
+        //
+        // Best-effort, and deliberately after the response is decided — the
+        // homeowner still gets the alternatives, whatever the flag does.
+        await withTables(() =>
+          prisma.lead.update({ where: { id: lead.id }, data: { needsReview: true } })
+        ).catch((err) => console.error('[flow/book] could not flag the failed booking:', err));
+        await ringDoorbell().catch(() => null);
+        return res.status(result.status).json(result.payload);
+      }
 
         // Only drains when something was queued, so the silent path stays silent.
         if (data.notify === true) await drainOutbox().catch(() => null);
@@ -2875,6 +2892,11 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
       });
     } catch (err) {
       console.error('[flow/book] failed:', err);
+      // Same reasoning as the handled failure above: a booking that threw is
+      // still a homeowner who picked a time and did not get it.
+      await withTables(() =>
+        prisma.lead.update({ where: { id: lead.id }, data: { needsReview: true } })
+      ).catch(() => null);
       return res.status(500).json({ error: 'We could not complete the booking. Please try again.' });
     }
   }
