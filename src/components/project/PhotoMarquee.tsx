@@ -30,11 +30,20 @@ export function PhotoMarquee({
   heading,
   aspect = 'aspect-[3/4]',
   tileWidth = 'w-[74vw] max-w-[300px]',
+  captionFor,
 }: {
   photos: MarqueePhoto[];
   /** Pixels per second. Slow enough to read as drift, not as a slideshow. */
   speed?: number;
   heading: string;
+  /**
+   * Optional label under each tile, e.g. "Kitchen · Durham Region".
+   *
+   * The hub pages pass nothing: there, every tile is the same room and
+   * captioning it four times says nothing. The home page passes one, because
+   * there the mix of rooms and regions IS the message.
+   */
+  captionFor?: (photo: MarqueePhoto) => string | null;
   /**
    * Tile shape. Bathrooms are shot portrait and keep the 3:4 default; kitchens
    * are wide rooms, and a 3:4 tile crops off the run of cabinetry the
@@ -141,24 +150,35 @@ export function PhotoMarquee({
            back onto a tile edge every frame. */
         className="mt-8 flex gap-5 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {loop.map((photo, i) => (
+        {loop.map((photo, i) => {
+          const caption = captionFor ? captionFor(photo) : null;
+          return (
           <figure
             key={`${photo.src}-${i}`}
             aria-hidden={i >= photos.length ? true : undefined}
-            className={`m-0 ${tileWidth} shrink-0 overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm`}
+            className={`m-0 ${tileWidth} shrink-0`}
           >
-            <img
-              src={photo.src}
-              srcSet={photo.srcSet}
-              sizes="(min-width: 640px) 380px, 74vw"
-              alt={i >= photos.length ? '' : photo.alt}
-              loading="lazy"
-              decoding="async"
-              className={`${aspect} w-full object-cover`}
-            />
+            <div className="overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm">
+              <img
+                src={photo.src}
+                srcSet={photo.srcSet}
+                sizes="(min-width: 640px) 380px, 74vw"
+                alt={i >= photos.length ? '' : photo.alt}
+                loading="lazy"
+                decoding="async"
+                className={`${aspect} w-full object-cover`}
+              />
+            </div>
+            {caption ? (
+              <figcaption className="mt-3 text-sm font-medium text-slate-600">
+                {caption}
+              </figcaption>
+            ) : null}
           </figure>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
+

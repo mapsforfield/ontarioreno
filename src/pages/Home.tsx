@@ -17,6 +17,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import CitySelectorSection from '../components/CitySelectorSection';
+import { HUB_CARDS } from '../data/projects/showcase';
 import { buttonStyles } from '../lib/uiStyles';
 import {
   BASEMENT_FINANCING_OFFER,
@@ -561,6 +562,81 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Moved directly under the hero.
+
+          This section routes a homeowner to the trade they came for, and it
+          used to sit fifth — below the mistakes band, the grant programs,
+          the trust section and the financing band. Someone arriving from an
+          ad for a bathroom had to scroll past four unrelated pitches before
+          the page acknowledged bathrooms existed. Now that the cards carry
+          the work rather than a coloured icon, they earn the position. */}
+      <section className="py-24 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Explore Our Renovation Hubs</h2>
+            <p className="text-lg text-slate-600">
+              Comprehensive guides, cost breakdowns, and expert advice for Ontario&apos;s most popular home improvement projects.
+            </p>
+            {/* A Hamilton-only line used to sit here, pointing at the
+                Hamilton basement cost guide. It made sense when the Hamilton
+                secondary-suite grant was the reason people came — it is not
+                any more; that program is closed (see CURATED_PAGES in
+                lib/grants.ts). Anchoring the home page's only routing section
+                on one city singled out a minority of visitors and said nothing
+                to the rest.
+
+                The Hamilton cost guide is NOT orphaned by this: it is still
+                linked from lib/cities.ts (the city selector below), from
+                HamiltonGrant.tsx, and it is in the sitemap. */}
+          </div>
+
+          {/* Photo cards, not icon cards.
+
+              This section's whole job is routing a homeowner to the trade they
+              came for, and until now it did that with four coloured squares
+              while the four pages it links to each open with real work. The
+              photograph IS the routing signal — someone planning a bathroom
+              recognises theirs instantly.
+
+              Nothing else in the section changed: same four links, same
+              titles, same body copy, same order. */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {HUB_CARDS.map((hub) => (
+              <Link
+                key={hub.to}
+                to={hub.to}
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all hover:shadow-xl"
+              >
+                <div className="relative overflow-hidden bg-slate-200">
+                  <img
+                    src={hub.photo.src}
+                    srcSet={hub.photo.srcSet}
+                    sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 100vw"
+                    alt={hub.photo.alt}
+                    loading="lazy"
+                    decoding="async"
+                    className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                  />
+                  {/* Region, not a town — same privacy rule as the hub pages. */}
+                  <span className="absolute bottom-3 left-3 rounded-full bg-slate-900/75 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.06em] text-white">
+                    {hub.photo.region}
+                  </span>
+                </div>
+
+                <div className="flex flex-1 flex-col p-6">
+                  <h3 className="text-xl font-bold text-slate-900">{hub.title}</h3>
+                  <p className="mt-2 flex-grow text-sm text-slate-600">{hub.body}</p>
+                  <div className="mt-6 flex items-center text-sm font-semibold text-[#1B3C6C]">
+                    Explore Hub
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="border-b border-slate-100 bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-12 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-16">
@@ -832,82 +908,6 @@ export default function Home() {
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Renovation Categories */}
-      <section className="py-24 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Explore Our Renovation Hubs</h2>
-            <p className="text-lg text-slate-600">
-              Comprehensive guides, cost breakdowns, and expert advice for Ontario&apos;s most popular home improvement projects.
-            </p>
-            <p className="mt-4 text-base text-slate-600">
-              If you are planning in Hamilton, start with our{' '}
-              <Link
-                to="/basement-renovation-cost-hamilton"
-                className="font-semibold underline underline-offset-4"
-              >
-                basement renovation cost in Hamilton
-              </Link>{' '}
-              guide for a faster pricing reality check.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Link to="/basements" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
-                <HomeIcon className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Basement Finishing</h3>
-              <p className="text-slate-600 text-sm mb-6 flex-grow">
-                From framing to flooring, understand the costs and process of finishing your Ontario basement.
-              </p>
-              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
-                Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-
-            <Link to="/legal-suites" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Legal Secondary Suites</h3>
-              <p className="text-slate-600 text-sm mb-6 flex-grow">
-                Navigate zoning, fire separation, and municipal requirements to build a legal income suite.
-              </p>
-              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
-                Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-
-            <Link to="/kitchen-renovations" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
-                <PaintBucket className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Kitchen Renovations</h3>
-              <p className="text-slate-600 text-sm mb-6 flex-grow">
-                Real pricing for cabinets, countertops, and layout changes across Ontario kitchens.
-              </p>
-              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
-                Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-
-            <Link to="/bathroom-renovations" className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#1B3C6C] group-hover:text-white transition-colors">
-                <Bath className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Bathroom Renovations</h3>
-              <p className="text-slate-600 text-sm mb-6 flex-grow">
-                Waterproofing, plumbing, and tile costs explained before you start your project.
-              </p>
-              <div className="flex items-center text-[#1B3C6C] font-semibold text-sm mt-auto">
-                Explore Hub <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
           </div>
         </div>
       </section>
