@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -9,8 +10,20 @@ import {
   Hammer,
 } from 'lucide-react';
 import { BookConsultationBand, BookConsultationButton } from '../components/BookConsultationCta';
+import { CostDrawer } from '../components/project/CostDrawer';
+import { ProjectDossierCompact } from '../components/project/ProjectDossierCompact';
+import { PhotoMarquee } from '../components/project/PhotoMarquee';
+import {
+  SEPARATE_ENTRANCE,
+  SUITE_MORE_PHOTOS,
+  SUITE_PROJECTS,
+  SUITE_TRANSFORMATION,
+} from '../data/projects/suites';
+import { BASEMENT_COST_TABS } from '../data/projects/costContent';
 
 export default function LegalSuites() {
+  const [costsOpen, setCostsOpen] = useState(false);
+
   return (
     <div className="bg-slate-50 min-h-screen">
       {/* Hero */}
@@ -57,6 +70,156 @@ export default function LegalSuites() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ---- Suite work, added to a page that previously had no photographs.
+
+              ADDITIVE: everything below this block is untouched. The four
+              pillars, the cost table, the drivers and the permits section are
+              why this page ranks and why a homeowner trusts it. They stay.
+              This sits above them because the page was asking people to
+              believe a description of work they had never been shown.
+
+              ON THE WORD "LEGAL", WHICH IS THE WHOLE POINT OF THIS PAGE.
+              A photograph can show an excavated entrance, an exit sign or a
+              fire-rated door. It cannot show a permit, and legal status is a
+              municipal decision made after inspection. So these sections name
+              what was BUILT, and say plainly that approval comes from the
+              municipality. On a page that warns homeowners about illegal
+              apartments, implying otherwise would be the one unforgivable
+              thing to get wrong. ---- */}
+
+      {/* The separate entrance gets its own section. It is the piece
+          homeowners least expect, the biggest single line on this page's own
+          cost table, and the only part of a suite involving excavation,
+          concrete and drainage — none of which is visible once the door is
+          hung. */}
+      <section className="border-t border-slate-200/80 bg-slate-50 px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+                The part nobody pictures
+              </p>
+              <h2 className="mt-4 max-w-[18ch] text-2xl font-bold leading-tight tracking-[-0.025em] text-slate-900 md:text-3xl">
+                A suite usually needs its own way in
+              </h2>
+            </div>
+            <div className="space-y-4 text-base leading-8 text-slate-600">
+              <p>
+                Most basements were never built to be entered from outside.
+                Giving a suite its own entrance means excavating beside the
+                house, pouring retaining walls, cutting an opening through the
+                foundation, and draining the well so it never holds water.
+              </p>
+              <p>
+                It is the single largest line on the cost table below — and the
+                one homeowners are most often surprised by, because by the time
+                anyone sees the finished suite it just looks like a door.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            {SEPARATE_ENTRANCE.map((photo, i) => (
+              <figure
+                key={photo.src}
+                className="m-0 overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm"
+              >
+                <img
+                  src={photo.src}
+                  srcSet={photo.srcSet}
+                  sizes="(min-width: 640px) 30vw, 100vw"
+                  alt={photo.alt}
+                  width={photo.width}
+                  height={photo.height}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  className="aspect-[4/3] w-full object-cover"
+                />
+              </figure>
+            ))}
+          </div>
+          <p className="mt-4 text-sm text-slate-500">
+            Three separate entrances: the excavated well, the finished
+            stairwell, and the door a tenant actually uses.
+          </p>
+        </div>
+      </section>
+
+      {/* The progression composite. The closest thing the site has to the
+          "beneath the surface" layer every other room page was built around
+          and has never been able to fill — and on this page it carries more
+          weight than any finished room, because the argument is precisely that
+          the expensive work happens before anyone sees the space. */}
+      <section className="border-t border-slate-200/80 bg-white px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+            Start to finish
+          </p>
+          <h2 className="mt-4 max-w-[22ch] text-2xl font-bold leading-tight tracking-[-0.025em] text-slate-900 md:text-3xl">
+            Most of the build is over before it starts to look like anything
+          </h2>
+          <figure className="m-0 mt-8 overflow-hidden rounded-[1.35rem] bg-slate-200 shadow-sm">
+            <img
+              src={SUITE_TRANSFORMATION.src}
+              srcSet={SUITE_TRANSFORMATION.srcSet}
+              sizes="(min-width: 1024px) 80rem, 100vw"
+              alt={SUITE_TRANSFORMATION.alt}
+              width={SUITE_TRANSFORMATION.width}
+              height={SUITE_TRANSFORMATION.height}
+              loading="lazy"
+              decoding="async"
+              className="w-full object-cover"
+            />
+          </figure>
+          <p className="mt-4 max-w-[70ch] text-sm leading-7 text-slate-500">
+            The same room at four stages — framing and taping, flooring, trim,
+            finished. Fire separation, egress and mechanical work all happen in
+            the first frame, and none of it can be inspected once the drywall
+            is closed up.
+          </p>
+        </div>
+      </section>
+
+      {/* The dossiers. */}
+      <section className="border-t border-slate-200/80 bg-slate-50 px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">
+            Recent work
+          </p>
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.025em] text-slate-900 md:text-3xl">
+            What a suite build actually looks like
+          </h2>
+          <p className="mt-4 max-w-[68ch] text-base leading-8 text-slate-600">
+            Completed through OntarioReno by vetted contractors. The
+            photographs show what was built — the approval itself comes from
+            your municipality after inspection, which is what the guide below
+            walks through.
+          </p>
+
+          <div className="mt-10 space-y-10 sm:space-y-14">
+            {SUITE_PROJECTS.map((project, i) => (
+              <ProjectDossierCompact
+                key={project.slug}
+                project={project}
+                index={i}
+                accent="emerald"
+                costsLabel="What a suite costs"
+                onOpenCosts={() => setCostsOpen(true)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-slate-200/80 bg-white py-12 lg:py-16">
+        <PhotoMarquee
+          photos={SUITE_MORE_PHOTOS}
+          heading="More finished suites"
+          aspect="aspect-[4/3]"
+          tileWidth="w-[80vw] max-w-[380px]"
+        />
       </section>
 
       {/* Main Content */}
@@ -456,6 +619,12 @@ export default function LegalSuites() {
           </div>
         </div>
       </section>
+
+      <CostDrawer
+        open={costsOpen}
+        onClose={() => setCostsOpen(false)}
+        tabs={BASEMENT_COST_TABS}
+      />
 
       <BookConsultationBand
         slug="basement"

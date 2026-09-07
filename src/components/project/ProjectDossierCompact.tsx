@@ -28,18 +28,44 @@ import { ProjectPhotos } from './ProjectPhotos';
  * THERE IS NO PRICE ROW. Pricing happens in the home with the room measured;
  * see the note in data/projects/types.ts.
  */
+/**
+ * Accent, so a dossier sits inside its page's own palette rather than dragging
+ * navy onto a page built in green. Matches the accents BookConsultationCta
+ * already offers.
+ */
+const ACCENT = {
+  blue: {
+    label: 'text-[#1B3C6C]',
+    check: 'text-[#1B3C6C]',
+    cta: 'bg-[#1B3C6C] hover:bg-[#16325a]',
+    ghost: 'text-[#1B3C6C]',
+  },
+  emerald: {
+    label: 'text-emerald-800',
+    check: 'text-emerald-600',
+    cta: 'bg-emerald-700 hover:bg-emerald-600',
+    ghost: 'text-emerald-800',
+  },
+} as const;
+
 export function ProjectDossierCompact({
   project,
   index,
   eager = false,
   onOpenCosts,
+  accent = 'blue',
+  costsLabel = 'What it costs',
 }: {
   project: Project;
   index: number;
   /** True for the first dossier only — it is near the top of the page. */
   eager?: boolean;
   onOpenCosts: () => void;
+  accent?: keyof typeof ACCENT;
+  /** The secondary button's label, where a page calls its costs something else. */
+  costsLabel?: string;
 }) {
+  const a = ACCENT[accent];
   return (
     <article
       id={project.slug}
@@ -59,7 +85,7 @@ export function ProjectDossierCompact({
 
         {/* ---- The detail column ---- */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+          <p className={`text-xs font-bold uppercase tracking-[0.18em] ${a.label}`}>
             Project {String(index + 1).padStart(2, '0')}
           </p>
           <h3 className="mt-3 text-xl font-bold tracking-[-0.02em] text-slate-900 sm:text-2xl">
@@ -84,7 +110,7 @@ export function ProjectDossierCompact({
           {/* Rendered only when the photographs exist. Empty renders nothing. */}
           {project.beneath.length > 0 ? (
             <div className="mt-7">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+              <p className={`text-xs font-bold uppercase tracking-[0.18em] ${a.label}`}>
                 Beneath the surface
               </p>
               <ol className="mt-4 space-y-5">
@@ -119,7 +145,7 @@ export function ProjectDossierCompact({
 
           {/* ---- What was done ---- */}
           <div className="mt-7">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+            <p className={`text-xs font-bold uppercase tracking-[0.18em] ${a.label}`}>
               What was done
             </p>
             {project.scope.length === 0 ? (
@@ -131,7 +157,7 @@ export function ProjectDossierCompact({
                 {project.scope.map((line) => (
                   <li key={line} className="flex gap-2.5">
                     <Check
-                      className="mt-1 h-4 w-4 shrink-0 text-[#1B3C6C]"
+                      className={`mt-1 h-4 w-4 shrink-0 ${a.check}`}
                       aria-hidden="true"
                     />
                     <span className="text-sm leading-6 text-slate-700">{line}</span>
@@ -147,7 +173,7 @@ export function ProjectDossierCompact({
               to={`/consultation/${project.room}`}
               data-analytics="dossier-cta"
               data-project={project.slug}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-4 font-bold text-white shadow-md transition-colors hover:bg-[#16325a]"
+              className={`inline-flex items-center gap-2 rounded-xl px-6 py-4 font-bold text-white shadow-md transition-colors ${a.cta}`}
             >
               Price my version of this
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -155,9 +181,9 @@ export function ProjectDossierCompact({
             <button
               type="button"
               onClick={onOpenCosts}
-              className="rounded-[0.95rem] border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#1B3C6C] shadow-sm transition hover:bg-slate-50"
+              className={`rounded-[0.95rem] border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm transition hover:bg-slate-50 ${a.ghost}`}
             >
-              What it costs
+              {costsLabel}
             </button>
           </div>
         </div>

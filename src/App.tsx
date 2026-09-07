@@ -6,7 +6,13 @@ import ScrollToTop from './components/ScrollToTop';
 const Home = lazy(() => import('./pages/Home'));
 const GrantsHub = lazy(() => import('./pages/GrantsHub'));
 const GrantLandingPage = lazy(() => import('./pages/GrantLandingPage'));
+/*
+ * The basements page. Same arrangement as the bathroom and kitchen pairs:
+ * `BasementsNext` is live, `Basements` is the previous cost-guide build kept
+ * unrouted as the rollback. Do not delete it without saying so first.
+ */
 const Basements = lazy(() => import('./pages/Basements'));
+const BasementsNext = lazy(() => import('./pages/BasementsNext'));
 const LegalSuites = lazy(() => import('./pages/LegalSuites'));
 const GardenSuitesLanewaySuitesOntario = lazy(() => import('./pages/GardenSuitesLanewaySuitesOntario'));
 const GardenSuiteCostOntario = lazy(() => import('./pages/GardenSuiteCostOntario'));
@@ -204,7 +210,7 @@ export default function App() {
 
           <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="basements" element={<Basements />} />
+          <Route path="basements" element={<BasementsNext />} />
           <Route path="grants" element={<GrantsHub />} />
           <Route path="grants/:slug" element={<GrantLandingPage />} />
           <Route path="legal-suites" element={<LegalSuites />} />
