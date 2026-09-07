@@ -71,7 +71,13 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // the portal's label map, unused: leads routed before this change still carry
   // them, and dropping the codes would render their history as raw strings.
   if (addressState === 'ADDRESS_OUTSIDE_SERVICE_AREA') {
-    return { outcome: 'DECLINE', reasons: ['OUTSIDE_ONTARIO'] };
+    // A program may choose to KEEP these rather than turn them away — see
+    // capturesOutOfAreaLeads. Still never a booking: the calendar would promise
+    // a visit to a property nobody is driving to. It becomes work for a person,
+    // which is what an out-of-area enquiry has always actually been.
+    return program?.capturesOutOfAreaLeads
+      ? { outcome: 'MANUAL_REVIEW', reasons: ['OUTSIDE_ONTARIO'] }
+      : { outcome: 'DECLINE', reasons: ['OUTSIDE_ONTARIO'] };
   }
 
   // ── 2. MANUAL_REVIEW — every form of doubt ──

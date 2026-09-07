@@ -101,24 +101,42 @@ test('an unparseable address still reaches the calendar on the basement flow', (
   }
 });
 
-test('an address outside Ontario is still declined, however badly it was typed', () => {
-  // Checked before any of the rescue above. Widening the rule must never turn a
-  // decline into a booking for a property nobody can drive to.
+test('an address outside Ontario is kept as a call-back, and never as a booking', () => {
+  // Checked before the rescue above, and the geography is still withheld — no
+  // amount of address handling turns Gatineau into a place we drive to.
   const geo = resolveProgramGeography(basement, {
     area: null,
     addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA',
     cause: 'INCOMPLETE_ADDRESS',
   });
   assert.equal(geo.area, null);
-  assert.equal(
-    routeConsultation({
-      addressState: geo.addressState,
-      area: geo.area,
-      program: basement,
-      answers: { projectType: 'basement_finish' },
-    }).outcome,
-    'DECLINE'
-  );
+
+  const routed = routeConsultation({
+    addressState: geo.addressState,
+    area: geo.area,
+    program: basement,
+    answers: { projectType: 'basement_finish' },
+  });
+  // Kept rather than turned away — this flow is fed by paid traffic, and a dead
+  // end is a lead we already bought being thrown out over a postal code.
+  assert.equal(routed.outcome, 'MANUAL_REVIEW');
+  assert.ok(routed.reasons.includes('OUTSIDE_ONTARIO'), 'the reason must survive');
+  // The line that matters most: it must never become a calendar. A booking
+  // promises "a specialist will visit your property", and for this address that
+  // is a promise nobody can keep.
+  assert.notEqual(routed.outcome, 'DIRECT_CALENDAR');
+});
+
+test('a program that has not opted in still declines an address outside Ontario', () => {
+  // capturesOutOfAreaLeads is per program. Hamilton's grant is the City's money
+  // and its own eligibility rules; nothing here may quietly widen that.
+  const routed = routeConsultation({
+    addressState: 'ADDRESS_OUTSIDE_SERVICE_AREA',
+    area: null,
+    program: hamilton,
+    answers: { projectType: 'garden_suite', timeline: 'asap' },
+  });
+  assert.equal(routed.outcome, 'DECLINE');
 });
 
 test('a grant flow still queues an address it could not read', () => {

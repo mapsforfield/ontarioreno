@@ -199,6 +199,21 @@ export type ProgramConfig = {
    */
   booksWithoutVerifiedAddress?: boolean;
   /**
+   * An address outside Ontario becomes a CALL-BACK rather than a decline.
+   *
+   * The decline is not wrong — we genuinely will not drive to Gatineau — but
+   * "this program isn't the right fit" is a dead end, and the person on the
+   * other side of it typed their details in and asked us for something. Often
+   * they own a property here and gave the number or the address they happened
+   * to be standing at.
+   *
+   * So they are captured and queued for a human instead. Deliberately NOT
+   * booked: a confirmed booking sends "a specialist will visit your property",
+   * which is a promise nobody can keep for an address outside the province, and
+   * a promise we cannot keep is worse than a call.
+   */
+  capturesOutOfAreaLeads?: boolean;
+  /**
    * What the booked consultation actually is. Drives the customer-facing wording
    * and the Appointment.appointmentType written at booking, so the homeowner is
    * never unclear about whether someone is coming to the property.
@@ -671,6 +686,9 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // ever see an address here, so a lookup we could not parse must not throw the
   // booking away.
   booksWithoutVerifiedAddress: true,
+  // See capturesOutOfAreaLeads. This flow is fed by SMS and by ads; a dead end
+  // here is a lead we already paid for, thrown away over a postal code.
+  capturesOutOfAreaLeads: true,
   // Asked on the confirmation screen, after the slot is held, and skippable.
   //
   // Not PREP_QUESTIONS: those three (basement condition, separate entrance,
