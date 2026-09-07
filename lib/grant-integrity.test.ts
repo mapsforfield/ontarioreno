@@ -148,7 +148,22 @@ test('the homepage and the hub agree about which cities are closed', () => {
 
 test('the homepage does not advertise a closed grant amount or a grant CTA', () => {
   const home = read('src/pages/Home.tsx');
-  const featured = home.slice(home.indexOf('const featuredPrograms = ['), home.indexOf('const disposableEmailDomains'));
+  /*
+   * Slice to the END OF THE ARRAY, not to whatever declaration happened to
+   * follow it.
+   *
+   * This used to end at `const disposableEmailDomains`, which sat directly
+   * below. That constant later moved into CostGuideCapture.tsx during an
+   * unrelated refactor, indexOf returned -1, and slice(start, -1) silently
+   * widened the region to the whole rest of the file. The test still passed,
+   * so nothing flagged it — but it had stopped checking what it claims to
+   * check. Anchoring on the array's own terminator cannot drift that way.
+   */
+  const featuredStart = home.indexOf('const featuredPrograms = [');
+  assert.ok(featuredStart !== -1, 'featuredPrograms array not found on the homepage');
+  const featuredEnd = home.indexOf('\n];', featuredStart);
+  assert.ok(featuredEnd !== -1, 'featuredPrograms array is not terminated as expected');
+  const featured = home.slice(featuredStart, featuredEnd);
 
   assert.ok(
     !/Up to \$40,000/.test(featured),
