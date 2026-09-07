@@ -286,3 +286,130 @@ export const KITCHEN_COST_TABS: CostTab[] = [
     ),
   },
 ];
+
+/* ------------------------------------------------------------- */
+/* Basement — as published on the previous /basements page.       */
+/*                                                                */
+/* Two ranges, kept separate on purpose: a basement finished for  */
+/* your own family and a basement built as a legal secondary      */
+/* suite are different jobs with different scopes, and collapsing */
+/* them into one number would understate the second badly.        */
+/* ------------------------------------------------------------- */
+
+const BASEMENT_ROWS: [string, string][] = [
+  ['Framing, drywall, taping & paint', '$12,000 – $22,000'],
+  ['Electrical', '$4,000 – $10,000'],
+  ['Plumbing', '$4,000 – $12,000'],
+  ['Flooring', '$4,000 – $10,000'],
+  ['Trim, doors & finishing', '$4,000 – $9,000'],
+  ['Bathroom addition', '$12,000 – $22,000'],
+  ['Kitchen for a legal apartment', '$12,000 – $25,000'],
+  ['Separate entrance', '$8,000 – $20,000'],
+  ['Permits & drawings', '$2,500 – $6,000+'],
+];
+
+export const BASEMENT_COST_TABS: CostTab[] = [
+  {
+    key: 'cost',
+    label: 'What it costs',
+    body: (
+      <>
+        <h4 className="text-base font-bold text-slate-900">Basements in Ontario</h4>
+        <p className="mt-2 text-sm leading-7 text-slate-600">
+          A basement finished for your own family usually runs{' '}
+          <strong>$45,000 to $85,000+</strong>, with many projects falling between{' '}
+          <strong>$50,000 and $70,000</strong>.
+        </p>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          A legal basement apartment — bathroom, kitchen, permits and
+          code-compliant upgrades — more often runs{' '}
+          <strong>$60,000 to $140,000+</strong>, with many landing between{' '}
+          <strong>$70,000 and $110,000</strong>. Where yours falls is settled in
+          the home, with the space measured.
+        </p>
+        <CostTable rows={BASEMENT_ROWS} />
+      </>
+    ),
+  },
+  {
+    key: 'drivers',
+    label: 'What drives it',
+    body: (
+      <>
+        <h4 className="text-base font-bold text-slate-900">
+          Why two basements price apart
+        </h4>
+        <p className="mt-2 text-sm leading-7 text-slate-600">
+          More of a basement&apos;s cost sits in things you cannot see from the
+          finished room than in any other renovation — headroom, moisture,
+          egress and fire separation are decided long before anything is painted.
+        </p>
+        <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
+          <li>Ceiling height and structural limitations</li>
+          <li>Adding a bathroom or full kitchen</li>
+          <li>Electrical panel upgrades</li>
+          <li>Waterproofing or moisture remediation</li>
+          <li>Separate entrance construction</li>
+        </ul>
+        <h4 className="mt-7 text-base font-bold text-slate-900">
+          Suite-specific drivers
+        </h4>
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+          <li>Fire separation requirements</li>
+          <li>Soundproofing between units</li>
+          <li>Egress and window compliance</li>
+          <li>Dedicated HVAC / ventilation work</li>
+          <li>Permit and drawing complexity</li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    key: 'quotes',
+    label: 'Why quotes differ',
+    body: (
+      <>
+        <h4 className="text-base font-bold text-slate-900">
+          The cheap basement quote is usually a smaller job
+        </h4>
+        <p className="mt-2 text-sm leading-7 text-slate-600">
+          Basement quotes diverge most on the work that never shows in a
+          photograph: moisture remediation, insulation and vapour control,
+          fire separation, egress windows, panel capacity, and the permit
+          drawings themselves. A quote that omits those is not cheaper — it is
+          for a different scope.
+        </p>
+        <Warning>
+          If a basement quote does not say whether permits and drawings are
+          included, that is the first question to ask, not the last.
+        </Warning>
+      </>
+    ),
+  },
+  {
+    key: 'permits',
+    label: 'Permits',
+    body: (
+      <>
+        <h4 className="text-base font-bold text-slate-900">Do I need a permit?</h4>
+        <p className="mt-2 text-sm leading-7 text-slate-600">
+          <strong>Usually yes.</strong> In most GTA municipalities, finishing a
+          previously unfinished basement, adding rooms, changing plumbing,
+          modifying electrical, or creating a legal secondary suite will need
+          permits and approved drawings before construction starts.
+        </p>
+        <h4 className="mt-6 text-base font-bold text-slate-900">
+          Commonly needed for
+        </h4>
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+          <li>Adding or moving walls</li>
+          <li>New bathroom plumbing</li>
+          <li>New kitchen plumbing</li>
+          <li>Electrical changes or new circuits</li>
+          <li>Enlarging windows for egress</li>
+          <li>Creating a legal basement apartment</li>
+        </ul>
+      </>
+    ),
+  },
+];

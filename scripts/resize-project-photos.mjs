@@ -25,7 +25,12 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, dirname, basename, extname } from 'node:path';
 import sharp from 'sharp';
 
-const ROOTS = ['public/Bathroom', 'public/Kitchen'];
+const ROOTS = [
+  'public/Bathroom',
+  'public/Kitchen',
+  'public/Basement',
+  'public/Legal Basements',
+];
 
 /** Display widths. 1600 covers the lead frame on a 2x desktop; 800 the thumbs. */
 const WIDTHS = [800, 1600];
@@ -56,9 +61,23 @@ for (const root of ROOTS) {
     const stem = basename(file, extname(file));
 
     for (const width of WIDTHS) {
-      // Never upscale — a 900px source has nothing to give a 1600px variant.
-      if (meta.width <= width) continue;
-
+      /*
+       * ALWAYS WRITE BOTH VARIANTS, even when the source is no wider than the
+       * target.
+       *
+       * This used to `continue` when meta.width <= width, on the reasoning that
+       * a 1600px source has nothing to give a 1600px variant. True of the
+       * pixels, and wrong about the contract: the data files build their `src`
+       * and `srcSet` from the naming convention, so a missing -1600w.webp is a
+       * 404 and a broken image on the page. It bit exactly that way on the
+       * basement photographs, which are all 1600px wide — the thumbnails
+       * resolved to -800w and looked fine while every lead frame failed.
+       *
+       * `withoutEnlargement` still prevents actual upscaling: the file is
+       * written at the source width and simply re-encoded. Cheap, and the
+       * convention holds for every photograph regardless of what came out of
+       * the camera.
+       */
       const out = join(dirname(file), `${stem}-${width}w.webp`);
       if (existsSync(out)) continue;
 
@@ -79,4 +98,36 @@ for (const root of ROOTS) {
 }
 
 console.log(`\n${made} variants written.`);
-console.log(`Largest variant is ~${(savedBytes / made / 1024).toFixed(0)}KB smaller than its source on average.`);
+if (made > 0) {
+  console.log(`Saved ~${(savedBytes / made / 1024).toFixed(0)}KB per variant on average.`);
+}
+
+/*
+ * Verify the naming contract the data files depend on.
+ *
+ * `src` and `srcSet` in src/data/projects/*.ts are built from the convention
+ * `<stem>-800w.webp` / `<stem>-1600w.webp`. If one is missing it is a 404, and
+ * it fails ASYMMETRICALLY: thumbnails resolve to the 800w and look perfect
+ * while every lead frame breaks. That is exactly how it shipped to review once.
+ * So the script refuses to exit clean unless both exist for every source.
+ */
+let missing = 0;
+for (const root of ROOTS) {
+  for await (const file of walk(root)) {
+    if (!/\.(webp|jpe?g|png)$/i.test(file) || VARIANT.test(file)) continue;
+    const stem = basename(file, extname(file));
+    for (const width of WIDTHS) {
+      const expected = join(dirname(file), `${stem}-${width}w.webp`);
+      if (!existsSync(expected)) {
+        console.error(`MISSING: ${expected}`);
+        missing += 1;
+      }
+    }
+  }
+}
+
+if (missing > 0) {
+  console.error(`\n${missing} expected variants are missing.`);
+  process.exit(1);
+}
+console.log('Verified: every source has both variants.');
