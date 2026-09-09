@@ -2508,6 +2508,34 @@ export default function PortalAppointments() {
           </div>
         </nav>
 
+        {/* Partner filter — the mobile twin of the one in the dispatch header.
+            That header lives inside a `lg:block` section, so on a phone the
+            control did not exist at all and a paired rep was stuck on 'mine'.
+            Same `pairScope` state, so the two can never disagree. */}
+        {showPairScope && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 lg:hidden">
+            {[
+              { value: 'mine', label: 'Mine' },
+              ...partners.map((partner) => ({ value: partner.id, label: partner.name })),
+              { value: 'all', label: 'Everyone' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPairScope(option.value)}
+                aria-pressed={pairScope === option.value}
+                className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
+                  pairScope === option.value
+                    ? 'bg-[#1B3C6C] text-white'
+                    : 'border border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Mobile tab content */}
         <div className="mt-4 space-y-3">
           {/* Today */}
