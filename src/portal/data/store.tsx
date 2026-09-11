@@ -13,6 +13,7 @@ import { appointmentBelongsToClient } from './clientLinks';
 import { DEFAULT_BALANCE_CLOCK_DAYS } from './balanceClock';
 import { visibleAppointmentsFor } from './repVisibility';
 import { showToast } from '../lib/toast';
+import { viewAsHeaders } from '../lib/viewAs';
 import {
   Client,
   Commission,
@@ -765,8 +766,10 @@ async function apiCall<T>(
   try {
     const res = await fetch(url, {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      // Spread AFTER options so a caller's own headers can't drop the view-as
+      // header and quietly fetch admin-scoped data into a rep view.
+      headers: { 'Content-Type': 'application/json', ...options?.headers, ...viewAsHeaders() },
     });
     if (!res.ok) {
       console.error(`[store] apiCall ${url} → ${res.status}`, await res.text().catch(() => ''));
