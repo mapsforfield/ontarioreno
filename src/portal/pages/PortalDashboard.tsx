@@ -39,6 +39,12 @@ function formatConsultationStage(stage: ConsultationStage) {
     .join(' ');
 }
 
+/** "Oct 11" — the year is noise in a row this small, and the full date is on
+ *  the row's tooltip. */
+function shortDueDate(dateKey: string) {
+  return formatDateKey(dateKey).replace(/,\s*\d{4}$/, '');
+}
+
 function getDaysSince(value: string) {
   if (!value) return 0;
   return Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
@@ -204,6 +210,37 @@ export default function PortalDashboard() {
     });
     return items.sort((a, b) => (a.urgent === b.urgent ? a.sort.localeCompare(b.sort) : a.urgent ? -1 : 1)).slice(0, 8);
   })();
+  // ── Balance clocks: every deal still waiting on its second payment ────────
+  // The agenda list above only speaks up on day 45. This is the standing
+  // overview — what is outstanding and how far along each one is — so a glance
+  // at the dashboard answers "what is PJ still into us for" without opening
+  // Commissions. Same visibleDeals scoping, so a rep sees their own deals and
+  // an admin sees all of them. Settled clocks drop off; they aren't pending.
+  const balanceClockRows = commissions
+    .map((commission) => {
+      const deal = visibleDeals.find((d) => d.id === commission.dealId);
+      if (!deal) return null;
+      const clock = balanceClock(commission, today);
+      if (!clock.active || clock.status === 'settled') return null;
+      const outstanding = Math.max(
+        commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0),
+        0
+      );
+      return { clock, commission, deal, outstanding };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    // Soonest first — the one about to come due is the one worth reading.
+    .sort((a, b) => a.clock.dueOn.localeCompare(b.clock.dueOn));
+  const balanceClockTotal = balanceClockRows.reduce((sum, row) => sum + row.outstanding, 0);
+  // Grey / amber / orange / red, matching the badge on the deal itself so the
+  // two screens never disagree about how urgent something is.
+  const balanceClockTone: Record<string, string> = {
+    running: 'bg-slate-100 text-slate-600',
+    due_soon: 'bg-amber-100 text-amber-700',
+    due: 'bg-orange-100 text-orange-700',
+    overdue: 'bg-red-100 text-red-700',
+  };
+
   const agendaDot: Record<AgendaItem['kind'], string> = {
     task: 'bg-amber-400',
     consult: 'bg-[#1B3C6C]',
@@ -328,6 +365,80 @@ export default function PortalDashboard() {
           </div>
         )}
       </section>
+
+      {/* Standing overview of every deal still owed its second payment.
+          Renders nothing at all when no clock is running, which is the normal
+          state — the dashboard doesn't grow an empty panel for a feature most
+          deals never use. Scrolls past four rows so it can never push the rest
+          of the page down. */}
+      {balanceClockRows.length > 0 && (
+        <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#32639b]">
+                45-Day Payouts
+              </p>
+              <span className="rounded-full bg-[#e8f1fb] px-2 py-0.5 text-[0.65rem] font-black text-[#1B3C6C]">
+                {balanceClockRows.length}
+              </span>
+            </div>
+            <p className="text-xs font-bold text-slate-500">
+              <span className="font-black text-slate-900">{formatCurrency(balanceClockTotal)}</span>{' '}
+              outstanding
+            </p>
+          </div>
+          <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
+            {balanceClockRows.map(({ clock, commission, deal, outstanding }) => {
+              // How far through the term we are, as a bar. Clamped so an
+              // overdue clock reads as full rather than overflowing.
+              const elapsed = Math.min(Math.max(clock.days - clock.daysRemaining, 0), clock.days);
+              const pct = clock.days > 0 ? Math.round((elapsed / clock.days) * 100) : 100;
+              return (
+                <button
+                  key={commission.id}
+                  type="button"
+                  onClick={() => navigate('/portal/commissions')}
+                  title={`Paid ${formatDateKey(clock.startedOn)} → due ${formatDateKey(clock.dueOn)}`}
+                  className="flex w-full items-center gap-2.5 rounded-[0.4rem] border border-slate-100 bg-[#fbfdff] px-2.5 py-2 text-left transition hover:bg-[#f6faff]"
+                >
+                  <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-900">
+                    {deal.homeownerName || 'Deal'}
+                  </span>
+                  <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-slate-200 sm:block">
+                    <span
+                      className={`block h-full rounded-full ${
+                        clock.status === 'overdue'
+                          ? 'bg-red-400'
+                          : clock.status === 'due'
+                            ? 'bg-orange-400'
+                            : clock.status === 'due_soon'
+                              ? 'bg-amber-400'
+                              : 'bg-[#1B3C6C]'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </span>
+                  <span className="hidden shrink-0 text-[0.65rem] font-semibold text-slate-400 sm:block">
+                    {shortDueDate(clock.dueOn)}
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-xs font-black text-slate-700">
+                    {formatCurrency(outstanding)}
+                  </span>
+                  <span
+                    className={`w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-[0.65rem] font-black ${balanceClockTone[clock.status]}`}
+                  >
+                    {clock.status === 'overdue'
+                      ? `${Math.abs(clock.daysRemaining)}d late`
+                      : clock.status === 'due'
+                        ? 'Due'
+                        : `${clock.daysRemaining}d`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {summaryCards.map((card) => (
