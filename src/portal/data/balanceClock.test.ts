@@ -6,6 +6,8 @@ import {
   balanceClockNeedsAttention,
   daysBetween,
   formatBalanceClock,
+  pendingBalanceClocks,
+  pendingBalanceClockTotal,
 } from './balanceClock.ts';
 
 const clockOf = (
@@ -126,5 +128,107 @@ describe('formatBalanceClock', () => {
 
   it('is blank when there is no clock', () => {
     assert.equal(formatBalanceClock(clockOf('')), '');
+  });
+});
+
+// ─── The rep-exposure guard ──────────────────────────────────────────────────
+// The admin's net is total commission minus the rep's 5%. Hand a rep that
+// number and they can add their own cut and recover the total rate and the
+// house's margin. The real figures below are the Matthew Melo deal.
+
+const MELO_DEAL = {
+  id: 'deal-melo',
+  homeownerName: 'Matthew Melo',
+  estimatedJobValue: 78535,
+} as unknown as import('./types.ts').Deal;
+
+const meloCommission = (fields: Record<string, unknown> = {}) =>
+  ({
+    id: 'comm-melo',
+    dealId: 'deal-melo',
+    repId: 'rep-steven',
+    // 8.5% of $78,535 total, less the rep's 5% → the admin's net.
+    adminTotalEstimatedCommission: 6675,
+    repEstimatedCommission: 3927,
+    adminNetCommission: 2748,
+    adminNetPaidCommission: 0,
+    balanceClockStartedAt: '2026-08-27',
+    balanceClockDays: 45,
+    balanceSettledAt: '',
+    ...fields,
+  }) as unknown as import('./types.ts').Commission;
+
+describe('pendingBalanceClocks', () => {
+  it('gives an admin the outstanding net', () => {
+    const rows = pendingBalanceClocks([meloCommission()], [MELO_DEAL], '2026-09-11', {
+      canSeeAmounts: true,
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].outstanding, 2748);
+    assert.equal(pendingBalanceClockTotal(rows), 2748);
+  });
+
+  // The one that matters: $2,748 + a rep's own $3,927 = $6,675 = 8.5%.
+  it('never hands a rep the admin net, in the row or the total', () => {
+    const rows = pendingBalanceClocks([meloCommission()], [MELO_DEAL], '2026-09-11', {
+      canSeeAmounts: false,
+    });
+    assert.equal(rows.length, 1, 'the rep still sees the deal and its countdown');
+    assert.equal(rows[0].outstanding, null);
+    assert.equal(pendingBalanceClockTotal(rows), 0);
+  });
+
+  it('still gives the rep the dates and the countdown', () => {
+    const [row] = pendingBalanceClocks([meloCommission()], [MELO_DEAL], '2026-09-11', {
+      canSeeAmounts: false,
+    });
+    assert.equal(row.clock.dueOn, '2026-10-11');
+    assert.equal(row.clock.daysRemaining, 30);
+  });
+
+  it('drops a commission whose deal the viewer cannot see', () => {
+    assert.equal(
+      pendingBalanceClocks([meloCommission()], [], '2026-09-11', { canSeeAmounts: true }).length,
+      0
+    );
+  });
+
+  it('drops settled and unstarted clocks — neither is pending', () => {
+    const rows = pendingBalanceClocks(
+      [
+        meloCommission({ id: 'a', balanceSettledAt: '2026-09-01' }),
+        meloCommission({ id: 'b', balanceClockStartedAt: '' }),
+      ],
+      [MELO_DEAL],
+      '2026-09-11',
+      { canSeeAmounts: true }
+    );
+    assert.equal(rows.length, 0);
+  });
+
+  it('subtracts what has already been collected', () => {
+    const [row] = pendingBalanceClocks(
+      [meloCommission({ adminNetPaidCommission: 1000 })],
+      [MELO_DEAL],
+      '2026-09-11',
+      { canSeeAmounts: true }
+    );
+    assert.equal(row.outstanding, 1748);
+  });
+
+  it('sorts soonest due first', () => {
+    const rows = pendingBalanceClocks(
+      [
+        meloCommission({ id: 'later', balanceClockStartedAt: '2026-09-01' }),
+        meloCommission({ id: 'sooner', balanceClockStartedAt: '2026-08-01' }),
+      ],
+      [MELO_DEAL],
+      '2026-09-11',
+      { canSeeAmounts: true }
+    );
+    assert.deepEqual(
+      rows.map((r) => r.commission.id),
+      ['sooner', 'later']
+    );
   });
 });
