@@ -14,7 +14,7 @@
 // Most deals have no clock. A blank `balanceClockStartedAt` means exactly
 // that, and every function here returns the inactive state for it.
 
-import type { Commission } from './types';
+import type { Commission, Deal } from './types';
 
 /** Default term. Stored per-commission so a different deal can differ. */
 export const DEFAULT_BALANCE_CLOCK_DAYS = 45;
@@ -152,4 +152,66 @@ export function formatDateKey(dateKey: string): string {
     timeZone: 'UTC',
     year: 'numeric',
   }).format(new Date(`${dateKey}T00:00:00Z`));
+}
+
+// ─── The dashboard's pending list ────────────────────────────────────────────
+
+export type PendingBalanceClock = {
+  commission: Commission;
+  deal: Deal;
+  clock: BalanceClock;
+  /**
+   * What is still owed on this deal — or NULL when the viewer must not see it.
+   *
+   * This is the whole reason the list is built here rather than inline in the
+   * dashboard. The admin's net is total commission minus the rep's 5%, so a rep
+   * shown that figure can add their own cut and recover the total rate and the
+   * house's margin from it. On the first live deal that was $2,748 next to a
+   * rep's own $3,927 — 8.5% and the split, in one glance.
+   *
+   * So the amount is decided by role, once, in a function with a test on it,
+   * and the dashboard renders whatever it is handed. A rep gets null and no
+   * money column at all; their own payout ledger lives on the Commissions page
+   * where it is labelled as theirs, not beside a due date that belongs to the
+   * contractor's payment term.
+   */
+  outstanding: number | null;
+};
+
+/**
+ * Deals still waiting on their second payment, soonest due first.
+ *
+ * `deals` is expected to be already scoped to the viewer (getVisibleDealsForUser),
+ * so a rep's list is their own deals; a commission whose deal isn't in that list
+ * is dropped entirely. Settled clocks drop off too — they aren't pending.
+ */
+export function pendingBalanceClocks(
+  commissions: Commission[],
+  deals: Deal[],
+  today: string,
+  { canSeeAmounts }: { canSeeAmounts: boolean }
+): PendingBalanceClock[] {
+  const dealsById = new Map(deals.map((deal) => [deal.id, deal]));
+  return commissions
+    .map((commission) => {
+      const deal = dealsById.get(commission.dealId);
+      if (!deal) return null;
+      const clock = balanceClock(commission, today);
+      if (!clock.active || clock.status === 'settled') return null;
+      return {
+        clock,
+        commission,
+        deal,
+        outstanding: canSeeAmounts
+          ? Math.max(commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0), 0)
+          : null,
+      };
+    })
+    .filter((row): row is PendingBalanceClock => row !== null)
+    .sort((a, b) => a.clock.dueOn.localeCompare(b.clock.dueOn));
+}
+
+/** Total still outstanding across the list. Zero when amounts are withheld. */
+export function pendingBalanceClockTotal(rows: PendingBalanceClock[]): number {
+  return rows.reduce((sum, row) => sum + (row.outstanding ?? 0), 0);
 }

@@ -16,7 +16,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { followUpSilenced, lostDealIds } from '../data/followUps';
-import { balanceClock, balanceClockNeedsAttention, formatDateKey } from '../data/balanceClock';
+import {
+  balanceClock,
+  balanceClockNeedsAttention,
+  formatDateKey,
+  pendingBalanceClocks,
+  pendingBalanceClockTotal,
+} from '../data/balanceClock';
 import { needsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
 import { countUnworkedSubmissions } from '../data/submissions';
@@ -52,7 +58,7 @@ function getDaysSince(value: string) {
 
 export default function PortalDashboard() {
   const navigate = useNavigate();
-  const { currentUser } = usePortalAuth();
+  const { currentUser, isAdmin } = usePortalAuth();
 
   // Reps on mobile land on the appointments view — that's where their day starts.
   // Only once per session so they can still visit the dashboard deliberately.
@@ -216,22 +222,14 @@ export default function PortalDashboard() {
   // at the dashboard answers "what is PJ still into us for" without opening
   // Commissions. Same visibleDeals scoping, so a rep sees their own deals and
   // an admin sees all of them. Settled clocks drop off; they aren't pending.
-  const balanceClockRows = commissions
-    .map((commission) => {
-      const deal = visibleDeals.find((d) => d.id === commission.dealId);
-      if (!deal) return null;
-      const clock = balanceClock(commission, today);
-      if (!clock.active || clock.status === 'settled') return null;
-      const outstanding = Math.max(
-        commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0),
-        0
-      );
-      return { clock, commission, deal, outstanding };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null)
-    // Soonest first — the one about to come due is the one worth reading.
-    .sort((a, b) => a.clock.dueOn.localeCompare(b.clock.dueOn));
-  const balanceClockTotal = balanceClockRows.reduce((sum, row) => sum + row.outstanding, 0);
+  // Amounts are admin-only. The admin's net is the total commission less the
+  // rep's 5%, so a rep shown it can add their own cut and recover the total
+  // rate and the margin — see pendingBalanceClocks, where the rule and its
+  // test live. A rep gets the deal, the date and the countdown, no money.
+  const balanceClockRows = pendingBalanceClocks(commissions, visibleDeals, today, {
+    canSeeAmounts: isAdmin,
+  });
+  const balanceClockTotal = pendingBalanceClockTotal(balanceClockRows);
   // Grey / amber / orange / red, matching the badge on the deal itself so the
   // two screens never disagree about how urgent something is.
   const balanceClockTone: Record<string, string> = {
@@ -383,8 +381,16 @@ export default function PortalDashboard() {
               </span>
             </div>
             <p className="text-xs font-bold text-slate-500">
-              <span className="font-black text-slate-900">{formatCurrency(balanceClockTotal)}</span>{' '}
-              outstanding
+              {isAdmin ? (
+                <>
+                  <span className="font-black text-slate-900">
+                    {formatCurrency(balanceClockTotal)}
+                  </span>{' '}
+                  outstanding
+                </>
+              ) : (
+                'awaiting final payment'
+              )}
             </p>
           </div>
           <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
@@ -421,9 +427,11 @@ export default function PortalDashboard() {
                   <span className="hidden shrink-0 text-[0.65rem] font-semibold text-slate-400 sm:block">
                     {shortDueDate(clock.dueOn)}
                   </span>
-                  <span className="w-16 shrink-0 text-right text-xs font-black text-slate-700">
-                    {formatCurrency(outstanding)}
-                  </span>
+                  {outstanding !== null && (
+                    <span className="w-16 shrink-0 text-right text-xs font-black text-slate-700">
+                      {formatCurrency(outstanding)}
+                    </span>
+                  )}
                   <span
                     className={`w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-[0.65rem] font-black ${balanceClockTone[clock.status]}`}
                   >
