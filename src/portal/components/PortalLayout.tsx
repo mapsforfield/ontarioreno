@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Eye,
   Bell,
   BellOff,
   BriefcaseBusiness,
@@ -85,8 +86,9 @@ const contractorNavItems: NavItem[] = [
 ];
 
 export default function PortalLayout() {
-  const { currentUser, isAdmin, isContractor, logout, updateCurrentUser } = usePortalAuth();
-  const { changeUserPassword, updateUser, deals, getVisibleAppointmentsForUser, loadError, refetch, repAccess } = usePortalData();
+  const { currentUser, isAdmin, isContractor, logout, updateCurrentUser, viewingAsRepId, setViewAs } =
+    usePortalAuth();
+  const { changeUserPassword, updateUser, deals, getVisibleAppointmentsForUser, loadError, refetch, repAccess, users } = usePortalData();
 
   // Global quick-search (Cmd/Ctrl+K, or "/" when not typing)
   const [searchOpen, setSearchOpen] = useState(false);
@@ -509,6 +511,29 @@ export default function PortalLayout() {
               </button>
             </div>
           )}
+          {/* ── Viewing as a rep ──────────────────────────────────────────
+              Loud on purpose. The entire portal is showing someone else's
+              data, and the one genuinely dangerous outcome here is forgetting
+              that and reading a rep's empty column as your own. Writes are
+              refused by the server while this is up, not merely hidden. */}
+          {viewingAsRepId && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[0.5rem] border-2 border-amber-300 bg-amber-50 px-4 py-3">
+              <Eye className="h-4 w-4 shrink-0 text-amber-700" />
+              <p className="min-w-0 flex-1 text-sm font-black text-amber-900">
+                Viewing as {currentUser?.name ?? 'a rep'} — this is their view, read-only.
+                <span className="ml-1 font-semibold text-amber-800">
+                  Nothing you click can change anything.
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setViewAs(null)}
+                className="shrink-0 rounded-[0.4rem] bg-amber-700 px-3 py-1.5 text-xs font-black text-white transition hover:bg-amber-800"
+              >
+                Exit rep view
+              </button>
+            </div>
+          )}
           <div className="mb-6 hidden items-center justify-between lg:flex">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
@@ -519,6 +544,29 @@ export default function PortalLayout() {
               </h2>
             </div>
             <div className="flex items-center gap-3">
+              {/* Admin-only, and only when not already viewing — the banner
+                  above owns the exit. */}
+              {isAdmin && !viewingAsRepId && (
+                <label className="flex items-center gap-2 rounded-full border border-white bg-white px-3 py-2 shadow-sm">
+                  <Eye className="h-4 w-4 text-[#1B3C6C]" />
+                  <span className="sr-only">View the portal as a rep</span>
+                  <select
+                    value=""
+                    onChange={(event) => event.target.value && setViewAs(event.target.value)}
+                    title="See the portal exactly as one of your reps sees it — read-only"
+                    className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 focus:ring-0"
+                  >
+                    <option value="">View as rep…</option>
+                    {users
+                      .filter((user) => user.role === 'rep' && user.active)
+                      .map((rep) => (
+                        <option key={rep.id} value={rep.id}>
+                          {rep.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
               <AdminActivityCenter variant="desktop" />
               <div className="flex items-center gap-2 rounded-full border border-white bg-white px-4 py-2 shadow-sm">
                 <BarChart3 className="h-4 w-4 text-[#1B3C6C]" />

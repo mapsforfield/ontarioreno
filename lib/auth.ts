@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from './prisma.js';
+import { canViewAs, isReadOnlyMethod, requestedViewAsId } from './view-as.js';
 
 // Use || (not ??) so an empty-string env var falls back too — an empty secret
 // makes jwt.sign throw "secretOrPrivateKey must have a value" and crashes login.
@@ -71,28 +72,74 @@ export function getTokenFromRequest(req: VercelRequest): string | null {
   return null;
 }
 
-/** Verify auth and return the current User from DB, or null. */
+/**
+ * Verify auth and return the current User from DB, or null.
+ *
+ * This is also where "view as rep" takes effect, deliberately — it is the one
+ * chokepoint every portal endpoint already goes through, so an endpoint cannot
+ * forget to honour it, and cannot honour it differently from its neighbour.
+ * The returned user IS the rep, so every downstream scope check (including the
+ * commission ledger strip) narrows on its own with no per-endpoint change.
+ *
+ * `viewAsOf` carries the real admin's id, for requireAuth's write block and so
+ * anything that needs to know who is really here can ask.
+ */
 export async function getCurrentUser(req: VercelRequest) {
   const token = getTokenFromRequest(req);
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: payload.userId, active: true },
     select: AUTH_USER_SELECT,
   });
+  if (!user) return null;
+
+  const viewAsId = requestedViewAsId(req, user);
+  if (!viewAsId) return user;
+
+  const target = await prisma.user.findUnique({
+    where: { id: viewAsId },
+    select: AUTH_USER_SELECT,
+  });
+  // An unusable target is ignored rather than refused: the admin stays
+  // themselves and sees their own portal, which is a confusing-but-safe
+  // outcome. Failing the request instead would lock an admin out of the portal
+  // over a stale id in their own browser.
+  if (!canViewAs(user, target)) return user;
+
+  return { ...target!, viewAsOf: user.id };
 }
 
-/** Session profile lookup used only by /auth/me, where avatar data is needed. */
+/**
+ * Session profile lookup used only by /auth/me, where avatar data is needed.
+ *
+ * Honours view-as for the same reason getCurrentUser does: if /auth/me kept
+ * reporting the admin while every other endpoint answered as the rep, the
+ * portal would render one person's name over another person's data — exactly
+ * the confusion this feature exists to avoid.
+ */
 export async function getCurrentUserProfile(req: VercelRequest) {
   const token = getTokenFromRequest(req);
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: payload.userId, active: true },
     select: PROFILE_USER_SELECT,
   });
+  if (!user) return null;
+
+  const viewAsId = requestedViewAsId(req, user);
+  if (!viewAsId) return user;
+
+  const target = await prisma.user.findUnique({
+    where: { id: viewAsId },
+    select: PROFILE_USER_SELECT,
+  });
+  if (!canViewAs(user, target)) return user;
+
+  return { ...target!, viewAsOf: user.id };
 }
 
 /** Middleware helper — returns user or sends 401 and returns null. */
@@ -100,6 +147,15 @@ export async function requireAuth(req: VercelRequest, res: VercelResponse) {
   const user = await getCurrentUser(req);
   if (!user) {
     res.status(401).json({ error: 'Unauthorized.' });
+    return null;
+  }
+  // Viewing as a rep is a way of LOOKING, never a way of acting. A write made
+  // while viewing would land in the activity log attributed to someone who was
+  // not there. Blocked here rather than per-endpoint so nothing can miss it.
+  if ('viewAsOf' in user && user.viewAsOf && !isReadOnlyMethod(req.method)) {
+    res.status(403).json({
+      error: 'Read-only while viewing as another user. Exit the rep view to make changes.',
+    });
     return null;
   }
   return user;
