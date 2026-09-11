@@ -373,6 +373,23 @@ model Commission {
   // One-off flat payout not based on the % rate. When true, the total and rep
   // amounts are entered manually and NOT recomputed from job value × rate.
   customPayout                  Boolean @default(false)
+  // ── 45-day balance clock (Galaxy-style staggered payments) ────────────────
+  // Some deals are paid in two parts: a 25%/50% payment up front, then the
+  // remainder a fixed number of days later. Starting the clock records the day
+  // the FIRST payment landed; everything else is derived from it, so there is
+  // no stored countdown to go stale. Blank = this deal has no clock, which is
+  // the case for most of them.
+  /// YYYY-MM-DD the first (partial) payment was received. Blank = no clock.
+  /// A date string, not a DateTime, for the same reason Deal.nextFollowUpDate
+  /// is: it is a calendar day in Ontario, and a timestamp would slide across
+  /// midnight for anyone reading it from another timezone.
+  balanceClockStartedAt         String  @default("")
+  /// Term length in days. 45 for the Galaxy deals; a field rather than a
+  /// constant so a different term is a data change, not a deploy.
+  balanceClockDays              Int     @default(45)
+  /// YYYY-MM-DD the remainder was actually collected. Stops the countdown so a
+  /// settled deal doesn't sit permanently overdue.
+  balanceSettledAt              String  @default("")
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   rep  User @relation(fields: [repId], references: [id])

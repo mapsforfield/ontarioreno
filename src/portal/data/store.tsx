@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { usePortalAuth } from '../auth';
 import { appointmentBelongsToClient } from './clientLinks';
+import { DEFAULT_BALANCE_CLOCK_DAYS } from './balanceClock';
 import { visibleAppointmentsFor } from './repVisibility';
 import { showToast } from '../lib/toast';
 import {
@@ -219,6 +220,9 @@ type PortalDataContextValue = PortalDataState & {
         | 'payoutStatus'
         | 'repEstimatedCommission'
         | 'repPaidCommission'
+        | 'balanceClockStartedAt'
+        | 'balanceClockDays'
+        | 'balanceSettledAt'
       >
     >,
     actor?: User
@@ -2614,8 +2618,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 Math.max(adminNetCommission, 0)
               );
 
+              // The 45-day balance clock is stored, never derived — it records
+              // the day a payment landed. Carried through explicitly so an
+              // update that only touches the clock isn't swallowed by the
+              // spread of the previous row. Undefined means "not in this
+              // update"; '' is a real value meaning "clock cleared".
+              const balanceClockStartedAt =
+                updates.balanceClockStartedAt ?? commission.balanceClockStartedAt ?? '';
+              const balanceClockDays =
+                updates.balanceClockDays ?? commission.balanceClockDays ?? DEFAULT_BALANCE_CLOCK_DAYS;
+              // Clearing the clock clears the settlement with it, so a later
+              // restart doesn't come back pre-settled.
+              const balanceSettledAt = balanceClockStartedAt
+                ? updates.balanceSettledAt ?? commission.balanceSettledAt ?? ''
+                : '';
+
               return {
                 ...commission,
+                balanceClockStartedAt,
+                balanceClockDays,
+                balanceSettledAt,
                 adminNetCommission,
                 adminNetPaidCommission,
                 adminTotalCommissionRate,

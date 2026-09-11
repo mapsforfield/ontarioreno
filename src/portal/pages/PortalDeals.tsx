@@ -7,6 +7,7 @@ import { dealWonDate } from '../../../lib/deal-won-date';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
+import BalanceClockControl from '../components/BalanceClockControl';
 import { getRecommendedContractors } from '../data/recommendations';
 import {
   formatCurrency,
@@ -271,6 +272,8 @@ export default function PortalDeals() {
     assignDispatchContractor,
     assignContractorToDeal,
     clients,
+    commissions,
+    updateCommission,
     contractors,
     financePartners,
     deleteDeal,
@@ -548,6 +551,12 @@ export default function PortalDeals() {
   // deal links back to that client record.
   const prefillClientIdRef = useRef<string | null>(null);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
+  // The commission row backing the drawer's balance clock. Won deals always
+  // have one; anything earlier in the pipeline may not, and the panel simply
+  // doesn't render rather than inventing a record.
+  const selectedDealCommission = selectedDeal
+    ? commissions.find((commission) => commission.dealId === selectedDeal.id)
+    : undefined;
   const assignedContractor = selectedDeal?.assignedContractorId
     ? contractors.find(
         (contractor) => contractor.id === selectedDeal.assignedContractorId
@@ -1965,6 +1974,27 @@ OntarioReno Broker Portal`;
                     }
                   />
                 </label>
+                {/* 45-day balance clock. Some deals are paid in two parts —
+                    part of the commission up front, the rest a fixed term
+                    later. Reps see the countdown; admins start and settle it.
+                    Absent entirely on deals with no commission record yet. */}
+                {!isAddingDeal && selectedDeal && selectedDealCommission && (
+                  <div className="col-span-full rounded-[0.5rem] border border-slate-100 bg-[#fbfdff] p-3">
+                    <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-[#32639b]">
+                      Balance Clock
+                    </p>
+                    <div className="mt-2">
+                      <BalanceClockControl
+                        variant="panel"
+                        commission={selectedDealCommission}
+                        canEdit={isAdmin}
+                        onChange={(updates) =>
+                          updateCommission(selectedDealCommission.id, updates, currentUser)
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
                 {!isAddingDeal && selectedDeal && (
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     Assigned Contractor

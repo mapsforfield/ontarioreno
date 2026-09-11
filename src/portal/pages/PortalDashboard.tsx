@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { formatCurrency } from '../data/selectors';
 import { followUpSilenced, lostDealIds } from '../data/followUps';
+import { balanceClock, balanceClockNeedsAttention, formatDateKey } from '../data/balanceClock';
 import { needsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
 import { countUnworkedSubmissions } from '../data/submissions';
@@ -61,6 +62,7 @@ export default function PortalDashboard() {
     calculatePipelineValueForUser,
     calculateVisiblePendingCommission,
     calculateVisibleWonDeals,
+    commissions,
     contractors,
     deals,
     getVisibleAppointmentsForUser,
@@ -154,7 +156,7 @@ export default function PortalDashboard() {
     const h12 = h % 12 || 12;
     return m ? `${h12}:${String(m).padStart(2, '0')} ${p}` : `${h12} ${p}`;
   };
-  type AgendaItem = { id: string; kind: 'task' | 'consult' | 'followup' | 'stale'; title: string; subtitle: string; href: string; state?: Record<string, unknown>; urgent: boolean; sort: string };
+  type AgendaItem = { id: string; kind: 'task' | 'consult' | 'followup' | 'stale' | 'balance'; title: string; subtitle: string; href: string; state?: Record<string, unknown>; urgent: boolean; sort: string };
   const agendaItems: AgendaItem[] = (() => {
     const items: AgendaItem[] = [];
     myOpenTasks.forEach((t) => {
@@ -178,6 +180,28 @@ export default function PortalDashboard() {
       .sort((x, y) => getDaysSince(y.updatedAt) - getDaysSince(x.updatedAt))
       .slice(0, 3)
       .forEach((d) => items.push({ id: `stale-${d.id}`, kind: 'stale', title: d.homeownerName || 'Deal', subtitle: `${getDaysSince(d.updatedAt)}d untouched · ${d.status.replace(/_/g, ' ')}`, href: '/portal/deals', state: { openDealId: d.id }, urgent: false, sort: 'zzz' }));
+    // 45-day balance clocks that have come due. Scoped by visibleDeals, so an
+    // admin sees every one and a rep sees only the deals assigned to them —
+    // the rep whose sale it was should know the remainder is owed too. Quiet
+    // until day 45 actually arrives; see data/balanceClock.ts.
+    commissions.forEach((commission) => {
+      const deal = visibleDeals.find((d) => d.id === commission.dealId);
+      if (!deal) return;
+      const clock = balanceClock(commission, today);
+      if (!balanceClockNeedsAttention(clock)) return;
+      items.push({
+        id: `balance-${commission.id}`,
+        kind: 'balance',
+        title: `${deal.homeownerName || 'Deal'} — balance due`,
+        subtitle:
+          clock.status === 'overdue'
+            ? `${Math.abs(clock.daysRemaining)}d overdue · was due ${formatDateKey(clock.dueOn)}`
+            : `Day ${clock.days} · remainder owed today`,
+        href: '/portal/commissions',
+        urgent: true,
+        sort: clock.dueOn,
+      });
+    });
     return items.sort((a, b) => (a.urgent === b.urgent ? a.sort.localeCompare(b.sort) : a.urgent ? -1 : 1)).slice(0, 8);
   })();
   const agendaDot: Record<AgendaItem['kind'], string> = {
@@ -185,6 +209,7 @@ export default function PortalDashboard() {
     consult: 'bg-[#1B3C6C]',
     followup: 'bg-sky-400',
     stale: 'bg-orange-400',
+    balance: 'bg-emerald-500',
   };
 
   const summaryCards = [
