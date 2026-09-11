@@ -672,6 +672,11 @@ export type Commission = {
   /** One-off flat payout: total + rep amounts are entered manually and NOT
    *  recomputed from job value × rate. */
   customPayout?: boolean;
+  /** 45-day balance clock — see data/balanceClock.ts. Blank/absent on the
+   *  great majority of deals, which are paid in one go. */
+  balanceClockStartedAt?: string;
+  balanceClockDays?: number;
+  balanceSettledAt?: string;
 };
 
 export type ProposalTemplateType =

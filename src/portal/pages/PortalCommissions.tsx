@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { usePortalAuth } from '../auth';
+import BalanceClockControl from '../components/BalanceClockControl';
 import { dealWonDate } from '../../../lib/deal-won-date';
 
 /** The year a deal belongs to: when it was won, else its last edit. */
@@ -665,6 +666,17 @@ export default function PortalCommissions() {
                           }
                         />
                         <div><PayoutBadge status={adminStatus} /></div>
+                        {/* 45-day balance clock — only shows a control when a
+                            deal is actually paid in two parts. */}
+                        <div className="mt-2">
+                          <BalanceClockControl
+                            commission={commission}
+                            canEdit={currentUser?.role === 'admin'}
+                            onChange={(updates) =>
+                              updateCommission(commission.id, updates, currentUser)
+                            }
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
