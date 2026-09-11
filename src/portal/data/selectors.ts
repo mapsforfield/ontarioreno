@@ -64,7 +64,7 @@ export function calculateRepPendingCommission(repId: string): number {
 export function calculateAdminPendingNetCommission(): number {
   return commissions
     .filter((commission) => commission.payoutStatus !== 'paid')
-    .reduce((total, commission) => total + commission.adminNetCommission, 0);
+    .reduce((total, commission) => total + (commission.adminNetCommission ?? 0), 0);
 }
 
 export function calculatePipelineValue(repId: string): number {

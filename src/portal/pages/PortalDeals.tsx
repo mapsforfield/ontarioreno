@@ -3196,7 +3196,7 @@ OntarioReno Broker Portal`;
         </div>
       )}
 
-      {invoiceOpen && selectedDeal && (
+      {invoiceOpen && isAdmin && selectedDeal && (
         <Suspense fallback={null}>
           <CommissionInvoice
             deal={selectedDeal}

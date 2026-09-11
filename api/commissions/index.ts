@@ -2,7 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
-import { canReadCommission, commissionScopeFor } from '../../lib/commission-scope.js';
+import {
+  canReadCommission,
+  commissionScopeFor,
+  stripAdminLedger,
+} from '../../lib/commission-scope.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -25,12 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!commission || !canReadCommission(user, commission)) {
         return res.status(404).json({ error: 'Not found.' });
       }
-      return res.status(200).json(commission);
+      return res.status(200).json(stripAdminLedger(user, commission));
     }
     const commissions = await withSchema(() =>
       prisma.commission.findMany({ where: commissionScopeFor(user) })
     );
-    return res.status(200).json(commissions);
+    // Row scope is not enough on its own: a rep's OWN row still carries the
+    // total rate and the house's net, which is the whole arrangement.
+    return res.status(200).json(commissions.map((c) => stripAdminLedger(user, c)));
   }
 
   if (req.method === 'PUT' || req.method === 'PATCH') {
