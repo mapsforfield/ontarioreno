@@ -646,14 +646,14 @@ function syncCommissionWithDeal(commission: Commission, deal: Deal) {
     return {
       ...commission,
       adminNetCommission:
-        commission.adminTotalEstimatedCommission - commission.repEstimatedCommission,
+        (commission.adminTotalEstimatedCommission ?? 0) - commission.repEstimatedCommission,
       repId: deal.assignedRepId,
     };
   }
 
   const base = commissionableValue(deal);
   const repEstimatedCommission = Math.round(base * 0.05);
-  const adminTotalEstimatedCommission = Math.round(base * commission.adminTotalCommissionRate);
+  const adminTotalEstimatedCommission = Math.round(base * (commission.adminTotalCommissionRate ?? 0));
 
   return {
     ...commission,
@@ -683,7 +683,7 @@ function normalizeCommissionWithDeal(commission: Commission, deal: Deal) {
   // Admin's collected-net can't exceed the admin's net owed, nor go negative.
   const adminNetPaidCommission = Math.min(
     Math.max(synced.adminNetPaidCommission ?? 0, 0),
-    Math.max(synced.adminNetCommission, 0)
+    Math.max(synced.adminNetCommission ?? 0, 0)
   );
 
   return {
@@ -697,9 +697,40 @@ function normalizeCommissionWithDeal(commission: Commission, deal: Deal) {
   };
 }
 
+/** The house's side of a commission, as the client knows it. Mirrors
+ *  ADMIN_LEDGER_FIELDS in lib/commission-scope.ts — the server already deletes
+ *  these for a rep; this is the client half, so nothing downstream can put
+ *  them back. */
+function withoutAdminLedger(commission: Commission): Commission {
+  const {
+    adminTotalCommissionRate: _rate,
+    adminTotalEstimatedCommission: _total,
+    adminNetCommission: _net,
+    adminNetPaidCommission: _paid,
+    ...safe
+  } = commission;
+  void _rate; void _total; void _net; void _paid;
+  return safe;
+}
+
+/**
+ * `canSeeAdminLedger` is false for everyone but an admin, and it does real work
+ * rather than just re-stating the API.
+ *
+ * The sync below FILLS IN a commission for any won deal that doesn't have one,
+ * using the rate from localStorage — which on a rep's machine is the 0.1
+ * fallback, not the real rate. That would drop a fabricated total and net into
+ * a rep's client for a row the server never sent. Wrong numbers in devtools are
+ * not better than right ones; they still describe the shape of the
+ * arrangement, and the next person to read them would assume they're real.
+ *
+ * So a rep's commissions come out of here with no admin ledger at all, whether
+ * the row came from the API or was synthesised here.
+ */
 function syncCommissionsWithDeals(
   commissions: Commission[],
-  deals: Deal[]
+  deals: Deal[],
+  canSeeAdminLedger: boolean
 ): Commission[] {
   const dealsById = new Map(deals.map((deal) => [deal.id, deal]));
   const syncedCommissions = commissions.map((commission) => {
@@ -713,7 +744,8 @@ function syncCommissionsWithDeals(
     .filter((deal) => deal.status === 'won' && !deal.isHistorical && !commissionDealIds.has(deal.id))
     .map(createMissingCommissionForDeal);
 
-  return [...syncedCommissions, ...missingWonDealCommissions];
+  const all = [...syncedCommissions, ...missingWonDealCommissions];
+  return canSeeAdminLedger ? all : all.map(withoutAdminLedger);
 }
 
 // ─── API helper ───────────────────────────────────────────────────────────────
@@ -828,7 +860,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         financePartners: financePartners ?? [],
         deals,
         appointments: (appointments ?? []).map((a) => normalizeAppointment(a, deals)),
-        commissions: syncCommissionsWithDeals(commissions ?? [], deals),
+        commissions: syncCommissionsWithDeals(
+          commissions ?? [],
+          deals,
+          currentUser?.role === 'admin'
+        ),
         activities: activities ?? [],
         dispatches,
         proposals,
@@ -1154,7 +1190,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
           return deal?.status === 'won' && !deal.isHistorical && commission.payoutStatus !== 'paid';
         })
-        .reduce((total, commission) => total + commission.adminNetCommission, 0);
+        .reduce((total, commission) => total + (commission.adminNetCommission ?? 0), 0);
 
     const calculateAdminProjectedCommission = () =>
       state.commissions
@@ -1169,7 +1205,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         })
         .reduce(
           (total, commission) =>
-            total + commission.adminTotalEstimatedCommission,
+            total + (commission.adminTotalEstimatedCommission ?? 0),
           0
         );
 
@@ -2586,7 +2622,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               );
               const customPayout = updates.customPayout ?? commission.customPayout ?? false;
               const adminTotalCommissionRate =
-                updates.adminTotalCommissionRate ?? commission.adminTotalCommissionRate;
+                updates.adminTotalCommissionRate ?? commission.adminTotalCommissionRate ?? 0;
               // Custom payouts keep manually-entered rep + total; standard ones
               // derive them from job value (rep = 5%, total = job × rate).
               const repEst = customPayout
@@ -2595,11 +2631,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   ? Math.round(commissionableValue(deal) * 0.05)
                   : commission.repEstimatedCommission;
               const adminTotalEstimatedCommission = customPayout
-                ? Math.round(updates.adminTotalEstimatedCommission ?? commission.adminTotalEstimatedCommission)
+                ? Math.round(updates.adminTotalEstimatedCommission ?? commission.adminTotalEstimatedCommission ?? 0)
                 : updates.adminTotalEstimatedCommission ??
                   (deal
                     ? Math.round(commissionableValue(deal) * adminTotalCommissionRate)
-                    : commission.adminTotalEstimatedCommission);
+                    : commission.adminTotalEstimatedCommission ?? 0);
               const requestedPaid =
                 updates.repPaidCommission ?? commission.repPaidCommission;
               const repPaidCommission =

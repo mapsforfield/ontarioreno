@@ -36,3 +36,44 @@ export function canReadCommission(
 ): boolean {
   return user.role === 'admin' || commission.repId === user.id;
 }
+
+// ─── Field-level scope ───────────────────────────────────────────────────────
+
+/**
+ * The fields on a Commission that describe the HOUSE's side of the deal.
+ *
+ * Row-level scoping is not enough on its own. A rep's own commission row still
+ * carries the total rate (0.085), the total commission, and the net — so after
+ * scoping the list to their own rows, a rep reading the network response still
+ * had the whole arrangement. `adminTotalCommissionRate` is the rate itself; the
+ * other three each give it back when divided by the job value or added to the
+ * rep's own 5%.
+ *
+ * Kept as a list rather than three property deletes so that adding a field to
+ * the admin ledger is a one-line change here, and so the test can assert the
+ * list is actually empty on a rep's payload.
+ */
+export const ADMIN_LEDGER_FIELDS = [
+  'adminTotalCommissionRate',
+  'adminTotalEstimatedCommission',
+  'adminNetCommission',
+  'adminNetPaidCommission',
+] as const;
+
+/**
+ * Remove the house's side of a commission unless the reader is an admin.
+ *
+ * The fields are DELETED, not zeroed — a zero is a value a reader can mistake
+ * for real data, and it still says "this field exists and you are being shown
+ * something". Absent is unambiguous. Mirrors how api/contractors already
+ * handles the confidential `commissionRate`.
+ */
+export function stripAdminLedger<T extends Record<string, unknown>>(
+  user: { role: string },
+  commission: T
+): T {
+  if (user.role === 'admin') return commission;
+  const safe = { ...commission };
+  for (const field of ADMIN_LEDGER_FIELDS) delete safe[field];
+  return safe;
+}

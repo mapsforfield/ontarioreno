@@ -203,7 +203,7 @@ export function pendingBalanceClocks(
         commission,
         deal,
         outstanding: canSeeAmounts
-          ? Math.max(commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0), 0)
+          ? Math.max((commission.adminNetCommission ?? 0) - (commission.adminNetPaidCommission ?? 0), 0)
           : null,
       };
     })

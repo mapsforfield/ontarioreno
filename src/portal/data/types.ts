@@ -662,9 +662,15 @@ export type Commission = {
   repEstimatedCommission: number;
   repPaidCommission: number;
   payoutStatus: CommissionPayoutStatus;
-  adminTotalCommissionRate: number;
-  adminTotalEstimatedCommission: number;
-  adminNetCommission: number;
+  /** ── The house's side of the deal ──
+   *  Optional because the API DELETES these for anyone who isn't an admin:
+   *  the rate is confidential, and each of the others gives it back when
+   *  divided by the job value or added to the rep's own 5%. A rep's client
+   *  genuinely never has them, so every read must tolerate their absence —
+   *  see lib/commission-scope.ts. */
+  adminTotalCommissionRate?: number;
+  adminTotalEstimatedCommission?: number;
+  adminNetCommission?: number;
   /** How much of the admin's net (total − rep) has been collected from the
    *  contractor. Tracked independently of the rep payout. Optional only so
    *  older records/seed data compile; the DB column is non-null (default 0). */

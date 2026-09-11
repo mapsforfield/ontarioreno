@@ -75,7 +75,7 @@ function overallPaymentStatus(commission: Commission, deal: Deal): Exclude<Payme
     ? commission.repEstimatedCommission
     : calculateRepEstimatedCommission(deal);
   const repPaid = commission.repPaidCommission;
-  const adminNet = commission.adminTotalEstimatedCommission - repEst;
+  const adminNet = (commission.adminTotalEstimatedCommission ?? 0) - repEst;
   const adminPaid = commission.adminNetPaidCommission ?? 0;
   const remaining = Math.max(repEst - repPaid, 0) + Math.max(adminNet - adminPaid, 0);
   const paidSoFar =
@@ -339,7 +339,7 @@ export default function PortalCommissions() {
         acc.paidOut += commission.repPaidCommission;
         acc.paidToMe += commission.adminNetPaidCommission ?? 0;
         if (!deal.isHistorical && projectedStatuses.includes(deal.status)) {
-          acc.projected += commission.adminTotalEstimatedCommission;
+          acc.projected += commission.adminTotalEstimatedCommission ?? 0;
         }
         if (deal.status === 'won' && !deal.isHistorical) {
           // Two independent ledgers: what's still owed to the rep, and what's
@@ -349,7 +349,7 @@ export default function PortalCommissions() {
             0
           );
           acc.adminNetPending += Math.max(
-            commission.adminNetCommission - (commission.adminNetPaidCommission ?? 0),
+            (commission.adminNetCommission ?? 0) - (commission.adminNetPaidCommission ?? 0),
             0
           );
         }
@@ -560,7 +560,7 @@ export default function PortalCommissions() {
                   const repRemaining = Math.max(repEstimatedCommission - commission.repPaidCommission, 0);
                   const repStatus = derivePayoutStatus(commission.repPaidCommission, repEstimatedCommission);
                   // Your ledger: your net vs. what you've collected from the contractor.
-                  const adminNet = commission.adminTotalEstimatedCommission - repEstimatedCommission;
+                  const adminNet = (commission.adminTotalEstimatedCommission ?? 0) - repEstimatedCommission;
                   const adminReceived = commission.adminNetPaidCommission ?? 0;
                   const adminRemaining = Math.max(adminNet - adminReceived, 0);
                   const adminStatus = derivePayoutStatus(adminReceived, adminNet);
@@ -597,7 +597,7 @@ export default function PortalCommissions() {
                           <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
                         ) : (
                           <CommitNumberInput
-                            value={commission.adminTotalCommissionRate * 100}
+                            value={(commission.adminTotalCommissionRate ?? 0) * 100}
                             step={0.5}
                             className="w-20"
                             onCommit={(v) =>
@@ -615,7 +615,7 @@ export default function PortalCommissions() {
                       </td>
                       <td className="px-4 py-4">
                         <CommitNumberInput
-                          value={commission.adminTotalEstimatedCommission}
+                          value={commission.adminTotalEstimatedCommission ?? 0}
                           className="w-28"
                           onCommit={(v) =>
                             updateCommission(commission.id, { adminTotalEstimatedCommission: v }, currentUser)
