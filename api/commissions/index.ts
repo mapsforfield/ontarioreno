@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
+import { canReadCommission, commissionScopeFor } from '../../lib/commission-scope.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -14,12 +15,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query['id'] as string | undefined;
 
   if (req.method === 'GET') {
+    // A commission row carries the admin's net alongside the rep's cut, and
+    // the two together give away the total rate. Scope is enforced here, not
+    // in the client — see lib/commission-scope.ts.
     if (id) {
       const commission = await prisma.commission.findUnique({ where: { id } });
-      if (!commission) return res.status(404).json({ error: 'Not found.' });
+      // Same 404 either way: a rep asking for someone else's row learns only
+      // that they can't have it, not that it exists.
+      if (!commission || !canReadCommission(user, commission)) {
+        return res.status(404).json({ error: 'Not found.' });
+      }
       return res.status(200).json(commission);
     }
-    const commissions = await withSchema(() => prisma.commission.findMany());
+    const commissions = await withSchema(() =>
+      prisma.commission.findMany({ where: commissionScopeFor(user) })
+    );
     return res.status(200).json(commissions);
   }
 
