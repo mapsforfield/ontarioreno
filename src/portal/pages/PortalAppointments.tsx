@@ -301,6 +301,18 @@ function coordsInOntario(lat?: number | null, lon?: number | null) {
   return lat != null && lon != null && lat >= 41.5 && lat <= 57 && lon >= -95.5 && lon <= -74;
 }
 
+/** Href that hands an address to the phone's navigation apps.
+ *  On Android a `geo:` URI raises the app chooser (Google Maps / Waze / …),
+ *  which is what a rep wants standing in a driveway. Everywhere else — iOS
+ *  Safari and desktop — `geo:` has no handler, so fall back to a Google Maps
+ *  search URL, which opens the Maps app on iOS and the web map on desktop. */
+function mapsHref(address: string) {
+  const q = encodeURIComponent(address);
+  const isAndroid =
+    typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+  return isAndroid ? `geo:0,0?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+
 function getDaysSince(value: string) {
   if (!value) return 0;
   const start = new Date(value);
@@ -3886,12 +3898,27 @@ export default function PortalAppointments() {
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                       Address
                     </p>
-                    <p className="mt-1 text-sm font-black text-slate-950">
-                      {(isEventType(form.appointmentType)
+                    {(() => {
+                      const fullAddress = isEventType(form.appointmentType)
                         ? form.address
-                        : [form.address, form.city].filter(Boolean).join(', ')) ||
-                        'Address not set'}
-                    </p>
+                        : [form.address, form.city].filter(Boolean).join(', ');
+                      if (!fullAddress) {
+                        return (
+                          <p className="mt-1 text-sm font-black text-slate-950">Address not set</p>
+                        );
+                      }
+                      return (
+                        <a
+                          href={mapsHref(fullAddress)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open in maps"
+                          className="mt-1 block text-sm font-black text-[#1d4ed8] underline decoration-[#93b4e6] underline-offset-2 hover:decoration-[#1d4ed8]"
+                        >
+                          {fullAddress}
+                        </a>
+                      );
+                    })()}
                   </div>
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
