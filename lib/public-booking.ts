@@ -34,6 +34,11 @@ export type BookingRequest = {
   leadTimeHours: number;
   bookingHorizonDays: number;
   maxBookingsPerRepPerDay: number;
+  /**
+   * Admin-recorded per-rep, per-date cap exception. Optional — omitted, every
+   * rep is measured against the flat cap above, exactly as before.
+   */
+  dayCapFor?: (repId: string, date: string) => number;
   primaryRepPrimingBookings: number;
   maxSameDayTravelKm: number;
   /**
@@ -139,6 +144,7 @@ export async function bookSlot(
     leadTimeHours: request.leadTimeHours,
     bookingHorizonDays: request.bookingHorizonDays,
     maxBookingsPerRepPerDay: request.maxBookingsPerRepPerDay,
+    dayCapFor: request.dayCapFor,
     primaryRepPrimingBookings: request.primaryRepPrimingBookings,
     maxSameDayTravelKm: request.maxSameDayTravelKm,
     visitMinutes: request.visitMinutes,

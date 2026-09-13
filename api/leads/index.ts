@@ -32,8 +32,13 @@ import {
   BOOKABLE_REP_QUERY,
   SCHEDULING_APPOINTMENT_SELECT,
   availableSlotsForLead as sharedAvailableSlotsForLead,
+  loadSchedulingSettings,
   leadIsRemote,
 } from '../../lib/lead-availability.js';
+import {
+  applySchedulingSettings,
+  dayCapResolver,
+} from '../../lib/scheduling-settings.js';
 import {
   bookSlot,
   SYSTEM_BOOKING_USER_ID,
@@ -1947,8 +1952,14 @@ async function bookVisitForLead(params: {
   if (!lead.schedulingArea) {
     return { ok: false, status: 400, payload: { error: 'This lead has no scheduling area.' } };
   }
-  const program =
+  const baseProgram =
     programByKey(lead.programKey) ?? programForArea(lead.schedulingArea as SchedulingArea);
+  // The admin's calendar settings override the program's shipped numbers. Read
+  // here so booking is measured against exactly the same cap, radius and floor
+  // that availableSlotsForLead just offered the homeowner — a booking path that
+  // used the defaults would reject the slot its own calendar had shown.
+  const schedulingSettings = await loadSchedulingSettings(prisma as never);
+  const program = baseProgram ? applySchedulingSettings(baseProgram, schedulingSettings) : null;
   if (!program || !program.enabled) {
     return {
       ok: false,
@@ -2110,6 +2121,7 @@ async function bookVisitForLead(params: {
       leadTimeHours: program.leadTimeHours,
       bookingHorizonDays: program.bookingHorizonDays,
       maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+      dayCapFor: dayCapResolver(schedulingSettings),
       primaryRepPrimingBookings: program.primaryRepPrimingBookings,
       maxSameDayTravelKm: program.maxSameDayTravelKm,
       visitMinutes: program.visitMinutes,

@@ -269,7 +269,7 @@ export type ProgramConfig = {
  * reserving 120 minutes exactly fill that window, so travel buffer is implicit
  * and no buffer arithmetic is needed anywhere.
  */
-const SHARED_SCHEDULING: Pick<
+export const SHARED_SCHEDULING: Pick<
   ProgramConfig,
   | 'visitMinutes' | 'reservationMinutes' | 'slotStartTimes' | 'leadTimeHours' | 'bookingHorizonDays'
   | 'maxBookingsPerRepPerDay' | 'primaryRepPrimingBookings' | 'maxSameDayTravelKm'
