@@ -5,6 +5,12 @@ import { prisma } from '../../lib/prisma.js';
 import { withSchema } from '../../lib/schema.js';
 import { parseNoteTemplates } from '../../lib/note-templates.js';
 import {
+  parseSchedulingSettings,
+  pruneExpiredOverrides,
+  SCHEDULING_SETTINGS_KEY,
+} from '../../lib/scheduling-settings.js';
+import { torontoWallClock } from '../../lib/scheduling.js';
+import {
   reminderContextFor,
   resyncAppointmentReminders,
   suppressPendingReminders,
@@ -129,6 +135,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         create: { key: 'rep_access', value: JSON.stringify(access) },
       }));
       return res.status(200).json(access);
+    }
+
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
+
+  // ── /api/auth/scheduling-settings ─────────────────────────────────────────
+  // The calendar's numbers — daily cap, priming, travel radius, lead time,
+  // horizon — plus per-rep, per-date cap exceptions. Any authed user can READ
+  // (the portal shows reps what today's cap is); only admins can WRITE.
+  //
+  // Validation lives in lib/scheduling-settings.ts rather than here, so the
+  // panel's bounds and the server's bounds are one list. A field the panel
+  // would reject cannot be smuggled in by posting to this endpoint directly.
+  if (action === 'scheduling-settings') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    if (req.method === 'GET') {
+      const row = await withSchema(() =>
+        prisma.setting.findUnique({ where: { key: SCHEDULING_SETTINGS_KEY } })
+      );
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(parseSchedulingSettings(row?.value));
+    }
+
+    if (req.method === 'POST') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      // Round-trip through the parser: whatever arrives is clamped to the same
+      // bounds a stored value is read back under.
+      const clean = parseSchedulingSettings(JSON.stringify(req.body ?? {}));
+      // Yesterday's exception is spent. Pruning on write keeps the list from
+      // growing forever without making a read do a write.
+      clean.dayCapOverrides = pruneExpiredOverrides(
+        clean.dayCapOverrides,
+        torontoWallClock().slice(0, 10)
+      );
+      await withSchema(() =>
+        prisma.setting.upsert({
+          where: { key: SCHEDULING_SETTINGS_KEY },
+          update: { value: JSON.stringify(clean) },
+          create: { key: SCHEDULING_SETTINGS_KEY, value: JSON.stringify(clean) },
+        })
+      );
+      return res.status(200).json(clean);
     }
 
     return res.status(405).json({ error: 'Method not allowed.' });

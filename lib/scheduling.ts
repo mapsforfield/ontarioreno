@@ -438,6 +438,15 @@ export type AvailabilityInput = {
   leadTimeHours: number;
   bookingHorizonDays: number;
   maxBookingsPerRepPerDay: number;
+  /**
+   * Per-rep, per-date cap, when an admin has recorded an exception for that day.
+   *
+   * Optional, and when absent every rep is measured against the flat
+   * `maxBookingsPerRepPerDay` above — which is what every caller did before
+   * there was a settings panel. See lib/scheduling-settings.ts for where the
+   * exceptions come from and why they are scoped to a single date.
+   */
+  dayCapFor?: (repId: string, date: string) => number;
   primaryRepPrimingBookings: number;
   maxSameDayTravelKm: number;
   /**
@@ -495,7 +504,10 @@ export function eligibleRepsForSlot(input: AvailabilityInput, date: string, time
       if (destinationIsRemote) return true;
 
       // Daily cap — a rep at capacity is done for the day regardless of gaps.
-      if (day.length >= maxBookingsPerRepPerDay) return false;
+      // An admin may have raised (or lowered) it for this one rep on this one
+      // date; with no exception recorded, this is the flat cap unchanged.
+      const cap = input.dayCapFor?.(rep.id, date) ?? maxBookingsPerRepPerDay;
+      if (day.length >= cap) return false;
       if (!repEligibleForArea(day, area)) return false;
       if (collidesWithExisting(time, reservationMinutes, day)) return false;
       // Keep a rep's day geographically tight — but let a genuine gap in the

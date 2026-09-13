@@ -15,6 +15,34 @@ import { formatCurrency } from '../data/selectors';
 import { generateTemporaryPassword, usePortalData } from '../data/store';
 import { ActivityEntityType, NoteTemplate, User } from '../data/types';
 import { REP_FEATURES, repCanAccess } from '../data/repFeatures';
+import {
+  SCHEDULING_FIELDS,
+  clampSchedulingField,
+  type DayCapOverride,
+  type SchedulingSettings,
+} from '../../../lib/scheduling-settings';
+
+/** Today in Ontario, as YYYY-MM-DD — the floor for a cap exception's date. */
+function todayInOntario(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function formatOverrideDate(date: string): string {
+  try {
+    return new Date(`${date}T12:00:00`).toLocaleDateString('en-CA', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return date;
+  }
+}
 
 type RepFormState = {
   active: boolean;
@@ -138,6 +166,8 @@ export default function PortalAdmin() {
     setRepAccess,
     noteTemplates,
     setNoteTemplates,
+    schedulingSettings,
+    setSchedulingSettings,
     contractors,
     addContractorAccount,
   } = usePortalData();
@@ -184,6 +214,55 @@ export default function PortalAdmin() {
     setTplSaved(true);
     setTimeout(() => setTplSaved(false), 2000);
   };
+  // ── Calendar settings ──────────────────────────────────────────────────────
+  // Draft-and-save rather than save-on-change: these numbers decide what the
+  // public calendar offers, and a half-typed "1" on the way to "14" would be a
+  // live setting for as long as it took to type the second digit.
+  const [calDraft, setCalDraft] = useState<SchedulingSettings>(schedulingSettings);
+  const [calDirty, setCalDirty] = useState(false);
+  const [calSaved, setCalSaved] = useState(false);
+  useEffect(() => { if (!calDirty) setCalDraft(schedulingSettings); }, [schedulingSettings, calDirty]);
+  const editCal = (patch: Partial<SchedulingSettings>) => {
+    setCalDirty(true);
+    setCalDraft((cur) => ({ ...cur, ...patch }));
+  };
+  const saveCal = async () => {
+    await setSchedulingSettings(calDraft);
+    setCalDirty(false);
+    setCalSaved(true);
+    setTimeout(() => setCalSaved(false), 2000);
+  };
+  const [ovRepId, setOvRepId] = useState('');
+  const [ovDate, setOvDate] = useState('');
+  const [ovMax, setOvMax] = useState('4');
+  const [ovNotice, setOvNotice] = useState('');
+  const addOverride = () => {
+    if (!ovRepId || !ovDate) {
+      setOvNotice('Pick a rep and a date.');
+      return;
+    }
+    const row: DayCapOverride = {
+      repId: ovRepId,
+      date: ovDate,
+      maxBookings: clampSchedulingField('maxBookingsPerRepPerDay', ovMax, calDraft.maxBookingsPerRepPerDay),
+    };
+    // One row per rep per date — replacing rather than appending, so the list
+    // can never show two different caps for the same day.
+    editCal({
+      dayCapOverrides: [
+        ...calDraft.dayCapOverrides.filter((o) => !(o.repId === row.repId && o.date === row.date)),
+        row,
+      ],
+    });
+    setOvNotice('');
+    setOvDate('');
+  };
+  const removeOverride = (repId: string, date: string) => {
+    editCal({
+      dayCapOverrides: calDraft.dayCapOverrides.filter((o) => !(o.repId === repId && o.date === date)),
+    });
+  };
+
   const [commissionInput, setCommissionInput] = useState(String(Math.round(defaultCommissionRate * 100)));
   const [commissionSaved, setCommissionSaved] = useState(false);
   const repManagementRef = useRef<HTMLElement>(null);
@@ -441,6 +520,147 @@ export default function PortalAdmin() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Booking</p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">Calendar settings</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              The rules the public calendar and every portal booking are measured against.
+              Changes take effect on the next slot the site offers — they never move an
+              appointment that is already booked.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {calSaved && <span className="text-sm font-bold text-emerald-600">Saved</span>}
+            <button
+              type="button"
+              onClick={saveCal}
+              disabled={!calDirty}
+              className="rounded-[0.5rem] bg-[#1B3C6C] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#153158] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save settings
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {SCHEDULING_FIELDS.map((field) => (
+            <label key={field.key} className="rounded-[0.5rem] border border-slate-200 p-3">
+              <span className="block text-sm font-black text-slate-800">{field.label}</span>
+              <span className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={field.min}
+                  max={field.max}
+                  value={calDraft[field.key]}
+                  onChange={(e) => editCal({ [field.key]: Number(e.target.value) } as Partial<SchedulingSettings>)}
+                  onBlur={(e) =>
+                    editCal({
+                      [field.key]: clampSchedulingField(field.key, e.target.value, schedulingSettings[field.key]),
+                    } as Partial<SchedulingSettings>)
+                  }
+                  className="w-24 rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800"
+                />
+                <span className="text-xs font-bold text-slate-500">{field.unit}</span>
+              </span>
+              <span className="mt-2 block text-xs font-semibold text-slate-500">{field.help}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <h3 className="text-lg font-black text-slate-950">One-day exceptions</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Give one rep a different cap on one date — a fourth appointment on a day their
+            colleague is off, say. The row applies to that date only and is cleared once the
+            date has passed, so the normal cap above comes back on its own.
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {calDraft.dayCapOverrides.length === 0 && (
+              <p className="text-sm font-semibold text-slate-400">
+                No exceptions — every rep is capped at {calDraft.maxBookingsPerRepPerDay} a day.
+              </p>
+            )}
+            {[...calDraft.dayCapOverrides]
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .map((override) => (
+                <div
+                  key={`${override.repId}|${override.date}`}
+                  className="flex items-center justify-between gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2"
+                >
+                  <span className="min-w-0 text-sm font-bold text-slate-800">
+                    {users.find((u) => u.id === override.repId)?.name ?? 'Former rep'}
+                    <span className="font-semibold text-slate-500">
+                      {' · '}{formatOverrideDate(override.date)}{' · '}
+                      {override.maxBookings} appointments
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeOverride(override.repId, override.date)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.5rem] border border-slate-200 text-slate-400 transition hover:border-red-200 hover:text-red-600"
+                    aria-label="Remove exception"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              Rep
+              <select
+                value={ovRepId}
+                onChange={(e) => setOvRepId(e.target.value)}
+                className="mt-1 block rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800"
+              >
+                <option value="">Choose…</option>
+                {reps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>{rep.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              Date
+              <input
+                type="date"
+                value={ovDate}
+                min={todayInOntario()}
+                onChange={(e) => setOvDate(e.target.value)}
+                className="mt-1 block rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              Appointments
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={ovMax}
+                onChange={(e) => setOvMax(e.target.value)}
+                className="mt-1 block w-24 rounded-[0.5rem] border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addOverride}
+              className="inline-flex items-center gap-2 rounded-[0.5rem] border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              <Plus className="h-4 w-4" /> Add exception
+            </button>
+            {ovNotice && <span className="text-sm font-bold text-red-600">{ovNotice}</span>}
+          </div>
+          {calDirty && (
+            <p className="mt-3 text-sm font-bold text-amber-600">
+              Unsaved — nothing changes on the calendar until you press Save settings.
+            </p>
+          )}
         </div>
       </section>
 

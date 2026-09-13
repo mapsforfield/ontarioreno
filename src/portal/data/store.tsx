@@ -54,6 +54,10 @@ import {
 } from './types';
 import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 import { mergeNotes } from '../../../lib/consultation-notes';
+import {
+  schedulingDefaults,
+  type SchedulingSettings,
+} from '../../../lib/scheduling-settings';
 import { resolvesRescheduleRequest } from '../../../lib/sms-reply-resolution';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
@@ -112,6 +116,8 @@ type PortalDataState = {
   repAccess: Record<string, boolean>;
   /** Reusable Customer Notes templates for booking consultations. */
   noteTemplates: NoteTemplate[];
+  /** Admin-configurable calendar rules (daily cap, radius, lead time, horizon). */
+  schedulingSettings: SchedulingSettings;
 };
 
 type ContractorDispatchDraft = Omit<
@@ -320,6 +326,7 @@ type PortalDataContextValue = PortalDataState & {
   getInteractionsForLead: (leadId: string) => Interaction[];
   setRepAccess: (access: Record<string, boolean>) => Promise<void>;
   setNoteTemplates: (templates: NoteTemplate[]) => Promise<void>;
+  setSchedulingSettings: (settings: SchedulingSettings) => Promise<void>;
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   deleteTrackerRow: (id: string) => Promise<void>;
@@ -405,6 +412,9 @@ const emptyState: PortalDataState = {
   loadError: false,
   repAccess: {},
   noteTemplates: [],
+  // The shipped defaults, so a render before the fetch lands shows the real
+  // numbers rather than zeroes.
+  schedulingSettings: schedulingDefaults(),
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | undefined>(
@@ -843,9 +853,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       apiCall<Lead[]>('/api/leads'),
       apiCall<Record<string, boolean>>('/api/auth/rep-access'),
       apiCall<NoteTemplate[]>('/api/auth/note-templates'),
+      apiCall<SchedulingSettings>('/api/auth/scheduling-settings'),
       apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
       apiCall<FinancePartner[]>('/api/contractors?_resource=finance_partners'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, contractPresets, financePartners]) => {
+    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -886,6 +897,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         loadError: [users, contractors, rawDeals, appointments, commissions].some((r) => r === null),
         repAccess: repAccess ?? {},
         noteTemplates: noteTemplates ?? [],
+        schedulingSettings: schedulingSettings ?? schedulingDefaults(),
         contractPresets: contractPresets ?? [],
       });
       setIsLoading(false);
@@ -1731,6 +1743,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           loadError: current.loadError,
           repAccess: current.repAccess,
           noteTemplates: current.noteTemplates,
+          schedulingSettings: current.schedulingSettings,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
@@ -3977,6 +3990,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           body: JSON.stringify(access),
         });
+      },
+
+      setSchedulingSettings: async (settings) => {
+        // Optimistic, then reconciled with what the server actually stored —
+        // the API clamps out-of-range numbers and drops expired exceptions, so
+        // the panel must show the saved value, not the typed one.
+        setState((current) => ({ ...current, schedulingSettings: settings }));
+        const saved = await apiCall<SchedulingSettings>('/api/auth/scheduling-settings', {
+          method: 'POST',
+          body: JSON.stringify(settings),
+        });
+        if (saved) setState((current) => ({ ...current, schedulingSettings: saved }));
       },
 
       setNoteTemplates: async (templates) => {

@@ -27,6 +27,14 @@ import {
   type ProgramConfig,
   type SchedulingArea,
 } from './program-config.js';
+import {
+  applySchedulingSettings,
+  dayCapResolver,
+  parseSchedulingSettings,
+  schedulingDefaults,
+  SCHEDULING_SETTINGS_KEY,
+  type SchedulingSettings,
+} from './scheduling-settings.js';
 import type { LeadSlotsPayload, SlotBlock } from './lead-slots.js';
 
 /** Statuses that still occupy a rep's calendar. */
@@ -86,7 +94,36 @@ export type AvailabilityStore = {
   repDayOff: {
     findMany: (args: unknown) => Promise<Array<{ userId: string; date: string }>>;
   };
+  /**
+   * Admin-edited calendar settings (Setting.scheduling_settings).
+   *
+   * Optional: a caller that does not supply it — and any test written before
+   * the settings panel existed — computes against the shipped defaults, which
+   * is exactly what this function did previously.
+   */
+  setting?: {
+    findUnique: (args: unknown) => Promise<{ value: string } | null>;
+  };
 };
+
+/**
+ * Read the admin's calendar settings, falling back to the shipped defaults.
+ *
+ * Swallows a read failure on purpose. The settings row is an override on
+ * working defaults, so a database hiccup here should hand a homeowner the
+ * normal calendar, not an error page.
+ */
+export async function loadSchedulingSettings(
+  store: Pick<AvailabilityStore, 'setting'>
+): Promise<SchedulingSettings> {
+  if (!store.setting) return schedulingDefaults();
+  try {
+    const row = await store.setting.findUnique({ where: { key: SCHEDULING_SETTINGS_KEY } });
+    return parseSchedulingSettings(row?.value);
+  } catch {
+    return schedulingDefaults();
+  }
+}
 
 /** Program the lead was CAPTURED under, falling back to the area's. */
 export function programForLead(lead: AvailabilityLead): ProgramConfig | null {
@@ -116,8 +153,13 @@ export async function availableSlotsForLead(
   // Keying on the lead is what lets two Ontario-wide programs coexist: they
   // share the ONTARIO area, so resolving by area alone would hand every one of
   // them the first match.
-  const program = programForLead(lead);
-  if (!program) return empty({ reason: 'NO_AREA' });
+  const baseProgram = programForLead(lead);
+  if (!baseProgram) return empty({ reason: 'NO_AREA' });
+  // The admin's panel overrides the program's shipped numbers. Applied here,
+  // before anything reads them, so the horizon, the lead-time floor and the cap
+  // in the payload below all describe the same calendar.
+  const settings = await loadSchedulingSettings(store);
+  const program = applySchedulingSettings(baseProgram, settings);
   if (!program.enabled) {
     return empty(
       program.closure
@@ -172,6 +214,7 @@ export async function availableSlotsForLead(
     leadTimeHours: program.leadTimeHours,
     bookingHorizonDays: program.bookingHorizonDays,
     maxBookingsPerRepPerDay: program.maxBookingsPerRepPerDay,
+    dayCapFor: dayCapResolver(settings),
     primaryRepPrimingBookings: program.primaryRepPrimingBookings,
     maxSameDayTravelKm: program.maxSameDayTravelKm,
     visitMinutes: program.visitMinutes,
