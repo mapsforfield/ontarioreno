@@ -233,6 +233,25 @@ export default function Home() {
         </div>
       </section>
 
+      {/* The booking demo, first thing after the hero.
+
+          It was lower down at first, sitting after the trust section on the
+          reasoning that trust earns the right to ask. In practice that put
+          the page's actual conversion six sections deep, below three
+          sections about money and one about rooms, where most readers never
+          reached it. The hero makes the promise; this shows the promise
+          costs three taps. That is the strongest thing the page has and it
+          now runs second.
+
+          This does NOT disturb the order argued for below: financing still
+          comes before the hubs, because "can I afford this at all?" still
+          precedes "which room?". What changed is that neither of those is
+          the first thing a reader meets any more.
+
+          It plays a REPLICA of /consultation, not the live flow. See
+          BookingFlowDemo for why, and for what that costs. */}
+      <BookingFlowDemo />
+
       {/* Financing first, then the hubs.
 
           Both of these sit above the fold-adjacent fold for a reason, and
@@ -623,19 +642,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* The booking demo sits here, directly after the trust section, and
-          deliberately before /match's "Ready to start your project?".
-
-          Order is the argument: the trust section earns the right to ask,
-          this answers the question that actually stalls a booking — "how
-          long is this, and who is going to call me" — and only then does
-          the page make its ask. Put it above the trust section and it is a
-          stranger demanding a phone number.
-
-          It plays a REPLICA of /consultation, not the live flow. See
-          BookingFlowDemo for why, and for what that costs. */}
-      <BookingFlowDemo />
 
       <div className="hidden md:block">
         <CitySelectorSection />

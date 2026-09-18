@@ -328,7 +328,12 @@ export default function BookingFlowDemo() {
   return (
     <section
       ref={sectionRef}
-      className="border-b border-slate-100 bg-slate-50 py-16 lg:py-20"
+      /* White, not slate-50: this sits between the dark hero and the
+         financing band, and the band is slate-50. Two slate grounds in a
+         row separated by a hairline reads as one section that failed to
+         load a background, which is the exact fault the financing band's
+         own note describes running into. */
+      className="border-b border-slate-100 bg-white py-16 lg:py-20"
       aria-labelledby="booking-demo-heading"
     >
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-16 lg:px-8">
