@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
+import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
 import { CostGuideCapture } from '../components/CostGuideCapture';
 import { HUB_CARDS } from '../data/projects/showcase';
@@ -622,6 +623,19 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* The booking demo sits here, directly after the trust section, and
+          deliberately before /match's "Ready to start your project?".
+
+          Order is the argument: the trust section earns the right to ask,
+          this answers the question that actually stalls a booking — "how
+          long is this, and who is going to call me" — and only then does
+          the page make its ask. Put it above the trust section and it is a
+          stranger demanding a phone number.
+
+          It plays a REPLICA of /consultation, not the live flow. See
+          BookingFlowDemo for why, and for what that costs. */}
+      <BookingFlowDemo />
 
       <div className="hidden md:block">
         <CitySelectorSection />
