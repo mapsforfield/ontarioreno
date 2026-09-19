@@ -80,7 +80,27 @@ const FIELDS = [
 
 type Cursor = { x: number; y: number; shown: boolean };
 
-export default function BookingFlowDemo() {
+/**
+ * `aside` and `footer` exist because the phone is roughly 700px tall and the
+ * booking copy beside it is roughly 450px. That left a quarter of the section
+ * as dead space at desktop width, directly above a financing band that was
+ * paying a full section's padding for content that fits in the gap.
+ *
+ * `aside` lands in the left column under a hairline, in that dead space.
+ * `footer` runs full width under both columns, for a row of terms that wants
+ * the whole measure. Both are optional; with neither passed this renders
+ * exactly as it did before.
+ *
+ * The caller keeps ownership of whatever it passes — the point is to lend
+ * layout, not to absorb someone else's content and its reasoning.
+ */
+export default function BookingFlowDemo({
+  aside,
+  footer,
+}: {
+  aside?: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
   const screenRef = useRef<HTMLDivElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
 
@@ -336,9 +356,15 @@ export default function BookingFlowDemo() {
       className="border-b border-slate-100 bg-white py-16 lg:py-20"
       aria-labelledby="booking-demo-heading"
     >
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-16 lg:px-8">
-        {/* ── the claim ── */}
-        <div>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Explicit row/column placement rather than source order, so the
+            phone can span both rows at desktop while the DOM stays in
+            reading order: claim, screen, aside. That DOM order is also the
+            mobile order, which is the one that matters — the claim sets up
+            the screen, and the screen earns the aside. */}
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-14">
+          {/* ── the claim ── */}
+          <div className="lg:col-start-1 lg:row-start-1 lg:self-center">
           <p className="mb-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B3C6C]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
             Booking is open
@@ -409,7 +435,7 @@ export default function BookingFlowDemo() {
         </div>
 
         {/* ── the screen ── */}
-        <div className="relative mx-auto w-full max-w-[23.5rem] justify-self-center">
+        <div className="relative mx-auto w-full max-w-[23.5rem] justify-self-center lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-center">
           <div className="relative overflow-hidden rounded-[2.125rem] bg-slate-900 p-2.5 shadow-[0_2px_6px_rgba(15,23,42,0.12),0_24px_56px_rgba(15,23,42,0.2)]">
             <div
               ref={screenRef}
@@ -675,6 +701,18 @@ export default function BookingFlowDemo() {
             </div>
           </div>
         </div>
+
+          {/* ── the aside ── fills the gap the phone leaves in the left column */}
+          {aside ? (
+            <div className="border-t border-slate-200 pt-8 lg:col-start-1 lg:row-start-2 lg:pt-9">
+              {aside}
+            </div>
+          ) : null}
+        </div>
+
+        {footer ? (
+          <div className="mt-10 border-t border-[#1B3C6C]/15 pt-6 lg:mt-12">{footer}</div>
+        ) : null}
       </div>
     </section>
   );
