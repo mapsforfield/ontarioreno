@@ -758,9 +758,14 @@ export default function BookingFlowDemo({
                 }`}
                 style={{ transform: `translate(${cursor.x}px, ${cursor.y}px)` }}
               >
+                {/* The logo's light blue — the colour "Ontario" is set in,
+                    sampled from public/logo.png — not the navy the UI itself
+                    is built from. A #1B3C6C ripple was invisible for half the
+                    clicks, because the things worth clicking (a selected day,
+                    a chosen slot, the primary button) are that exact navy. */}
                 <span
                   key={clicks}
-                  className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#1B3C6C] motion-safe:animate-[ping_0.5s_ease-out_1]"
+                  className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#508CC8] motion-safe:animate-[ping_0.5s_ease-out_1]"
                   style={{ opacity: clicks ? undefined : 0 }}
                 />
                 <svg
