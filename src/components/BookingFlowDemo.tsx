@@ -94,12 +94,44 @@ type Cursor = { x: number; y: number; shown: boolean };
  * The caller keeps ownership of whatever it passes — the point is to lend
  * layout, not to absorb someone else's content and its reasoning.
  */
+/**
+ * How the screen is framed.
+ *
+ *   device — a phone: thick dark bezel, hardware radius.
+ *   slim   — a hairline device frame, most of the weight removed.
+ *   flat   — no device at all: the UI floats as a card on its own shadow.
+ *
+ * `flat` is the cheapest in height (no bezel padding) and reads as product
+ * UI rather than as a photograph of a phone.
+ */
+export type DemoFrame = 'device' | 'slim' | 'flat';
+
+const FRAMES: Record<DemoFrame, { outer: string; inner: string }> = {
+  device: {
+    outer:
+      'rounded-[2.125rem] bg-slate-900 p-2.5 shadow-[0_2px_6px_rgba(15,23,42,0.12),0_24px_56px_rgba(15,23,42,0.2)]',
+    inner: 'rounded-[1.625rem]',
+  },
+  slim: {
+    outer:
+      'rounded-[1.75rem] bg-white p-1 ring-1 ring-slate-900/12 shadow-[0_2px_6px_rgba(15,23,42,0.08),0_18px_44px_rgba(15,23,42,0.16)]',
+    inner: 'rounded-[1.5rem]',
+  },
+  flat: {
+    outer:
+      'rounded-[1.25rem] shadow-[0_1px_2px_rgba(15,23,42,0.06),0_16px_40px_rgba(15,23,42,0.16)] ring-1 ring-slate-900/8',
+    inner: 'rounded-[1.25rem]',
+  },
+};
+
 export default function BookingFlowDemo({
   aside,
   footer,
+  frame = 'device',
 }: {
   aside?: React.ReactNode;
   footer?: React.ReactNode;
+  frame?: DemoFrame;
 }) {
   const screenRef = useRef<HTMLDivElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -166,9 +198,19 @@ export default function BookingFlowDemo({
     if (!el || !screen) return;
     const a = el.getBoundingClientRect();
     const b = screen.getBoundingClientRect();
+
+    /* On mobile the whole device is drawn at full size and scaled down with a
+       transform, so getBoundingClientRect returns POST-transform pixels while
+       the cursor's own translate is applied INSIDE that transform. Dividing by
+       the live scale converts back to the device's own coordinate space.
+       Without this the cursor drifts further off target the smaller the phone
+       gets — at 0.4 it lands nowhere near what it is meant to be clicking. */
+    const scale = screen.offsetWidth ? b.width / screen.offsetWidth : 1;
+    const k = scale || 1;
+
     setCursor({
-      x: a.left - b.left + a.width / 2,
-      y: a.top - b.top + a.height / 2,
+      x: (a.left - b.left + a.width / 2) / k,
+      y: (a.top - b.top + a.height / 2) / k,
       shown: true,
     });
   }, []);
@@ -357,14 +399,22 @@ export default function BookingFlowDemo({
       aria-labelledby="booking-demo-heading"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        {/* Explicit row/column placement rather than source order, so the
-            phone can span both rows at desktop while the DOM stays in
-            reading order: claim, screen, aside. That DOM order is also the
-            mobile order, which is the one that matters — the claim sets up
-            the screen, and the screen earns the aside. */}
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-14">
+        {/* Everything is placed explicitly by row and column, because the two
+            breakpoints want genuinely different arrangements out of the same
+            DOM.
+
+            MOBILE is a two-column grid: the headline spans it, then the
+            device sits in a narrow left column with the step list beside it,
+            then the buttons span it again. The device is drawn full size and
+            scaled down rather than rebuilt small — see the wrapper below.
+            Stacked full-width it ran 731px, most of a screen of scrolling for
+            one image, with its own interior half empty.
+
+            DESKTOP is the two columns it always was: everything in the left
+            column, device full size down the right, spanning all of it. */}
+        <div className="grid grid-cols-[9.375rem_minmax(0,1fr)] gap-x-5 gap-y-8 sm:grid-cols-1 sm:gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-x-14">
           {/* ── the claim ── */}
-          <div className="lg:col-start-1 lg:row-start-1 lg:self-center">
+          <div className="col-span-2 sm:col-span-1 lg:col-start-1 lg:row-start-1">
           <p className="mb-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B3C6C]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
             Booking is open
@@ -382,10 +432,13 @@ export default function BookingFlowDemo({
             works, tell us what you’re planning, and we’ll confirm by text.
           </p>
 
-          {/* The captions are numbered because the booking genuinely is a
-              sequence — the numbers carry the "how many steps is this"
-              answer the section exists to give. */}
-          <ol className="mt-8 flex flex-col gap-0.5">
+          </div>
+
+          {/* ── the steps ── beside the mini device on mobile, under the
+              claim on desktop. The captions are numbered because the booking
+              genuinely is a sequence — the numbers carry the "how many steps
+              is this" answer the section exists to give. */}
+          <ol className="col-start-2 row-start-2 flex flex-col gap-0.5 self-start sm:col-start-1 sm:row-auto sm:self-auto lg:row-start-2">
             {STEP_CAPTIONS.map((caption, i) => {
               const on = i === step;
               const done = i < step;
@@ -415,7 +468,8 @@ export default function BookingFlowDemo({
             })}
           </ol>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          {/* ── the buttons ── full width under both columns on mobile */}
+          <div className="col-span-2 flex flex-wrap items-center gap-3 sm:col-span-1 lg:col-start-1 lg:row-start-3">
             <Link
               to="/consultation"
               className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-3.5 text-base font-bold text-white shadow-[0_10px_22px_rgba(27,60,108,0.26)] transition hover:bg-[#153158]"
@@ -423,25 +477,49 @@ export default function BookingFlowDemo({
               Book your free consultation
               <ArrowRight className="h-4 w-4" />
             </Link>
+            {/* Desktop only. On a phone this is a second button competing
+                with the one that converts, for a control nobody needs on a
+                loop that repeats itself every 18 seconds. */}
             <button
               type="button"
               onClick={onReplay}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-[#1B3C6C] hover:text-[#1B3C6C]"
+              className="hidden items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-[#1B3C6C] hover:text-[#1B3C6C] sm:inline-flex"
             >
               <RotateCw className="h-3.5 w-3.5" />
               Replay
             </button>
           </div>
-        </div>
 
         {/* ── the screen ── */}
-        <div className="relative mx-auto w-full max-w-[23.5rem] justify-self-center lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-center">
-          <div className="relative overflow-hidden rounded-[2.125rem] bg-slate-900 p-2.5 shadow-[0_2px_6px_rgba(15,23,42,0.12),0_24px_56px_rgba(15,23,42,0.2)]">
+        {/* MINI ON MOBILE, full size from `sm` up.
+
+            The device is always BUILT at 376px — its natural design width —
+            and shrunk with a transform. Narrowing the box instead would
+            reflow everything inside it: the day chips are a fixed 4.25rem, so
+            two of the seven would survive and the slot grid would break. A
+            transform keeps the real thing, just smaller.
+
+            The wrapper carries the scaled FOOTPRINT, as an explicit box. A
+            scaled element still occupies its original size in layout, so
+            without this the grid row would reserve the full 712px and nothing
+            would be saved. `aspect-ratio` does not work here either — content
+            wins over the ratio on a visible-overflow block, which is exactly
+            what it did on the first attempt.
+
+            So the two mobile numbers are a matched pair, and must move
+            together: the device is 376 x 712 at full size (356px screen at
+            360/700, plus 2 x 10px of bezel). 150 / 376 = the 0.3989 scale,
+            and 712 x 0.3989 = the 284px height below. Overflow stays visible
+            so the device's drop shadow is not clipped. */}
+        <div className="col-start-1 row-start-2 h-[17.75rem] w-[9.375rem] self-start justify-self-center sm:col-start-1 sm:row-auto sm:mx-auto sm:h-auto sm:w-full sm:max-w-[23.5rem] lg:col-start-2 lg:row-start-1 lg:row-span-4 lg:self-center">
+          <div>
+            <div className="w-[23.5rem] origin-top-left scale-[0.3989] sm:w-full sm:scale-100">
+          <div className={`relative overflow-hidden ${FRAMES[frame].outer}`}>
             <div
               ref={screenRef}
               role="img"
               aria-label="A preview of the OntarioReno consultation booking: choosing a day and time, choosing a project type, entering contact details, and a confirmed visit."
-              className="relative aspect-[360/700] max-w-full overflow-hidden rounded-[1.625rem] bg-white"
+              className={`relative aspect-[360/700] max-w-full overflow-hidden bg-white ${FRAMES[frame].inner}`}
             >
               {/* The same photo the real calendar screen opens on. */}
               <div className="relative h-[31%] overflow-hidden bg-[#1B3C6C]">
@@ -700,11 +778,13 @@ export default function BookingFlowDemo({
               </div>
             </div>
           </div>
+            </div>
+          </div>
         </div>
 
           {/* ── the aside ── fills the gap the phone leaves in the left column */}
           {aside ? (
-            <div className="border-t border-slate-200 pt-8 lg:col-start-1 lg:row-start-2 lg:pt-9">
+            <div className="col-span-2 border-t border-slate-200 pt-8 sm:col-span-1 lg:col-start-1 lg:row-start-4 lg:pt-9">
               {aside}
             </div>
           ) : null}
