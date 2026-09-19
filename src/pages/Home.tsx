@@ -243,134 +243,129 @@ export default function Home() {
           costs three taps. That is the strongest thing the page has and it
           now runs second.
 
-          This does NOT disturb the order argued for below: financing still
-          comes before the hubs, because "can I afford this at all?" still
-          precedes "which room?". What changed is that neither of those is
-          the first thing a reader meets any more.
+          FINANCING NOW SHARES THIS SECTION rather than following it as its
+          own band. Two stacked sections cost roughly 1,400px to say "booking
+          is easy" and "here is what it costs" — two halves of one decision,
+          read one after the other, with a full section's padding between
+          them. The phone is ~700px tall and the booking copy beside it is
+          ~450px, so a quarter of this section was empty at desktop width
+          while the band below paid for its own padding. The figure moved
+          into that gap.
+
+          The order argued for below still holds: financing still comes
+          before the hubs, because "can I afford this at all?" still precedes
+          "which room?". It just no longer needs a section of its own to say
+          so.
 
           It plays a REPLICA of /consultation, not the live flow. See
           BookingFlowDemo for why, and for what that costs. */}
-      <BookingFlowDemo />
+      <BookingFlowDemo
+        aside={
+          <>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+              Renovation financing
+            </p>
 
-      {/* Financing first, then the hubs.
+            {/* THE QUALIFIER STAYS WELDED TO THE FIGURE. A bare "$399/month"
+                set large is a quoted price, and the consultant is the one who
+                has to walk it back. The sentence runs continuously across the
+                size change, so the floor is stated before the reader reaches
+                the number.
 
-          Both of these sit above the fold-adjacent fold for a reason, and
-          this is the order that reflects how a homeowner actually decides.
-          "Can I afford this at all?" comes before "which room?" — someone
-          who has quietly written the project off on price never gets as far
-          as picking a trade. The monthly figure is the thing most likely to
-          keep them on the page.
+                The figure is smaller than it was in the standalone band
+                (5rem → 4rem) because the column is narrower. It is still the
+                largest type in the section by a wide margin, which is all the
+                emphasis that note ever asked for — it was written against a
+                version where the number sat mid-sentence at body size. */}
+            {/* Figure beside its explanation, which is the relationship the
+                standalone band had. It survives the move because the left
+                column is still ~700px wide — wide enough for two. */}
+            <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:items-center lg:gap-10">
+              <div>
+                <p className="text-base font-semibold text-slate-500">Starting from</p>
+                <p className="mt-0.5 flex items-baseline gap-2.5">
+                  <span className="text-[3.25rem] font-bold leading-[0.9] tracking-[-0.045em] text-[#1B3C6C] sm:text-[4rem]">
+                    $399
+                  </span>
+                  <span className="text-lg font-semibold text-slate-500">/month</span>
+                </p>
+                <h2 className="mt-2.5 max-w-[24ch] text-lg font-bold leading-[1.3] tracking-[-0.02em] text-slate-900 sm:text-xl">
+                  for a finished basement, financed in full
+                </h2>
+              </div>
 
-          The figure itself is governed: see the note inside the band. */}
-      {/* The number IS the section — compactly.
+              <div>
+                <p className="text-[0.95rem] leading-7 text-slate-600">
+                  Nothing is paid upfront. It is an open loan — pay it down or clear
+                  it whenever you want, with no penalty and no lien on your home.
+                </p>
 
-          Five versions preceded this. The first three fixed the CONTAINER
-          rather than the content: a dark card floating on white (which read as
-          a rendering fault, since its gradient started at the hero's exact
-          colour with a white strip between them), a plain white band (three
-          tonal grounds in a row), then a dark band flush with the hero
-          (structurally right, still mostly empty).
-
-          The content fix was making the FIGURE the subject — it had been buried
-          mid-sentence at body size. The last fix is size: at 120px type and
-          16-unit padding the block ran 798px tall for a number, a sentence, a
-          button and three facts. It now runs about half that. The figure is
-          still the largest thing in it, which is all the emphasis it needed;
-          the rest was padding pretending to be design.
-
-          Two columns are explicit rather than space-between, which is what left
-          a dead void down the middle at 1440px.
-
-          $399 is the same figure as BASEMENT_FINANCING_PROGRAM.displayAmountLabel
-          in lib/program-config.ts and the closed-grant pages' offer: never a
-          quoted price, always on approved credit. The qualifier reads "Starting
-          from" rather than the "from about" used by displayAmountLabel and the
-          closed-grant pages. Both say the same thing — it is a FLOOR — and
-          lib/consultation-routing.test.ts still enforces "from about" plus "on
-          approved credit" on the consultation labels, which are untouched. */}
-      <section className="bg-slate-50 px-4 py-12 sm:px-6 lg:px-8 lg:py-14">
-        {/* A hairline, not a card. No shadow, deliberately — a shadow is what
-            made an earlier version float off the page. */}
-        <div className="mx-auto max-w-7xl rounded-[1.25rem] border border-[#1B3C6C]/20 bg-white px-6 py-8 sm:px-8 lg:px-10 lg:py-9">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
-            Renovation financing
-          </p>
-
-          <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-14">
-            <div>
-              {/* THE QUALIFIER STAYS WELDED TO THE FIGURE. A bare "$399/month"
-                  set large is a quoted price, and the consultant is the one who
-                  has to walk it back. The sentence runs continuously across the
-                  size change, so the floor is stated before the reader reaches
-                  the number. */}
-              <p className="text-base font-semibold text-slate-500">Starting from</p>
-              <p className="mt-0.5 flex items-baseline gap-2.5">
-                <span className="text-[3.5rem] font-bold leading-[0.9] tracking-[-0.045em] text-[#1B3C6C] sm:text-[4.25rem] lg:text-[5rem]">
-                  $399
-                </span>
-                <span className="text-lg font-semibold text-slate-500">/month</span>
-              </p>
-              <h2 className="mt-3 max-w-[28ch] text-xl font-bold leading-[1.25] tracking-[-0.02em] text-slate-900 sm:text-2xl">
-                for a finished basement, financed in full
-              </h2>
-            </div>
-
-            <div>
-              <p className="max-w-[42ch] text-base leading-7 text-slate-600">
-                Nothing is paid upfront. It is an open loan — pay it down or clear
-                it whenever you want, with no penalty and no lien on your home.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-5">
-                <Link
-                  to="/consultation/basement"
-                  data-analytics="financing-cta"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-3.5 font-bold text-white shadow-sm transition-colors hover:bg-[#16325a]"
-                >
-                  See my monthly payment
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                {/* Both financing routes stay reachable — demoted to links, not
-                    removed. One filled button per section. */}
-                <Link
-                  to="/open-loan-financing"
-                  className="text-sm font-semibold text-[#1B3C6C] underline underline-offset-4 hover:text-[#16325a]"
-                >
-                  Open Loan financing
-                </Link>
+                <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+                  {/* Outlined, not filled. The booking CTA above is this
+                      section's one filled button, and the band's own note kept
+                      that rule when it demoted the second financing route to a
+                      link. Merging the two sections is what forced the choice;
+                      this route stays a button rather than becoming a third
+                      link, because it is a conversion and it carries the
+                      analytics hook. */}
+                  <Link
+                    to="/consultation/basement"
+                    data-analytics="financing-cta"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#1B3C6C]/35 px-5 py-3 text-[0.95rem] font-bold text-[#1B3C6C] transition-colors hover:border-[#1B3C6C] hover:bg-[#f2f7ff]"
+                  >
+                    See my monthly payment
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  {/* Both financing routes stay reachable — demoted to links,
+                      not removed. */}
+                  <Link
+                    to="/open-loan-financing"
+                    className="text-sm font-semibold text-[#1B3C6C] underline underline-offset-4 hover:text-[#16325a]"
+                  >
+                    Open Loan financing
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          </>
+        }
+        /* The terms as three facts on a rule, not a boxed widget. The panel
+           this replaced repeated the paragraph beside it almost word for word,
+           on a wash that was invisible against its own background.
 
-          {/* The terms as three facts on a rule, not a boxed widget. The panel
-              this replaced repeated the paragraph beside it almost word for
-              word, on a wash that was invisible against its own background. */}
-          <dl className="mt-8 grid gap-x-10 gap-y-4 border-t border-[#1B3C6C]/15 pt-6 sm:grid-cols-3">
-            {[
-              ['Due upfront', '$0'],
-              ['Loan type', 'Open — repay early, no penalty'],
-              ['Secured against your home', 'No lien'],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {label}
-                </dt>
-                <dd className="mt-1 text-base font-bold text-slate-900">{value}</dd>
-              </div>
-            ))}
-          </dl>
+           Full width under both columns rather than inside the aside: three
+           facts across the whole measure is one short row, while the same
+           three stacked in a half-width column is three. */
+        footer={
+          <>
+            <dl className="grid gap-x-10 gap-y-4 sm:grid-cols-3">
+              {[
+                ['Due upfront', '$0'],
+                ['Loan type', 'Open — repay early, no penalty'],
+                ['Secured against your home', 'No lien'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                    {label}
+                  </dt>
+                  <dd className="mt-1 text-base font-bold text-slate-900">{value}</dd>
+                </div>
+              ))}
+            </dl>
 
-          <p className="mt-6 text-sm text-slate-500">
-            On approved credit.{' '}
-            <Link
-              to="/financing"
-              className="font-semibold text-[#1B3C6C] underline underline-offset-4"
-            >
-              View all financing options
-            </Link>
-            .
-          </p>
-        </div>
-      </section>
+            <p className="mt-6 text-sm text-slate-500">
+              On approved credit.{' '}
+              <Link
+                to="/financing"
+                className="font-semibold text-[#1B3C6C] underline underline-offset-4"
+              >
+                View all financing options
+              </Link>
+              .
+            </p>
+          </>
+        }
+      />
 
       {/* Moved directly under the hero.
 
