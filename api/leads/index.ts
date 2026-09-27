@@ -1597,7 +1597,13 @@ async function placesAutocomplete(input: string): Promise<PlaceSuggestion[]> {
     });
     const j = (await r.json()) as {
       suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }>;
+      error?: { code?: number; status?: string; message?: string };
     };
+    if (!r.ok || j.error) {
+      // Don't cache a Google-side failure as "no results" for five minutes.
+      console.error('[placesAutocomplete] Google error', r.status, JSON.stringify(j.error ?? j));
+      return [];
+    }
     const suggestions = (j.suggestions ?? [])
       .map((s) => ({
         placeId: s.placePrediction?.placeId ?? '',

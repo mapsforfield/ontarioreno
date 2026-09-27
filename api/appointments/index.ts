@@ -775,12 +775,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
           body: JSON.stringify({ input, includedRegionCodes: ['ca'], ...(token ? { sessionToken: token } : {}) }),
         });
-        const j = (await r.json()) as { suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }> };
+        const j = (await r.json()) as {
+          suggestions?: Array<{ placePrediction?: { placeId?: string; text?: { text?: string } } }>;
+          error?: { code?: number; status?: string; message?: string };
+        };
+        // Google reports key/billing/API-restriction problems as a JSON error;
+        // log it so a dead key shows up in the logs instead of as "no results".
+        if (!r.ok || j.error) console.error('[places_autocomplete] Google error', r.status, JSON.stringify(j.error ?? j));
         const suggestions = (j.suggestions ?? [])
           .map((s) => ({ placeId: s.placePrediction?.placeId ?? '', description: s.placePrediction?.text?.text ?? '' }))
           .filter((s) => s.placeId && s.description);
         return res.status(200).json({ suggestions });
-      } catch {
+      } catch (err) {
+        console.error('[places_autocomplete] request failed', err);
         return res.status(200).json({ suggestions: [] });
       }
     }
