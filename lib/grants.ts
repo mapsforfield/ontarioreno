@@ -3,6 +3,7 @@ import { officialSourceFromProgram, validOfficialSourceUrl } from './grant-sourc
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
 import { prisma } from './prisma.js';
+import { tileProbeScript } from './map-tiles.js';
 import { requireAdmin } from './auth.js';
 import { ensureSchema, withSchema } from './schema.js';
 import {
@@ -1474,7 +1475,7 @@ ${siteFooterHtml()}
 <script>
 (function(){var CITIES=${mapData};if(!window.L||!document.getElementById('map'))return;
 var map=L.map('map',{scrollWheelZoom:false}).setView([43.95,-79.2],8);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:13}).addTo(map);
+${tileProbeScript()}
 CITIES.forEach(function(c){var label=c.amount||'Incentive';var badge=c.count>1?'<i>'+c.count+'</i>':'';
 var icon=L.divIcon({className:'',html:'<div class="atag">'+label+badge+'</div>',iconSize:[0,0],iconAnchor:[0,0],popupAnchor:[0,-42]});
 var m=L.marker([c.lat,c.lng],{icon:icon}).addTo(map);
