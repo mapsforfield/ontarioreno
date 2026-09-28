@@ -1,0 +1,32 @@
+name: Map Tile Check
+
+# Daily: are the public maps still getting real tiles? CARTO once started
+# answering keyless requests with an "API KEY REQUIRED" watermark and nobody
+# noticed until a screenshot. See lib/map-tiles.ts.
+
+on:
+  schedule:
+    - cron: '0 12 * * *'    # Daily 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Probe tile providers
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GRANT_ALERT_EMAIL: ${{ secrets.GRANT_ALERT_EMAIL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        run: npx tsx scripts/map-tile-check.ts

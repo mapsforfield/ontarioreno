@@ -8,6 +8,7 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { ArrowRight } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
+import { FALLBACK_TILES, PRIMARY_TILES, probeTiles, type TileProvider } from '../../lib/map-tiles';
 
 // Public /grants hub. A React page (so it uses the real site Navbar/Footer via
 // Layout), fed by /api/appointments?resource=grants-hub-data — which merges the
@@ -88,6 +89,18 @@ export default function GrantsHub() {
       .catch(() => setData({ updatedLabel: '', rows: [], mapCities: [] }));
   }, []);
 
+  // Render the primary tiles straight away, then swap to the fallback if the
+  // probe says the provider is serving a placeholder. See lib/map-tiles.ts.
+  const [tiles, setTiles] = useState<TileProvider>(PRIMARY_TILES);
+  useEffect(() => {
+    probeTiles(PRIMARY_TILES).then((problem) => {
+      if (problem) {
+        console.warn(`[grants map] ${PRIMARY_TILES.name} unusable (${problem}); using ${FALLBACK_TILES.name}`);
+        setTiles(FALLBACK_TILES);
+      }
+    });
+  }, []);
+
   const rows = data?.rows ?? [];
   const mapCities = data?.mapCities ?? [];
   const title = 'Ontario Home Renovation & ADU Grants by City (2026) | OntarioReno';
@@ -133,7 +146,7 @@ export default function GrantsHub() {
         {/* z-0 keeps Leaflet's high internal z-indexes contained below the sticky header (z-50). */}
         <div className="relative z-0 mt-6">
           <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} className="grantmapbox">
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" maxZoom={13} />
+            {tiles.layers.map((l) => <TileLayer key={l.url} url={l.url} attribution={l.attribution} maxZoom={l.maxZoom} />)}
             <ClusterLayer cities={mapCities} />
             <FitCore cities={mapCities} />
           </MapContainer>
