@@ -54,7 +54,19 @@ export type InvoiceData = {
   accountNumber: string;
   showPayment: boolean;
   adjustments: Adjustment[];
+  // The commission is HST-inclusive; when on, the totals break the HST out so
+  // accounting can see it. Optional so invoices saved before this existed
+  // re-render exactly as they were issued.
+  showHst?: boolean;
+  hstRate?: number; // percent, e.g. 13
 };
+
+/** Split an HST-inclusive total into its pre-tax subtotal and HST portion. */
+export function splitHst(total: number, ratePct: number): { subtotal: number; hst: number } {
+  const r = Math.max(0, Number(ratePct) || 0) / 100;
+  const subtotal = Math.round((total / (1 + r)) * 100) / 100;
+  return { subtotal, hst: Math.round((total - subtotal) * 100) / 100 };
+}
 
 function money(v: number) {
   return `CAD $${v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -215,7 +227,24 @@ export function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.line(43, totalsTop, 569, totalsTop);
   let ty = totalsTop + 22;
   doc.setFontSize(12);
-  if (adjustments.length > 0) {
+  const net = d.amount + adjTotal;
+  if (d.showHst) {
+    const rowT = (label: string, value: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, 400, ty);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, 569, ty, { align: 'right' });
+      ty += 18;
+    };
+    if (adjustments.length > 0) {
+      rowT('Commission', money(d.amount));
+      rowT('Adjustments', signedMoney(adjTotal));
+    }
+    const { subtotal, hst } = splitHst(net, d.hstRate ?? 13);
+    rowT('Subtotal', signedMoney(subtotal));
+    rowT(`HST (${d.hstRate ?? 13}%)`, signedMoney(hst));
+    ty -= 8;
+  } else if (adjustments.length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.text('Sub Total', 400, ty);
     doc.setFont('helvetica', 'normal');
@@ -232,7 +261,7 @@ export function buildPdf(letterhead: string | null, d: InvoiceData): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.text('Total (CAD)', 400, ty);
   doc.setFont('helvetica', 'normal');
-  doc.text(money(d.amount + adjTotal), 569, ty, { align: 'right' });
+  doc.text(signedMoney(net), 569, ty, { align: 'right' });
 
   // ── Payment instructions (lower-left white space, clear of the wave) ──
   if (d.showPayment && (d.bankName || d.accountNumber)) {
@@ -298,7 +327,7 @@ export default function CommissionInvoice({
   contractor: Contractor | undefined;
   onClose: () => void;
 }) {
-  const { getInvoiceConfig, saveBusinessProfile, getNextInvoiceNumber, recordInvoice, deals } = usePortalData();
+  const { getInvoiceConfig, saveBusinessProfile, saveInvoiceBillTo, getNextInvoiceNumber, recordInvoice, deals } = usePortalData();
 
   // This contractor's other jobs — offered as quick-pick when crediting against
   // a previous deal.
@@ -357,7 +386,10 @@ export default function CommissionInvoice({
     accountNumber: '5064635',
     showPayment: true,
     adjustments: seedAdjustments,
+    showHst: true,
+    hstRate: 13,
   });
+  const [billToRemembered, setBillToRemembered] = useState(false);
   const [saveProfileDefault, setSaveProfileDefault] = useState(false);
 
   const set = <K extends keyof InvoiceData>(key: K, value: InvoiceData[K]) =>
@@ -387,6 +419,7 @@ export default function CommissionInvoice({
 
   const adjustmentsTotal = data.adjustments.reduce((s, a) => s + adjValue(a), 0);
   const netTotal = data.amount + adjustmentsTotal;
+  const hstSplit = splitHst(netTotal, data.hstRate ?? 13);
 
   // Recompute amount when price or rate changes
   useEffect(() => {
@@ -402,14 +435,24 @@ export default function CommissionInvoice({
     (async () => {
       const [lh, config, num] = await Promise.all([
         loadLetterhead(),
-        getInvoiceConfig(),
+        getInvoiceConfig(contractor?.id),
         getNextInvoiceNumber(),
       ]);
       if (cancelled) return;
       setLetterhead(lh);
+      setBillToRemembered(Boolean(config?.billTo));
       setData((cur) => ({
         ...cur,
         invoiceNumber: String(num ?? ''),
+        // This contractor's TO block as last used on one of their invoices
+        ...(config?.billTo
+          ? {
+              toContact: config.billTo.toContact,
+              toCompany: config.billTo.toCompany,
+              toAddr1: config.billTo.toAddr1,
+              toAddr2: config.billTo.toAddr2,
+            }
+          : {}),
         ...(config?.businessProfile
           ? {
               fromLegalName: config.businessProfile.legalName,
@@ -484,6 +527,18 @@ export default function CommissionInvoice({
   };
 
   const persistProfileIfNeeded = async () => {
+    // Always remember this contractor's TO block for their next invoice.
+    if (contractor?.id) {
+      try {
+        await saveInvoiceBillTo(contractor.id, {
+          toContact: data.toContact,
+          toCompany: data.toCompany,
+          toAddr1: data.toAddr1,
+          toAddr2: data.toAddr2,
+        });
+        setBillToRemembered(true);
+      } catch { /* best-effort — the invoice itself still goes out */ }
+    }
     if (saveProfileDefault) {
       await saveBusinessProfile({
         legalName: data.fromLegalName,
@@ -528,9 +583,18 @@ export default function CommissionInvoice({
                   ...data.adjustments
                     .filter((a) => adjValue(a) !== 0 || a.description.trim())
                     .map((a) => `${adjLabel(a)}: ${signedMoney(adjValue(a))}`),
+                  ...(data.showHst
+                    ? [`Subtotal: ${signedMoney(hstSplit.subtotal)}`, `HST (${data.hstRate ?? 13}%): ${signedMoney(hstSplit.hst)}`]
+                    : []),
                   `Total payable: ${money(netTotal)}`,
                 ]
-              : [`Amount: ${money(data.amount)}`]),
+              : data.showHst
+                ? [
+                    `Subtotal: ${signedMoney(hstSplit.subtotal)}`,
+                    `HST (${data.hstRate ?? 13}%): ${signedMoney(hstSplit.hst)}`,
+                    `Total: ${money(data.amount)}`,
+                  ]
+                : [`Amount: ${money(data.amount)}`]),
             ...(data.showPayment
               ? [
                   '',
@@ -612,6 +676,13 @@ export default function CommissionInvoice({
                 {field('Address line 1', 'toAddr1', { full: true })}
                 {field('Address line 2', 'toAddr2', { full: true })}
               </div>
+              {contractor?.id && (
+                <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">
+                  {billToRemembered
+                    ? `Saved for ${contractor.companyName || 'this contractor'} — edits are remembered when you download or send.`
+                    : `Remembered for ${contractor.companyName || 'this contractor'} once you download or send.`}
+                </p>
+              )}
 
               <p className="mb-2 mt-4 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">Invoice details</p>
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -622,6 +693,32 @@ export default function CommissionInvoice({
                 {field('Commission %', 'commissionRate', { type: 'number' })}
                 {field('Amount (CAD)', 'amount', { type: 'number' })}
               </div>
+
+              {/* ── HST breakdown ── */}
+              <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-400">HST (included in total)</p>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(data.showHst)}
+                  onClick={() => set('showHst', !data.showHst)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${data.showHst ? 'bg-[#1B3C6C]' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${data.showHst ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <div className={`grid gap-2.5 sm:grid-cols-2 ${data.showHst ? '' : 'pointer-events-none opacity-40'}`}>
+                {field('HST %', 'hstRate', { type: 'number' })}
+                <div className="grid content-end gap-0.5 text-xs font-bold text-slate-600">
+                  <span>Subtotal {signedMoney(hstSplit.subtotal)}</span>
+                  <span>HST {signedMoney(hstSplit.hst)}</span>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[0.7rem] font-semibold text-slate-400">
+                {data.showHst
+                  ? 'The total stays the same — the invoice shows the subtotal and HST inside it.'
+                  : 'Hidden — the invoice shows the total only.'}
+              </p>
 
               {/* ── Adjustments & credits ── */}
               <div className="mb-2 mt-4 flex items-center justify-between gap-2">

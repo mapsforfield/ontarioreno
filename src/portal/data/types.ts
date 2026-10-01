@@ -348,6 +348,14 @@ export type BusinessProfile = {
   accountNumber: string;
 };
 
+/** A contractor's commission-invoice "TO" block, remembered per contractor. */
+export type InvoiceBillTo = {
+  toContact: string;
+  toCompany: string;
+  toAddr1: string;
+  toAddr2: string;
+};
+
 export type CommissionInvoiceRecord = {
   id: string;
   invoiceNumber: number | null;

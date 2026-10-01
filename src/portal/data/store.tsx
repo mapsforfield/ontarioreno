@@ -29,6 +29,7 @@ import {
   Activity,
   Appointment,
   BusinessProfile,
+  InvoiceBillTo,
   ClientVideo,
   CommissionInvoiceRecord,
   ConsultationStage,
@@ -170,7 +171,8 @@ type PortalDataContextValue = PortalDataState & {
   restoreDeal: (dealId: string) => Promise<void>;
   purgeDeal: (dealId: string) => Promise<void>;
   fetchTrashedDeals: () => Promise<Deal[]>;
-  getInvoiceConfig: () => Promise<{ businessProfile: BusinessProfile } | null>;
+  getInvoiceConfig: (contractorId?: string) => Promise<{ businessProfile: BusinessProfile; billTo?: InvoiceBillTo | null } | null>;
+  saveInvoiceBillTo: (contractorId: string, billTo: InvoiceBillTo) => Promise<void>;
   saveBusinessProfile: (profile: BusinessProfile) => Promise<void>;
   recordInvoice: (payload: Partial<CommissionInvoiceRecord>) => Promise<void>;
   listInvoices: () => Promise<CommissionInvoiceRecord[]>;
@@ -1984,8 +1986,16 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         return (trashed ?? []).map(normalizeDeal);
       },
 
-      getInvoiceConfig: async () => {
-        return apiCall<{ businessProfile: BusinessProfile }>('/api/deals?_resource=invoice_config');
+      getInvoiceConfig: async (contractorId) => {
+        const q = contractorId ? `&contractorId=${encodeURIComponent(contractorId)}` : '';
+        return apiCall<{ businessProfile: BusinessProfile; billTo?: InvoiceBillTo | null }>(`/api/deals?_resource=invoice_config${q}`);
+      },
+
+      saveInvoiceBillTo: async (contractorId, billTo) => {
+        await apiCall('/api/deals', {
+          method: 'POST',
+          body: JSON.stringify({ _action: 'save_invoice_bill_to', contractorId, ...billTo }),
+        });
       },
 
       saveBusinessProfile: async (profile) => {
