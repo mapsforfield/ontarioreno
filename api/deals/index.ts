@@ -40,6 +40,41 @@ async function readBusinessProfile() {
   return DEFAULT_BUSINESS_PROFILE;
 }
 
+// The commission invoice's "TO" block, remembered per contractor so it does not
+// have to be retyped on every invoice. Saved explicitly on download/send; if a
+// contractor has never been saved, fall back to the TO block of their most
+// recent invoice in the ledger.
+type BillTo = { toContact: string; toCompany: string; toAddr1: string; toAddr2: string };
+
+function pickBillTo(v: Record<string, unknown> | null | undefined): BillTo | null {
+  if (!v) return null;
+  const b = {
+    toContact: String(v.toContact ?? '').slice(0, 200),
+    toCompany: String(v.toCompany ?? '').slice(0, 200),
+    toAddr1: String(v.toAddr1 ?? '').slice(0, 200),
+    toAddr2: String(v.toAddr2 ?? '').slice(0, 200),
+  };
+  return Object.values(b).some((x) => x.trim()) ? b : null;
+}
+
+async function readBillTo(contractorId: string): Promise<BillTo | null> {
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: `invoice_bill_to:${contractorId}` } });
+    const saved = row?.value ? pickBillTo(JSON.parse(row.value)) : null;
+    if (saved) return saved;
+  } catch { /* Setting table may not exist yet */ }
+  try {
+    const rows = (await prisma.$queryRawUnsafe(
+      'SELECT "snapshot" FROM "CommissionInvoiceRecord" WHERE "contractorId" = $1 AND "snapshot" IS NOT NULL ORDER BY "createdAt" DESC LIMIT 1',
+      contractorId,
+    )) as Array<{ snapshot: string | null }>;
+    const snap = rows?.[0]?.snapshot ? JSON.parse(rows[0].snapshot) : null;
+    // Client invoices share the ledger but have no contractor TO block.
+    if (snap && snap.kind !== 'client') return pickBillTo(snap);
+  } catch { /* ledger may not exist yet */ }
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req, res);
   if (!user) return;
@@ -50,7 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.query['_resource'] === 'invoice_config') {
       if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
       const businessProfile = await readBusinessProfile();
-      return res.status(200).json({ businessProfile });
+      const contractorId = typeof req.query['contractorId'] === 'string' ? req.query['contractorId'] : '';
+      const billTo = contractorId ? await readBillTo(contractorId) : null;
+      return res.status(200).json({ businessProfile, billTo });
     }
 
     // ── Next commission invoice number (admin) — advances per issuance ──
@@ -219,6 +256,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await prisma.$executeRawUnsafe('DELETE FROM "CommissionInvoiceRecord" WHERE id = $1', id);
       } catch { /* nothing to delete */ }
       return res.status(200).json({ ok: true });
+    }
+
+    // ── Remember a contractor's invoice "TO" block (admin only) ──
+    if (data._action === 'save_invoice_bill_to') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const contractorId = String(data.contractorId ?? '');
+      const billTo = pickBillTo(data);
+      if (!contractorId || !billTo) return res.status(400).json({ error: 'Missing contractor or details.' });
+      const key = `invoice_bill_to:${contractorId}`;
+      const value = JSON.stringify(billTo);
+      try {
+        await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+      } catch {
+        await prisma.$executeRawUnsafe(
+          'CREATE TABLE IF NOT EXISTS "Setting" ("key" TEXT PRIMARY KEY, "value" TEXT NOT NULL DEFAULT \'\', "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+        );
+        await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+      }
+      return res.status(200).json(billTo);
     }
 
     // ── Save the commission-invoice business profile (admin only) ──
