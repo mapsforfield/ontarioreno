@@ -68,6 +68,7 @@ type ConsultationFilter =
 
 type AppointmentFormState = {
   address: string;
+  unit: string;
   appointmentDate: string;
   appointmentTime: string;
   appointmentType: AppointmentType;
@@ -212,6 +213,7 @@ const dispatchReadyStages: ConsultationStage[] = [
 
 const emptyForm: AppointmentFormState = {
   address: '',
+  unit: '',
   appointmentDate: torontoToday(),
   appointmentTime: '10:00',
   appointmentType: 'home_visit',
@@ -323,6 +325,7 @@ function getDaysSince(value: string) {
 function appointmentToForm(appointment: Appointment): AppointmentFormState {
   return {
     address: appointment.address,
+    unit: appointment.unit ?? '',
     appointmentDate: appointment.appointmentDate,
     appointmentTime: appointment.appointmentTime,
     appointmentType: appointment.appointmentType,
@@ -901,6 +904,7 @@ export default function PortalAppointments() {
         phone: prefill.phone ?? '',
         email: prefill.email ?? '',
         address: prefill.address ?? '',
+        unit: prefill.unit ?? '',
         city: prefill.city ?? '',
         postalCode: prefill.postalCode ?? '',
         projectType: prefill.projectTypes?.[0] ?? '',
@@ -1236,6 +1240,7 @@ export default function PortalAppointments() {
     selectedAppointment && {
       ...selectedAppointment,
       address: form.address,
+      unit: form.unit,
       appointmentDate: form.appointmentDate,
       appointmentTime: form.appointmentTime,
       appointmentType: form.appointmentType,
@@ -1444,6 +1449,7 @@ export default function PortalAppointments() {
 
     const payload = {
       address: form.address.trim(),
+      unit: form.unit.trim(),
       appointmentDate: form.appointmentDate,
       appointmentTime: form.appointmentTime,
       appointmentType: form.appointmentType,
@@ -3907,6 +3913,7 @@ export default function PortalAppointments() {
                           <p className="mt-1 text-sm font-black text-slate-950">Address not set</p>
                         );
                       }
+                      const unit = form.unit.trim();
                       return (
                         <a
                           href={mapsHref(fullAddress)}
@@ -3915,7 +3922,7 @@ export default function PortalAppointments() {
                           title="Open in maps"
                           className="mt-1 block text-sm font-black text-[#1d4ed8] underline decoration-[#93b4e6] underline-offset-2 hover:decoration-[#1d4ed8]"
                         >
-                          {fullAddress}
+                          {unit ? `Unit ${unit}, ${fullAddress}` : fullAddress}
                         </a>
                       );
                     })()}
@@ -4334,6 +4341,10 @@ export default function PortalAppointments() {
                       if (postalCode) updateForm('postalCode', postalCode);
                     }}
                   />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Unit / Apt / Suite
+                  <input value={form.unit} onChange={(event) => updateForm('unit', event.target.value)} placeholder="e.g. 12 (condos, townhomes)" />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Project Type

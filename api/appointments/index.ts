@@ -1574,6 +1574,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         phone: data.phone ?? '',
         email: data.email ?? '',
         address: data.address ?? '',
+        unit: data.unit ?? '',
         city: data.city ?? '',
         postalCode: data.postalCode ?? '',
         projectType: data.projectType,

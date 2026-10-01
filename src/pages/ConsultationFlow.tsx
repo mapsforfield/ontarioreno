@@ -159,6 +159,9 @@ export default function ConsultationFlow() {
 
   const [addressText, setAddressText] = useState('');
   const [placeId, setPlaceId] = useState('');
+  // Condo / townhome unit. Places suggestions drop it, so it is asked for on
+  // its own rather than parsed out of the address text.
+  const [unit, setUnit] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ placeId: string; description: string }>>([]);
   // The one address the typed text could mean, offered for a yes/no when no
   // suggestion was picked. Tapping the dropdown remains the primary path; this
@@ -416,6 +419,7 @@ export default function ConsultationFlow() {
           // the confirmation step never ran — a dropped request or a homeowner
           // who skipped past it must not silently cost the booking.
           addressText: addressText.trim(),
+          unit: unit.trim(),
           sourceDetail: trafficSource,
           notes: !placeId && addressText.trim() ? `Typed address (not confirmed): ${addressText.trim()}` : '',
           answers,
@@ -829,6 +833,7 @@ export default function ConsultationFlow() {
    * Places wiring is the part that must not drift.
    */
   const addressField = (
+    <div className="space-y-3">
     <div className="relative">
       <label className="mb-2 block text-sm font-bold text-slate-700">
         <MapPin className="mr-1 inline h-4 w-4 text-[#1B3C6C]" /> Property address
@@ -860,6 +865,14 @@ export default function ConsultationFlow() {
           ))}
         </div>
       )}
+    </div>
+    <div>
+      <label className="mb-2 block text-sm font-bold text-slate-700">
+        Unit / Apt / Suite <span className="font-normal text-slate-400">(optional)</span>
+      </label>
+      <input className={inputCls} value={unit} autoComplete="address-line2" placeholder="e.g. 12"
+        onChange={(e) => setUnit(e.target.value)} />
+    </div>
     </div>
   );
 

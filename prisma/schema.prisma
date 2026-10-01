@@ -254,6 +254,9 @@ model Appointment {
   phone                    String
   email                    String
   address                  String   @default("")
+  /// Unit / apt / suite for condos and townhomes. Kept apart from `address` so
+  /// geocoding and travel-radius math keep reading a clean street address.
+  unit                     String   @default("")
   city                     String   @default("")
   postalCode               String   @default("")
   projectType              String
@@ -606,6 +609,8 @@ model Lead {
   email             String    @default("")
   city              String    @default("")
   address           String    @default("")
+  /// Unit / apt / suite — see Appointment.unit.
+  unit              String    @default("")
   postalCode        String    @default("")
   projectType       String    @default("")
   /// Free-text — Meta sends ranges like "$25k–50k", so this stays a String.
