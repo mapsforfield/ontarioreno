@@ -1796,16 +1796,34 @@
       unreadDrawerEl.classList.remove("hidden");
       unreadDrawerEl.classList.toggle("collapsed", unreadDrawerCollapsed);
       const unreadHtml = `
-        <button id="unreadDrawerToggle" class="drawer-toggle" type="button">
-          <span class="drawer-title">Unread new messages <span class="drawer-count">${unreadConversations.length}</span></span>
-          <span class="drawer-chevron">▾</span>
-        </button>
+        <div class="drawer-header">
+          <button id="unreadDrawerToggle" class="drawer-toggle" type="button">
+            <span class="drawer-title">Unread new messages <span class="drawer-count">${unreadConversations.length}</span></span>
+            <span class="drawer-chevron">▾</span>
+          </button>
+          <span class="drawer-actions">
+            <button id="markUnreadReadBtn" class="drawer-action-btn" type="button">Mark all read</button>
+          </span>
+        </div>
         <div class="drawer-list ${unreadDrawerCollapsed ? "hidden" : ""}">
           ${unreadConversations.map((conv) => renderConversationCard(conv, search)).join("")}
         </div>
       `;
 
       if (!paint(unreadDrawerEl, unreadHtml)) return;
+
+      unreadDrawerEl.querySelector("#markUnreadReadBtn").addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        unreadConversations.forEach((conv) => {
+          delete unreadMap[conv.contact];
+          conv.unread = false;
+        });
+
+        localStorage.setItem("unreadMap", JSON.stringify(unreadMap));
+        renderConversationList();
+      });
 
       unreadDrawerEl.querySelector("#unreadDrawerToggle").addEventListener("click", () => {
         unreadDrawerCollapsed = !unreadDrawerCollapsed;
