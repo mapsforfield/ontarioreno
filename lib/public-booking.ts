@@ -64,6 +64,8 @@ export type BookingRequest = {
     phone: string;
     email: string;
     address: string;
+    /** Unit / apt / suite — optional; absent on callers that predate it. */
+    unit?: string;
     city: string;
     postalCode: string;
     projectType: string;

@@ -108,6 +108,8 @@ export default function BasementBookingFlow({
 
   const [addressText, setAddressText] = useState('');
   const [placeId, setPlaceId] = useState('');
+  // Condo / townhome unit — Places suggestions drop it, so it is its own box.
+  const [unit, setUnit] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ placeId: string; description: string }>>([]);
 
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -486,6 +488,7 @@ export default function BasementBookingFlow({
           email: '',
           placeId,
           addressText: addressText.trim(),
+          unit: unit.trim(),
           sourceDetail: trafficSource,
           notes:
             !placeId && addressText.trim()
@@ -1074,6 +1077,19 @@ export default function BasementBookingFlow({
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              Unit / Apt / Suite <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <input
+              className={inputCls}
+              value={unit}
+              autoComplete="address-line2"
+              placeholder="e.g. 12"
+              onChange={(e) => setUnit(e.target.value)}
+            />
           </div>
 
           {error && <ErrorNote>{error}</ErrorNote>}

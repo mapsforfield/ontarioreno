@@ -139,6 +139,9 @@ export type Appointment = {
   phone: string;
   email: string;
   address: string;
+  /** Unit / apt / suite (condos, townhomes). Shown with the address, never
+   *  folded into it — `address` stays a clean street address for geocoding. */
+  unit?: string;
   city: string;
   postalCode: string;
   projectType: string;
@@ -207,6 +210,8 @@ export type Client = {
   phone: string;
   email: string;
   address: string;
+  /** Not stored on clients — carried only when a lead prefills a booking. */
+  unit?: string;
   city: string;
   postalCode: string;
   projectTypes: string[];
@@ -546,6 +551,8 @@ export type Lead = {
   email: string;
   city: string;
   address: string;
+  /** Unit / apt / suite — see Appointment.unit. */
+  unit?: string;
   postalCode: string;
   projectType: string;
   budget: string;

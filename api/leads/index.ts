@@ -1662,6 +1662,8 @@ type ResolvedAddress = {
   /** The place this resolved from. Empty whenever nothing resolved. */
   placeId: string;
   address: string;
+  /** Google's `subpremise` — the unit, when the picked place carried one. */
+  unit: string;
   city: string;
   postalCode: string;
   province: string;
@@ -1681,6 +1683,7 @@ const UNRESOLVED: ResolvedAddress = {
   addressState: 'ADDRESS_UNVERIFIED',
   placeId: '',
   address: '',
+  unit: '',
   city: '',
   postalCode: '',
   province: '',
@@ -1744,6 +1747,7 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       pick('administrative_area_level_2')?.longText ??
       '';
     const address = [streetNumber, route].filter(Boolean).join(' ');
+    const unit = pick('subpremise')?.longText ?? '';
 
     // Outside Ontario is the one address fact we can decline on with confidence.
     if (province && province !== 'ON') {
@@ -1755,7 +1759,7 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
     // A missing street number or postal code means we cannot confirm a dwelling.
     if (!streetNumber || !route || !postalCode) {
       return {
-        ...UNRESOLVED, placeId, address, city: municipality, postalCode, province, municipality,
+        ...UNRESOLVED, placeId, address, unit, city: municipality, postalCode, province, municipality,
         latitude, longitude,
         cause: 'INCOMPLETE_ADDRESS',
       };
@@ -1768,6 +1772,7 @@ async function resolvePlace(placeId: string): Promise<ResolvedAddress> {
       addressState: area ? 'ADDRESS_VERIFIED' : 'ADDRESS_UNVERIFIED',
       placeId,
       address,
+      unit,
       city: municipality,
       postalCode,
       province,
@@ -2071,6 +2076,7 @@ async function bookVisitForLead(params: {
             phone: request.lead.phone,
             email: request.lead.email,
             address: request.lead.address,
+            unit: request.lead.unit ?? '',
             city: request.lead.city,
             postalCode: request.lead.postalCode,
             // A readable label, not the raw form value.
@@ -2142,6 +2148,7 @@ async function bookVisitForLead(params: {
         phone: lead.phone,
         email: lead.email,
         address: lead.address,
+        unit: lead.unit,
         city: lead.city,
         postalCode: lead.postalCode,
         projectType: lead.projectType,
@@ -2489,6 +2496,9 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           phone,
           email,
           address: resolved.address,
+          // What the homeowner typed in the unit box wins; Google's subpremise
+          // is the fallback for an address picked with the unit already in it.
+          unit: clean(body.unit).slice(0, 40) || resolved.unit,
           city: resolved.city,
           postalCode: resolved.postalCode,
           projectType: answers.projectType ?? '',

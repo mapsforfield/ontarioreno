@@ -587,7 +587,9 @@ export default function PortalSubmissions() {
                       <td className="max-w-[16rem] px-4 py-3 text-slate-600">
                         {/* Raw submitted text, with the verification state beside
                             it so partial data never reads as confirmed. */}
-                        <div className="truncate text-xs">{lead.address || <NotRecorded />}</div>
+                        <div className="truncate text-xs">
+                          {lead.address ? (lead.unit ? `Unit ${lead.unit}, ${lead.address}` : lead.address) : <NotRecorded />}
+                        </div>
                         <div className="text-[0.65rem] font-bold uppercase tracking-wide text-slate-400">
                           {lead.addressState ? ADDRESS_STATE_LABEL[lead.addressState] ?? lead.addressState : 'Unknown'}
                         </div>
@@ -1100,7 +1102,7 @@ function SubmissionDrawer({
             <Field label="Email" icon={Mail}>{lead.email || <NotRecorded />}</Field>
             <Field label="Address" icon={MapPin}>
               <span className="inline-flex items-center gap-2">
-                {lead.address || <NotRecorded />}
+                {lead.address ? (lead.unit ? `Unit ${lead.unit}, ${lead.address}` : lead.address) : <NotRecorded />}
                 {!lead.deletedAt ? (
                   <button
                     type="button"

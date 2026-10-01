@@ -173,6 +173,7 @@ function leadToClient(lead: Lead): Client {
     phone: lead.phone,
     email: lead.email,
     address: lead.address,
+    unit: lead.unit,
     city: lead.city,
     postalCode: lead.postalCode,
     projectTypes: lead.projectType ? [lead.projectType] : [],
@@ -612,7 +613,7 @@ function CustomerCard({
               <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Address</p>
               <p className="flex items-center gap-1 text-sm font-semibold text-slate-800">
                 <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                {[lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ')}
+                {[lead.unit ? `Unit ${lead.unit}` : '', lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ')}
               </p>
             </div>
           )}
@@ -1268,7 +1269,7 @@ function ContextPanel({ lead }: { lead: Lead }) {
           <div>
             <p className="text-[0.7rem] font-bold uppercase tracking-wide text-slate-400">Contact</p>
             <p className="font-semibold text-slate-700">{lead.email || 'No email'}</p>
-            <p className="text-slate-500">{[lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ') || 'No address'}</p>
+            <p className="text-slate-500">{[lead.unit ? `Unit ${lead.unit}` : '', lead.address, lead.city, lead.postalCode].filter(Boolean).join(', ') || 'No address'}</p>
           </div>
           {lead.notes && (
             <details>
