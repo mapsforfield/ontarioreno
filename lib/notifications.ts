@@ -704,6 +704,25 @@ export function toE164(raw: string): string | null {
 }
 
 /**
+ * The form body for one Twilio message.
+ *
+ * A `mediaUrl` turns the text into a picture message (MMS): Twilio fetches the
+ * file from that URL and carries it alongside the body. Only an https URL is
+ * attached — anything else is dropped and the text still goes, because a
+ * picture is a bonus and the words and link are the message.
+ */
+export function twilioMessageParams(
+  to: string,
+  from: string,
+  body: string,
+  mediaUrl = ''
+): URLSearchParams {
+  const params = new URLSearchParams({ To: to, From: from, Body: body });
+  if (/^https:\/\/\S+$/.test(mediaUrl.trim())) params.append('MediaUrl', mediaUrl.trim());
+  return params;
+}
+
+/**
  * Send one SMS through Twilio's REST API.
  *
  * Called directly rather than through the Twilio SDK: one form-encoded POST is
@@ -713,7 +732,8 @@ export function toE164(raw: string): string | null {
 export async function deliverSms(
   to: string,
   body: string,
-  env = process.env
+  env = process.env,
+  mediaUrl = ''
 ): Promise<DeliveryOutcome> {
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
@@ -735,7 +755,7 @@ export async function deliverSms(
           Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({ To: destination, From: from, Body: body }).toString(),
+        body: twilioMessageParams(destination, from, body, mediaUrl).toString(),
       }
     );
 

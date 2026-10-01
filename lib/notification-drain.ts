@@ -39,6 +39,7 @@ export type OutboxStore = {
         subject: string;
         body: string;
         html?: string;
+        mediaUrl?: string;
         attempts: number;
         expiresAt?: string;
       }>
@@ -210,7 +211,7 @@ export async function drainOutbox(
       reason = 'no_sms_provider';
       summary.blocked++;
     } else if (row.channel === 'sms') {
-      const outcome = await deliverSms(row.recipient, row.body, env);
+      const outcome = await deliverSms(row.recipient, row.body, env, row.mediaUrl ?? '');
       state = outcome.state;
       reason = outcome.reason;
       if (outcome.state === 'sent') summary.sent++;
