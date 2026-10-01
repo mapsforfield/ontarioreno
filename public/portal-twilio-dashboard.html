@@ -1698,13 +1698,19 @@
       localStorage.setItem("responsesDoneMap", JSON.stringify(responsesDoneMap));
     }
 
+    // Only prune a done mark when the contact is in view and the mark is
+    // provably obsolete. A contact missing from the list is not evidence of
+    // anything: the first paint after a refresh is built from a partial
+    // message window, and switching lines swaps the whole set — pruning absent
+    // contacts there wiped every "Mark all done" before the full sync landed.
+    // A new inbound message already resurfaces a contact via the SID check.
     function syncResponsesDoneMapState(conversationItems) {
-      const validContacts = new Set(conversationItems.map((conv) => conv.contact));
+      const byContact = new Map(conversationItems.map((conv) => [conv.contact, conv]));
       let changed = false;
 
       Object.keys(responsesDoneMap).forEach((contact) => {
-        const conv = conversationItems.find((item) => item.contact === contact);
-        if (!validContacts.has(contact) || !conv || !conv.lastIsInbound) {
+        const conv = byContact.get(contact);
+        if (conv && !conv.lastIsInbound) {
           delete responsesDoneMap[contact];
           changed = true;
         }
