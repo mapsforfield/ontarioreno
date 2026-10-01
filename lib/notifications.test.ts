@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   dayOfReminderAt,
   deliverSms,
+  twilioMessageParams,
   toE164,
   friendlyDate,
   friendlyTime,
@@ -227,6 +228,25 @@ test('a malformed number fails without calling Twilio', async () => {
   } as NodeJS.ProcessEnv);
   assert.equal(outcome.state, 'failed');
   assert.match(outcome.reason, /unusable_phone_number/);
+});
+
+test('a text with no picture sends exactly as before', () => {
+  const p = twilioMessageParams('+16475550100', '+15550001111', 'Hi');
+  assert.deepEqual([...p.keys()], ['To', 'From', 'Body']);
+});
+
+test('a picture URL is attached as MediaUrl, making it a picture message', () => {
+  const p = twilioMessageParams('+16475550100', '+15550001111', 'Hi', 'https://ontarioreno.ca/sms/bathroom-booking.gif');
+  assert.equal(p.get('MediaUrl'), 'https://ontarioreno.ca/sms/bathroom-booking.gif');
+  assert.equal(p.get('Body'), 'Hi');
+});
+
+test('a non-https picture URL is dropped and the text still goes', () => {
+  for (const bad of ['http://ontarioreno.ca/x.gif', '/sms/x.gif', 'not a url']) {
+    const p = twilioMessageParams('+16475550100', '+15550001111', 'Hi', bad);
+    assert.equal(p.has('MediaUrl'), false, bad);
+    assert.equal(p.get('Body'), 'Hi');
+  }
 });
 
 test('SMS rows carry no HTML', () => {

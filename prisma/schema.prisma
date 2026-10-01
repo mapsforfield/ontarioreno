@@ -752,6 +752,11 @@ model NotificationOutbox {
   /// Rendered HTML for email rows. Stored because delivery is deferred, so the
   /// message must survive until the drain runs. Empty for SMS.
   html           String   @default("")
+  /// Public https URL of an image to attach to an SMS row, which Twilio then
+  /// sends as a picture message (MMS). Empty for every row that is plain text,
+  /// which is every row written before this column existed. Twilio fetches the
+  /// file itself at send time, so it must be live on the public site first.
+  mediaUrl       String   @default("")
   /// 'pending' | 'sending' | 'sent' | 'failed' | 'suppressed' | 'blocked'
   /// 'sending' is a claim, not an outcome: the drain compare-and-sets a row out
   /// of 'pending' before it hands anything to a provider, so two drains racing
