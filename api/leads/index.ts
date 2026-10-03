@@ -50,6 +50,8 @@ import { fetchThread, missingFromThread } from '../../lib/twilio-thread-sync.js'
 import {
   planBookingNotifications,
   planLeadWelcomeNotifications,
+  welcomeRoomForAd,
+  type WelcomeRoom,
   planSubmissionNotifications,
   smsProviderConfigured,
   type BookingContext,
@@ -393,7 +395,13 @@ function leadWelcomeSender(): string {
   return process.env.LEAD_WELCOME_SENDER ?? 'Michael';
 }
 
-function leadBookingUrl(): string {
+function leadBookingUrl(room: WelcomeRoom = 'basement'): string {
+  if (room === 'bathroom') {
+    return (
+      process.env.LEAD_WELCOME_BATHROOM_BOOKING_URL ??
+      'https://ontarioreno.ca/consultation/bathroom'
+    );
+  }
   return (
     process.env.LEAD_WELCOME_BOOKING_URL ??
     'https://ontarioreno.ca/consultation/basement'
@@ -414,14 +422,18 @@ function leadBookingUrl(): string {
  * anything that is not a 2xx — turning a Twilio outage into a retry storm that
  * duplicates leads would cost far more than a missed text.
  */
-async function sendLeadWelcome(lead: { id: string; name: string; phone: string }) {
+async function sendLeadWelcome(
+  lead: { id: string; name: string; phone: string },
+  room: WelcomeRoom = 'basement',
+) {
   try {
     const planned = planLeadWelcomeNotifications({
       leadId: lead.id,
       name: lead.name ?? '',
       phone: lead.phone ?? '',
-      bookingUrl: leadBookingUrl(),
+      bookingUrl: leadBookingUrl(room),
       senderName: leadWelcomeSender(),
+      room,
     });
     if (planned.length === 0) return; // no phone ⇒ nothing to send, not a failure
 
@@ -476,6 +488,11 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
   // Parse with the same logic as the bulk importer, so website/Meta rows get the
   // same field mapping, extra-answers-into-notes, and source handling.
   const incoming = importLeadData(data);
+  // The Meta ad this lead answered (sheet column `ad_name`). Picks the room the
+  // first text talks about, and is kept on the lead so a rep can see it.
+  const adName = clean(data.adName);
+  const welcomeRoom = welcomeRoomForAd(adName);
+  if (adName && !incoming.sourceDetail) incoming.sourceDetail = `Ad: ${adName}`;
   if (!incoming.name && !incoming.phone && !incoming.email) {
     return res.status(400).json({ error: 'A name, phone, or email is required.' });
   }
@@ -516,7 +533,7 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
     // Best-effort throughout: the lead is committed and a texting problem must
     // never turn a captured lead into an error the sender will retry.
     if (!result.merged && result.lead) {
-      await sendLeadWelcome(result.lead);
+      await sendLeadWelcome(result.lead, welcomeRoom);
     }
     // Merge → 200, create → 201; always ok so the sender never retry-storms.
     return res.status(result.merged ? 200 : 201).json({ ok: true, ...result });

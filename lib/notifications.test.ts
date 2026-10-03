@@ -10,6 +10,7 @@ import {
   planBookingNotifications,
   planLeadWelcomeNotifications,
   smsLeadWelcome,
+  welcomeRoomForAd,
   smsBookingConfirmation,
   smsReminder24h,
   smsReminderDayOf,
@@ -414,6 +415,30 @@ test('the welcome text stays inside two SMS segments', () => {
     smsLeadWelcome(WELCOME).length <= 306,
     `welcome sms is ${smsLeadWelcome(WELCOME).length} characters`
   );
+});
+
+test('the bathroom ad gets a bathroom text, not the basement one', () => {
+  const body = smsLeadWelcome({
+    ...WELCOME,
+    room: 'bathroom',
+    bookingUrl: 'https://ontarioreno.ca/consultation/bathroom',
+  });
+  assert.match(body, /about your bathroom renovation/);
+  assert.ok(!/basement/i.test(body), 'a bathroom lead must never be told about a basement');
+  assert.ok(body.trim().endsWith('https://ontarioreno.ca/consultation/bathroom'));
+  assert.ok(body.length <= 306, `bathroom welcome is ${body.length} characters`);
+});
+
+test('the ad name picks the room, and anything unknown stays basement', () => {
+  // The bathroom ad was duplicated from the basement campaign, so campaign and
+  // ad set still say "Basement" — the ad name is the only thing that differs.
+  assert.equal(welcomeRoomForAd('Bathroom'), 'bathroom');
+  assert.equal(welcomeRoomForAd('bathroom reno - v2'), 'bathroom');
+  assert.equal(welcomeRoomForAd('Basement Ad'), 'basement');
+  // A sheet script that predates ad_name sends nothing: unchanged behaviour.
+  assert.equal(welcomeRoomForAd(''), 'basement');
+  assert.equal(welcomeRoomForAd(undefined), 'basement');
+  assert.match(smsLeadWelcome(WELCOME), /about your basement\./, 'basement copy is unchanged');
 });
 
 test('one text per lead, whatever the sender does', () => {
