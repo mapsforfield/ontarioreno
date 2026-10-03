@@ -185,8 +185,9 @@ export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const sender = (c.senderName ?? '').trim() || DEFAULT_WELCOME_SENDER;
   // "Hi Sarah," or a bare "Hi," — never "Hi undefined,".
   const greeting = name ? `Hi ${name}, ` : 'Hi, ';
+  const about = c.room === 'bathroom' ? 'your bathroom renovation' : 'your basement';
   return (
-    `${greeting}this is ${sender} from OntarioReno about your basement. ` +
+    `${greeting}this is ${sender} from OntarioReno about ${about}. ` +
     `Quick question, are weekdays or weekends better for us to come take a look? ` +
     `If you prefer to book directly instead please visit: ${c.bookingUrl}`
   );
@@ -331,7 +332,27 @@ export type LeadWelcomeContext = {
    * Optional so existing callers keep the default.
    */
   senderName?: string;
+  /**
+   * Which ad the lead answered, so the text talks about the right room. Absent
+   * means basement — the only ad there was before this existed.
+   */
+  room?: WelcomeRoom;
 };
+
+export type WelcomeRoom = 'basement' | 'bathroom';
+
+/**
+ * Which room a Meta lead is about, read from the sheet's `ad_name` column.
+ *
+ * The bathroom ad is a duplicate of the basement campaign and ad set, so the
+ * campaign and ad set names both still say "Basement" — only the AD name tells
+ * them apart. Anything unrecognised, including a blank name from a sheet
+ * script that predates this, stays basement: that is what every lead got
+ * before, so an older script keeps behaving exactly as it did.
+ */
+export function welcomeRoomForAd(adName: string | null | undefined): WelcomeRoom {
+  return /bath/i.test(adName ?? '') ? 'bathroom' : 'basement';
+}
 
 /**
  * The one text a new external lead gets, and only ever one.

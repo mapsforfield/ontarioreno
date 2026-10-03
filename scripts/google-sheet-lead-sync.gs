@@ -27,11 +27,13 @@ const FIELD_MAP = {
   phone: ['phone', 'phonenumber', 'mobile'],
   address: ['streetaddress', 'address', 'propertyaddress'],
   submittedAt: ['createdtime', 'timestamp', 'submitted', 'submissiondate', 'date'],
+  // Which Meta ad the lead answered — picks the basement vs bathroom first text.
+  adName: ['adname'],
 };
 
 // ONLY these extra columns are captured as qualifying "answers" on the lead —
 // every other column on the sheet (Meta ad ids, campaign, platform, etc.) is
-// ignored. "Label shown on the lead": [matching header aliases].
+// ignored. (ad_name is read separately, via FIELD_MAP.adName.) "Label shown on the lead": [matching header aliases].
 const ANSWER_MAP = {
   'Hamilton homeowner?': ['areyouahamiltonhomeowner'],
 };
@@ -96,6 +98,7 @@ function syncNewLeads() {
       source: CONFIG.SOURCE,
       sourceDetail: get('sourceDetail'),
       submittedAt: get('submittedAt'),
+      adName: get('adName'),
       extraAnswers: extraAnswers,
     };
 
