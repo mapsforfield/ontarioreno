@@ -214,6 +214,25 @@ export type ProgramConfig = {
    */
   capturesOutOfAreaLeads?: boolean;
   /**
+   * The photo across the top of the calendar-early flow's landing screen.
+   *
+   * Per program because the photo IS the offer before anyone has read a word —
+   * a bathroom ad landing on a half-insulated basement tells the homeowner
+   * they clicked the wrong thing. Absent ⇒ no banner, never someone else's.
+   */
+  bookingBanner?: { src: string; alt: string };
+  /**
+   * The line under the payment question on the calendar-early confirmation
+   * screen, after the slot is held.
+   *
+   * Per program, and written out in full rather than assembled from the
+   * amount, because what it may claim differs: the basement offer carries a
+   * 6-month no-payment promotion in its programTerms and the others do not.
+   * A shared sentence advertised that promotion on every flow that used it.
+   * Absent ⇒ no line. Never claim here what programTerms does not.
+   */
+  prepFinancingNote?: string;
+  /**
    * What the booked consultation actually is. Drives the customer-facing wording
    * and the Appointment.appointmentType written at booking, so the homeowner is
    * never unclear about whether someone is coming to the property.
@@ -689,6 +708,14 @@ export const BASEMENT_FINANCING_PROGRAM: ProgramConfig = {
   // See capturesOutOfAreaLeads. This flow is fed by SMS and by ads; a dead end
   // here is a lead we already paid for, thrown away over a postal code.
   capturesOutOfAreaLeads: true,
+  bookingBanner: {
+    src: '/images/banner.webp',
+    alt: 'A basement mid-renovation: bare insulation on one side, finished living space on the other',
+  },
+  // The 6-month promotion is in this program's programTerms, so it may be
+  // claimed here. Check the terms before copying this line to another program.
+  prepFinancingNote:
+    'Monthly plans from $399 a month, nothing upfront, and 6 months with no payments and no interest — on approved credit.',
   // Asked on the confirmation screen, after the slot is held, and skippable.
   //
   // Not PREP_QUESTIONS: those three (basement condition, separate entrance,
@@ -736,13 +763,21 @@ const BATHROOM_PROJECT_TYPE: Question = {
   key: 'projectType',
   label: 'What are you planning?',
   routingRelevant: true,
-  step: 2,
+  // Step 1: on the calendar-early flow this is the one question between a
+  // chosen time and the contact fields.
+  step: 1,
+  // "Still deciding" ('unsure') was retired with the move to calendar-early,
+  // exactly as the basement offer has no such option. Routing reads 'unsure' as
+  // PROJECT_TYPE_UNCERTAIN, which is a MANUAL_REVIEW — and on this flow the
+  // homeowner has already picked a time by then, so that answer would take the
+  // calendar away from them after the fact. Someone undecided picks the
+  // closest one; the rep scopes it on the visit. Rows captured with 'unsure'
+  // before the change still read correctly.
   options: [
     { value: 'bathroom_refresh', label: 'Update an existing bathroom' },
     { value: 'bathroom_gut', label: 'Full gut and rebuild' },
     { value: 'bathroom_addition', label: 'Add a new bathroom' },
     { value: 'multiple_bathrooms', label: 'More than one bathroom' },
-    { value: 'unsure', label: 'Still deciding' },
   ],
 };
 
@@ -857,8 +892,31 @@ export const BATHROOM_FINANCING_PROGRAM: ProgramConfig = {
   // and an exploratory lead is usually someone who has not been shown the build
   // is affordable yet. Everyone gets the calendar.
   nurtureTimelines: [],
-  questions: [BATHROOM_PROJECT_TYPE, TIMELINE, BATHROOM_CONTRIBUTION],
-  prepQuestions: BATHROOM_PREP_QUESTIONS,
+  // The basement treatment: calendar first, one question, then name, mobile and
+  // address. See BASEMENT_FINANCING_PROGRAM for the reasoning on each field.
+  //
+  // TIMELINE is gone from the pre-booking set for the same reason it went from
+  // the basement's: nurtureTimelines is [], so the answer could not change
+  // anything and only stood between a chosen time and a held one.
+  // BATHROOM_CONTRIBUTION is not gone — it moved to prepQuestions, after the
+  // booking, where /api/leads?flow=prep still adds the same funding tags to the
+  // rep's brief.
+  questions: [BATHROOM_PROJECT_TYPE],
+  addressPlacement: 'final',
+  bookingFlow: 'calendar_early',
+  booksWithoutVerifiedAddress: true,
+  capturesOutOfAreaLeads: true,
+  bookingBanner: {
+    src: '/images/bathroom-reno/booking-banner.webp',
+    alt: 'A dated bathroom on one side and the same room renovated with a glass shower and marble tile on the other',
+  },
+  // No promotion here: this program's terms do not carry the basement's
+  // 6-month deferral, so this line may not either. displayAmountLabel already
+  // says "on approved credit".
+  prepFinancingNote: 'Monthly plans from about $99 a month, on approved credit, with nothing upfront.',
+  // The bathroom questions in their existing order, then the payment question
+  // last — where the basement flow asks it, with the financing line under it.
+  prepQuestions: [...BATHROOM_PREP_QUESTIONS, BATHROOM_CONTRIBUTION],
   // Nobody prices tile, waterproofing and a plumbing move off a photo.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Bathroom Renovation Consultation',
@@ -869,6 +927,9 @@ export const BATHROOM_FINANCING_PROGRAM: ProgramConfig = {
   guideLabel: '',
   officialSourceUrls: [],
   ...SHARED_SCHEDULING,
+  // A month, as on the basement offer and for the same reason: no deadline, and
+  // the calendar is the first thing the page shows.
+  bookingHorizonDays: 30,
 };
 
 // ─── Kitchen renovation financing ─────────────────────────────────────────────

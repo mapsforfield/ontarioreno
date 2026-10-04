@@ -158,3 +158,54 @@ test('a grant flow still queues an address it could not read', () => {
     'MANUAL_REVIEW'
   );
 });
+
+// ─── The bathroom offer on the same flow ──────────────────────────────────────
+//
+// Moved to calendar-early after a bathroom ad's lead booked through the
+// basement page. Same shape as the basement, with its own photo and its own
+// financing line — the two things this file used to hardcode for basement.
+
+const bathroom = programBySlug('bathroom')!;
+
+test('the bathroom flow is calendar-first with one question before the booking', () => {
+  assert.equal(bathroom.bookingFlow, 'calendar_early');
+  assert.equal(bathroom.addressPlacement, 'final');
+  assert.equal(bathroom.booksWithoutVerifiedAddress, true);
+  assert.deepEqual(
+    bathroom.questions.map((q) => q.key),
+    ['projectType']
+  );
+});
+
+test('every bathroom answer before the booking reaches the calendar', () => {
+  // The homeowner has already chosen a time when they answer this, so an
+  // option that routes to MANUAL_REVIEW ('unsure') would take it back from
+  // them. Each one must book.
+  for (const option of bathroom.questions[0].options) {
+    const routed = routeConsultation({
+      addressState: 'ADDRESS_VERIFIED',
+      area: bathroom.schedulingArea,
+      program: bathroom,
+      answers: { projectType: option.value },
+    });
+    assert.equal(routed.outcome, 'DIRECT_CALENDAR', `${option.value} lost the booking`);
+  }
+});
+
+test('the bathroom payment and prep questions still exist — after the booking', () => {
+  const prep = bathroom.prepQuestions.map((q) => q.key);
+  for (const key of ['contribution', 'layoutChange', 'bathroomType', 'waterDamage']) {
+    assert.ok(prep.includes(key), `the rep still wants the ${key} answer`);
+  }
+});
+
+test('each calendar-early program shows its own photo and claims only its own terms', () => {
+  assert.notEqual(bathroom.bookingBanner?.src, basement.bookingBanner?.src);
+  for (const program of [basement, bathroom]) {
+    const note = program.prepFinancingNote ?? '';
+    const promoInTerms = program.programTerms.some((t) => /6 months/i.test(t));
+    if (/6 months/i.test(note)) {
+      assert.ok(promoInTerms, `${program.slug} advertises a promotion its terms do not carry`);
+    }
+  }
+});

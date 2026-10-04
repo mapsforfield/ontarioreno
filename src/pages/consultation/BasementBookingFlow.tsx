@@ -27,9 +27,11 @@ import {
 
 // ─── The calendar-early booking flow ──────────────────────────────────────────
 //
-// One program uses this today (/consultation/basement, bookingFlow
-// 'calendar_early'). Everything else still runs ConsultationFlow's original
-// order and is untouched by this file.
+// Used by every program with bookingFlow 'calendar_early' — today
+// /consultation/basement and /consultation/bathroom. Everything else still runs
+// ConsultationFlow's original order and is untouched by this file. The name is
+// historical; anything program-specific (banner, financing line) comes from the
+// program config, never from this file.
 //
 // The order, and why:
 //
@@ -72,6 +74,8 @@ export type BasementProgram = {
   prepQuestions: Question[];
   pageTitle: string | null;
   displayAmountLabel: string;
+  bookingBanner?: { src: string; alt: string } | null;
+  prepFinancingNote?: string;
   smsEnabled: boolean;
 };
 
@@ -653,7 +657,7 @@ export default function BasementBookingFlow({
     phase === 'project' ? () => setPhase('time') : phase === 'lock' ? () => setPhase('project') : undefined;
 
   const projectLabel =
-    projectQuestion?.options.find((o) => o.value === answers.projectType)?.label ?? 'Basement project';
+    projectQuestion?.options.find((o) => o.value === answers.projectType)?.label ?? 'Your project';
 
   return (
     <Shell
@@ -665,11 +669,7 @@ export default function BasementBookingFlow({
       // before/after is what makes the offer concrete before they have read a
       // word. On the later screens the same photo would just be height between
       // a homeowner and the field they are filling in.
-      banner={
-        phase === 'time'
-          ? { src: '/images/banner.webp', alt: 'A basement mid-renovation: bare insulation on one side, finished living space on the other' }
-          : undefined
-      }
+      banner={phase === 'time' && program.bookingBanner ? program.bookingBanner : undefined}
     >
       <Helmet>
         <title>{program.pageTitle ?? `${program.areaLabel} Consultation | OntarioReno`}</title>
@@ -1024,7 +1024,7 @@ export default function BasementBookingFlow({
 
           {/* Required — but the DROPDOWN is not.
               These are two different things and the difference is the whole
-              point. We need an address: nobody prices a basement without
+              point. We need an address: nobody prices a renovation without
               knowing which one, and a rep cannot plan a day around a blank.
               What we do not need is for the homeowner to realise that tapping a
               Google suggestion is what makes the button work. Most of these
@@ -1207,10 +1207,11 @@ export default function BasementBookingFlow({
                   text under the question it belongs to, on a screen where the
                   visit is already secured — not a pitch standing between
                   somebody and the calendar. */}
-              {prepQuestion.key === 'contribution' && program.displayAmountLabel && (
+              {/* Per program (prepFinancingNote): the basement line carries a
+                  6-month promotion that the other offers' terms do not. */}
+              {prepQuestion.key === 'contribution' && program.prepFinancingNote && (
                 <p className="mt-2.5 text-xs leading-relaxed text-slate-500">
-                  Monthly plans {program.displayAmountLabel}, nothing upfront, and 6 months with no
-                  payments and no interest — on approved credit.
+                  {program.prepFinancingNote}
                 </p>
               )}
 
