@@ -92,6 +92,10 @@ type Program = {
   bookingFlow?: 'questions_first' | 'calendar_early';
   /** Asked after booking, on the calendar-early flow only. */
   prepQuestions: Question[];
+  /** Calendar-early landing photo. Absent on an older payload ⇒ no banner. */
+  bookingBanner?: { src: string; alt: string } | null;
+  /** Line under the post-booking payment question. Absent ⇒ none. */
+  prepFinancingNote?: string;
   guideUrl: string;
   guideLabel: string;
   /** False until a Twilio adapter is configured — copy adapts rather than lying. */

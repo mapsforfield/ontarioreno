@@ -1546,6 +1546,8 @@ function publicProgramPayload(program: ProgramConfig) {
     // Sent for every program regardless — an unused field is cheaper than a
     // second payload shape.
     prepQuestions: program.prepQuestions,
+    bookingBanner: program.bookingBanner ?? null,
+    prepFinancingNote: program.prepFinancingNote ?? '',
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
     // Told to the client so confirmation copy can't promise a text we cannot

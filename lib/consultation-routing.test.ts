@@ -768,9 +768,10 @@ test('the shared timeline question is untouched by the kitchen form', () => {
   // live flows would lose an option nobody asked to change.
   // BASEMENT_FINANCING_PROGRAM was deliberately removed from this list when it
   // stopped asking about timing — a visible line in the diff rather than a
-  // question quietly disappearing. The programs below still ask it and still
-  // share one object.
-  for (const program of [HAMILTON_PROGRAM, SIMCOE_PROGRAM, BATHROOM_FINANCING_PROGRAM]) {
+  // question quietly disappearing. BATHROOM_FINANCING_PROGRAM was removed for
+  // the same reason when it moved to the calendar-early flow. The programs
+  // below still ask it and still share one object.
+  for (const program of [HAMILTON_PROGRAM, SIMCOE_PROGRAM]) {
     const values = program.questions.find((q) => q.key === 'timeline')!.options.map((o) => o.value);
     assert.deepEqual(
       values,

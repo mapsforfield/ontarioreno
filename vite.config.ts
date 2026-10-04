@@ -71,6 +71,8 @@ function mockLeadsApi(): Plugin {
             addressPlacement: program.addressPlacement ?? 'first',
             bookingFlow: program.bookingFlow ?? 'questions_first',
             prepQuestions: program.prepQuestions,
+            bookingBanner: program.bookingBanner ?? null,
+            prepFinancingNote: program.prepFinancingNote ?? '',
             guideUrl: program.guideUrl,
             guideLabel: program.guideLabel,
             smsEnabled: false,
