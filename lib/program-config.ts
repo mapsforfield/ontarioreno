@@ -53,10 +53,10 @@ export type QuestionOption = {
   /** A smaller second line under the label — a concrete example of the answer. */
   hint?: string;
   /**
-   * Draws a small pie beside the option, filled to this share (0–1) as "yours".
-   * Kept small and to the side on purpose: the words are read first and the
-   * picture confirms them. A full-width bar under each label was the first
-   * thing the eye landed on, before the question had been read.
+   * Draws a small house beside the option, filled from the ground up to this
+   * share (0–1) as paid off. Kept small and to the side on purpose: the words
+   * are read first and the picture confirms them. A full-width bar under each
+   * label was the first thing the eye landed on, before the question was read.
    */
   ownedShare?: number;
 };
@@ -66,6 +66,11 @@ export type Question = {
   label: string;
   /** Short clarifier shown under the label. */
   help?: string;
+  /**
+   * Ask this question only when an earlier answer is one of `values`. Used by
+   * the calendar-early flow; a hidden question is not sent, and is stored blank.
+   */
+  showIf?: { key: string; values: string[] };
   options: QuestionOption[];
   /** Only these answers influence routing; everything else is captured for the rep. */
   routingRelevant?: boolean;
@@ -1392,25 +1397,36 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
     ],
   },
   {
+    // Asked first as a plain yes/no, because everyone knows the answer without
+    // thinking. Only a "yes" is asked how much is paid off (see showIf below).
+    key: 'hasMortgage',
+    label: 'Is there a mortgage or line of credit on the home?',
+    step: 1,
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No, it’s paid off' },
+    ],
+  },
+  {
     // The City's 90% loan-to-value condition, asked as a range. Exact figures
     // are the rep's to ask on the call, not a form's.
     //
-    // Asked as what the homeowner OWNS, not what they owe. "What share of your
-    // value is owed" was a ratio of two numbers nobody keeps in their head;
-    // "how much of it is yours" is something people already have a feel for,
-    // and each option carries a bar to match against rather than a sum to do.
+    // Asked as how much is PAID OFF, not as a share owed: a ratio of two
+    // numbers nobody keeps in their head read as a puzzle in every wording that
+    // tried it. Coming straight after "yes, there's a mortgage" it reads as the
+    // natural follow-up, each answer carries a dollar example to match against,
+    // and a house filled to that level as a picture.
+    //
     // The stored values are unchanged and mean the same thing (under_50 owed ==
-    // more than half owned), so rows captured under the old wording still read
-    // correctly. 'paid_off' is new: the easiest answer of all for a homeowner
-    // with no mortgage, who otherwise had to work out that it meant "under 50".
+    // more than half paid off), so rows captured under earlier wording still
+    // read correctly. A homeowner with no mortgage is never asked this; their
+    // hasMortgage 'no' says it.
     key: 'mortgageShare',
-    label: 'How much of your home is yours?',
-    // Each option carries its own dollar example, so the reader matches their
-    // situation to a line rather than decoding a worked example first.
-    help: 'What it’s worth, minus what you still owe. A rough guess is fine.',
+    label: 'Roughly how much of the home is paid off?',
+    help: 'Compared with what it’s worth today. A rough guess is fine.',
+    showIf: { key: 'hasMortgage', values: ['yes'] },
     step: 1,
     options: [
-      { value: 'paid_off', label: 'All of it', hint: 'No mortgage or line of credit', ownedShare: 1 },
       { value: 'under_50', label: 'More than half', hint: 'Owe $300k on an $800k home', ownedShare: 0.65 },
       { value: '50_75', label: 'A quarter to half', hint: 'Owe $500k on an $800k home', ownedShare: 0.38 },
       { value: 'over_75', label: 'Less than a quarter', hint: 'Owe $700k on an $800k home', ownedShare: 0.15 },

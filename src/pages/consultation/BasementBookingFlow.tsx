@@ -161,8 +161,12 @@ export default function BasementBookingFlow({
   const skipSuggest = useRef(false);
 
   const projectQuestion = program.questions.find((q) => q.key === 'projectType') ?? program.questions[0];
-  const currentQuestion = program.questions[questionIndex] ?? projectQuestion;
-  const isLastQuestion = questionIndex + 1 >= program.questions.length;
+  // Only the questions this homeowner's answers so far call for (showIf).
+  // Recomputed every render, so going Back and changing an answer re-routes.
+  const visibleQuestions = program.questions.filter(
+    (q) => !q.showIf || q.showIf.values.includes(answers[q.showIf.key] ?? '')
+  );
+  const currentQuestion = visibleQuestions[questionIndex] ?? projectQuestion;
 
   // ── Funnel instrumentation ──
   // Same shape as ConsultationFlow's: custom events, once per screen per
@@ -509,7 +513,11 @@ export default function BasementBookingFlow({
             !placeId && addressText.trim()
               ? `Typed address (not confirmed): ${addressText.trim()}`
               : '',
-          answers,
+          // Only what was actually asked: an answer to a question that a
+          // later change hid (Back, then "No, it's paid off") must not ride along.
+          answers: Object.fromEntries(
+            Object.entries(answers).filter(([key]) => visibleQuestions.some((q) => q.key === key))
+          ),
         }),
       });
       const submitted = await submitRes.json();
@@ -920,7 +928,14 @@ export default function BasementBookingFlow({
                   key={o.value}
                   type="button"
                   onClick={() => {
-                    setAnswers({ ...answers, [currentQuestion.key]: o.value });
+                    const next = { ...answers, [currentQuestion.key]: o.value };
+                    setAnswers(next);
+                    // Decided against the answers INCLUDING this one: a "yes"
+                    // here can add the next question.
+                    const remaining = program.questions.filter(
+                      (q) => !q.showIf || q.showIf.values.includes(next[q.showIf.key] ?? '')
+                    );
+                    const isLastQuestion = questionIndex + 1 >= remaining.length;
                     // The pause is the point: a tap that both selects and
                     // navigates with no visible acknowledgement reads as the
                     // page having jumped on its own.
@@ -939,19 +954,10 @@ export default function BasementBookingFlow({
                       : 'border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  {/* Only drawn when the question uses pies, so every other
+                  {/* Only drawn when the question uses them, so every other
                       option list keeps its plain layout. */}
                   {currentQuestion.options.some((x) => x.ownedShare !== undefined) && (
-                    <span
-                      className="mr-3 h-7 w-7 shrink-0 rounded-full border border-slate-200"
-                      aria-hidden="true"
-                      style={{
-                        background:
-                          o.ownedShare === undefined
-                            ? '#f1f5f9'
-                            : `conic-gradient(#34d399 0 ${Math.round(o.ownedShare * 100)}%, #e2e8f0 0)`,
-                      }}
-                    />
+                    <HouseFill share={o.ownedShare} />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block">{o.label}</span>
@@ -970,9 +976,9 @@ export default function BasementBookingFlow({
             <p className="text-center text-xs leading-relaxed text-slate-500">{program.prepFinancingNote}</p>
           )}
           <p className="text-center text-xs text-slate-500">
-            {isLastQuestion
+            {questionIndex + 1 >= visibleQuestions.length
               ? 'Last question before we hold your time.'
-              : `Question ${questionIndex + 1} of ${program.questions.length}`}
+              : `Question ${questionIndex + 1} of ${visibleQuestions.length}`}
           </p>
         </div>
       )}
@@ -1337,5 +1343,32 @@ export default function BasementBookingFlow({
         </p>
       )}
     </Shell>
+  );
+}
+
+/**
+ * A small house filled from the ground up to `share` (0–1) — how much of the
+ * home is paid off. No share draws the empty outline (the "Not sure" answer).
+ */
+function HouseFill({ share }: { share?: number }) {
+  const id = useMemo(() => `house-${Math.random().toString(36).slice(2, 9)}`, []);
+  const outline = 'M16 3 L29 14 H26 V29 H6 V14 H3 Z';
+  // Filled against the WALLS (y 14 to 29), not the whole icon: measured to the
+  // roof peak, 65% reached the eaves and read as nearly full. Only a fully
+  // paid-off home fills the roof too.
+  const fillTop = share === 1 ? 0 : 29 - 15 * (share ?? 0);
+  return (
+    <svg viewBox="0 0 32 32" className="mr-3 h-8 w-8 shrink-0" aria-hidden="true">
+      <defs>
+        <clipPath id={id}>
+          <path d={outline} />
+        </clipPath>
+      </defs>
+      <path d={outline} fill="#f1f5f9" />
+      {share !== undefined && (
+        <rect x="0" y={fillTop} width="32" height={32 - fillTop} fill="#34d399" clipPath={`url(#${id})`} />
+      )}
+      <path d={outline} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
   );
 }

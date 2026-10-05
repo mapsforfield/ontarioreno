@@ -14,6 +14,8 @@ export type Question = {
   key: string;
   label: string;
   help?: string;
+  /** See Question.showIf in lib/program-config.ts. */
+  showIf?: { key: string; values: string[] };
   step: 1 | 2 | 3;
   /** hint, ownedShare: see QuestionOption in lib/program-config.ts. */
   options: Array<{ value: string; label: string; hint?: string; ownedShare?: number }>;

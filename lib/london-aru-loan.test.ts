@@ -80,7 +80,7 @@ test('every offered unit type is eligible', () => {
 test('the City conditions are asked BEFORE booking, after the unit type', () => {
   // The owner chose qualified calls over volume for this program.
   const keys = london.questions.map((q) => q.key);
-  assert.deepEqual(keys, ['projectType', 'ownerOccupied', 'workStarted', 'mortgageShare', 'contribution']);
+  assert.deepEqual(keys, ['projectType', 'ownerOccupied', 'workStarted', 'hasMortgage', 'mortgageShare', 'contribution']);
   for (const q of london.questions) assert.ok(q.options.length > 0, `${q.key} has no options`);
   assert.equal(london.prepQuestions.length, 0, 'nothing left to ask after booking');
   assert.equal(london.addressPlacement, 'final');
@@ -96,7 +96,7 @@ const qualified = {
 };
 
 test('a qualified London homeowner books, whatever they owe or how they fund it', () => {
-  for (const mortgageShare of ['paid_off', 'under_50', '50_75', 'over_75', 'unsure']) {
+  for (const mortgageShare of ['', 'under_50', '50_75', 'over_75', 'unsure']) {
     for (const contribution of ['cash_equity', 'need_financing', 'unsure']) {
       const routing = routeConsultation({
         addressState: 'ADDRESS_VERIFIED',
@@ -168,6 +168,7 @@ test('the equity question keeps the values earlier leads were stored under', () 
   assert.ok(share.under_50! > 0.5, 'under_50 owed means more than half is yours');
   assert.ok(share['50_75']! >= 0.25 && share['50_75']! <= 0.5);
   assert.ok(share.over_75! < 0.25);
-  assert.equal(share.paid_off, 1);
+  const asked = london.questions.find((x) => x.key === 'mortgageShare')!.showIf;
+  assert.deepEqual(asked, { key: 'hasMortgage', values: ['yes'] }, 'only asked of someone with a mortgage');
   assert.equal(share.unsure, undefined, 'no bar for "not sure"');
 });
