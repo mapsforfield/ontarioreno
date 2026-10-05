@@ -50,10 +50,13 @@ export type AddressState =
 export type QuestionOption = {
   value: string;
   label: string;
+  /** A smaller second line under the label — a concrete example of the answer. */
+  hint?: string;
   /**
-   * Draws a small bar under the option, filled to this share (0–1) as "yours"
-   * against the rest as "owed". For a question about money people do not hold
-   * as a ratio in their heads: matching a picture is easier than doing the sum.
+   * Draws a small pie beside the option, filled to this share (0–1) as "yours".
+   * Kept small and to the side on purpose: the words are read first and the
+   * picture confirms them. A full-width bar under each label was the first
+   * thing the eye landed on, before the question had been read.
    */
   ownedShare?: number;
 };
@@ -63,8 +66,6 @@ export type Question = {
   label: string;
   /** Short clarifier shown under the label. */
   help?: string;
-  /** A worked example, shown in its own box under the help. */
-  example?: string;
   options: QuestionOption[];
   /** Only these answers influence routing; everything else is captured for the rep. */
   routingRelevant?: boolean;
@@ -1404,15 +1405,16 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
     // with no mortgage, who otherwise had to work out that it meant "under 50".
     key: 'mortgageShare',
     label: 'How much of your home is yours?',
-    help: 'What your home is worth, minus what’s still owed on the mortgage or any line of credit. A rough guess is fine.',
-    example: 'Worth $800,000 and $300,000 left on the mortgage → more than half is yours.',
+    // Each option carries its own dollar example, so the reader matches their
+    // situation to a line rather than decoding a worked example first.
+    help: 'What it’s worth, minus what you still owe. A rough guess is fine.',
     step: 1,
     options: [
-      { value: 'paid_off', label: 'All of it — no mortgage', ownedShare: 1 },
-      { value: 'under_50', label: 'More than half', ownedShare: 0.65 },
-      { value: '50_75', label: 'A quarter to half', ownedShare: 0.38 },
-      { value: 'over_75', label: 'Less than a quarter', ownedShare: 0.15 },
-      { value: 'unsure', label: 'Not sure — we’ll work it out on the call' },
+      { value: 'paid_off', label: 'All of it', hint: 'No mortgage or line of credit', ownedShare: 1 },
+      { value: 'under_50', label: 'More than half', hint: 'Owe $300k on an $800k home', ownedShare: 0.65 },
+      { value: '50_75', label: 'A quarter to half', hint: 'Owe $500k on an $800k home', ownedShare: 0.38 },
+      { value: 'over_75', label: 'Less than a quarter', hint: 'Owe $700k on an $800k home', ownedShare: 0.15 },
+      { value: 'unsure', label: 'Not sure', hint: 'We’ll work it out on the call' },
     ],
   },
   {
