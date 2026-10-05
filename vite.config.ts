@@ -33,6 +33,10 @@ function mockLeadsApi(): Plugin {
     return ALL_TIMES.slice(0, OPEN_PER_DAY[d]).map((time) => ({ date, time }))
   }).flat()
 
+  // flow=book carries only the leadRef, so the program it books under is the
+  // one the preceding submit named.
+  let lastSubmitted: ReturnType<typeof programBySlug> = null
+
   return {
     name: 'mock-leads-api',
     apply: 'serve',
@@ -111,6 +115,7 @@ function mockLeadsApi(): Plugin {
             const parsed = JSON.parse(body || '{}')
             const answers = (parsed.answers ?? {}) as Record<string, string>
             const submitted = programBySlug(String(parsed.programSlug ?? '')) ?? program
+            lastSubmitted = submitted
             // The REAL router, so the preview cannot disagree with production
             // about who gets a calendar. Only the address is faked: localhost has
             // no Places key, so we assume a verified address in the program's own
@@ -134,7 +139,16 @@ function mockLeadsApi(): Plugin {
           req.on('data', (c) => (body += c))
           return req.on('end', () => {
             const b = JSON.parse(body || '{}')
-            send({ publicReference: 'LOCAL-MOCK-1', date: b.date, time: b.time, propertyAddress: 'Local preview' })
+            // A phone-only program books remote in production (leadIsRemote);
+            // without this the preview shows it the in-person confirmation.
+            const booked = lastSubmitted ?? program
+            send({
+              publicReference: 'LOCAL-MOCK-1',
+              date: b.date,
+              time: b.time,
+              propertyAddress: 'Local preview',
+              remoteConsultation: booked.consultationMode === 'phone',
+            })
           })
         }
         send({})

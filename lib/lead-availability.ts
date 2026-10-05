@@ -64,17 +64,28 @@ export const SCHEDULING_APPOINTMENT_SELECT = {
 };
 
 /**
- * Is this lead's property served remotely?
+ * Is this lead's consultation remote?
  *
  * Both name fields are consulted: Places fills `city` for most addresses and
  * `resolvedMunicipality` carries what it actually returned, and a lead that
  * arrived with one of them blank must not quietly fall back to in-person.
+ *
+ * A program whose consultation is a phone call (London's ARU Loan) is remote
+ * for every property it books, whatever the city. Without this the homeowner
+ * would be told "a specialist will call you" while the scheduler treated the
+ * booking as a London site visit — anchoring the rep's travel radius on London
+ * and counting it against their daily cap. Every in-person program is
+ * unaffected: for them this is the city rule alone, exactly as before.
  */
 export function leadIsRemote(lead: {
   city?: string | null;
   resolvedMunicipality?: string | null;
+  programKey?: string | null;
 }): boolean {
-  return isRemoteConsultationCity(lead.city, lead.resolvedMunicipality);
+  return (
+    isRemoteConsultationCity(lead.city, lead.resolvedMunicipality) ||
+    programByKey(lead.programKey)?.consultationMode === 'phone'
+  );
 }
 
 /** The lead fields availability actually reads. */

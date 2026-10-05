@@ -624,16 +624,19 @@ export default function BasementBookingFlow({
     }
   };
 
-  const meeting = remote
+  // A phone-only program is checked first: its bookings are always remote too,
+  // and "your city is outside our visit area" would explain a call nobody on
+  // that program was ever going to get as a visit.
+  const meeting = program.consultationMode === 'phone'
     ? {
-        line: `Virtual Consultation · ${program.visitMinutes} minutes`,
-        detail:
-          'Your city is outside our in-person visit area, so this one is done by video or phone. A specialist will contact you around your chosen time.',
+        line: `Phone Consultation · ${program.visitMinutes} minutes`,
+        detail: 'A specialist will call you around your chosen time.',
       }
-    : program.consultationMode === 'phone'
+    : remote
       ? {
-          line: `Initial Consultation Call · ${program.visitMinutes} minutes`,
-          detail: 'A specialist will call you at your scheduled time.',
+          line: `Virtual Consultation · ${program.visitMinutes} minutes`,
+          detail:
+            'Your city is outside our in-person visit area, so this one is done by video or phone. A specialist will contact you around your chosen time.',
         }
       : {
           line: `In-Person Site Visit · ${program.visitMinutes} minutes`,
@@ -1194,7 +1197,9 @@ export default function BasementBookingFlow({
                 </p>
               </div>
               <p className="mb-4 text-xs leading-relaxed text-slate-500">
-                Optional — it just helps your consultant arrive prepared.
+                {remote
+                  ? 'Optional — it just helps your specialist call prepared.'
+                  : 'Optional — it just helps your consultant arrive prepared.'}
               </p>
 
               <Choice
@@ -1243,7 +1248,11 @@ export default function BasementBookingFlow({
                       ? 'Check your texts for the booking details.'
                       : 'We’ll be in touch with the booking details.',
                   ],
-                  ['Before the visit:', 'Our team reviews your property so the consultant arrives prepared.'],
+                  // "arrives prepared" promised a doorstep to every remote
+                  // booking, Windsor included.
+                  remote
+                    ? ['Before the call:', 'Our team reviews your details so the specialist calls prepared.']
+                    : ['Before the visit:', 'Our team reviews your property so the consultant arrives prepared.'],
                   [
                     remote ? 'Your consultation:' : 'Your visit:',
                     remote

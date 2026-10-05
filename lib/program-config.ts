@@ -20,7 +20,7 @@ import type { AddressResolutionCause } from './address-resolution.js';
  * kilometres between real coordinates, and that constraint applies to an
  * ONTARIO booking exactly as it does to a Hamilton one.
  */
-export type SchedulingArea = 'HAMILTON' | 'SIMCOE' | 'ONTARIO';
+export type SchedulingArea = 'HAMILTON' | 'SIMCOE' | 'LONDON' | 'ONTARIO';
 
 /**
  * How a program decides whether it applies to an address.
@@ -1301,10 +1301,158 @@ export const FINANCING_PROGRAMS: ProgramConfig[] = [
   GARDEN_SUITE_FINANCING_PROGRAM,
 ];
 
+// ─── London — Additional Residential Unit (ARU) Loan ─────────────────────────
+// The City of London's money, so the ADDRESS decides ('municipality'), exactly
+// as Hamilton's grant did. Terms are from the City's CIP incentives page and
+// from CIP Incentives staff in writing (October 2, 2026 and October 5, 2026):
+//
+//   - the only ARU incentive currently open; the ARU Construction Grant (the
+//     "forgivable" one) is closed with all funding allocated
+//   - a REPAYABLE loan: the lesser of $45,000 or the cost of eligible works,
+//     0% interest over up to 10 years (108 monthly payments, starting one year
+//     after the advance) if the terms are met, otherwise an 8% penalty may apply
+//   - open: repayable at any time without penalty
+//   - advanced only after the unit is built and paid for in full
+//   - registered on title; all mortgages and charges including the loan must
+//     stay at or under 90% of the post-renovation appraised value
+//   - construction may not begin until BOTH the building permit and the loan
+//     are approved
+//   - owner-occupied primary dwelling, a Residential Rental Unit Licence, leases
+//     of 31 days or more (no short-term rentals), taxes paid, no City orders
+//
+// It is NOT a grant and NOT forgivable. Nothing here may say otherwise.
+//
+// The first consultation is a CALL, never a visit: London is a long drive and
+// the call is what pre-qualifies the homeowner. consultationMode 'phone' makes
+// every booking on this program remote for scheduling too — see leadIsRemote in
+// lib/lead-availability.ts — so it never anchors a rep's travel radius, area
+// lock or daily cap. London leads from other programs are unaffected.
+
+const LONDON_ARU_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What kind of unit are you planning?',
+  routingRelevant: true,
+  step: 1,
+  // No 'unsure': on the calendar-early flow it would route to MANUAL_REVIEW
+  // after the homeowner has already picked a time. See BATHROOM_PROJECT_TYPE.
+  options: [
+    { value: 'secondary_suite', label: 'Basement apartment / secondary suite' },
+    { value: 'garden_suite', label: 'Garden suite in the back yard' },
+    { value: 'aru_other', label: 'Another unit (addition, above a garage)' },
+  ],
+};
+
+/**
+ * Asked after the booking. These are the City's hard conditions, collected so
+ * the rep opens the call knowing whether there is a deal — never a gate on the
+ * calendar, because the call is cheap and is where qualifying happens.
+ */
+const LONDON_ARU_PREP_QUESTIONS: Question[] = [
+  {
+    key: 'ownerOccupied',
+    label: 'Do you live in the main house?',
+    step: 3,
+    options: [
+      { value: 'yes', label: 'Yes, it’s my home' },
+      { value: 'no', label: 'No, it’s a rental or investment property' },
+    ],
+  },
+  {
+    key: 'workStarted',
+    label: 'Has any construction on the unit started?',
+    help: 'The City requires approval before any work begins.',
+    step: 3,
+    options: [
+      { value: 'no', label: 'Not yet' },
+      { value: 'yes', label: 'Yes, work has started' },
+    ],
+  },
+  {
+    // The City's 90% loan-to-value condition, asked as a range. Exact figures
+    // are the rep's to ask on the call, not a form's.
+    key: 'mortgageShare',
+    label: 'Roughly how much of your home’s value is still owed on mortgages or lines of credit?',
+    step: 3,
+    options: [
+      { value: 'under_50', label: 'Less than half' },
+      { value: '50_75', label: 'About half to three quarters' },
+      { value: 'over_75', label: 'More than three quarters' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    // Keyed 'contribution' so the prep endpoint tags WANTS_FINANCING /
+    // NEEDS_FUNDING_GUIDANCE exactly as it does on every other program.
+    key: 'contribution',
+    label: 'How will you pay for the build before the City’s loan is paid out?',
+    step: 3,
+    options: [
+      { value: 'cash_equity', label: 'Cash, savings or home equity' },
+      { value: 'need_financing', label: 'I’d like to explore financing' },
+      { value: 'unsure', label: 'I’d like to talk it through' },
+    ],
+  },
+];
+
+export const LONDON_ARU_LOAN_PROGRAM: ProgramConfig = {
+  key: 'london-aru-loan',
+  version: 1,
+  schedulingArea: 'LONDON',
+  geography: 'municipality',
+  enabled: true,
+  slug: 'london-aru',
+  areaLabel: 'London',
+  displayAmountLabel: '0% interest loan up to $45,000',
+  fundingHighlights: [
+    'A City of London loan of up to $45,000 (or the cost of the work, if less) — repayable, not a grant.',
+    '0% interest over up to 10 years when the program terms are met.',
+    'Paid out after the unit is finished, so the build is funded first.',
+  ],
+  programTerms: [
+    'The ARU Loan is a City of London program. The City decides eligibility and approval, not OntarioReno.',
+    'The loan is the lesser of $45,000 or the cost of the eligible works, and is repayable.',
+    '0% interest, repaid over up to 10 years (108 monthly payments starting one year after the loan is advanced), provided the terms and conditions are met; otherwise an 8% penalty may apply. It can be repaid early at any time without penalty.',
+    'The loan is advanced after the unit has been created and paid for in full, and is registered on title.',
+    'Construction may not begin until both the building permit and the loan are approved.',
+    'The main house must be owner-occupied, the unit needs a Residential Rental Unit Licence, and leases must be at least 31 days.',
+  ],
+  whyFreeText:
+    "Homeowners shouldn't have to pay just to find out whether a City program fits their property, and builders don't want to spend days on projects that were never going to qualify. So the first step is a call: we check the City's conditions against your situation and, if it fits, organize the drawings, quotes and application so a builder can take it on. When a project is a good fit, participating builders pay us for access to organized, qualified opportunities. That keeps the call free for you, and you're free to compare or decline any proposal you receive.",
+  fundingGuidance: {
+    heading: 'That’s what the call is for',
+    lead: 'The City pays its loan out after the unit is finished, so the build has to be funded first.',
+    leadEmphasis: 'Most homeowners plan for that.',
+    milestones: ['Permit', 'Loan approved', 'Build', 'Loan paid out'],
+    highlight: 'Your specialist will go through how other homeowners fund the build before the City’s loan arrives.',
+    closing: 'Nothing is committed on the call, and it costs nothing.',
+    continueLabel: 'Continue',
+  },
+  eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'aru_other'],
+  // A call costs a rep minutes, not an afternoon, so everyone gets one.
+  nurtureTimelines: [],
+  questions: [LONDON_ARU_PROJECT_TYPE],
+  addressPlacement: 'final',
+  bookingFlow: 'calendar_early',
+  // An address outside London becomes a call-back, not a dead end.
+  capturesOutOfAreaLeads: true,
+  prepFinancingNote:
+    'The City’s loan is paid out after the unit is finished, so the build is funded first. Your specialist will go through the options with you.',
+  prepQuestions: LONDON_ARU_PREP_QUESTIONS,
+  consultationMode: 'phone',
+  appointmentProjectTypeLabel: 'London ARU Loan Phone Consultation',
+  pageTitle: 'London ARU Loan Consultation | OntarioReno',
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: ['https://london.ca/business-development/community-improvement-incentives'],
+  ...SHARED_SCHEDULING,
+};
+
 export const PROGRAMS: ProgramConfig[] = [
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   ...FINANCING_PROGRAMS,
+  LONDON_ARU_LOAN_PROGRAM,
 ];
 
 /**
@@ -1326,6 +1474,11 @@ export const MUNICIPALITY_AREA: Record<string, SchedulingArea> = {
   'stoney creek': 'HAMILTON',
   waterdown: 'HAMILTON', // within Flamborough
   binbrook: 'HAMILTON', // within Glanbrook
+  // The City of London's ARU Loan is city-wide. Lambeth and Byron are inside
+  // the City and are sometimes returned as the locality.
+  london: 'LONDON',
+  lambeth: 'LONDON',
+  byron: 'LONDON',
 };
 
 const normalizeMunicipality = (v: string) => v.trim().toLowerCase().replace(/\s+/g, ' ');

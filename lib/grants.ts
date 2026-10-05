@@ -68,7 +68,7 @@ export const MUNICIPALITY_SEED: SeedMuni[] = [
 type SeedSource = { name: string; url: string; jurisdiction: string; category: string; slug?: string; hafLinked?: boolean };
 export const SEED_SOURCES: SeedSource[] = [
   { name: 'Hamilton — ADU & Multi-Plex Housing Incentive (grant up to $40k)', url: 'https://www.hamilton.ca/build-invest-grow/housing-secretariat/housing-accelerator-fund/additional-dwelling-unit-and-multi', jurisdiction: 'Hamilton', category: 'ADU', slug: 'hamilton', hafLinked: true },
-  { name: 'London — Additional Residential Units (forgivable loans up to $45k)', url: 'https://london.ca/living-london/building-renovating/additional-residential-units', jurisdiction: 'London', category: 'ADU', slug: 'london', hafLinked: true },
+  { name: 'London — Additional Residential Units (ARU Loan: repayable, 0% interest, up to $45k)', url: 'https://london.ca/living-london/building-renovating/additional-residential-units', jurisdiction: 'London', category: 'ADU', slug: 'london', hafLinked: true },
   { name: 'CMHC — Housing Accelerator Fund (which cities got funded)', url: 'https://www.cmhc-schl.gc.ca/professionals/project-funding-and-mortgage-financing/funding-programs/all-funding-programs/housing-accelerator-fund', jurisdiction: 'federal', category: 'general', hafLinked: true },
 ];
 
