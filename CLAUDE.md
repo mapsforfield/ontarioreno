@@ -119,6 +119,15 @@ Some cities are real business and a bad drive. `lib/remote-consultation.ts` list
 them (**Windsor · Niagara Falls · Thorold**); adding a city there is the whole
 change, everything downstream reads that list.
 
+A **program** can also be remote: one with `consultationMode: 'phone'` (today
+only the London ARU Loan, `/consultation/london-aru`) books every lead as a
+call, whatever the city — `leadIsRemote` in `lib/lead-availability.ts` checks
+both. London is deliberately NOT on the city list: a London basement or
+bathroom lead is still a visit. Guarded by `lib/london-aru-loan.test.ts`.
+
+The London ARU Loan is a **repayable** 0% City loan, not a grant and not
+forgivable (that one is closed). Never let its copy say otherwise.
+
 A remote booking is **inert in both directions** — see the header of
 `lib/scheduling.ts`. It does not anchor the same-day travel radius, is not
 measured against it, neither sets nor respects the scheduling-area lock, does

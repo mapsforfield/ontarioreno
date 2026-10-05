@@ -1999,9 +1999,10 @@ async function bookVisitForLead(params: {
   }
 
   const nowWall = torontoWallClock();
-  // Decided once, here, from the property — never from the rep's dropdown and
-  // never from the program's own consultationMode. A Windsor basement is a call
-  // whichever program brought it in.
+  // Decided once, here, from the property and the lead's program — never from
+  // the rep's dropdown. A Windsor basement is a call whichever program brought
+  // it in, and a phone-only program (London ARU) is a call wherever the
+  // property is. See leadIsRemote.
   const remote = leadIsRemote(lead);
 
   // The same Customer Notes template a rep would insert by hand, read from the
