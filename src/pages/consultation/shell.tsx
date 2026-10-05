@@ -14,8 +14,11 @@ export type Question = {
   key: string;
   label: string;
   help?: string;
+  /** See Question.example in lib/program-config.ts. */
+  example?: string;
   step: 1 | 2 | 3;
-  options: Array<{ value: string; label: string }>;
+  /** ownedShare: see QuestionOption in lib/program-config.ts. */
+  options: Array<{ value: string; label: string; ownedShare?: number }>;
 };
 
 export const inputCls =

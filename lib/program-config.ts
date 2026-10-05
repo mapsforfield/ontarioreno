@@ -47,13 +47,24 @@ export type AddressState =
   | 'ADDRESS_OUTSIDE_SERVICE_AREA'
   | 'ADDRESS_UNVERIFIED';
 
-export type QuestionOption = { value: string; label: string };
+export type QuestionOption = {
+  value: string;
+  label: string;
+  /**
+   * Draws a small bar under the option, filled to this share (0–1) as "yours"
+   * against the rest as "owed". For a question about money people do not hold
+   * as a ratio in their heads: matching a picture is easier than doing the sum.
+   */
+  ownedShare?: number;
+};
 
 export type Question = {
   key: string;
   label: string;
   /** Short clarifier shown under the label. */
   help?: string;
+  /** A worked example, shown in its own box under the help. */
+  example?: string;
   options: QuestionOption[];
   /** Only these answers influence routing; everything else is captured for the rep. */
   routingRelevant?: boolean;
@@ -1382,14 +1393,26 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
   {
     // The City's 90% loan-to-value condition, asked as a range. Exact figures
     // are the rep's to ask on the call, not a form's.
+    //
+    // Asked as what the homeowner OWNS, not what they owe. "What share of your
+    // value is owed" was a ratio of two numbers nobody keeps in their head;
+    // "how much of it is yours" is something people already have a feel for,
+    // and each option carries a bar to match against rather than a sum to do.
+    // The stored values are unchanged and mean the same thing (under_50 owed ==
+    // more than half owned), so rows captured under the old wording still read
+    // correctly. 'paid_off' is new: the easiest answer of all for a homeowner
+    // with no mortgage, who otherwise had to work out that it meant "under 50".
     key: 'mortgageShare',
-    label: 'Roughly how much of your home’s value is still owed on mortgages or lines of credit?',
+    label: 'How much of your home is yours?',
+    help: 'What your home is worth, minus what’s still owed on the mortgage or any line of credit. A rough guess is fine.',
+    example: 'Worth $800,000 and $300,000 left on the mortgage → more than half is yours.',
     step: 1,
     options: [
-      { value: 'under_50', label: 'Less than half' },
-      { value: '50_75', label: 'About half to three quarters' },
-      { value: 'over_75', label: 'More than three quarters' },
-      { value: 'unsure', label: 'Not sure' },
+      { value: 'paid_off', label: 'All of it — no mortgage', ownedShare: 1 },
+      { value: 'under_50', label: 'More than half', ownedShare: 0.65 },
+      { value: '50_75', label: 'A quarter to half', ownedShare: 0.38 },
+      { value: 'over_75', label: 'Less than a quarter', ownedShare: 0.15 },
+      { value: 'unsure', label: 'Not sure — we’ll work it out on the call' },
     ],
   },
   {

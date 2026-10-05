@@ -96,7 +96,7 @@ const qualified = {
 };
 
 test('a qualified London homeowner books, whatever they owe or how they fund it', () => {
-  for (const mortgageShare of ['under_50', '50_75', 'over_75', 'unsure']) {
+  for (const mortgageShare of ['paid_off', 'under_50', '50_75', 'over_75', 'unsure']) {
     for (const contribution of ['cash_equity', 'need_financing', 'unsure']) {
       const routing = routeConsultation({
         addressState: 'ADDRESS_VERIFIED',
@@ -158,4 +158,16 @@ test('the copy never calls the loan a grant or forgivable', () => {
   assert.doesNotMatch(copy.replace(/not a grant/gi, ''), /\bgrant\b/i);
   assert.match(copy, /repayable/i);
   assert.match(copy, /\$45,000/);
+});
+
+test('the equity question keeps the values earlier leads were stored under', () => {
+  // Reworded from "owed" to "yours"; the stored meaning must not move, or a
+  // lead captured last week reads backwards in the rep's brief.
+  const q = london.questions.find((x) => x.key === 'mortgageShare')!;
+  const share = Object.fromEntries(q.options.map((o) => [o.value, o.ownedShare]));
+  assert.ok(share.under_50! > 0.5, 'under_50 owed means more than half is yours');
+  assert.ok(share['50_75']! >= 0.25 && share['50_75']! <= 0.5);
+  assert.ok(share.over_75! < 0.25);
+  assert.equal(share.paid_off, 1);
+  assert.equal(share.unsure, undefined, 'no bar for "not sure"');
 });

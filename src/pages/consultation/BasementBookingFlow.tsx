@@ -912,6 +912,23 @@ export default function BasementBookingFlow({
           {currentQuestion.help && (
             <p className="text-center text-sm text-slate-600">{currentQuestion.help}</p>
           )}
+          {currentQuestion.example && (
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs leading-relaxed text-slate-600">
+              <span className="font-bold text-slate-700">Example: </span>
+              {currentQuestion.example}
+            </p>
+          )}
+          {/* One key for every bar below, rather than a label inside each. */}
+          {currentQuestion.options.some((o) => o.ownedShare !== undefined) && (
+            <div className="flex items-center justify-center gap-4 text-xs font-semibold text-slate-500" aria-hidden="true">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Yours
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-slate-300" /> Still owed
+              </span>
+            </div>
+          )}
           <div className="grid gap-2">
             {currentQuestion.options.map((o) => {
               const on = answers[currentQuestion.key] === o.value;
@@ -939,8 +956,19 @@ export default function BasementBookingFlow({
                       : 'border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  {o.label}
-                  {on ? <Check className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 text-slate-300" />}
+                  <span className="min-w-0 flex-1">
+                    {o.label}
+                    {o.ownedShare !== undefined && (
+                      <span className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-slate-300" aria-hidden="true">
+                        <span className="h-full bg-emerald-500" style={{ width: `${Math.round(o.ownedShare * 100)}%` }} />
+                      </span>
+                    )}
+                  </span>
+                  {on ? (
+                    <Check className="ml-3 h-4 w-4 shrink-0" />
+                  ) : (
+                    <ChevronRight className="ml-3 h-4 w-4 shrink-0 text-slate-300" />
+                  )}
                 </button>
               );
             })}
