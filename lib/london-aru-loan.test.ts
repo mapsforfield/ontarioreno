@@ -150,6 +150,9 @@ test('the copy never calls the loan a grant or forgivable', () => {
     ...london.programTerms,
     london.prepFinancingNote ?? '',
     london.declineMessage ?? '',
+    london.qualifiedNote ?? '',
+    ...Object.values(london.offer ?? {}),
+    ...london.questions.map((q) => `${q.label} ${q.help ?? ''} ${q.why ?? ''}`),
     london.whyFreeText,
     london.fundingGuidance.lead,
     london.fundingGuidance.highlight,
@@ -170,4 +173,12 @@ test('the two dollar questions are asked only of someone with a mortgage', () =>
     assert.deepEqual(q.showIf, { key: 'hasMortgage', values: ['yes'] }, `${key} asked without a mortgage`);
     assert.ok(q.options.every((o) => o.value === 'unsure' || /\$/.test(o.label)), `${key} must answer in dollars`);
   }
+});
+
+test('the form carries the ad: the offer lockup, and a reason for every question', () => {
+  assert.equal(london.offer?.amount, '$45,000');
+  assert.match(london.offer?.chip ?? '', /0% interest/i);
+  for (const q of london.questions) assert.ok(q.why, `${q.key} has no "why we ask"`);
+  // The reward line may describe the answers, never promise approval.
+  assert.doesNotMatch(london.qualifiedNote ?? '', /(qualif|approv|eligible)/i);
 });
