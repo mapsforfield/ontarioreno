@@ -77,6 +77,7 @@ function mockLeadsApi(): Plugin {
             prepQuestions: program.prepQuestions,
             bookingBanner: program.bookingBanner ?? null,
             prepFinancingNote: program.prepFinancingNote ?? '',
+            declineMessage: program.declineMessage ?? '',
             guideUrl: program.guideUrl,
             guideLabel: program.guideLabel,
             smsEnabled: false,

@@ -172,6 +172,16 @@ export type ProgramConfig = {
   /** Asked after booking. Never blocks the calendar. */
   prepQuestions: Question[];
   /**
+   * Answers that rule a homeowner out of THIS program — a condition the program
+   * itself sets, never a judgement of ours. Routing declines on any match (the
+   * lead is still saved and the team alerted), and the flow shows
+   * `declineMessage` instead of a calendar. Only for conditions on the official
+   * source; anything softer belongs in the rep's brief.
+   */
+  disqualifyingAnswers?: Record<string, string[]>;
+  /** Shown to a homeowner declined by disqualifyingAnswers. */
+  declineMessage?: string;
+  /**
    * Where the calendar sits in the public flow.
    *
    * 'questions_first' (the default, and every grant flow) asks the whole
@@ -1343,15 +1353,17 @@ const LONDON_ARU_PROJECT_TYPE: Question = {
 };
 
 /**
- * Asked after the booking. These are the City's hard conditions, collected so
- * the rep opens the call knowing whether there is a deal — never a gate on the
- * calendar, because the call is cheap and is where qualifying happens.
+ * Asked BEFORE booking, one per screen, after the unit type — a deliberate
+ * departure from the other calendar-early flows. The owner wants qualified
+ * calls over volume here, so the City's conditions screen people before a rep's
+ * time is spent. Two answers fail a condition outright (see
+ * disqualifyingAnswers); the other two only inform the rep's brief.
  */
-const LONDON_ARU_PREP_QUESTIONS: Question[] = [
+const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
   {
     key: 'ownerOccupied',
     label: 'Do you live in the main house?',
-    step: 3,
+    step: 1,
     options: [
       { value: 'yes', label: 'Yes, it’s my home' },
       { value: 'no', label: 'No, it’s a rental or investment property' },
@@ -1361,7 +1373,7 @@ const LONDON_ARU_PREP_QUESTIONS: Question[] = [
     key: 'workStarted',
     label: 'Has any construction on the unit started?',
     help: 'The City requires approval before any work begins.',
-    step: 3,
+    step: 1,
     options: [
       { value: 'no', label: 'Not yet' },
       { value: 'yes', label: 'Yes, work has started' },
@@ -1372,7 +1384,7 @@ const LONDON_ARU_PREP_QUESTIONS: Question[] = [
     // are the rep's to ask on the call, not a form's.
     key: 'mortgageShare',
     label: 'Roughly how much of your home’s value is still owed on mortgages or lines of credit?',
-    step: 3,
+    step: 1,
     options: [
       { value: 'under_50', label: 'Less than half' },
       { value: '50_75', label: 'About half to three quarters' },
@@ -1385,7 +1397,7 @@ const LONDON_ARU_PREP_QUESTIONS: Question[] = [
     // NEEDS_FUNDING_GUIDANCE exactly as it does on every other program.
     key: 'contribution',
     label: 'How will you pay for the build before the City’s loan is paid out?',
-    step: 3,
+    step: 1,
     options: [
       { value: 'cash_equity', label: 'Cash, savings or home equity' },
       { value: 'need_financing', label: 'I’d like to explore financing' },
@@ -1430,14 +1442,21 @@ export const LONDON_ARU_LOAN_PROGRAM: ProgramConfig = {
   eligibleProjectTypes: ['secondary_suite', 'garden_suite', 'aru_other'],
   // A call costs a rep minutes, not an afternoon, so everyone gets one.
   nurtureTimelines: [],
-  questions: [LONDON_ARU_PROJECT_TYPE],
+  questions: [LONDON_ARU_PROJECT_TYPE, ...LONDON_ARU_QUALIFYING_QUESTIONS],
+  // The City's two hard conditions. The mortgage share and funding answers are
+  // NOT here: the 90% limit is measured against the post-renovation value, which
+  // nobody can answer on a form, and funding is a conversation.
+  disqualifyingAnswers: { ownerOccupied: ['no'], workStarted: ['yes'] },
+  declineMessage:
+    'Thanks for your answers. The City of London’s ARU Loan requires the owner to live in the main house, and City approval before any construction starts — so this program likely isn’t a fit right now. We’ve saved your details, and a specialist may follow up about other options.',
   addressPlacement: 'final',
   bookingFlow: 'calendar_early',
   // An address outside London becomes a call-back, not a dead end.
   capturesOutOfAreaLeads: true,
   prepFinancingNote:
     'The City’s loan is paid out after the unit is finished, so the build is funded first. Your specialist will go through the options with you.',
-  prepQuestions: LONDON_ARU_PREP_QUESTIONS,
+  // Empty: everything is asked before booking on this program.
+  prepQuestions: [],
   consultationMode: 'phone',
   appointmentProjectTypeLabel: 'London ARU Loan Phone Consultation',
   pageTitle: 'London ARU Loan Consultation | OntarioReno',

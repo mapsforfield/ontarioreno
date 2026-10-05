@@ -116,6 +116,7 @@ const REASON_TEXT: Record<string, string> = {
   OWNERSHIP_UNCERTAIN: 'Ownership was left as “It’s complicated”.',
   PROJECT_TYPE_UNCERTAIN: 'Project type was left as “Still deciding”.',
   PROJECT_TYPE_NOT_LISTED: 'That project type is not listed for this program.',
+  PROGRAM_CONDITION_NOT_MET: 'An answer does not meet the program’s own conditions.',
   WANTS_FINANCING: 'Wants to discuss financing (noted for the specialist — not a barrier).',
   NEEDS_FUNDING_GUIDANCE: 'Answered “Not sure yet” on funding and read the guidance screen (noted for the specialist — not a barrier).',
   EXPLORATORY_TIMELINE: 'Timeline is “Just exploring”.',

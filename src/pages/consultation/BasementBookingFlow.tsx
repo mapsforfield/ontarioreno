@@ -76,6 +76,7 @@ export type BasementProgram = {
   displayAmountLabel: string;
   bookingBanner?: { src: string; alt: string } | null;
   prepFinancingNote?: string;
+  declineMessage?: string;
   smsEnabled: boolean;
 };
 
@@ -108,6 +109,14 @@ export default function BasementBookingFlow({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [prep, setPrep] = useState<Record<string, string>>({});
   const [prepIndex, setPrepIndex] = useState(0);
+  /**
+   * Which pre-booking question is on screen. Every other program asks exactly
+   * one, so this never leaves 0 for them and the screen is unchanged; London's
+   * ARU Loan asks its qualifying questions here, one per screen.
+   */
+  const [questionIndex, setQuestionIndex] = useState(0);
+  /** Set when routing declined on the program's own conditions. */
+  const [declined, setDeclined] = useState(false);
   const [contact, setContact] = useState({ name: '', phone: '' });
 
   const [addressText, setAddressText] = useState('');
@@ -152,6 +161,8 @@ export default function BasementBookingFlow({
   const skipSuggest = useRef(false);
 
   const projectQuestion = program.questions.find((q) => q.key === 'projectType') ?? program.questions[0];
+  const currentQuestion = program.questions[questionIndex] ?? projectQuestion;
+  const isLastQuestion = questionIndex + 1 >= program.questions.length;
 
   // ── Funnel instrumentation ──
   // Same shape as ConsultationFlow's: custom events, once per screen per
@@ -516,6 +527,7 @@ export default function BasementBookingFlow({
       // — but a homeowner who has already picked a time must never be dropped
       // silently if it ever does.
       if (!submitted.offersCalendar) {
+        setDeclined(submitted.outcome === 'DECLINE');
         setPhase('no_calendar');
         return;
       }
@@ -573,7 +585,9 @@ export default function BasementBookingFlow({
 
       setRemote(booked.remoteConsultation === true);
       setBooking(booked);
-      setPhase('booked');
+      // Nothing to ask after booking (London asks it all up front): straight to
+      // the finished screen, or it would wait for prep answers that never come.
+      setPhase(program.prepQuestions.length > 0 ? 'booked' : 'done');
       trackStep('ConsultationBooked');
       trackEvent('Schedule', { content_name: program.slug, content_category: 'consultation' }, bookEventId);
     } catch (err) {
@@ -645,7 +659,7 @@ export default function BasementBookingFlow({
 
   const title = {
     time: 'Pick a time that suits you',
-    project: 'What are you planning?',
+    project: currentQuestion?.label ?? 'What are you planning?',
     lock: 'Lock it in',
     booked: remote ? 'Your consultation is booked' : 'Your visit is booked',
     done: remote ? 'Your consultation is booked' : 'Your visit is booked',
@@ -657,7 +671,13 @@ export default function BasementBookingFlow({
   // No Back on the calendar: it is the first screen, and a Back button that
   // leaves the site is worse than none.
   const back =
-    phase === 'project' ? () => setPhase('time') : phase === 'lock' ? () => setPhase('project') : undefined;
+    phase === 'project'
+      ? questionIndex > 0
+        ? () => setQuestionIndex((i) => i - 1)
+        : () => setPhase('time')
+      : phase === 'lock'
+        ? () => setPhase('project')
+        : undefined;
 
   const projectLabel =
     projectQuestion?.options.find((o) => o.value === answers.projectType)?.label ?? 'Your project';
@@ -887,21 +907,31 @@ export default function BasementBookingFlow({
       )}
 
       {/* ── 2. Project type ── */}
-      {phase === 'project' && projectQuestion && (
+      {phase === 'project' && currentQuestion && (
         <div className="space-y-4 text-left">
+          {currentQuestion.help && (
+            <p className="text-center text-sm text-slate-600">{currentQuestion.help}</p>
+          )}
           <div className="grid gap-2">
-            {projectQuestion.options.map((o) => {
-              const on = answers.projectType === o.value;
+            {currentQuestion.options.map((o) => {
+              const on = answers[currentQuestion.key] === o.value;
               return (
                 <button
                   key={o.value}
                   type="button"
                   onClick={() => {
-                    setAnswers({ ...answers, projectType: o.value });
+                    setAnswers({ ...answers, [currentQuestion.key]: o.value });
                     // The pause is the point: a tap that both selects and
                     // navigates with no visible acknowledgement reads as the
                     // page having jumped on its own.
-                    window.setTimeout(goToLockIn, 180);
+                    window.setTimeout(() => {
+                      if (isLastQuestion) {
+                        goToLockIn();
+                      } else {
+                        setQuestionIndex((i) => i + 1);
+                        trackStep(`ConsultationStepQuestion${questionIndex + 2}`);
+                      }
+                    }, 180);
                   }}
                   className={`flex items-center justify-between rounded-xl border-2 px-4 py-4 text-left text-sm font-bold transition ${
                     on
@@ -915,8 +945,13 @@ export default function BasementBookingFlow({
               );
             })}
           </div>
+          {currentQuestion.key === 'contribution' && program.prepFinancingNote && (
+            <p className="text-center text-xs leading-relaxed text-slate-500">{program.prepFinancingNote}</p>
+          )}
           <p className="text-center text-xs text-slate-500">
-            Last question before we hold your time.
+            {isLastQuestion
+              ? 'Last question before we hold your time.'
+              : `Question ${questionIndex + 1} of ${program.questions.length}`}
           </p>
         </div>
       )}
@@ -1274,7 +1309,11 @@ export default function BasementBookingFlow({
       )}
 
       {phase === 'no_calendar' && (
-        <p className="text-slate-600">A specialist will review your details and call you shortly.</p>
+        <p className="text-slate-600">
+          {declined && program.declineMessage
+            ? program.declineMessage
+            : 'A specialist will review your details and call you shortly.'}
+        </p>
       )}
     </Shell>
   );

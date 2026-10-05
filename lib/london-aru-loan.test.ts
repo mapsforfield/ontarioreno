@@ -77,16 +77,66 @@ test('every offered unit type is eligible', () => {
   assert.equal(offered.includes('unsure'), false, 'unsure would pull the calendar after a time is picked');
 });
 
-test('the City conditions are asked after booking', () => {
-  const keys = london.prepQuestions.map((q) => q.key);
-  for (const key of ['ownerOccupied', 'workStarted', 'mortgageShare', 'contribution']) {
-    assert.ok(keys.includes(key), `the rep needs the ${key} answer before the call`);
-  }
-  for (const q of london.prepQuestions) assert.ok(q.options.length > 0, `${q.key} has no options`);
-  // One question before the calendar, on step 1; the address is on the last screen.
-  assert.equal(questionsForStep(london, 1).length, 1);
+test('the City conditions are asked BEFORE booking, after the unit type', () => {
+  // The owner chose qualified calls over volume for this program.
+  const keys = london.questions.map((q) => q.key);
+  assert.deepEqual(keys, ['projectType', 'ownerOccupied', 'workStarted', 'mortgageShare', 'contribution']);
+  for (const q of london.questions) assert.ok(q.options.length > 0, `${q.key} has no options`);
+  assert.equal(london.prepQuestions.length, 0, 'nothing left to ask after booking');
   assert.equal(london.addressPlacement, 'final');
   assert.equal(london.bookingFlow, 'calendar_early');
+});
+
+const qualified = {
+  projectType: 'secondary_suite',
+  ownerOccupied: 'yes',
+  workStarted: 'no',
+  mortgageShare: 'over_75',
+  contribution: 'need_financing',
+};
+
+test('a qualified London homeowner books, whatever they owe or how they fund it', () => {
+  for (const mortgageShare of ['under_50', '50_75', 'over_75', 'unsure']) {
+    for (const contribution of ['cash_equity', 'need_financing', 'unsure']) {
+      const routing = routeConsultation({
+        addressState: 'ADDRESS_VERIFIED',
+        area: 'LONDON',
+        program: london,
+        answers: { ...qualified, mortgageShare, contribution },
+      });
+      assert.equal(routing.outcome, 'DIRECT_CALENDAR', `${mortgageShare}/${contribution} must book`);
+    }
+  }
+});
+
+test('a rental, or work already started, is declined — never booked', () => {
+  for (const failing of [{ ownerOccupied: 'no' }, { workStarted: 'yes' }]) {
+    const routing = routeConsultation({
+      addressState: 'ADDRESS_VERIFIED',
+      area: 'LONDON',
+      program: london,
+      answers: { ...qualified, ...failing },
+    });
+    assert.equal(routing.outcome, 'DECLINE');
+    assert.deepEqual(routing.reasons, ['PROGRAM_CONDITION_NOT_MET']);
+  }
+  assert.ok(london.declineMessage, 'a declined homeowner must be told why');
+});
+
+test('a skipped answer is never a decline', () => {
+  const routing = routeConsultation({
+    addressState: 'ADDRESS_VERIFIED',
+    area: 'LONDON',
+    program: london,
+    answers: { projectType: 'garden_suite' },
+  });
+  assert.equal(routing.outcome, 'DIRECT_CALENDAR');
+});
+
+test('no other program declines on an answer', () => {
+  for (const program of PROGRAMS.filter((p) => p !== london)) {
+    assert.equal(program.disqualifyingAnswers, undefined, `${program.slug} gained a decline rule`);
+  }
 });
 
 test('the copy never calls the loan a grant or forgivable', () => {
@@ -97,6 +147,7 @@ test('the copy never calls the loan a grant or forgivable', () => {
     ...london.fundingHighlights,
     ...london.programTerms,
     london.prepFinancingNote ?? '',
+    london.declineMessage ?? '',
     london.whyFreeText,
     london.fundingGuidance.lead,
     london.fundingGuidance.highlight,
