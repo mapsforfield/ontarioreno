@@ -50,15 +50,6 @@ export type AddressState =
 export type QuestionOption = {
   value: string;
   label: string;
-  /** A smaller second line under the label — a concrete example of the answer. */
-  hint?: string;
-  /**
-   * Draws a small house beside the option, filled from the ground up to this
-   * share (0–1) as paid off. Kept small and to the side on purpose: the words
-   * are read first and the picture confirms them. A full-width bar under each
-   * label was the first thing the eye landed on, before the question was read.
-   */
-  ownedShare?: number;
 };
 
 export type Question = {
@@ -1398,7 +1389,7 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
   },
   {
     // Asked first as a plain yes/no, because everyone knows the answer without
-    // thinking. Only a "yes" is asked how much is paid off (see showIf below).
+    // thinking. Only a "yes" is asked the two dollar questions below.
     key: 'hasMortgage',
     label: 'Is there a mortgage or line of credit on the home?',
     step: 1,
@@ -1408,29 +1399,40 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
     ],
   },
   {
-    // The City's 90% loan-to-value condition, asked as a range. Exact figures
-    // are the rep's to ask on the call, not a form's.
+    // The City's 90% loan-to-value condition, asked as the two numbers a
+    // homeowner actually knows — what the place is worth and what is left on
+    // the mortgage — rather than as a ratio of them. Every single-question
+    // version ("how much is owed / yours / paid off") made the reader do the
+    // subtraction, and one read "owe $300k on an $800k home" against "more than
+    // half" and got it backwards. The rep sees both ranges; the 90% test is
+    // against the post-renovation value anyway, which only the call can settle.
     //
-    // Asked as how much is PAID OFF, not as a share owed: a ratio of two
-    // numbers nobody keeps in their head read as a puzzle in every wording that
-    // tried it. Coming straight after "yes, there's a mortgage" it reads as the
-    // natural follow-up, each answer carries a dollar example to match against,
-    // and a house filled to that level as a picture.
-    //
-    // The stored values are unchanged and mean the same thing (under_50 owed ==
-    // more than half paid off), so rows captured under earlier wording still
-    // read correctly. A homeowner with no mortgage is never asked this; their
-    // hasMortgage 'no' says it.
-    key: 'mortgageShare',
-    label: 'Roughly how much of the home is paid off?',
-    help: 'Compared with what it’s worth today. A rough guess is fine.',
+    // Only asked of a homeowner who said there is a mortgage (showIf).
+    key: 'homeValue',
+    label: 'Roughly what’s your home worth today?',
+    help: 'A rough guess is fine.',
     showIf: { key: 'hasMortgage', values: ['yes'] },
     step: 1,
     options: [
-      { value: 'under_50', label: 'More than half', hint: 'Owe $300k on an $800k home', ownedShare: 0.65 },
-      { value: '50_75', label: 'A quarter to half', hint: 'Owe $500k on an $800k home', ownedShare: 0.38 },
-      { value: 'over_75', label: 'Less than a quarter', hint: 'Owe $700k on an $800k home', ownedShare: 0.15 },
-      { value: 'unsure', label: 'Not sure', hint: 'We’ll work it out on the call' },
+      { value: 'under_500k', label: 'Under $500k' },
+      { value: '500k_750k', label: '$500k – $750k' },
+      { value: '750k_1m', label: '$750k – $1M' },
+      { value: 'over_1m', label: 'Over $1M' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'mortgageOwing',
+    label: 'Roughly how much is left on the mortgage?',
+    help: 'Include any line of credit on the home. A rough guess is fine.',
+    showIf: { key: 'hasMortgage', values: ['yes'] },
+    step: 1,
+    options: [
+      { value: 'under_100k', label: 'Under $100k' },
+      { value: '100k_250k', label: '$100k – $250k' },
+      { value: '250k_500k', label: '$250k – $500k' },
+      { value: 'over_500k', label: 'Over $500k' },
+      { value: 'unsure', label: 'Not sure' },
     ],
   },
   {

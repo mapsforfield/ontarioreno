@@ -954,20 +954,8 @@ export default function BasementBookingFlow({
                       : 'border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  {/* Only drawn when the question uses them, so every other
-                      option list keeps its plain layout. */}
-                  {currentQuestion.options.some((x) => x.ownedShare !== undefined) && (
-                    <HouseFill share={o.ownedShare} />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block">{o.label}</span>
-                    {o.hint && <span className="mt-0.5 block text-xs font-medium text-slate-500">{o.hint}</span>}
-                  </span>
-                  {on ? (
-                    <Check className="ml-3 h-4 w-4 shrink-0" />
-                  ) : (
-                    <ChevronRight className="ml-3 h-4 w-4 shrink-0 text-slate-300" />
-                  )}
+                  {o.label}
+                  {on ? <Check className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 text-slate-300" />}
                 </button>
               );
             })}
@@ -1343,32 +1331,5 @@ export default function BasementBookingFlow({
         </p>
       )}
     </Shell>
-  );
-}
-
-/**
- * A small house filled from the ground up to `share` (0–1) — how much of the
- * home is paid off. No share draws the empty outline (the "Not sure" answer).
- */
-function HouseFill({ share }: { share?: number }) {
-  const id = useMemo(() => `house-${Math.random().toString(36).slice(2, 9)}`, []);
-  const outline = 'M16 3 L29 14 H26 V29 H6 V14 H3 Z';
-  // Filled against the WALLS (y 14 to 29), not the whole icon: measured to the
-  // roof peak, 65% reached the eaves and read as nearly full. Only a fully
-  // paid-off home fills the roof too.
-  const fillTop = share === 1 ? 0 : 29 - 15 * (share ?? 0);
-  return (
-    <svg viewBox="0 0 32 32" className="mr-3 h-8 w-8 shrink-0" aria-hidden="true">
-      <defs>
-        <clipPath id={id}>
-          <path d={outline} />
-        </clipPath>
-      </defs>
-      <path d={outline} fill="#f1f5f9" />
-      {share !== undefined && (
-        <rect x="0" y={fillTop} width="32" height={32 - fillTop} fill="#34d399" clipPath={`url(#${id})`} />
-      )}
-      <path d={outline} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
   );
 }
