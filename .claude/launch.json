@@ -21,6 +21,17 @@
       "port": 5173
     },
     {
+      "name": "preview-closed-pages",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port=5191",
+        "--strictPort",
+        "--host=0.0.0.0"
+      ],
+      "port": 5191
+    },
+    {
       "name": "preview-basement",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
@@ -30,6 +41,18 @@
         "--host=0.0.0.0"
       ],
       "port": 5190
+    },
+    {
+      "name": "dist-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port=5192",
+        "--strictPort",
+        "--host=0.0.0.0"
+      ],
+      "port": 5192
     }
   ]
 }
