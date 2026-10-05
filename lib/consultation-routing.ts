@@ -32,6 +32,8 @@ export type RoutingReason =
   | 'NEEDS_FUNDING_GUIDANCE'
   | 'EXPLORATORY_TIMELINE'
   | 'TIMELINE_BEYOND_BOOKING_WINDOW'
+  /** An answer the program itself cannot accept — see disqualifyingAnswers. */
+  | 'PROGRAM_CONDITION_NOT_MET'
   | 'ELIGIBLE_FOR_BOOKING';
 
 export type RoutingInput = {
@@ -78,6 +80,15 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
     return program?.capturesOutOfAreaLeads
       ? { outcome: 'MANUAL_REVIEW', reasons: ['OUTSIDE_ONTARIO'] }
       : { outcome: 'DECLINE', reasons: ['OUTSIDE_ONTARIO'] };
+  }
+
+  // A program's own hard conditions (London's ARU Loan: owner-occupied, no work
+  // started before approval). Only ever from a program that lists them, and only
+  // from a stated answer — a blank is never a decline. Still a captured lead:
+  // the team is alerted and the homeowner is told why, not just turned away.
+  const conditions = program?.disqualifyingAnswers ?? {};
+  if (Object.entries(conditions).some(([key, values]) => values.includes(answers[key] ?? ''))) {
+    return { outcome: 'DECLINE', reasons: ['PROGRAM_CONDITION_NOT_MET'] };
   }
 
   // ── 2. MANUAL_REVIEW — every form of doubt ──

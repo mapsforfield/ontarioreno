@@ -1548,6 +1548,7 @@ function publicProgramPayload(program: ProgramConfig) {
     prepQuestions: program.prepQuestions,
     bookingBanner: program.bookingBanner ?? null,
     prepFinancingNote: program.prepFinancingNote ?? '',
+    declineMessage: program.declineMessage ?? '',
     guideUrl: program.guideUrl,
     guideLabel: program.guideLabel,
     // Told to the client so confirmation copy can't promise a text we cannot
