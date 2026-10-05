@@ -1,0 +1,258 @@
+<!-- ==================================================================
+     OntarioReno.ca - Basement lead email
+     One template for every Meta lead: new, contacted, bad number,
+     gone quiet. Nothing in the copy assumes a reason for writing.
+
+     Built to be SCANNED. Every block is one glanceable unit; no
+     paragraph runs longer than two lines. If you add copy here,
+     take some out somewhere else.
+
+     Brand palette sampled from the logo: navy #183B6C, blue #5494CF
+     Images are served from ontarioreno.ca and must stay at those URLs.
+
+     HARDENING NOTES
+     - All text passes WCAG AA contrast (verified, not estimated).
+     - Both <img> tags carry color + font styling so the ALT text is
+       legible when images are blocked (default in many clients).
+     - CTAs are white-on-blue, not dark-on-white: survives the partial
+       colour inversion that Outlook.com and Yahoo force in dark mode.
+     - MSO ghost table gives Outlook desktop a fixed 600px width, since
+       its Word engine ignores max-width. NOTE: copy-pasting a rendered
+       page into Gmail strips HTML comments, so this only takes effect
+       if you send the raw HTML through a sequencer.
+     - Greeting is "Hi {{FirstName}}," - a blank name renders "Hi,"
+       which reads fine, so no merge-tag default syntax is needed.
+     ================================================================== -->
+<div style="margin:0;padding:0;background-color:#0A1A30;">
+
+  <!-- Preheader: the line beside your subject in the inbox -->
+  <div style="display:none;font-size:1px;color:#0A1A30;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Finished basements from $399 a month, $0 down. Free estimate, firm written price, no obligation.
+    &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#0A1A30;">
+    <tr>
+      <td align="center" style="padding:0;">
+
+        <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;max-width:600px;margin:0 auto;background-color:#FFFFFF;">
+
+          <!-- ============ HERO ============ -->
+
+          <tr>
+            <td style="height:5px;line-height:5px;font-size:0;background-color:#5494CF;">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:22px 34px 24px 34px;background-color:#132E55;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td align="left" valign="middle">
+                    <img src="https://ontarioreno.ca/logo-white.png" alt="OntarioReno.ca" width="168" height="38" style="display:block;width:168px;height:38px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;color:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;line-height:38px;">
+                  </td>
+                  <td align="right" valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:15px;font-weight:700;color:#9AACC4;letter-spacing:1.1px;text-transform:uppercase;">
+                    Finish your basement
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ IMAGE ============
+               Overlay is COMPOSITED INTO THE JPG, not layered in CSS -
+               absolute positioning and z-index do not survive Outlook and
+               Gmail's compose paste strips them. Rebuild with
+               make-hero-image.py. Live only after your next site deploy.
+               ==================================================== -->
+          <tr>
+            <td style="padding:0;font-size:0;line-height:0;background-color:#132E55;">
+              <img src="https://ontarioreno.ca/images/ontarioreno/email-basement-hero.jpg" alt="Basement renovation &mdash; from unfinished to fully lived-in" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;color:#BCCDE2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:24px;">
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:26px 34px 0 34px;background-color:#132E55;">
+              <h1 style="margin:0 0 14px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:30px;line-height:37px;font-weight:800;color:#FFFFFF;letter-spacing:-0.8px;">
+                Let&rsquo;s put a real number<br>on your basement.
+              </h1>
+
+              <p style="margin:0 0 22px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#BCCDE2;">
+                Hi {{FirstName}}, free on-site estimate and a firm written price &mdash; no obligation. Basements from <strong style="color:#FFFFFF;">$399 a month, $0 down</strong>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Hero CTA: white-on-blue survives forced dark-mode inversion.
+               The lighter 2px border lifts it off the navy. -->
+          <tr>
+            <td style="padding:0 34px 6px 34px;background-color:#132E55;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+                <tr>
+                  <td align="center" bgcolor="#2F6FB0" style="border-radius:8px;background-color:#2F6FB0;border:2px solid #5494CF;">
+                    <a href="https://ontarioreno.ca/consultation" target="_blank" style="display:inline-block;padding:16px 34px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;line-height:21px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:8px;letter-spacing:-0.1px;">
+                      Choose my estimate time &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:14px 34px 30px 34px;background-color:#132E55;">
+              <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#9AACC4;letter-spacing:0.2px;">
+                30 seconds &nbsp;&middot;&nbsp; Free estimate &nbsp;&middot;&nbsp; No sales pressure
+              </p>
+            </td>
+          </tr>
+
+          <!-- ============ FINANCING ============
+               The qualifier below is a legal disclosure, not decoration.
+               It is set at 13px / 5.05:1 so it is actually readable.
+               Do not shrink or lighten it. -->
+          <tr>
+            <td style="padding:30px 34px 0 34px;background-color:#FFFFFF;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#F3F7FB;border-left:4px solid #5494CF;border-radius:0 10px 10px 0;">
+                <tr>
+                  <td style="padding:22px 24px;">
+                    <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:32px;font-weight:800;color:#132E55;letter-spacing:-0.7px;">
+                      Renovate now, pay later
+                    </p>
+                    <p style="margin:0 0 10px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:25px;color:#4A5867;">
+                      <strong style="color:#132E55;">No down payment required.</strong> Spread the cost monthly and start now &mdash; we&rsquo;ll show you your real figure at the estimate.
+                    </p>
+                    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#5D6B7D;">
+                      Financing is subject to credit approval. Your monthly figure depends on the size and scope of your project.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ THREE STEPS ============ -->
+          <tr>
+            <td style="padding:34px 34px 0 34px;background-color:#FFFFFF;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td width="44" valign="top" style="padding:0 0 18px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:26px;font-weight:800;color:#2F6FB0;letter-spacing:-1px;">01</td>
+                  <td valign="top" style="padding:0 0 18px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#4A5867;">
+                    <strong style="color:#132E55;">Pick your time.</strong> Evenings and Saturdays included.
+                  </td>
+                </tr>
+                <tr>
+                  <td width="44" valign="top" style="padding:0 0 18px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:26px;font-weight:800;color:#2F6FB0;letter-spacing:-1px;">02</td>
+                  <td valign="top" style="padding:0 0 18px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#4A5867;">
+                    <strong style="color:#132E55;">We measure.</strong> 30 minutes on site, every question answered.
+                  </td>
+                </tr>
+                <tr>
+                  <td width="44" valign="top" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:26px;font-weight:800;color:#2F6FB0;letter-spacing:-1px;">03</td>
+                  <td valign="top" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#4A5867;">
+                    <strong style="color:#132E55;">You get your price.</strong> Itemized, in writing, within 48 hours.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ SECOND CTA ============ -->
+          <tr>
+            <td align="center" style="padding:30px 34px 0 34px;background-color:#FFFFFF;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+                <tr>
+                  <td align="center" bgcolor="#2F6FB0" style="border-radius:8px;background-color:#2F6FB0;">
+                    <a href="https://ontarioreno.ca/consultation" target="_blank" style="display:inline-block;padding:16px 34px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;line-height:21px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:8px;letter-spacing:-0.1px;">
+                      Book my free estimate &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ OTHER WAYS IN ============
+               Markers are coloured table cells, not glyphs: the envelope
+               and phone characters render as colour emoji on iOS and some
+               Android builds, which looks broken next to this palette. -->
+          <tr>
+            <td style="padding:26px 34px 0 34px;background-color:#FFFFFF;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #DCE5EF;border-radius:10px;">
+                <tr>
+                  <td style="padding:20px 22px;">
+                    <p style="margin:0 0 14px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;font-weight:700;color:#132E55;">
+                      Prefer not to book online?
+                    </p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                      <tr>
+                        <td width="18" valign="top" style="padding:0 0 10px 0;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td width="8" height="8" style="width:8px;height:8px;font-size:0;line-height:0;background-color:#5494CF;border-radius:2px;">&nbsp;</td></tr></table>
+                        </td>
+                        <td valign="top" style="padding:0 0 10px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#4A5867;">
+                          <strong style="color:#132E55;">Email us</strong> &mdash; reply here or <a href="mailto:info@ontarioreno.ca?subject=My%20basement%20project" style="color:#1B3F72;font-weight:700;text-decoration:underline;">info@ontarioreno.ca</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td width="18" valign="top">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td width="8" height="8" style="width:8px;height:8px;font-size:0;line-height:0;background-color:#5494CF;border-radius:2px;">&nbsp;</td></tr></table>
+                        </td>
+                        <td valign="top" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#4A5867;">
+                          <strong style="color:#132E55;">Request a call</strong> &mdash; send your number and a time window
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ CREDENTIALS ============ -->
+          <tr>
+            <td style="padding:26px 34px 0 34px;background-color:#FFFFFF;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border-top:1px solid #DCE5EF;">
+                <tr>
+                  <td style="padding-top:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:28px;color:#4A5867;">
+                    <span style="color:#2F6FB0;font-weight:700;">&#10003;</span>&nbsp; 70+ basements completed this year<br>
+                    <span style="color:#2F6FB0;font-weight:700;">&#10003;</span>&nbsp; Free estimate, no obligation<br>
+                    <span style="color:#2F6FB0;font-weight:700;">&#10003;</span>&nbsp; Fixed written quotes &mdash; no hourly surprises<br>
+                    <span style="color:#2F6FB0;font-weight:700;">&#10003;</span>&nbsp; Vetted trades, serving all of Ontario
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============ CLOSE ============ -->
+          <tr>
+            <td style="padding:22px 34px 32px 34px;background-color:#FFFFFF;">
+              <p style="margin:0 0 18px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:24px;color:#68758A;">
+                On hold? Reply &ldquo;<strong style="color:#4A5867;">not now</strong>&rdquo; and we&rsquo;ll close the file.
+              </p>
+              <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#4A5867;">
+                Talk soon,<br>
+                <strong style="color:#132E55;">The OntarioReno.ca team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- ============ FOOTER / CASL ============ -->
+          <tr>
+            <td style="padding:20px 34px 26px 34px;background-color:#132E55;">
+              <p style="margin:0 0 6px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#9AACC4;">
+                You asked for a renovation quote through our Facebook or Instagram ad.
+              </p>
+              <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#9AACC4;">
+                OntarioReno.ca &middot; <a href="mailto:info@ontarioreno.ca" style="color:#9AACC4;text-decoration:underline;">info@ontarioreno.ca</a> &middot; <a href="mailto:info@ontarioreno.ca?subject=Unsubscribe" style="color:#9AACC4;text-decoration:underline;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if mso]></td></tr></table><![endif]-->
+
+      </td>
+    </tr>
+  </table>
+</div>
