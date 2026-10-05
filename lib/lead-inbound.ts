@@ -18,6 +18,8 @@
 import { phoneKey } from './sms-replies.js';
 import { availableSlotsForLead, spreadAcrossDays } from './lead-availability.js';
 import { runInboundReply, type ConversationState, type RunnerDeps } from './lead-conversation-runner.js';
+import { planConversationAlert } from './lead-conversation-alert.js';
+import { drainOutbox } from './notification-drain.js';
 import type { ConversationPhase } from './lead-conversation.js';
 import type { OfferedSlot } from './lead-reply-templates.js';
 
@@ -65,6 +67,11 @@ export type LeadInboundStore = {
   user?: unknown;
   appointment?: unknown;
   repDayOff?: unknown;
+  /** Optional: without it the reply is still handled, just not announced. */
+  notificationOutbox?: {
+    create: (args: unknown) => Promise<unknown>;
+    createMany?: (args: unknown) => Promise<unknown>;
+  };
 };
 
 const PHASES: ConversationPhase[] = [
@@ -187,12 +194,53 @@ export async function handleLeadReply(
       },
     };
 
-    await runInboundReply(
+    // What the classifier made of the message, captured on the way past. The
+    // runner records it and moves on; the alert needs it to tell the reader
+    // how the reply was read — and, more usefully, when it was not sure.
+    let seenIntent = '';
+    let seenConfident = false;
+    const recordMessage = deps.recordMessage;
+    deps.recordMessage = async (m) => {
+      if (m.direction === 'in') {
+        seenIntent = m.intent ?? '';
+        seenConfident = m.confident ?? false;
+      }
+      await recordMessage(m);
+    };
+
+    const outcome = await runInboundReply(
       conversation,
       { messageSid: params.messageSid, body: params.body, leadName: lead.name ?? '' },
       deps,
       env
     );
+
+    // ── Tell a person, now ──
+    // Everything above ends in a DRAFT or an escalation, and both wait for a
+    // human. Finding one meant opening the Conversations page on the off
+    // chance, so replies sat for hours. Best-effort on purpose: an alert that
+    // fails must not undo a thread that was handled correctly.
+    await announce(store, env, {
+      leadId: lead.id,
+      conversationId: conversation.id,
+      messageSid: params.messageSid,
+      leadName: lead.name ?? '',
+      leadPhone: String(lead.phone ?? ''),
+      body: params.body,
+      intent: seenIntent,
+      confident: seenConfident,
+      outcome:
+        outcome.kind === 'drafted'
+          ? 'draft'
+          : outcome.kind === 'closed'
+            ? 'closed'
+            : 'escalated',
+      draftBody: outcome.kind === 'drafted' ? outcome.body : '',
+      reason: outcome.kind === 'escalated' ? outcome.reason : '',
+    }).catch((err: unknown) => {
+      console.error('[lead-inbound] could not alert on the reply:', err);
+    });
+
     return true;
   } catch (err) {
     // The reply is already in SmsReply. Failing loudly here would make Twilio
@@ -200,5 +248,50 @@ export async function handleLeadReply(
     // handler — a far worse outcome than a draft that did not get written.
     console.error('[lead-inbound] could not run the conversation:', err);
     return false;
+  }
+}
+
+/**
+ * Queue the alert and deliver it in the same request.
+ *
+ * The outbox drain runs on a Vercel cron, and a reply announced on the next
+ * cron tick is not an improvement on finding it by hand. So this queues (for
+ * the record, the dedupe key and the retry) and then drains inline, the same
+ * shape the appointment reply path already uses.
+ *
+ * Recipients come from TEAM_INBOX_EMAIL, never from EMAIL_FROM. Those are two
+ * different addresses on purpose: info@ontarioreno.ca is a mailbox on the web
+ * host that forwards to Gmail, and that hop has taken up to 76 minutes on a
+ * booking alert. It is copied for the record, as its own row, so it can never
+ * hold the fast one up.
+ */
+async function announce(
+  store: LeadInboundStore,
+  env: NodeJS.ProcessEnv,
+  context: Parameters<typeof planConversationAlert>[0]
+): Promise<void> {
+  if (!store.notificationOutbox?.create) return;
+  const bare = (raw: string) => raw.trim().replace(/^.*<([^>]+)>.*$/, '$1').trim();
+  // Same fallback the booking alerts use, so an unset variable does not make
+  // this one path silently quieter than the rest of the system.
+  const team = bare(env.TEAM_INBOX_EMAIL ?? 'mapsforfield@gmail.com');
+  const archive = bare(env.EMAIL_FROM ?? '');
+  const recipients = [team, archive].filter(Boolean);
+  if (recipients.length === 0) return;
+
+  // One row per recipient, created individually: a duplicate key on the
+  // archive copy must not stop the fast copy being queued.
+  for (const row of planConversationAlert(context, recipients)) {
+    // A Twilio retry re-runs this with the same message SID. The unique key
+    // collapses it rather than mailing the same reply twice.
+    await store.notificationOutbox.create({ data: row }).catch((err: unknown) => {
+      console.error('[lead-inbound] could not queue an alert row:', err);
+    });
+  }
+
+  try {
+    await drainOutbox(store as never, 25, env);
+  } catch (err) {
+    console.error('[lead-inbound] inline drain failed:', err);
   }
 }
