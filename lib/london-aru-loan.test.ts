@@ -80,7 +80,7 @@ test('every offered unit type is eligible', () => {
 test('the City conditions are asked BEFORE booking, after the unit type', () => {
   // The owner chose qualified calls over volume for this program.
   const keys = london.questions.map((q) => q.key);
-  assert.deepEqual(keys, ['projectType', 'ownerOccupied', 'workStarted', 'mortgageShare', 'contribution']);
+  assert.deepEqual(keys, ['projectType', 'ownerOccupied', 'workStarted', 'hasMortgage', 'homeValue', 'mortgageOwing', 'contribution']);
   for (const q of london.questions) assert.ok(q.options.length > 0, `${q.key} has no options`);
   assert.equal(london.prepQuestions.length, 0, 'nothing left to ask after booking');
   assert.equal(london.addressPlacement, 'final');
@@ -91,20 +91,22 @@ const qualified = {
   projectType: 'secondary_suite',
   ownerOccupied: 'yes',
   workStarted: 'no',
-  mortgageShare: 'over_75',
+  hasMortgage: 'yes',
+  homeValue: '500k_750k',
+  mortgageOwing: 'over_500k',
   contribution: 'need_financing',
 };
 
 test('a qualified London homeowner books, whatever they owe or how they fund it', () => {
-  for (const mortgageShare of ['under_50', '50_75', 'over_75', 'unsure']) {
+  for (const mortgageOwing of ['', 'under_100k', '100k_250k', '250k_500k', 'over_500k', 'unsure']) {
     for (const contribution of ['cash_equity', 'need_financing', 'unsure']) {
       const routing = routeConsultation({
         addressState: 'ADDRESS_VERIFIED',
         area: 'LONDON',
         program: london,
-        answers: { ...qualified, mortgageShare, contribution },
+        answers: { ...qualified, mortgageOwing, contribution },
       });
-      assert.equal(routing.outcome, 'DIRECT_CALENDAR', `${mortgageShare}/${contribution} must book`);
+      assert.equal(routing.outcome, 'DIRECT_CALENDAR', `${mortgageOwing}/${contribution} must book`);
     }
   }
 });
@@ -148,6 +150,9 @@ test('the copy never calls the loan a grant or forgivable', () => {
     ...london.programTerms,
     london.prepFinancingNote ?? '',
     london.declineMessage ?? '',
+    london.qualifiedNote ?? '',
+    ...Object.values(london.offer ?? {}),
+    ...london.questions.map((q) => `${q.label} ${q.help ?? ''} ${q.why ?? ''}`),
     london.whyFreeText,
     london.fundingGuidance.lead,
     london.fundingGuidance.highlight,
@@ -158,4 +163,22 @@ test('the copy never calls the loan a grant or forgivable', () => {
   assert.doesNotMatch(copy.replace(/not a grant/gi, ''), /\bgrant\b/i);
   assert.match(copy, /repayable/i);
   assert.match(copy, /\$45,000/);
+});
+
+test('the two dollar questions are asked only of someone with a mortgage', () => {
+  // Asked as the numbers people know, never as a ratio: "owe $300k on an $800k
+  // home" read against "more than half" was understood backwards.
+  for (const key of ['homeValue', 'mortgageOwing']) {
+    const q = london.questions.find((x) => x.key === key)!;
+    assert.deepEqual(q.showIf, { key: 'hasMortgage', values: ['yes'] }, `${key} asked without a mortgage`);
+    assert.ok(q.options.every((o) => o.value === 'unsure' || /\$/.test(o.label)), `${key} must answer in dollars`);
+  }
+});
+
+test('the form carries the ad: the offer lockup, and a reason for every question', () => {
+  assert.equal(london.offer?.amount, '$45,000');
+  assert.match(london.offer?.chip ?? '', /0% interest/i);
+  for (const q of london.questions) assert.ok(q.why, `${q.key} has no "why we ask"`);
+  // The reward line may describe the answers, never promise approval.
+  assert.doesNotMatch(london.qualifiedNote ?? '', /(qualif|approv|eligible)/i);
 });

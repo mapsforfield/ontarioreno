@@ -47,13 +47,27 @@ export type AddressState =
   | 'ADDRESS_OUTSIDE_SERVICE_AREA'
   | 'ADDRESS_UNVERIFIED';
 
-export type QuestionOption = { value: string; label: string };
+export type QuestionOption = {
+  value: string;
+  label: string;
+};
 
 export type Question = {
   key: string;
   label: string;
   /** Short clarifier shown under the label. */
   help?: string;
+  /**
+   * One line under the question saying why it is asked, in terms of the offer
+   * the homeowner came for. A long form is only worth finishing when every
+   * question visibly earns its place.
+   */
+  why?: string;
+  /**
+   * Ask this question only when an earlier answer is one of `values`. Used by
+   * the calendar-early flow; a hidden question is not sent, and is stored blank.
+   */
+  showIf?: { key: string; values: string[] };
   options: QuestionOption[];
   /** Only these answers influence routing; everything else is captured for the rep. */
   routingRelevant?: boolean;
@@ -231,6 +245,29 @@ export type ProgramConfig = {
    * they clicked the wrong thing. Absent ⇒ no banner, never someone else's.
    */
   bookingBanner?: { src: string; alt: string };
+  /**
+   * The ad's own lockup, carried onto the form: the offer the homeowner tapped
+   * on, set the way the ad set it. Drawn over the banner photo on the landing
+   * screen and as a slim strip above every question after it, so a long
+   * qualifying form never loses sight of what it is qualifying them FOR.
+   * Absent ⇒ the flow looks exactly as it did.
+   */
+  offer?: {
+    /** Small caps line with a location pin, e.g. "London homeowners". */
+    eyebrow: string;
+    /** The headline figure, e.g. "$45,000". */
+    amount: string;
+    /** The white chip under the figure, e.g. "0% interest". */
+    chip: string;
+    /** The program's name, under the chip and in the strip. */
+    programName: string;
+  };
+  /**
+   * Shown above the contact fields when none of the answers hit
+   * disqualifyingAnswers. A reward for finishing the questions — so it may only
+   * claim what the answers show, never that the homeowner qualifies.
+   */
+  qualifiedNote?: string;
   /**
    * The line under the payment question on the calendar-early confirmation
    * screen, after the slot is held.
@@ -1341,6 +1378,7 @@ export const FINANCING_PROGRAMS: ProgramConfig[] = [
 const LONDON_ARU_PROJECT_TYPE: Question = {
   key: 'projectType',
   label: 'What kind of unit are you planning?',
+  why: 'The loan covers any kind of additional unit. This tells your specialist what to prepare.',
   routingRelevant: true,
   step: 1,
   // No 'unsure': on the calendar-early flow it would route to MANUAL_REVIEW
@@ -1362,6 +1400,7 @@ const LONDON_ARU_PROJECT_TYPE: Question = {
 const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
   {
     key: 'ownerOccupied',
+    why: 'The City lends only to owners who live in the main house.',
     label: 'Do you live in the main house?',
     step: 1,
     options: [
@@ -1372,7 +1411,7 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
   {
     key: 'workStarted',
     label: 'Has any construction on the unit started?',
-    help: 'The City requires approval before any work begins.',
+    why: 'The City has to approve the loan before any work begins.',
     step: 1,
     options: [
       { value: 'no', label: 'Not yet' },
@@ -1380,15 +1419,53 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
     ],
   },
   {
-    // The City's 90% loan-to-value condition, asked as a range. Exact figures
-    // are the rep's to ask on the call, not a form's.
-    key: 'mortgageShare',
-    label: 'Roughly how much of your home’s value is still owed on mortgages or lines of credit?',
+    // Asked first as a plain yes/no, because everyone knows the answer without
+    // thinking. Only a "yes" is asked the two dollar questions below.
+    key: 'hasMortgage',
+    why: 'The City registers its loan on title, so it looks at what’s already owing.',
+    label: 'Is there a mortgage or line of credit on the home?',
     step: 1,
     options: [
-      { value: 'under_50', label: 'Less than half' },
-      { value: '50_75', label: 'About half to three quarters' },
-      { value: 'over_75', label: 'More than three quarters' },
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No, it’s paid off' },
+    ],
+  },
+  {
+    // The City's 90% loan-to-value condition, asked as the two numbers a
+    // homeowner actually knows — what the place is worth and what is left on
+    // the mortgage — rather than as a ratio of them. Every single-question
+    // version ("how much is owed / yours / paid off") made the reader do the
+    // subtraction, and one read "owe $300k on an $800k home" against "more than
+    // half" and got it backwards. The rep sees both ranges; the 90% test is
+    // against the post-renovation value anyway, which only the call can settle.
+    //
+    // Only asked of a homeowner who said there is a mortgage (showIf).
+    key: 'homeValue',
+    why: 'With what’s owing, this shows whether there’s room for the City’s loan.',
+    label: 'Roughly what’s your home worth today?',
+    help: 'A rough guess is fine.',
+    showIf: { key: 'hasMortgage', values: ['yes'] },
+    step: 1,
+    options: [
+      { value: 'under_500k', label: 'Under $500k' },
+      { value: '500k_750k', label: '$500k – $750k' },
+      { value: '750k_1m', label: '$750k – $1M' },
+      { value: 'over_1m', label: 'Over $1M' },
+      { value: 'unsure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'mortgageOwing',
+    why: 'Everything owing, including the City’s loan, has to stay under 90% of the home’s value after the build.',
+    label: 'Roughly how much is left on the mortgage?',
+    help: 'Include any line of credit on the home. A rough guess is fine.',
+    showIf: { key: 'hasMortgage', values: ['yes'] },
+    step: 1,
+    options: [
+      { value: 'under_100k', label: 'Under $100k' },
+      { value: '100k_250k', label: '$100k – $250k' },
+      { value: '250k_500k', label: '$250k – $500k' },
+      { value: 'over_500k', label: 'Over $500k' },
       { value: 'unsure', label: 'Not sure' },
     ],
   },
@@ -1397,6 +1474,7 @@ const LONDON_ARU_QUALIFYING_QUESTIONS: Question[] = [
     // NEEDS_FUNDING_GUIDANCE exactly as it does on every other program.
     key: 'contribution',
     label: 'How will you pay for the build before the City’s loan is paid out?',
+    why: 'The City pays its loan once the unit is finished, so the build is funded first. Your specialist will go through the options.',
     step: 1,
     options: [
       { value: 'cash_equity', label: 'Cash, savings or home equity' },
@@ -1453,8 +1531,20 @@ export const LONDON_ARU_LOAN_PROGRAM: ProgramConfig = {
   bookingFlow: 'calendar_early',
   // An address outside London becomes a call-back, not a dead end.
   capturesOutOfAreaLeads: true,
-  prepFinancingNote:
-    'The City’s loan is paid out after the unit is finished, so the build is funded first. Your specialist will go through the options with you.',
+  // The ad this flow is paired with (Cauldron brew 2026-10-04 london-aru-loan,
+  // variant E): its aerial photo, its "$45,000 / 0% INTEREST" lockup and its
+  // program line. "Conditions apply" travels with the figure, as in the ad.
+  bookingBanner: {
+    src: '/images/london-aru/aerial.webp',
+    alt: 'Aerial view of a London neighbourhood: rooftops and back yards',
+  },
+  offer: {
+    eyebrow: 'London homeowners',
+    amount: '$45,000',
+    chip: '0% interest',
+    programName: 'City of London ARU Loan',
+  },
+  qualifiedNote: 'Your answers fit the City’s main conditions.',
   // Empty: everything is asked before booking on this program.
   prepQuestions: [],
   consultationMode: 'phone',

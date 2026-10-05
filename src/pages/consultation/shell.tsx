@@ -7,13 +7,17 @@
 // not drift.
 
 import { useState } from 'react';
-import { ArrowLeft, CalendarDays, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, ChevronDown, MapPin } from 'lucide-react';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../../lib/calendar-links';
 
 export type Question = {
   key: string;
   label: string;
   help?: string;
+  /** See Question.why in lib/program-config.ts. */
+  why?: string;
+  /** See Question.showIf in lib/program-config.ts. */
+  showIf?: { key: string; values: string[] };
   step: 1 | 2 | 3;
   options: Array<{ value: string; label: string }>;
 };
@@ -121,7 +125,57 @@ export function ErrorNote({ children }: { children: React.ReactNode }) {
  * the page someone lands on. Everywhere else this is absent and the header
  * renders exactly as it always has, on the page background above the card.
  */
-export type ShellBanner = { src: string; alt: string };
+export type OfferLockup = { eyebrow: string; amount: string; chip: string; programName: string };
+
+/** Poppins, the ad's face — loaded only on a page that carries an offer lockup. */
+export const OFFER_FONT = 'https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap';
+const offerFont = { fontFamily: 'Poppins, ui-sans-serif, system-ui, sans-serif' };
+
+/**
+ * The ad's lockup, as the ad set it: pin and city, the figure, the white chip,
+ * the program line. Drawn over the banner photo.
+ */
+function OfferLockupBlock({ offer }: { offer: OfferLockup }) {
+  return (
+    <div className="text-center" style={offerFont}>
+      <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#9cc4ec]">
+        <MapPin className="h-3.5 w-3.5" /> {offer.eyebrow}
+      </p>
+      <p className="mt-1 text-[3.25rem] font-black leading-none tracking-tight text-white drop-shadow-[0_0_18px_rgba(156,196,236,0.45)]">
+        {offer.amount}
+      </p>
+      <span className="mt-2 inline-block rounded-lg bg-white px-3 py-1 text-sm font-extrabold uppercase tracking-wide text-[#1B3C6C]">
+        {offer.chip}
+      </span>
+      <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#9cc4ec]">
+        {offer.programName} · Conditions apply
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The same offer, slim, above every question after the landing screen — the
+ * ad's persistent offer bar. A reminder of what the answers are for, sized so
+ * it never pushes a question off a phone screen.
+ */
+export function OfferStrip({ offer }: { offer: OfferLockup }) {
+  return (
+    <div className="mb-4 rounded-xl bg-[#1B3C6C] px-4 py-2.5 text-white" style={offerFont}>
+      <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.1em] text-[#9cc4ec]">
+        <MapPin className="h-3 w-3 shrink-0" /> {offer.programName}
+      </p>
+      <p className="mt-0.5 flex items-center justify-center gap-2">
+        <span className="text-xl font-black leading-tight">{offer.amount}</span>
+        <span className="rounded-md bg-white px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-[#1B3C6C]">
+          {offer.chip}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+export type ShellBanner = { src: string; alt: string; offer?: OfferLockup };
 
 export function Shell({ children, title, step, totalSteps = 5, onBack, banner }: {
   children: React.ReactNode; title?: string; step?: number; totalSteps?: number; onBack?: () => void;
@@ -153,14 +207,24 @@ export function Shell({ children, title, step, totalSteps = 5, onBack, banner }:
                 // its whole point is the diagonal seam between the unfinished
                 // half and the finished one — an edge-anchored crop on a phone
                 // shows one half and throws the comparison away.
-                className="h-[168px] w-full object-cover object-center sm:h-[196px]"
+                className={`w-full object-cover object-center ${
+                  banner.offer ? 'h-[300px] sm:h-[320px]' : 'h-[168px] sm:h-[196px]'
+                }`}
               />
               {/* Seats the text without washing the photo out. Transparent
                   across the top third so the finished room still reads, then
                   deepening to the navy the rest of the page is built from. Tuned
                   against the bright half — it is the harder of the two, and what
                   holds there holds over the insulation. */}
-              <div className="absolute inset-0 bg-gradient-to-b from-[#0f2544]/5 via-[#0f2544]/45 to-[#0f2544]/85" />
+              <div
+                className={`absolute inset-0 bg-gradient-to-b ${
+                  // The ad's treatment: the photo sits under an even navy wash
+                  // so the figure reads first and the neighbourhood second.
+                  banner.offer
+                    ? 'from-[#0f2544]/75 via-[#0f2544]/70 to-[#0f2544]/90'
+                    : 'from-[#0f2544]/5 via-[#0f2544]/45 to-[#0f2544]/85'
+                }`}
+              />
               <div className="absolute inset-x-0 bottom-0 px-5 pb-4 text-center">
                 {/* The real mark, not the navy pill.
                     The pill exists so the wordmark reads against the pale grey
@@ -169,11 +233,17 @@ export function Shell({ children, title, step, totalSteps = 5, onBack, banner }:
                     like something pasted over it. The white logo goes straight
                     onto the image, with a drop shadow doing the pill's old job
                     of holding it away from whatever is behind it. */}
-                <img
-                  src="/logo-white.png"
-                  alt="OntarioReno"
-                  className="mx-auto mb-3 h-9 w-auto drop-shadow-lg sm:h-10"
-                />
+                {banner.offer ? (
+                  <div className="mb-3">
+                    <OfferLockupBlock offer={banner.offer} />
+                  </div>
+                ) : (
+                  <img
+                    src="/logo-white.png"
+                    alt="OntarioReno"
+                    className="mx-auto mb-3 h-9 w-auto drop-shadow-lg sm:h-10"
+                  />
+                )}
                 {/* On the photo the unfilled segments need to read against a
                     dark ground rather than the page's pale grey. */}
                 {step ? (

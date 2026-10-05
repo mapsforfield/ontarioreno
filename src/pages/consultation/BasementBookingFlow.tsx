@@ -9,6 +9,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { newEventId, trackCustom, trackEvent } from '../../lib/pixel';
@@ -18,10 +19,13 @@ import {
   Choice,
   ErrorNote,
   PrimaryButton,
+  OFFER_FONT,
+  OfferStrip,
   Shell,
   fmtDate,
   fmtTime,
   inputCls,
+  type OfferLockup,
   type Question,
 } from './shell';
 
@@ -77,6 +81,9 @@ export type BasementProgram = {
   bookingBanner?: { src: string; alt: string } | null;
   prepFinancingNote?: string;
   declineMessage?: string;
+  offer?: OfferLockup | null;
+  qualifiedNote?: string;
+  disqualifyingAnswers?: Record<string, string[]> | null;
   smsEnabled: boolean;
 };
 
@@ -161,8 +168,12 @@ export default function BasementBookingFlow({
   const skipSuggest = useRef(false);
 
   const projectQuestion = program.questions.find((q) => q.key === 'projectType') ?? program.questions[0];
-  const currentQuestion = program.questions[questionIndex] ?? projectQuestion;
-  const isLastQuestion = questionIndex + 1 >= program.questions.length;
+  // Only the questions this homeowner's answers so far call for (showIf).
+  // Recomputed every render, so going Back and changing an answer re-routes.
+  const visibleQuestions = program.questions.filter(
+    (q) => !q.showIf || q.showIf.values.includes(answers[q.showIf.key] ?? '')
+  );
+  const currentQuestion = visibleQuestions[questionIndex] ?? projectQuestion;
 
   // ── Funnel instrumentation ──
   // Same shape as ConsultationFlow's: custom events, once per screen per
@@ -509,7 +520,11 @@ export default function BasementBookingFlow({
             !placeId && addressText.trim()
               ? `Typed address (not confirmed): ${addressText.trim()}`
               : '',
-          answers,
+          // Only what was actually asked: an answer to a question that a
+          // later change hid (Back, then "No, it's paid off") must not ride along.
+          answers: Object.fromEntries(
+            Object.entries(answers).filter(([key]) => visibleQuestions.some((q) => q.key === key))
+          ),
         }),
       });
       const submitted = await submitRes.json();
@@ -692,10 +707,15 @@ export default function BasementBookingFlow({
       // before/after is what makes the offer concrete before they have read a
       // word. On the later screens the same photo would just be height between
       // a homeowner and the field they are filling in.
-      banner={phase === 'time' && program.bookingBanner ? program.bookingBanner : undefined}
+      banner={
+        phase === 'time' && program.bookingBanner
+          ? { ...program.bookingBanner, offer: program.offer ?? undefined }
+          : undefined
+      }
     >
       <Helmet>
         <title>{program.pageTitle ?? `${program.areaLabel} Consultation | OntarioReno`}</title>
+        {program.offer && <link rel="stylesheet" href={OFFER_FONT} />}
       </Helmet>
 
       {/* ── 1. The calendar — the screen this page opens on ── */}
@@ -907,6 +927,10 @@ export default function BasementBookingFlow({
       )}
 
       {/* ── 2. Project type ── */}
+      {/* The ad's offer bar, above every step between the landing screen and
+          the booking — the reason the homeowner is answering any of this. */}
+      {(phase === 'project' || phase === 'lock') && program.offer && <OfferStrip offer={program.offer} />}
+
       {phase === 'project' && currentQuestion && (
         <div className="space-y-4 text-left">
           {currentQuestion.help && (
@@ -920,7 +944,14 @@ export default function BasementBookingFlow({
                   key={o.value}
                   type="button"
                   onClick={() => {
-                    setAnswers({ ...answers, [currentQuestion.key]: o.value });
+                    const next = { ...answers, [currentQuestion.key]: o.value };
+                    setAnswers(next);
+                    // Decided against the answers INCLUDING this one: a "yes"
+                    // here can add the next question.
+                    const remaining = program.questions.filter(
+                      (q) => !q.showIf || q.showIf.values.includes(next[q.showIf.key] ?? '')
+                    );
+                    const isLastQuestion = questionIndex + 1 >= remaining.length;
                     // The pause is the point: a tap that both selects and
                     // navigates with no visible acknowledgement reads as the
                     // page having jumped on its own.
@@ -948,10 +979,21 @@ export default function BasementBookingFlow({
           {currentQuestion.key === 'contribution' && program.prepFinancingNote && (
             <p className="text-center text-xs leading-relaxed text-slate-500">{program.prepFinancingNote}</p>
           )}
+          {currentQuestion.why && (
+            <p className="flex items-start justify-center gap-1.5 text-center text-xs leading-relaxed text-slate-500">
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#32639B]" />
+              <span>
+                <span className="font-bold text-slate-600">Why we ask: </span>
+                {currentQuestion.why}
+              </span>
+            </p>
+          )}
           <p className="text-center text-xs text-slate-500">
-            {isLastQuestion
+            {questionIndex + 1 >= visibleQuestions.length
               ? 'Last question before we hold your time.'
-              : `Question ${questionIndex + 1} of ${program.questions.length}`}
+              : program.offer
+                ? `Eligibility check · ${questionIndex + 1} of ${visibleQuestions.length}`
+                : `Question ${questionIndex + 1} of ${visibleQuestions.length}`}
           </p>
         </div>
       )}
@@ -970,6 +1012,17 @@ export default function BasementBookingFlow({
               same shape: the homeowner reads one line about their appointment,
               which either confirms or offers, and never a red error about a
               step they completed correctly. */}
+          {/* The reward for getting through the questions — only when no answer
+              hit a hard condition, and only claiming what the answers show. */}
+          {program.qualifiedNote &&
+            !Object.entries(program.disqualifyingAnswers ?? {}).some(([key, values]) =>
+              values.includes(answers[key] ?? '')
+            ) && (
+              <p className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                {program.qualifiedNote}
+              </p>
+            )}
           {chosen && recheck !== 'moved' && (
             <p className="rounded-xl bg-[#f2f7ff] px-4 py-3 text-sm font-bold text-[#1B3C6C]">
               {fmtDate(chosen.date)} at {fmtTime(chosen.time)}
