@@ -24,6 +24,7 @@ import { isRemoteConsultationCity } from './remote-consultation.js';
 import {
   programByKey,
   programForArea,
+  repsForProgram,
   type ProgramConfig,
   type SchedulingArea,
 } from './program-config.js';
@@ -184,7 +185,7 @@ export async function availableSlotsForLead(
   }
 
   const remote = leadIsRemote(lead);
-  const reps = await store.user.findMany(BOOKABLE_REP_QUERY);
+  const reps = repsForProgram(program, await store.user.findMany(BOOKABLE_REP_QUERY));
   const repIds = reps.map((r) => r.id);
   if (repIds.length === 0) return empty({ reason: 'NO_REPS' });
 

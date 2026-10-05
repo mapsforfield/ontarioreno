@@ -8,6 +8,7 @@ import {
   programBySlug,
   programForArea,
   questionsForStep,
+  repsForProgram,
 } from './program-config.ts';
 import { leadIsRemote } from './lead-availability.ts';
 import { isRemoteConsultationCity } from './remote-consultation.ts';
@@ -181,4 +182,13 @@ test('the form carries the ad: the offer lockup, and a reason for every question
   for (const q of london.questions) assert.ok(q.why, `${q.key} has no "why we ask"`);
   // The reward line may describe the answers, never promise approval.
   assert.doesNotMatch(london.qualifiedNote ?? '', /(qualif|approv|eligible)/i);
+});
+
+test('London ARU is piloted by Steven alone; every other program keeps every rep', () => {
+  const steven = { id: 'cmq2mv9ka000004jm9qlieibb' };
+  const keven = { id: 'cmq2n9ww9000004l22xiz5axn' };
+  assert.deepEqual(repsForProgram(london, [keven, steven]), [steven]);
+  for (const program of PROGRAMS.filter((p) => p !== london)) {
+    assert.deepEqual(repsForProgram(program, [keven, steven]), [keven, steven], `${program.slug} lost a rep`);
+  }
 });
