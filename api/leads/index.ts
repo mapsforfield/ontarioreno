@@ -14,6 +14,7 @@ import {
   programBySlug,
   programByKey,
   programForArea,
+  repsForProgram,
   resolveProgramGeography,
   publicQuestions,
   type AddressState,
@@ -2058,7 +2059,8 @@ async function bookVisitForLead(params: {
       lockDate: async (d) => {
         await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', d);
       },
-      listBookableReps: async () => tx.user.findMany(BOOKABLE_REP_QUERY),
+      // The same per-program rep limit the offered times were computed under.
+      listBookableReps: async () => repsForProgram(program, await tx.user.findMany(BOOKABLE_REP_QUERY)),
       listDaysOff: async (repIds, d) =>
         new Set(
           (

@@ -269,6 +269,13 @@ export type ProgramConfig = {
    */
   qualifiedNote?: string;
   /**
+   * Only these reps (User ids) may be offered or assigned this program's
+   * bookings. Absent ⇒ every bookable rep, exactly as before. For a pilot that
+   * one rep runs before it is shared — never a substitute for a rep's own
+   * acceptsPublicBooking switch, which still applies on top.
+   */
+  onlyRepIds?: string[];
+  /**
    * The line under the payment question on the calendar-early confirmation
    * screen, after the slot is held.
    *
@@ -1545,6 +1552,9 @@ export const LONDON_ARU_LOAN_PROGRAM: ProgramConfig = {
     programName: 'City of London ARU Loan',
   },
   qualifiedNote: 'Your answers fit the City’s main conditions.',
+  // Piloted by Steven alone (owner's call, October 5, 2026). Keven joins later:
+  // add his id here, or remove the line to open it to every bookable rep.
+  onlyRepIds: ['cmq2mv9ka000004jm9qlieibb'], // Steven
   // Empty: everything is asked before booking on this program.
   prepQuestions: [],
   consultationMode: 'phone',
@@ -1690,6 +1700,21 @@ export function resolveProgramGeography(
 export function programForArea(area: SchedulingArea | null): ProgramConfig | null {
   if (!area) return null;
   return PROGRAMS.find((p) => p.schedulingArea === area) ?? null;
+}
+
+/**
+ * The bookable reps this program may use — see onlyRepIds. Applied wherever
+ * reps are listed for a booking (lib/lead-availability.ts for the times
+ * offered, api/leads for the booking itself), so a time is never offered by
+ * one rule and assigned by another.
+ */
+export function repsForProgram<T extends { id: string }>(
+  program: Pick<ProgramConfig, 'onlyRepIds'> | null | undefined,
+  reps: T[]
+): T[] {
+  const only = program?.onlyRepIds;
+  if (!only || only.length === 0) return reps;
+  return reps.filter((r) => only.includes(r.id));
 }
 
 export function programBySlug(slug: string): ProgramConfig | null {
