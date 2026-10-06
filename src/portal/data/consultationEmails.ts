@@ -8,6 +8,7 @@ import {
   APPOINTMENT_TYPE_LABELS,
 } from './emailTemplates.js';
 import { getCustomerFacingConsultantPhone } from './customerContactRouting.js';
+import { formatTimeOrWindow } from '../../../lib/arrival-window.js';
 
 export type ConsultationEmailType =
   | 'booking_confirmation'
@@ -65,7 +66,10 @@ function contractorPublicWebsite(contractor?: Contractor) {
 
 function formatDateTime(appointment: Appointment) {
   const date = appointment.appointmentDate || 'Date TBD';
-  const time = appointment.appointmentTime || 'Time TBD';
+  // A windowed booking is quoted as the whole window, never just its start.
+  const time = appointment.appointmentTime
+    ? formatTimeOrWindow(appointment.appointmentTime, appointment.arrivalWindowMinutes, (t) => t)
+    : 'Time TBD';
   return `${date} at ${time}`;
 }
 

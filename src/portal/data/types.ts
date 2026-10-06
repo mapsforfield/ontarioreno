@@ -150,6 +150,8 @@ export type Appointment = {
   appointmentDate: string;
   appointmentTime: string;
   durationMinutes: number;
+  /** 0 = exact time; 120 = "between 10 and 12". See lib/arrival-window.ts. */
+  arrivalWindowMinutes?: number;
   appointmentType: AppointmentType;
   status: AppointmentStatus;
   consultationStage: ConsultationStage;

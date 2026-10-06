@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, X, Clock, User, Wrench } from 'lucide-react'
 import { usePortalData } from '../data/store';
 import { torontoToday } from '../lib/time';
 import type { Appointment } from '../data/types';
+import { formatTimeOrWindow } from '../../../lib/arrival-window';
 
 // Appointments loaded for a contractor carry a server-added `repName`.
 // Contact fields (phone/email/address) and contractor attribution are stripped
@@ -84,7 +85,7 @@ function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: st
 
 function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => void }) {
   const c = statusColor(appt);
-  const timeLabel = [fmt12(appt.appointmentTime), appt.durationMinutes ? `${appt.durationMinutes} min` : '']
+  const timeLabel = [appt.appointmentTime ? formatTimeOrWindow(appt.appointmentTime, appt.arrivalWindowMinutes, fmt12) : '', appt.durationMinutes ? `${appt.durationMinutes} min` : '']
     .filter(Boolean)
     .join(' · ');
 

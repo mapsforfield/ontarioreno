@@ -35,6 +35,7 @@
 // rep. See lib/remote-consultation.ts for which cities these are and why.
 
 import type { SchedulingArea } from './program-config.js';
+import { blockedMinutes } from './arrival-window.js';
 
 /** Statuses that still occupy the calendar. */
 const ACTIVE_STATUSES = new Set(['scheduled', 'confirmed', 'rescheduled', 'completed']);
@@ -44,6 +45,11 @@ export type BookedAppointment = {
   appointmentDate: string; // YYYY-MM-DD
   appointmentTime: string; // HH:MM (24h)
   durationMinutes: number;
+  /**
+   * Portal "between 10 and 12" bookings. The rep may arrive as late as the end
+   * of the window, so the row blocks window + duration. Absent/0 = exact time.
+   */
+  arrivalWindowMinutes?: number | null;
   schedulingArea: SchedulingArea | null;
   status: string;
   /** Property coordinates, when known. Drives the same-day travel radius. */
@@ -136,7 +142,12 @@ export function collidesWithExisting(
   return constrainingAppointments(sameDayAppointments).some((a) => {
     const existingStart = minutesOfDay(a.appointmentTime);
     if (existingStart === null) return true; // unparseable existing row blocks the slot
-    return intervalsOverlap(start, proposedDuration, existingStart, a.durationMinutes);
+    return intervalsOverlap(
+      start,
+      proposedDuration,
+      existingStart,
+      blockedMinutes(a.durationMinutes, a.arrivalWindowMinutes)
+    );
   });
 }
 

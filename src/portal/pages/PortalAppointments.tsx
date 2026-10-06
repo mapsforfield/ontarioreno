@@ -31,6 +31,7 @@ import { sameHomeowner } from '../data/clientLinks';
 import { visibilityPartnerIds } from '../data/repVisibility';
 import { showToast } from '../lib/toast';
 import { torontoToday, localDateKey } from '../lib/time';
+import { formatTimeOrWindow } from '../../../lib/arrival-window';
 
 const AppointmentsMap = lazy(() => import('../components/AppointmentsMap'));
 import {
@@ -83,6 +84,8 @@ type AppointmentFormState = {
   customerName: string;
   dealId: string;
   durationMinutes: string;
+  /** '0' = exact time, '120' = 2-hour arrival window. */
+  arrivalWindowMinutes: string;
   email: string;
   internalNotes: string;
   estimatedProjectValue: string;
@@ -228,6 +231,7 @@ const emptyForm: AppointmentFormState = {
   customerName: '',
   dealId: '',
   durationMinutes: '60',
+  arrivalWindowMinutes: '0',
   email: '',
   estimatedProjectValue: '0',
   financingNeeded: 'unknown',
@@ -340,6 +344,7 @@ function appointmentToForm(appointment: Appointment): AppointmentFormState {
     customerName: appointment.customerName || appointment.title || '',
     dealId: appointment.dealId,
     durationMinutes: String(appointment.durationMinutes),
+    arrivalWindowMinutes: String(appointment.arrivalWindowMinutes ?? 0),
     email: appointment.email,
     estimatedProjectValue: String(appointment.estimatedProjectValue ?? 0),
     financingNeeded:
@@ -575,6 +580,12 @@ function fmt12(time: string | undefined): string {
   return m === 0 ? `${hour}${suffix}` : `${hour}:${String(m).padStart(2, '0')}${suffix}`;
 }
 
+/** "10AM", or "10AM – 12PM" for a booking with a 2-hour arrival window. */
+function fmtWhen(a: Pick<Appointment, 'appointmentTime' | 'arrivalWindowMinutes'>): string {
+  if (!a.appointmentTime) return fmt12(a.appointmentTime);
+  return formatTimeOrWindow(a.appointmentTime, a.arrivalWindowMinutes, fmt12);
+}
+
 function AppointmentPill({
   appointment,
   contractorName,
@@ -593,7 +604,7 @@ function AppointmentPill({
   const { bg, lightText } = getStagePillBg(appointment.consultationStage, appointment.status, appointment.appointmentType);
   const outcomeBadge = getOutcomeBadge(appointment);
   const name = appointment.customerName || appointment.title || 'Consultation';
-  const time = fmt12(appointment.appointmentTime);
+  const time = fmtWhen(appointment);
   const remote = isRemoteAppointment(appointment);
   // WHERE. The pill carried the time, the customer, the project and the rep,
   // but never the place — while the comment below says the pill exists so a rep
@@ -1254,6 +1265,7 @@ export default function PortalAppointments() {
       customerNotes: form.customerNotes,
       dealId: form.dealId,
       durationMinutes: Number(form.durationMinutes) || selectedAppointment.durationMinutes,
+      arrivalWindowMinutes: Number(form.arrivalWindowMinutes) || 0,
       email: form.email,
       estimatedProjectValue: Number(form.estimatedProjectValue) || 0,
       financingNeeded:
@@ -1465,6 +1477,7 @@ export default function PortalAppointments() {
       customerName: form.customerName.trim(),
       dealId: form.dealId,
       durationMinutes: Number(form.durationMinutes) || 60,
+      arrivalWindowMinutes: Number(form.arrivalWindowMinutes) || 0,
       email: form.email.trim(),
       estimatedProjectValue: Number(form.estimatedProjectValue) || 0,
       financingNeeded:
@@ -2054,7 +2067,7 @@ export default function PortalAppointments() {
         >
           <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageDot}`} />
           <span className="w-[4.5rem] shrink-0 text-sm font-black tabular-nums text-[#32639b]">
-            {fmt12(appointment.appointmentTime)}
+            {fmtWhen(appointment)}
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
             {appointment.customerName || appointment.title || 'Consultation'}
@@ -2583,7 +2596,7 @@ export default function PortalAppointments() {
                               <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="mt-px shrink-0 text-xs font-bold tabular-nums leading-tight text-slate-500">
-                              {fmt12(apt.appointmentTime)}
+                              {fmtWhen(apt)}
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -2662,7 +2675,7 @@ export default function PortalAppointments() {
                                       {apt.customerName || apt.title || 'Consultation'}
                                     </p>
                                     <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
-                                      {fmt12(apt.appointmentTime)}
+                                      {fmtWhen(apt)}
                                     </p>
                                   </div>
                                   <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -2904,7 +2917,7 @@ export default function PortalAppointments() {
                                   <ReplyChip status={apt.smsReplyStatus} body={apt.smsReplyBody} tone="onWhite" />
                                 </div>
                                 <p className="mt-px shrink-0 text-xs font-bold tabular-nums text-slate-500">
-                                  {fmt12(apt.appointmentTime)}
+                                  {fmtWhen(apt)}
                                 </p>
                               </div>
                               <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -3158,7 +3171,7 @@ export default function PortalAppointments() {
                                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotColor}`} />
                                 <span className="w-[8rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
                                   {apt.appointmentDate}
-                                  {apt.appointmentTime ? ` · ${fmt12(apt.appointmentTime)}` : ''}
+                                  {apt.appointmentTime ? ` · ${fmtWhen(apt)}` : ''}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
                                   {apt.customerName || apt.title || 'Consultation'}
@@ -3636,7 +3649,7 @@ export default function PortalAppointments() {
                               <ReplyChip status={appointment.smsReplyStatus} body={appointment.smsReplyBody} tone="onWhite" />
                             </div>
                             <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500 leading-tight mt-px">
-                              {fmt12(appointment.appointmentTime)}
+                              {fmtWhen(appointment)}
                             </p>
                           </div>
                           <p className="mt-1 text-[0.75rem] font-semibold text-slate-600">
@@ -3721,7 +3734,7 @@ export default function PortalAppointments() {
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${schedStageDot}`} />
                       <span className="w-[6.5rem] shrink-0 text-[0.72rem] font-bold tabular-nums text-slate-500">
                         {appointment.appointmentDate}
-                        {appointment.appointmentTime ? ` · ${fmt12(appointment.appointmentTime)}` : ''}
+                        {appointment.appointmentTime ? ` · ${fmtWhen(appointment)}` : ''}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
                         {getAppointmentLabel(appointment)}
@@ -3758,7 +3771,7 @@ export default function PortalAppointments() {
                           </div>
                           <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                             <Clock className="h-4 w-4 shrink-0 text-[#32639b]" />
-                            {fmt12(appointment.appointmentTime) || 'Time not set'}
+                            {fmtWhen(appointment) || 'Time not set'}
                           </div>
                           <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                             <UserRound className="h-4 w-4 shrink-0 text-[#32639b]" />
@@ -4168,6 +4181,13 @@ export default function PortalAppointments() {
                   <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Arrival
+                  <select value={form.arrivalWindowMinutes} onChange={(event) => updateForm('arrivalWindowMinutes', event.target.value)}>
+                    <option value="0">Exact time</option>
+                    <option value="120">2-hour window{form.appointmentTime ? ` (${fmtWhen({ appointmentTime: form.appointmentTime, arrivalWindowMinutes: 120 })})` : ''}</option>
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Duration (minutes)
                   <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} />
                 </label>
@@ -4359,6 +4379,13 @@ export default function PortalAppointments() {
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Consultation Time
                   <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Arrival
+                  <select value={form.arrivalWindowMinutes} onChange={(event) => updateForm('arrivalWindowMinutes', event.target.value)}>
+                    <option value="0">Exact time</option>
+                    <option value="120">2-hour window{form.appointmentTime ? ` (${fmtWhen({ appointmentTime: form.appointmentTime, arrivalWindowMinutes: 120 })})` : ''}</option>
+                  </select>
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Duration (minutes)
@@ -5398,7 +5425,7 @@ export default function PortalAppointments() {
         items={trashedAppointments}
         loading={trashLoading}
         primary={(a) => a.customerName || a.title || 'Consultation'}
-        secondary={(a) => `${a.appointmentDate}${a.appointmentTime ? ` · ${fmt12(a.appointmentTime)}` : ''} · ${getRepName(a.assignedRepId)}`}
+        secondary={(a) => `${a.appointmentDate}${a.appointmentTime ? ` · ${fmtWhen(a)}` : ''} · ${getRepName(a.assignedRepId)}`}
         onRestore={handleRestoreAppointment}
         onPurge={handlePurgeAppointment}
       />

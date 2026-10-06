@@ -36,6 +36,8 @@ export type ReminderAppointment = {
    * would tell a virtual homeowner a specialist is on the way.
    */
   remoteConsultation?: boolean | null;
+  /** Portal arrival window — reminders quote "between 10 and 12" from this. */
+  arrivalWindowMinutes?: number | null;
 };
 
 /** Build the reminder inputs from an appointment row. */
@@ -50,6 +52,7 @@ export function reminderContextFor(appointment: ReminderAppointment): ReminderCo
     date: appointment.appointmentDate ?? '',
     time: appointment.appointmentTime ?? '',
     consultationMode: appointment.remoteConsultation ? 'phone' : 'in_person',
+    arrivalWindowMinutes: appointment.arrivalWindowMinutes ?? 0,
   };
 }
 

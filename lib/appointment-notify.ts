@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { atTimeOrWindow } from './arrival-window.js';
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
 
@@ -28,6 +29,8 @@ interface NotifyParams {
   customerName: string;
   appointmentDate: string;
   appointmentTime: string;
+  /** 120 = "between 10 and 12". 0/absent = exact time. */
+  arrivalWindowMinutes?: number | null;
   address?: string;
   city?: string;
   appointmentType?: string;
@@ -35,6 +38,7 @@ interface NotifyParams {
   /** For moved events — the original date/time before the change */
   previousDate?: string;
   previousTime?: string;
+  previousArrivalWindowMinutes?: number | null;
 }
 
 const EVENT_LABELS: Record<NotifyEvent, string> = {
@@ -57,20 +61,22 @@ export async function sendAppointmentNotification(params: NotifyParams): Promise
 
   const {
     event, repName, repEmail, customerName,
-    appointmentDate, appointmentTime,
+    appointmentDate, appointmentTime, arrivalWindowMinutes,
     address, city, title,
-    previousDate, previousTime,
+    previousDate, previousTime, previousArrivalWindowMinutes,
   } = params;
 
   const label = EVENT_LABELS[event];
   const accent = ACCENT_COLORS[event];
   const location = [address, city].filter(Boolean).join(', ') || 'No location set';
-  const dateTime = `${fmtDate(appointmentDate)} at ${fmtTime(appointmentTime)}`;
+  const dateTime = `${fmtDate(appointmentDate)} ${appointmentTime ? atTimeOrWindow(appointmentTime, arrivalWindowMinutes, fmtTime) : 'at TBD'}`;
+  const wasTime = previousTime ?? appointmentTime;
+  const wasDateTime = `${fmtDate(previousDate ?? appointmentDate)} ${wasTime ? atTimeOrWindow(wasTime, previousArrivalWindowMinutes ?? arrivalWindowMinutes, fmtTime) : 'at TBD'}`;
   const displayName = customerName || title || 'Appointment';
   const subject = `${label}: ${displayName}`;
 
   const previousRow = (previousDate || previousTime)
-    ? `<tr><td width="4" style="width:4px;background:${accent};">&nbsp;</td><td style="padding:13px 18px;border-bottom:1px solid #f1f5f9;"><p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Was Scheduled For</p><p style="margin:0;font-size:15px;font-weight:600;color:#94a3b8;text-decoration:line-through;">${fmtDate(previousDate ?? appointmentDate)} at ${fmtTime(previousTime ?? appointmentTime)}</p></td></tr>`
+    ? `<tr><td width="4" style="width:4px;background:${accent};">&nbsp;</td><td style="padding:13px 18px;border-bottom:1px solid #f1f5f9;"><p style="margin:0 0 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">Was Scheduled For</p><p style="margin:0;font-size:15px;font-weight:600;color:#94a3b8;text-decoration:line-through;">${wasDateTime}</p></td></tr>`
     : '';
 
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4f8;padding:32px 12px;">
@@ -103,7 +109,7 @@ export async function sendAppointmentNotification(params: NotifyParams): Promise
   else if (event === 'rescheduled') plainLines.push('The following appointment has been rescheduled.');
   else plainLines.push('The following appointment has been moved to a new date or time.');
   plainLines.push('');
-  if (previousDate || previousTime) plainLines.push(`Was: ${fmtDate(previousDate ?? appointmentDate)} at ${fmtTime(previousTime ?? appointmentTime)}`);
+  if (previousDate || previousTime) plainLines.push(`Was: ${wasDateTime}`);
   plainLines.push(`Client: ${displayName}`, `Date & Time: ${dateTime}`, `Location: ${location}`, '', 'OntarioReno');
 
   try {

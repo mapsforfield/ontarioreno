@@ -14,6 +14,7 @@
 
 import type { Appointment, Contractor, ContractorDispatch, Deal, User } from './types.js';
 import { getCustomerFacingConsultantPhone } from './customerContactRouting.js';
+import { atTimeOrWindow } from '../../../lib/arrival-window.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,15 @@ function fmtDate(d: string | null | undefined): string {
 }
 
 /** Format HH:MM (24-hour) → 12-hour time with AM/PM. */
+/**
+ * "at 10:00 AM", or "between 10:00 AM and 12:00 PM" for a portal booking with an
+ * arrival window — a homeowner told "10:00" must not be waiting at 11:45.
+ */
+function fmtWhen(a: Pick<Appointment, 'appointmentTime' | 'arrivalWindowMinutes'>): string {
+  if (!a.appointmentTime) return `at ${fmtTime(a.appointmentTime)}`;
+  return atTimeOrWindow(a.appointmentTime, a.arrivalWindowMinutes, fmtTime);
+}
+
 function fmtTime(t: string | null | undefined): string {
   if (!t) return 'Time TBD';
   try {
@@ -447,7 +457,7 @@ export function buildCustomerHtml(input: CustomerEmailInput): string {
   }
 
   const detailTableRows = [
-    textRow('Date &amp; Time', e(`${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`)),
+    textRow('Date &amp; Time', e(`${fmtDate(appointment.appointmentDate)} ${fmtWhen(appointment)}`)),
     textRow('Service', e(apptTypeLabel)),
     isEvent
       ? textRow('Event', e(eventTitle))
@@ -581,7 +591,7 @@ export function buildRepAssignmentHtml(input: RepAssignmentEmailInput): string {
 
   const location =
     [appointment.address, appointment.city].filter(Boolean).join(', ') || 'Not provided';
-  const dateTime = `${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`;
+  const dateTime = `${fmtDate(appointment.appointmentDate)} ${fmtWhen(appointment)}`;
   const dealValue = deal
     ? new Intl.NumberFormat('en-CA', {
         currency: 'CAD',
@@ -645,7 +655,7 @@ export function buildAppointmentReminderHtml(input: AppointmentReminderEmailInpu
   const { appointment, rep, reminderMinutes } = input;
 
   const location = [appointment.address, appointment.city].filter(Boolean).join(', ') || 'No location set';
-  const dateTime = `${fmtDate(appointment.appointmentDate)} at ${fmtTime(appointment.appointmentTime)}`;
+  const dateTime = `${fmtDate(appointment.appointmentDate)} ${fmtWhen(appointment)}`;
   const title = appointment.customerName || appointment.title || 'Appointment';
 
   const detailRows = [

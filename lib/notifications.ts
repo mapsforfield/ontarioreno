@@ -14,6 +14,7 @@
 // These modules are pure string builders: no fetch, no env vars, no DOM.
 import { generateConsultationEmailPreview } from '../src/portal/data/consultationEmails.js';
 import type { Appointment, User } from '../src/portal/data/types.js';
+import { atTimeOrWindow } from './arrival-window.js';
 
 export type NotificationChannel = 'sms' | 'email';
 
@@ -201,9 +202,9 @@ export function smsLeadWelcome(c: LeadWelcomeContext): string {
 
 export function smsReminder24h(c: ReminderContext): string {
   if (c.consultationMode === 'phone') {
-    return `Reminder: Your OntarioReno consultation call about ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) at ${friendlyTime(c.time)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
+    return `Reminder: Your OntarioReno consultation call about ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) ${atTimeOrWindow(c.time, c.arrivalWindowMinutes, friendlyTime)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
   }
-  return `Reminder: Your OntarioReno site visit for ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) at ${friendlyTime(c.time)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
+  return `Reminder: Your OntarioReno site visit for ${c.propertyAddress} is scheduled for tomorrow (${friendlyDate(c.date)}) ${atTimeOrWindow(c.time, c.arrivalWindowMinutes, friendlyTime)}. Please reply 'C' to confirm or reply 'R' if you need to reschedule.`;
 }
 
 export function smsReminderDayOf(c: ReminderContext): string {
@@ -211,9 +212,9 @@ export function smsReminderDayOf(c: ReminderContext): string {
   // on the morning of, and "looking forward to visiting" would have someone in
   // Windsor clearing their afternoon for a van.
   if (c.consultationMode === 'phone') {
-    return `Hi ${c.name}, our specialist is looking forward to speaking with you today at ${friendlyTime(c.time)} about ${c.propertyAddress}. Talk soon!`;
+    return `Hi ${c.name}, our specialist is looking forward to speaking with you today ${atTimeOrWindow(c.time, c.arrivalWindowMinutes, friendlyTime)} about ${c.propertyAddress}. Talk soon!`;
   }
-  return `Hi ${c.name}, our specialist is looking forward to visiting ${c.propertyAddress} today at ${friendlyTime(c.time)} for your ADU assessment. See you soon!`;
+  return `Hi ${c.name}, our specialist is looking forward to visiting ${c.propertyAddress} today ${atTimeOrWindow(c.time, c.arrivalWindowMinutes, friendlyTime)} for your ADU assessment. See you soon!`;
 }
 
 /**
@@ -588,7 +589,14 @@ export type ReminderContext = Pick<
   // Reminders are rebuilt from the appointment row every time they are sent, so
   // this has to travel with it. Optional because most callers describe a site
   // visit, which is what the wording assumed before remote bookings existed.
-  Partial<Pick<BookingContext, 'consultationMode'>>;
+  Partial<Pick<BookingContext, 'consultationMode'>> & {
+    /**
+     * Portal "between 10 and 12" bookings. The reminder must quote the whole
+     * window, not the start, or the homeowner waits from 10 for a rep who was
+     * always going to arrive at 11:45. Absent/0 = exact time, wording unchanged.
+     */
+    arrivalWindowMinutes?: number | null;
+  };
 
 export function planReminderNotifications(
   c: ReminderContext,

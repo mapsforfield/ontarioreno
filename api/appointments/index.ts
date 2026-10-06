@@ -20,6 +20,7 @@ import { programByKey, readableAnswers } from '../../lib/program-config.js';
 import { mergeNotes, seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { randomUUID } from 'node:crypto';
+import { arrivalWindowOf, atTimeOrWindow } from '../../lib/arrival-window.js';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
 const CREATE_CLIENT_VIDEO_TABLE =
@@ -122,6 +123,7 @@ function scrubAppointmentForContractor(a: Record<string, unknown>, repName: stri
     appointmentDate: a.appointmentDate,
     appointmentTime: a.appointmentTime,
     durationMinutes: a.durationMinutes,
+    arrivalWindowMinutes: a.arrivalWindowMinutes,
     appointmentType: a.appointmentType,
     status: a.status,
     repName,
@@ -650,7 +652,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const rep = apt.assignedRep;
         const title = apt.customerName || apt.title || 'Appointment';
         const location = [apt.address, apt.city].filter(Boolean).join(', ') || 'No location set';
-        const dateTime = `${fmtDate(apt.appointmentDate)} at ${fmtTime(apt.appointmentTime)}`;
+        // "between 10:00 AM and 12:00 PM" for a windowed booking — the client
+        // email below must never promise an exact time we did not give them.
+        const dateTime = `${fmtDate(apt.appointmentDate)} ${atTimeOrWindow(apt.appointmentTime, apt.arrivalWindowMinutes, fmtTime)}`;
         const mins = apt.reminderMinutes ?? 30;
 
         const tasks: Promise<unknown>[] = [];
@@ -1616,6 +1620,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         appointmentDate: data.appointmentDate,
         appointmentTime: data.appointmentTime,
         durationMinutes: data.durationMinutes ?? 60,
+        arrivalWindowMinutes: arrivalWindowOf(data.arrivalWindowMinutes),
         appointmentType: data.appointmentType ?? 'home_visit',
         // Closes the hand-created gap: a rep booking a Windsor property from
         // the portal used to leave this false, so that appointment anchored
@@ -1791,6 +1796,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           customerName: appointment.customerName,
           appointmentDate: appointment.appointmentDate,
           appointmentTime: appointment.appointmentTime,
+          arrivalWindowMinutes: appointment.arrivalWindowMinutes,
           address: appointment.address,
           city: appointment.city,
           title: appointment.title,
