@@ -69,6 +69,28 @@ test('morning-of reminder SMS matches the approved copy', () => {
   );
 });
 
+test('rep booking alert carries every answer, not just scope and funding', () => {
+  const alert = planBookingNotifications(
+    ctx({
+      repEmail: 'rep@example.test',
+      answers: [
+        { question: 'Roughly what’s your home worth today?', answer: '$750k – $1M' },
+        { question: 'Roughly how much is left on the mortgage?', answer: 'Over $500k' },
+      ],
+    })
+  ).find((n) => n.kind === 'team_alert' && n.recipient === 'rep@example.test');
+  assert.ok(alert);
+  assert.match(alert.body, /Homeowner’s answers/);
+  assert.match(alert.body, /how much is left on the mortgage\?\s+Over \$500k/);
+  assert.match(alert.body, /home worth today\?\s+\$750k – \$1M/);
+});
+
+test('booking alert without an answer list reads as it always did', () => {
+  const alert = planBookingNotifications(ctx()).find((n) => n.kind === 'team_alert');
+  assert.ok(alert);
+  assert.doesNotMatch(alert.body, /Homeowner’s answers/);
+});
+
 test('date and time render the way a homeowner reads them', () => {
   assert.equal(friendlyDate('2026-08-10'), 'Monday, August 10');
   assert.equal(friendlyTime('10:00'), '10:00 AM');

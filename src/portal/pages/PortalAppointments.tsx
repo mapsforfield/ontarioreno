@@ -26,6 +26,7 @@ import { usePortalAuth } from '../auth';
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import FinanceTab from '../components/FinanceTab';
+import HomeownerAnswers from '../components/HomeownerAnswers';
 import { sameHomeowner } from '../data/clientLinks';
 import { visibilityPartnerIds } from '../data/repVisibility';
 import { showToast } from '../lib/toast';
@@ -3966,6 +3967,7 @@ export default function PortalAppointments() {
                     </p>
                   </div>
                 </div>
+                {selectedAppointment && <HomeownerAnswers appointmentId={selectedAppointment.id} />}
                 <div
                   className={`mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 ${form.internalNotes?.trim() ? 'cursor-pointer hover:bg-amber-100 transition-colors' : ''}`}
                   onClick={() => form.internalNotes?.trim() && setNotesModal(form.internalNotes)}

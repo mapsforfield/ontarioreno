@@ -16,6 +16,7 @@ import {
   wonDealsWhere,
 } from '../../lib/digest-filters.js';
 import { isRemoteConsultationCity } from '../../lib/remote-consultation.js';
+import { programByKey, readableAnswers } from '../../lib/program-config.js';
 import { mergeNotes, seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { randomUUID } from 'node:crypto';
@@ -880,6 +881,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.query['_resource'] === 'days_off') {
       const daysOff = await withSchema(() => prisma.repDayOff.findMany({ orderBy: { date: 'asc' } }));
       return res.status(200).json(daysOff);
+    }
+
+    // ── Homeowner's form answers for one appointment ──
+    // The rep's view of what the Submissions drawer shows an admin. Submissions
+    // is admin-only, and the booking brief in the notes only ever carried three
+    // of the answers, so a rep walking into a London ARU visit never saw the
+    // home value or the mortgage balance. Read live from the lead rather than
+    // copied into the notes, so it covers bookings made before this existed and
+    // never overwrites anything a rep has typed.
+    if (req.query['_resource'] === 'homeowner_answers') {
+      const appointmentId = String(req.query['appointmentId'] ?? '');
+      if (!appointmentId) return res.status(400).json({ error: 'Missing appointmentId.' });
+      const appointment = await withSchema(() =>
+        prisma.appointment.findUnique({
+          where: { id: appointmentId },
+          select: { id: true, leadId: true, programKey: true },
+        })
+      );
+      if (!appointment) return res.status(404).json({ error: 'Appointment not found.' });
+      // leadId is set by the public flow and portal-from-lead bookings; older
+      // rows may only carry the link on the lead side.
+      const lead = await prisma.lead.findFirst({
+        where: appointment.leadId ? { id: appointment.leadId } : { appointmentId: appointment.id },
+        select: { programKey: true, answersJson: true, submittedAt: true },
+      });
+      if (!lead) return res.status(200).json({ linked: false, answers: [] });
+      const programKey = lead.programKey ?? appointment.programKey ?? null;
+      const answers = readableAnswers(
+        programByKey(programKey),
+        (lead.answersJson ?? null) as Record<string, unknown> | null
+      );
+      return res.status(200).json({ linked: true, programKey, submittedAt: lead.submittedAt, answers });
     }
 
     // ── Household list ──

@@ -17,6 +17,7 @@ import {
   repsForProgram,
   resolveProgramGeography,
   publicQuestions,
+  readableAnswers,
   type AddressState,
   type ProgramConfig,
   type SchedulingArea,
@@ -2026,9 +2027,13 @@ async function bookVisitForLead(params: {
     const question = program.questions.find((q) => q.key === key);
     return question?.options.find((o) => o.value === leadAnswers[key])?.label ?? '';
   };
+  // Every answer on file, not a hand-picked three. The hand-picked set was
+  // written for Hamilton and silently dropped any question another program
+  // added — London ARU's home value and mortgage balance never reached a rep.
+  const briefAnswers = readableAnswers(program, leadAnswers).filter((a) => a.valueLabel);
   const internalBrief = [
     bookedVia === 'public_flow'
-      ? 'Booked through the public Hamilton grant flow.'
+      ? `Booked through the public ${program.appointmentProjectTypeLabel} flow.`
       : 'Booked from the portal on the homeowner’s behalf.',
     // First line the rep reads, and the one that changes what they do: nobody
     // is driving to this, and the time is a starting point rather than a
@@ -2036,9 +2041,9 @@ async function bookVisitForLead(params: {
     remote
       ? `VIRTUAL CONSULTATION — ${lead.city || lead.resolvedMunicipality} is outside the drive radius. Call the homeowner; arrange the time around your in-person day.`
       : '',
-    answerLabel('projectType') ? `Project: ${answerLabel('projectType')}` : '',
-    answerLabel('timeline') ? `Timeline: ${answerLabel('timeline')}` : '',
-    answerLabel('contribution') ? `Funding: ${answerLabel('contribution')}` : '',
+    ...briefAnswers.map((a) =>
+      /[?:]$/.test(a.questionLabel) ? `${a.questionLabel} ${a.valueLabel}` : `${a.questionLabel}: ${a.valueLabel}`
+    ),
     lead.resolvedMunicipality ? `Municipality: ${lead.resolvedMunicipality}` : '',
   ].filter(Boolean).join('\n');
 
@@ -2228,6 +2233,7 @@ async function bookVisitForLead(params: {
           // Readable answers for the team alert; the label for the customer.
           fundingPlan: answerLabel('contribution') || answers.contribution || '',
           projectScope: answerLabel('projectType') || answers.projectType || '',
+          answers: briefAnswers.map((a) => ({ question: a.questionLabel, answer: a.valueLabel })),
           projectTypeLabel: program.appointmentProjectTypeLabel,
           customerNotes: templateBody,
         };

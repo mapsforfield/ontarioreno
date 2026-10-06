@@ -100,6 +100,12 @@ export type BookingContext = {
   fundingPlan: string;
   projectScope: string;
   /**
+   * Every question the homeowner answered, readable, for the team/rep alert.
+   * Optional so callers that only ever had the two lines above keep working;
+   * absent, the alert reads exactly as it did.
+   */
+  answers?: Array<{ question: string; answer: string }>;
+  /**
    * Customer-facing project label ("ADU Grant Consultation"), matching what the
    * appointment records. Distinct from projectScope, which is the homeowner's
    * specific selection and is only useful internally.
@@ -314,6 +320,11 @@ export function emailTeamAlert(c: BookingContext): { subject: string; body: stri
       `Assigned to:    ${c.repName || c.repEmail || 'Unassigned'}`,
       `Reference:      ${c.publicReference}`,
       `Appointment ID: ${c.appointmentId}`,
+      // The full answer set, so the rep has the home value and mortgage lines
+      // without opening the portal. The portal's prep sheet shows the same.
+      ...(c.answers?.length
+        ? ['', 'Homeowner’s answers', ...c.answers.map((a) => `  ${a.question}  ${a.answer}`)]
+        : []),
     ].join('\n'),
   };
 }
