@@ -488,6 +488,7 @@ function normalizeAppointment(appointment: Appointment, deals: Deal[]): Appointm
       appointment.customerName ?? appointment.title ?? deal?.homeownerName ?? '',
     customerNotes: appointment.customerNotes ?? '',
     durationMinutes: appointment.durationMinutes ?? 60,
+    arrivalWindowMinutes: appointment.arrivalWindowMinutes ?? 0,
     email: appointment.email ?? deal?.email ?? '',
     internalNotes: appointment.internalNotes ?? appointment.notes ?? '',
     phone: appointment.phone ?? deal?.phone ?? '',

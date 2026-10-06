@@ -4,6 +4,7 @@ import { requireAuth } from '../../lib/auth.js';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { mergeNotes } from '../../lib/consultation-notes.js';
 import { resolvesRescheduleRequest } from '../../lib/sms-reply-resolution.js';
+import { arrivalWindowOf } from '../../lib/arrival-window.js';
 import {
   reminderContextFor,
   resyncAppointmentReminders,
@@ -29,6 +30,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...rest,
       ...(rawDealId !== undefined ? { dealId: rawDealId || null } : {}),
     };
+
+    if (data.arrivalWindowMinutes !== undefined) {
+      data.arrivalWindowMinutes = arrivalWindowOf(data.arrivalWindowMinutes);
+    }
 
     // Fetch before-state so we can detect what changed
     const before = await prisma.appointment.findUnique({ where: { id } });
@@ -85,7 +90,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Change detection is pure, and both the reminder resync and the rep
     // notification below depend on it, so it sits outside either try block.
     const dateChanged = before && data.appointmentDate !== undefined && data.appointmentDate !== before.appointmentDate;
-    const timeChanged = before && data.appointmentTime !== undefined && data.appointmentTime !== before.appointmentTime;
+    // Widening or narrowing the arrival window changes what the homeowner was
+    // told just as much as moving the start does.
+    const timeChanged = before && (
+      (data.appointmentTime !== undefined && data.appointmentTime !== before.appointmentTime) ||
+      (data.arrivalWindowMinutes !== undefined && Number(data.arrivalWindowMinutes) !== before.arrivalWindowMinutes)
+    );
     const wasCancelled = before && data.status === 'cancelled' && before.status !== 'cancelled';
     const wasRescheduled = before && data.status === 'rescheduled' && before.status !== 'rescheduled';
     const wasMoved = (dateChanged || timeChanged) && !wasCancelled && !wasRescheduled;
@@ -137,11 +147,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           customerName: appointment.customerName,
           appointmentDate: appointment.appointmentDate,
           appointmentTime: appointment.appointmentTime,
+          arrivalWindowMinutes: appointment.arrivalWindowMinutes,
           address: appointment.address,
           city: appointment.city,
           title: appointment.title,
           previousDate: (dateChanged && before) ? before.appointmentDate : undefined,
           previousTime: (timeChanged && before) ? before.appointmentTime : undefined,
+          previousArrivalWindowMinutes: (timeChanged && before) ? before.arrivalWindowMinutes : undefined,
         });
       }
 

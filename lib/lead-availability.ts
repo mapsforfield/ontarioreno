@@ -54,6 +54,8 @@ export const SCHEDULING_APPOINTMENT_SELECT = {
   appointmentDate: true,
   appointmentTime: true,
   durationMinutes: true,
+  // A portal "10–12" booking blocks window + visit, not the visit alone.
+  arrivalWindowMinutes: true,
   schedulingArea: true,
   status: true,
   latitude: true,

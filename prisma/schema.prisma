@@ -265,6 +265,10 @@ model Appointment {
   appointmentDate          String
   appointmentTime          String
   durationMinutes          Int      @default(60)
+  /// Arrival window after appointmentTime, in minutes. 0 = exact time; 120 =
+  /// "between 10 and 12". Portal-only. Homeowner messages quote the whole
+  /// window and the calendar blocks window + duration. See lib/arrival-window.ts.
+  arrivalWindowMinutes     Int      @default(0)
   appointmentType          String   @default("home_visit")
   status                   String   @default("scheduled")
   consultationStage        String   @default("consultation_scheduled")
