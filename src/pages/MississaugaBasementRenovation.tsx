@@ -11,6 +11,7 @@ import {
   Home,
   ShieldCheck,
 } from 'lucide-react';
+import { BasementCityLinks } from '../components/BasementCityLinks';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -519,6 +520,8 @@ export default function MississaugaBasementRenovation() {
           </div>
         </div>
       </section>
+
+      <BasementCityLinks current="Mississauga" />
 
       <section className="bg-slate-900 py-20 text-white">
         <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 lg:px-8">

@@ -11,6 +11,7 @@ import {
   Home,
   ShieldCheck,
 } from 'lucide-react';
+import { BasementCityLinks } from '../components/BasementCityLinks';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -90,10 +91,10 @@ export default function BramptonBasementRenovation() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovation in Brampton | OntarioReno</title>
+        <title>Basement Renovations in Brampton | Finishing & Legal Suites | OntarioReno</title>
         <meta
           name="description"
-          content="Planning a basement renovation in Brampton? Learn what finished basements usually involve, what City of Brampton permits may apply, and how family-use and legal-suite planning differ."
+          content="Basement finishing and legal basement suites in Brampton, built by vetted local contractors. See typical costs and City of Brampton permit steps, then book a free in-home project review."
         />
         <link
           rel="canonical"
@@ -522,6 +523,8 @@ export default function BramptonBasementRenovation() {
           </div>
         </div>
       </section>
+
+      <BasementCityLinks current="Brampton" />
 
       <section className="bg-slate-900 py-20 text-white">
         <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 lg:px-8">
