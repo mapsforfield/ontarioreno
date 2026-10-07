@@ -49,7 +49,7 @@ const ontarioConsiderations = [
     body:
       'Suite rules, permit timelines, and local interpretation can vary by municipality, which is why basement apartment financing should stay tied to actual project feasibility instead of assumptions.',
     links: [
-      { label: 'project review', href: '/match' },
+      { label: 'project review', href: '/consultation/basement' },
       { label: 'Hamilton grant guide', href: '/hamilton-grant-guide' },
     ],
   },
@@ -195,7 +195,7 @@ export default function HelocForLegalBasementApartment() {
             </p>
 
             <div className="mt-11 flex flex-col gap-4 sm:flex-row">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/basement" className={buttonStyles.primary}>
                 Review My Basement Project
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
@@ -422,7 +422,7 @@ export default function HelocForLegalBasementApartment() {
           </p>
 
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link to="/match" className={buttonStyles.primary}>
+            <Link to="/consultation/basement" className={buttonStyles.primary}>
               Review My Basement Project
             </Link>
             <Link to="/costs" className={buttonStyles.secondary}>

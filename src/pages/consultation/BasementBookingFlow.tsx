@@ -28,6 +28,7 @@ import {
   type OfferLockup,
   type Question,
 } from './shell';
+import { readAttribution } from '../../lib/attributionCapture';
 
 // ─── The calendar-early booking flow ──────────────────────────────────────────
 //
@@ -516,6 +517,7 @@ export default function BasementBookingFlow({
           addressText: addressText.trim(),
           unit: unit.trim(),
           sourceDetail: trafficSource,
+          attribution: readAttribution(),
           notes:
             !placeId && addressText.trim()
               ? `Typed address (not confirmed): ${addressText.trim()}`

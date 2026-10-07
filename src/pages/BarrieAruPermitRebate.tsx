@@ -172,7 +172,7 @@ export default function BarrieAruPermitRebate() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
+              <Link to="/consultation/basement" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
                 Check My ARU Project
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -382,7 +382,7 @@ export default function BarrieAruPermitRebate() {
               Before assuming the rebate applies, confirm whether your project type, permit path, timeline, and funding goals line up.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/basement" className={buttonStyles.primary}>
                 Start My Barrie ARU Review
                 <ArrowRight className="h-5 w-5" />
               </Link>

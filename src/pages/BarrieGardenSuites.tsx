@@ -128,7 +128,7 @@ export default function BarrieGardenSuites() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
+              <Link to="/consultation/garden-suite" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
                 Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -407,7 +407,7 @@ export default function BarrieGardenSuites() {
               Before committing to drawings, pricing, or construction, check whether your lot, servicing, budget, and funding goals line up.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/garden-suite" className={buttonStyles.primary}>
                 Start My Garden Suite Review
                 <ArrowRight className="h-5 w-5" />
               </Link>

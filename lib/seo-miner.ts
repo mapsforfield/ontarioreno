@@ -166,8 +166,21 @@ const path = (url: string) => url.replace(/^https?:\/\/(www\.)?ontarioreno\.ca/,
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const pos = (n: number) => (n ? n.toFixed(1) : '—');
 
+export type ChannelLeads = { channel: string; leads: number; booked: number };
+
+const CHANNEL_LABELS: Record<string, string> = {
+  google_organic: '**Google search (free)**',
+  google_ads: 'Google Ads',
+  other_search: 'Other search engines',
+  meta: 'Facebook / Instagram',
+  sms: 'SMS links',
+  email: 'Email links',
+  referral: 'Other websites',
+  direct: 'Direct / typed in',
+};
+
 /** The whole report as Markdown — printed to the log and to the GitHub job summary. */
-export function renderReport(input: { start: string; end: string; current: PerfRow[]; previous: PerfRow[] }): string {
+export function renderReport(input: { start: string; end: string; current: PerfRow[]; previous: PerfRow[]; leads?: ChannelLeads[] }): string {
   const cur = aggregate(input.current);
   const prev = aggregate(input.previous);
   const totals = (aggs: Agg[]) => {
@@ -220,6 +233,17 @@ export function renderReport(input: { start: string; end: string; current: PerfR
   else {
     out.push('| Page | Clicks | Impressions | Position |', '|---|---|---|---|');
     for (const m of trends) out.push(`| ${path(m.page)} | ${m.prevClicks} → **${m.clicks}** | ${m.prevImpressions} → ${m.impressions} | ${pos(m.prevPosition)} → ${pos(m.position)} |`);
+    out.push('');
+  }
+
+  // Where website leads came from (Lead.trafficChannel, lib/traffic-attribution.ts).
+  // The line that answers "is free search actually producing bookings?"
+  out.push('## 5. Website leads by channel', '');
+  if (!input.leads) out.push('_Not loaded._', '');
+  else if (!input.leads.length) out.push('_No website leads with a recorded channel in this period yet. Recording started October 2026._', '');
+  else {
+    out.push('| Channel | Leads | Booked |', '|---|---|---|');
+    for (const l of input.leads) out.push(`| ${CHANNEL_LABELS[l.channel] ?? l.channel} | ${l.leads} | ${l.booked} |`);
     out.push('');
   }
   return out.join('\n');

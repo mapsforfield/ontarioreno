@@ -155,7 +155,7 @@ export default function BarrieSecondarySuiteCosts() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
+              <Link to="/consultation/basement" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
                 Check My Project
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -407,7 +407,7 @@ export default function BarrieSecondarySuiteCosts() {
               Before assuming the cost, funding, or rental return, it helps to understand whether the property, project type, and program requirements line up.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/basement" className={buttonStyles.primary}>
                 Start My Barrie Review
                 <ArrowRight className="h-5 w-5" />
               </Link>

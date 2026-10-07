@@ -106,7 +106,7 @@ export default function BarrieBasementRenovation() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
               >
                 Review My Barrie Project
@@ -442,7 +442,7 @@ export default function BarrieBasementRenovation() {
             </p>
             <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className={cn(buttonStyles.primary, 'w-full sm:w-auto')}
               >
                 Review My Barrie Project
