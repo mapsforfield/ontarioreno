@@ -20,12 +20,18 @@ import {
   SUITE_TRANSFORMATION,
 } from '../data/projects/suites';
 import { BASEMENT_COST_TABS } from '../data/projects/costContent';
+import { PageMeta } from '../components/PageMeta';
 
 export default function LegalSuites() {
   const [costsOpen, setCostsOpen] = useState(false);
 
   return (
     <div className="bg-slate-50 min-h-screen">
+      <PageMeta
+        path="/legal-suites"
+        title="Legal Secondary Suites in Ontario | Zoning, Code & Costs | OntarioReno"
+        description="How to build a legal, code-compliant basement suite in Ontario: zoning, fire separation, egress, HVAC separation, and what real pricing looks like."
+      />
       {/* Hero */}
       <section className="bg-slate-900 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -251,7 +257,7 @@ export default function LegalSuites() {
               <div className="space-y-8">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    1. Zoning &amp; Municipal Rules
+                    1. Zoning & Municipal Rules
                   </h3>
                   <p className="text-slate-600 leading-relaxed">
                     Your municipality must allow a secondary suite on the
@@ -276,7 +282,7 @@ export default function LegalSuites() {
 
                 <div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    3. Egress &amp; Safe Exits
+                    3. Egress & Safe Exits
                   </h3>
                   <p className="text-slate-600 leading-relaxed">
                     The suite must have a safe way out. Bedroom windows often
@@ -287,7 +293,7 @@ export default function LegalSuites() {
 
                 <div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    4. HVAC, Ventilation &amp; Utilities
+                    4. HVAC, Ventilation & Utilities
                   </h3>
                   <p className="text-slate-600 leading-relaxed">
                     Heating and ventilation are a major legal-suite issue. Many
@@ -324,7 +330,7 @@ export default function LegalSuites() {
                 <div className="divide-y divide-slate-200 bg-white">
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
                     <div className="text-slate-700">
-                      Framing, drywall, taping &amp; paint
+                      Framing, drywall, taping & paint
                     </div>
                     <div className="text-right font-semibold text-slate-900">
                       $12,000 - $22,000
@@ -346,7 +352,7 @@ export default function LegalSuites() {
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
-                    <div className="text-slate-700">Flooring &amp; finishes</div>
+                    <div className="text-slate-700">Flooring & finishes</div>
                     <div className="text-right font-semibold text-slate-900">
                       $6,000 - $14,000
                     </div>
@@ -383,7 +389,7 @@ export default function LegalSuites() {
                   </div>
 
                   <div className="grid grid-cols-[1.4fr_1fr] px-5 py-4 text-sm md:text-base">
-                    <div className="text-slate-700">Permits &amp; drawings</div>
+                    <div className="text-slate-700">Permits & drawings</div>
                     <div className="text-right font-semibold text-slate-900">
                       $3,000 - $8,000+
                     </div>
@@ -436,7 +442,7 @@ export default function LegalSuites() {
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
               <h2 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
                 <FileText className="w-8 h-8 text-emerald-600" />
-                Permits, Drawings &amp; Approvals
+                Permits, Drawings & Approvals
               </h2>
 
               <p className="text-slate-600 mb-6 leading-relaxed">

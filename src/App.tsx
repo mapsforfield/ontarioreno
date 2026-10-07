@@ -1,5 +1,5 @@
-import { lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { lazy, type ReactNode } from 'react';
+import { BrowserRouter, StaticRouter, Routes, Route } from 'react-router-dom';
 import { LazyRoutes } from './components/RouteChunkBoundary';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
@@ -147,11 +147,21 @@ const ConsultationReschedule = lazy(() => import('./portal/pages/ConsultationRes
 const ConsultationCancel = lazy(() => import('./portal/pages/ConsultationCancel'));
 const ConsultationFlow = lazy(() => import('./pages/ConsultationFlow'));
 
-export default function App() {
+/**
+ * `location` is passed only by the build-time pre-render (src/entry-server.tsx),
+ * which renders one URL at a time with no browser. In the browser it is
+ * undefined and routing is exactly the BrowserRouter it has always been.
+ */
+function Router({ location, children }: { location?: string; children: ReactNode }) {
+  if (location === undefined) return <BrowserRouter>{children}</BrowserRouter>;
+  return <StaticRouter location={location}>{children}</StaticRouter>;
+}
+
+export default function App({ location }: { location?: string } = {}) {
   return (
     <PortalAuthProvider>
       <PortalDataProvider>
-        <Router>
+        <Router location={location}>
           <ScrollToTop />
           <LazyRoutes>
           <Routes>

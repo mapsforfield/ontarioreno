@@ -7,6 +7,7 @@ import { PhotoMarquee } from '../components/project/PhotoMarquee';
 import { ProjectDossierCompact } from '../components/project/ProjectDossierCompact';
 import { BATHROOM_PROJECTS } from '../data/projects/bathroom';
 import { BATHROOM_COST_TABS } from '../data/projects/costContent';
+import { PageMeta } from '../components/PageMeta';
 
 /**
  * The bathroom page, served at /bathroom-renovations.
@@ -80,6 +81,11 @@ export default function BathroomRenovationsNext() {
 
   return (
     <div className="bg-slate-50">
+      <PageMeta
+        path="/bathroom-renovations"
+        title="Bathroom Renovations in Ontario | Finished Projects & Costs | OntarioReno"
+        description="Finished bathroom renovations from across Ontario by vetted contractors, including the work behind the walls that decides how long a bathroom lasts. See costs and book a free review."
+      />
       {/* ---- Masthead. Short: it does not own a whole screen on its own.
 
            BOXED, like the rest of the site: a full-bleed background band with
