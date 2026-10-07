@@ -127,10 +127,10 @@ export default function MiltonLegalBasement() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
-                Start Project Review
+                Book a Free Consultation
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
@@ -304,10 +304,10 @@ export default function MiltonLegalBasement() {
                 Legal basements move better when the scope, permit strategy, and contractor are aligned from the start.
               </p>
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start project review
+                Book a free consultation
               </Link>
             </div>
 
@@ -409,7 +409,7 @@ export default function MiltonLegalBasement() {
           </p>
           <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
-              to="/match"
+              to="/consultation/basement"
               className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-8 py-4 text-base font-bold text-white transition hover:bg-blue-700"
             >
               Find the right team

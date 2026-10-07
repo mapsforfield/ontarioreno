@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { buttonStyles, formStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
+import { readAttribution } from '../lib/attributionCapture';
 
 type PropertyType = 'Detached' | 'Semi-Detached' | 'Townhome' | 'Condo' | '';
 type ProjectType =
@@ -490,10 +491,11 @@ export default function Match() {
       // succeeded as far as the homeowner is concerned — the Apps Script has
       // it — so an error on our side must not show them a red banner or make
       // them submit twice.
+      // attribution goes to our API only, not the Apps Script email above.
       void fetch('/api/leads?flow=project_review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, attribution: readAttribution() }),
       }).catch(() => {});
 
       setSubmitStatus({

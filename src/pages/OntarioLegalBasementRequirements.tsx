@@ -141,7 +141,7 @@ export default function OntarioLegalBasementRequirements() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
                 Check if your project qualifies and avoid permit delays
@@ -323,12 +323,12 @@ export default function OntarioLegalBasementRequirements() {
                 >
                   whether your basement needs a permit in Hamilton
                 </Link>
-                , that question should be settled before you assume the file is simple. If you want help turning that into a real next step, start with{' '}
+                , that question should be settled before you assume the file is simple. If you want help turning that into a real next step, you can{' '}
                 <Link
-                  to="/match"
+                  to="/consultation/basement"
                   className="font-semibold text-slate-900 underline underline-offset-4"
                 >
-                  /match
+                  book a free consultation
                 </Link>
                 .
               </p>
@@ -346,16 +346,16 @@ export default function OntarioLegalBasementRequirements() {
                 permit-heavy basement projects lose time. If you want help finding a
                 team that understands legal-suite work, start with{' '}
                 <Link
-                  to="/match"
+                  to="/consultation/basement"
                   className="font-semibold text-slate-900 underline underline-offset-4"
                 >
-                  OntarioReno&apos;s project review
+                  OntarioReno&apos;s free consultation
                 </Link>
                 .
               </p>
               <div className="mt-6">
                 <Link
-                  to="/match"
+                  to="/consultation/basement"
                   className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-6 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                 >
                   Check if your project qualifies and avoid permit delays
@@ -374,10 +374,10 @@ export default function OntarioLegalBasementRequirements() {
                 Permit-heavy basement projects move better when the right designer and contractor are aligned from the start.
               </p>
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start Project Review
+                Book a Free Consultation
               </Link>
             </div>
 
@@ -437,9 +437,9 @@ export default function OntarioLegalBasementRequirements() {
                 Want help structuring a legal basement project properly?
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-600">
-                If you are ready to talk to the right team, go to{' '}
-                <Link to="/match" className="font-semibold text-slate-900 underline underline-offset-4">
-                  /match
+                If you are ready to talk to the right team, you can{' '}
+                <Link to="/consultation/basement" className="font-semibold text-slate-900 underline underline-offset-4">
+                  book a free consultation
                 </Link>
                 . If you are comparing legal suite economics in Hamilton, also review{' '}
                 <Link
@@ -454,10 +454,10 @@ export default function OntarioLegalBasementRequirements() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
               >
-                Go to /match
+                Book a free consultation
               </Link>
               <Link
                 to="/hamilton-grant-guide"
@@ -519,7 +519,7 @@ export default function OntarioLegalBasementRequirements() {
           </p>
           <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
-              to="/match"
+              to="/consultation/basement"
               className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-8 py-4 text-base font-bold text-white transition hover:bg-blue-700"
             >
               Find the Right Team

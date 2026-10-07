@@ -184,7 +184,7 @@ export default function GardenSuiteFinancingOntario() {
             </p>
 
             <div className="mt-11 flex flex-col gap-4 sm:flex-row">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/garden-suite" className={buttonStyles.primary}>
                 Review My Garden Suite Project
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
@@ -349,9 +349,9 @@ export default function GardenSuiteFinancingOntario() {
                 <Link to="/costs" className="font-medium text-blue-200 hover:underline">
                   renovation costs
                 </Link>
-                , and a structured{' '}
-                <Link to="/match" className="font-medium text-blue-200 hover:underline">
-                  project review
+                , and a{' '}
+                <Link to="/consultation/garden-suite" className="font-medium text-blue-200 hover:underline">
+                  free in-home consultation
                 </Link>{' '}
                 before the borrowing path is treated as settled.
               </p>
@@ -435,7 +435,7 @@ export default function GardenSuiteFinancingOntario() {
           </p>
 
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link to="/match" className={buttonStyles.primary}>
+            <Link to="/consultation/garden-suite" className={buttonStyles.primary}>
               Review My Garden Suite Project
             </Link>
             <Link

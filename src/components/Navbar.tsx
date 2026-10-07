@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { bookingHrefFor } from '../lib/bookingRoutes';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { buttonStyles } from '../lib/uiStyles';
@@ -15,6 +16,9 @@ export default function Navbar() {
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [isMobileGrantsOpen, setIsMobileGrantsOpen] = useState(false);
   const location = useLocation();
+  // The header CTA opens the calendar for the service this page is about;
+  // see src/lib/bookingRoutes.ts.
+  const bookingHref = bookingHrefFor(location.pathname);
 
   useEffect(() => {
     if (!isOpen) {
@@ -465,7 +469,7 @@ export default function Navbar() {
             </div>
 
             <Link
-              to="/match"
+              to={bookingHref}
               className={cn(buttonStyles.primary, 'px-6 py-[0.82rem] text-sm')}
             >
               Start Project Review
@@ -719,7 +723,7 @@ export default function Navbar() {
 
                 <div className="px-3 pt-3">
                   <Link
-                    to="/match"
+                    to={bookingHref}
                     className={cn(buttonStyles.primary, 'w-full px-6 py-[0.92rem] text-center text-base')}
                   >
                     Start Project Review

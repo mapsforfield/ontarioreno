@@ -624,6 +624,15 @@ model Lead {
   // Provenance
   source            String    @default("manual") // 'meta' | 'import' | 'manual'
   sourceDetail      String    @default("")        // campaign / form name
+  /// Where the website visit started — see lib/traffic-attribution.ts. Set once
+  /// when a website form creates the lead, never overwritten. '' = unknown
+  /// (imports, manual entry, and every lead from before this was recorded).
+  /// 'google_organic' | 'google_ads' | 'other_search' | 'meta' | 'sms' | 'email' | 'referral' | 'direct'
+  trafficChannel    String    @default("")
+  /// Referring site's hostname on the visit's first page, e.g. "www.google.com".
+  referrerHost      String    @default("")
+  /// First page of the visit, path + query, e.g. "/basement-renovation-ajax".
+  landingPage       String    @default("")
   externalId        String?   @unique             // Meta leadgen id — dedupe key
   submittedAt       DateTime  @default(now())     // when the lead originated
   // Workflow

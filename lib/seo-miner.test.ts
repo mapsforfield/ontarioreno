@@ -117,3 +117,16 @@ test('report shows paths, not full URLs', () => {
   assert.ok(md.includes('| /basement-renovation-cost-hamilton |'));
   assert.ok(!md.includes('https://ontarioreno.ca/basement'));
 });
+
+test('report lists website leads by channel, Google search first-class', () => {
+  const md = renderReport({ start: 'a', end: 'b', current: [], previous: [],
+    leads: [{ channel: 'google_organic', leads: 4, booked: 3 }, { channel: 'meta', leads: 9, booked: 8 }] });
+  assert.ok(md.includes('## 5. Website leads by channel'));
+  assert.ok(md.includes('| **Google search (free)** | 4 | 3 |'));
+  assert.ok(md.includes('| Facebook / Instagram | 9 | 8 |'));
+});
+
+test('report says plainly when no channel data exists yet', () => {
+  const md = renderReport({ start: 'a', end: 'b', current: [], previous: [], leads: [] });
+  assert.ok(md.includes('Recording started October 2026'));
+});

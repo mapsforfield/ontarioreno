@@ -70,6 +70,7 @@ import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
 import { seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { isResubmission } from '../../lib/flow-resubmission.js';
+import { attributionFields } from '../../lib/traffic-attribution.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -2422,7 +2423,9 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
         }
         return { id: existing.id, name: existing.name ?? name, phone: existing.phone ?? phone };
       }
-      const created = await prisma.lead.create({ data: incoming as never });
+      // Attribution only on a NEW lead: an existing one keeps the visit that
+      // first brought it in. See lib/traffic-attribution.ts.
+      const created = await prisma.lead.create({ data: { ...incoming, ...attributionFields(body.attribution) } as never });
       return { id: created.id, name: created.name ?? name, phone: created.phone ?? phone };
     });
 
@@ -2553,6 +2556,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
           // tag — routingOutcome already makes nurture leads queryable, so
           // overwriting this would have thrown away where the lead came from.
           sourceDetail: clean(body.sourceDetail) || program.slug,
+          // Where the visit started (Google, Meta, SMS...). See lib/traffic-attribution.ts.
+          ...attributionFields(body.attribution, clean(body.sourceDetail)),
           notes: [clean(body.notes), isNurture ? `CRM tag: ${NURTURE_TAG}` : '']
             .filter(Boolean)
             .join('\n'),

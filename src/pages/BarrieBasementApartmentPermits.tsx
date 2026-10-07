@@ -131,7 +131,7 @@ export default function BarrieBasementApartmentPermits() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
+              <Link to="/consultation/basement" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
                 Check My Basement
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -389,7 +389,7 @@ export default function BarrieBasementApartmentPermits() {
               Before moving forward with drawings, pricing, or construction, confirm whether the basement layout, permit path, funding goals, and rental plan actually line up.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/basement" className={buttonStyles.primary}>
                 Start My Basement Suite Review
                 <ArrowRight className="h-5 w-5" />
               </Link>

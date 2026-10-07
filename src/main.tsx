@@ -2,7 +2,11 @@ import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App.tsx';
+import { captureAttribution } from './lib/attributionCapture';
 import './index.css';
+
+// Before anything renders, while the URL is still the one the visitor landed on.
+captureAttribution();
 
 const container = document.getElementById('root')!;
 const app = (

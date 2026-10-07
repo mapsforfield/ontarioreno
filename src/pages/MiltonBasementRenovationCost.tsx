@@ -69,7 +69,7 @@ export default function MiltonBasementRenovationCost() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
                 See what your project could look like
@@ -245,7 +245,7 @@ export default function MiltonBasementRenovationCost() {
           </p>
           <div className="mt-8">
             <Link
-              to="/match"
+              to="/consultation/basement"
               className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-8 py-4 text-base font-bold text-white transition hover:bg-blue-700"
             >
               See my options

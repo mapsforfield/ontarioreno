@@ -17,6 +17,7 @@ import {
   fmtTime,
   inputCls,
 } from './consultation/shell';
+import { readAttribution } from '../lib/attributionCapture';
 
 // Public homeowner journey — progressive, one decision per screen.
 //
@@ -426,6 +427,7 @@ export default function ConsultationFlow() {
           addressText: addressText.trim(),
           unit: unit.trim(),
           sourceDetail: trafficSource,
+          attribution: readAttribution(),
           notes: !placeId && addressText.trim() ? `Typed address (not confirmed): ${addressText.trim()}` : '',
           answers,
         }),

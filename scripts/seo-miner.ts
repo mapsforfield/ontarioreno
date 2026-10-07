@@ -75,7 +75,17 @@ async function main(): Promise<void> {
       prisma.searchPerformance.findMany({ where: { date: { gte: curStart, lte: latest.date } }, select }),
       prisma.searchPerformance.findMany({ where: { date: { gte: prevStart, lte: prevEnd } }, select }),
     ]);
-    const md = renderReport({ start: curStart, end: latest.date, current, previous });
+    // Website leads in the same window, by where the visit started (Lead.trafficChannel).
+    const leads = await prisma.$queryRawUnsafe<{ channel: string; leads: number; booked: number }[]>(
+      `SELECT "trafficChannel" AS channel, COUNT(*)::int AS leads,
+              SUM(CASE WHEN "appointmentId" IS NOT NULL THEN 1 ELSE 0 END)::int AS booked
+         FROM "Lead"
+        WHERE "deletedAt" IS NULL AND source IN ('consultation_flow', 'website_intake')
+          AND "trafficChannel" <> '' AND "submittedAt" >= $1::date
+        GROUP BY 1 ORDER BY 2 DESC`,
+      curStart,
+    );
+    const md = renderReport({ start: curStart, end: latest.date, current, previous, leads });
     console.log(md);
     if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + '\n');
   } else {

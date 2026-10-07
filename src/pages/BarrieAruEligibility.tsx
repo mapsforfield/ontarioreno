@@ -150,7 +150,7 @@ export default function BarrieAruEligibility() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
+              <Link to="/consultation/basement" className={cn(buttonStyles.primary, 'w-full sm:w-auto')}>
                 Check My Property
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -446,7 +446,7 @@ export default function BarrieAruEligibility() {
               Before spending time on drawings, pricing, or applications, confirm whether the property, project type, rental plan, and funding rules line up.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link to="/match" className={buttonStyles.primary}>
+              <Link to="/consultation/basement" className={buttonStyles.primary}>
                 Start My Eligibility Review
                 <ArrowRight className="h-5 w-5" />
               </Link>

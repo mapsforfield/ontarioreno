@@ -141,7 +141,7 @@ export default function HamiltonBasementPermitNeed() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white transition hover:bg-blue-700"
               >
                 Check if your project qualifies and avoid permit delays
@@ -296,10 +296,10 @@ export default function HamiltonBasementPermitNeed() {
                     If you want help avoiding the wrong assumptions early, it often
                     makes sense to start with{' '}
                     <Link
-                      to="/match"
+                      to="/consultation/basement"
                       className="font-semibold text-slate-900 underline underline-offset-4"
                     >
-                      OntarioReno&apos;s project review
+                      OntarioReno&apos;s free consultation
                     </Link>
                     .
                   </p>
@@ -348,16 +348,16 @@ export default function HamiltonBasementPermitNeed() {
                 reached the City. If you want help lining up the right team, start
                 with{' '}
                 <Link
-                  to="/match"
+                  to="/consultation/basement"
                   className="font-semibold text-slate-900 underline underline-offset-4"
                 >
-                  OntarioReno&apos;s project review
+                  OntarioReno&apos;s free consultation
                 </Link>
                 .
               </p>
               <div className="mt-6">
                 <Link
-                  to="/match"
+                  to="/consultation/basement"
                   className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-6 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                 >
                   Check if your project qualifies and avoid permit delays
@@ -376,10 +376,10 @@ export default function HamiltonBasementPermitNeed() {
                 Basement projects move better when the scope, drawings, and contractor are aligned early.
               </p>
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#1B3C6C] px-5 py-4 text-center font-bold text-white transition hover:bg-blue-700"
               >
-                Start Project Review
+                Book a Free Consultation
               </Link>
             </div>
 
@@ -441,9 +441,9 @@ export default function HamiltonBasementPermitNeed() {
                 Want help confirming permit scope before you build?
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-600">
-                If you are ready to move forward, go to{' '}
-                <Link to="/match" className="font-semibold text-slate-900 underline underline-offset-4">
-                  /match
+                If you are ready to move forward, you can{' '}
+                <Link to="/consultation/basement" className="font-semibold text-slate-900 underline underline-offset-4">
+                  book a free consultation
                 </Link>
                 . If you are evaluating a legal basement unit, also review{' '}
                 <Link
@@ -458,10 +458,10 @@ export default function HamiltonBasementPermitNeed() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                to="/match"
+                to="/consultation/basement"
                 className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
               >
-                Go to /match
+                Book a free consultation
               </Link>
               <Link
                 to="/hamilton-grant-guide"
@@ -523,7 +523,7 @@ export default function HamiltonBasementPermitNeed() {
           </p>
           <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
-              to="/match"
+              to="/consultation/basement"
               className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-8 py-4 text-base font-bold text-white transition hover:bg-blue-700"
             >
               Find the Right Team
