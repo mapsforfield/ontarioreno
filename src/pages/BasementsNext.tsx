@@ -8,6 +8,7 @@ import { ProjectDossierCompact } from '../components/project/ProjectDossierCompa
 import { BASEMENT_MORE_PHOTOS, BASEMENT_PROJECTS } from '../data/projects/basement';
 import { BASEMENT_COST_TABS } from '../data/projects/costContent';
 import { PageMeta } from '../components/PageMeta';
+import { BasementCityLinks } from '../components/BasementCityLinks';
 
 /**
  * The basements page, served at /basements.
@@ -205,6 +206,8 @@ export default function BasementsNext() {
           </button>
         </div>
       </section>
+
+      <BasementCityLinks />
 
       <BookConsultationBand
         slug="basement"

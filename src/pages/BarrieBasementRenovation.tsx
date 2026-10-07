@@ -14,6 +14,7 @@ import {
 import BarrieSecondarySuiteResources from '../components/BarrieSecondarySuiteResources';
 import { buttonStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
+import { BasementCityLinks } from '../components/BasementCityLinks';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -424,6 +425,8 @@ export default function BarrieBasementRenovation() {
       </section>
 
       <BarrieSecondarySuiteResources />
+
+      <BasementCityLinks current="Barrie" />
 
       <section className="bg-slate-900 py-20 text-white">
         <div className="mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
