@@ -1,0 +1,53 @@
+name: SEO Miner
+
+# Nightly pull of Google Search Console data into the SearchPerformance table,
+# then a ranked report on the run's summary page (Actions tab → SEO Miner → the
+# latest run). Read-only toward Google: the service account behind
+# GSC_SERVICE_ACCOUNT_JSON has Restricted access to the property. Sends nothing.
+
+on:
+  schedule:
+    - cron: '0 12 * * *'    # Daily 12:00 UTC — sync the last 7 days, then report
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'sync | backfill (all 16 months) | report'
+        default: 'sync'
+        required: true
+      days:
+        description: 'optional: days to sync, or report window (default 7 / 28)'
+        required: false
+
+concurrency:
+  group: seo-miner
+  cancel-in-progress: false
+
+jobs:
+  miner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run SEO miner
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -e
+          MODE="${{ github.event.inputs.mode || 'sync' }}"
+          DAYS="${{ github.event.inputs.days }}"
+          if [ "$MODE" = "report" ]; then
+            npx tsx scripts/seo-miner.ts report $DAYS
+          else
+            npx tsx scripts/seo-miner.ts "$MODE" $DAYS
+            npx tsx scripts/seo-miner.ts report
+          fi

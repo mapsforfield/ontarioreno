@@ -1084,3 +1084,31 @@ model LeadConversationMessage {
   @@index([conversationId, createdAt])
   @@index([state])
 }
+
+/// One day of Google Search Console performance, written nightly by the SEO
+/// miner (scripts/seo-miner.ts, on GitHub Actions). Search Console only keeps
+/// 16 months, so this table is the long-term history.
+///
+/// Two grains in one table:
+///   query = ''   the page's full daily total. Google's own number, including
+///                the searches it anonymises and never names.
+///   query = 'x'  one named search term on that page. These do NOT add up to the
+///                page total, because the anonymised searches are missing from them.
+/// Never sum query rows to get a page's traffic; read the '' row.
+model SearchPerformance {
+  id          String   @id @default(cuid())
+  /// The day Google counted it, YYYY-MM-DD in Pacific time (Search Console's clock).
+  date        String
+  /// Full URL as Search Console reports it, e.g. https://ontarioreno.ca/grants
+  page        String
+  query       String   @default("")
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  /// Average position, 1 = top result. Impression-weighted by Google.
+  position    Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([date, page, query])
+  @@index([page, date])
+  @@index([query])
+}
