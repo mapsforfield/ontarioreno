@@ -17,6 +17,7 @@ import {
 import { buttonStyles } from '../lib/uiStyles';
 import { cn } from '../lib/utils';
 import { CostGuideCapture } from '../components/CostGuideCapture';
+import { PageMeta } from '../components/PageMeta';
 
 export default function Costs() {
   const [revealPosition, setRevealPosition] = useState(58);
@@ -49,6 +50,11 @@ export default function Costs() {
        page background stranded between the band and the footer. Both were the
        same mistake: a full-width band rendered as if it were content. */
     <>
+      <PageMeta
+        path="/costs"
+        title="Ontario Renovation Cost Guides (2026) | OntarioReno"
+        description="Real price ranges from actual Ontario renovation projects, so you can set expectations before speaking with a contractor. Basements, bathrooms, kitchens and legal suites."
+      />
       <div className="bg-slate-50 min-h-screen pt-10 md:pt-14 pb-20 md:pb-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero */}

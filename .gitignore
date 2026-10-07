@@ -14,3 +14,4 @@ customer_notes.csv
 .env*
 
 /src/generated/prisma
+dist-ssr/

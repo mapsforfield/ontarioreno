@@ -1,21 +1,19 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { ArrowRight } from 'lucide-react';
 import { buttonStyles } from '../lib/uiStyles';
-import { FALLBACK_TILES, PRIMARY_TILES, probeTiles, type TileProvider } from '../../lib/map-tiles';
+import type { MapCity } from '../components/GrantsMap';
+
+// Leaflet reads `window` on import, so the map is browser-only: it loads after
+// mount, and the pre-rendered HTML holds an empty box of the same size.
+const GrantsMap = lazy(() => import('../components/GrantsMap'));
 
 // Public /grants hub. A React page (so it uses the real site Navbar/Footer via
 // Layout), fed by /api/appointments?resource=grants-hub-data — which merges the
 // hand-made grant pages (always shown) with scanner-approved programs.
 
 type Row = { city: string; name: string; amount: string; status: string; href: string; sourceUrl: string | null; lat: number | null; lng: number | null };
-type MapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
 type HubData = { updatedLabel: string; rows: Row[]; mapCities: MapCity[] };
 
 const STATUS: Record<string, { c: string; t: string }> = {
@@ -24,49 +22,6 @@ const STATUS: Record<string, { c: string; t: string }> = {
   closed: { c: 'bg-slate-200 text-slate-500', t: 'Closed' },
   unknown: { c: 'bg-slate-100 text-slate-500', t: 'Check status' },
 };
-
-function tagIcon(c: MapCity) {
-  const badge = c.count > 1 ? `<i>${c.count}</i>` : '';
-  return L.divIcon({ className: '', html: `<div class="atag">${c.amount || 'Incentive'}${badge}</div>`, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -42] });
-}
-
-const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-// Cluster nearby pins so the dense Golden Horseshoe doesn't overlap into a blob;
-// spread-out cities keep their amount pins. Click a cluster to expand.
-function ClusterLayer({ cities }: { cities: MapCity[] }) {
-  const map = useMap();
-  useEffect(() => {
-    const group = L.markerClusterGroup({
-      maxClusterRadius: 48,
-      showCoverageOnHover: false,
-      spiderfyDistanceMultiplier: 1.6,
-      iconCreateFunction: (cluster) => L.divIcon({ html: `<div class="ocluster">${cluster.getChildCount()}</div>`, className: '', iconSize: L.point(42, 42) }),
-    });
-    cities.forEach((c) => {
-      const m = L.marker([c.lat, c.lng], { icon: tagIcon(c) });
-      m.bindPopup(`<div class="grantpop"><b>${esc(c.city)}</b><br>${c.count} program${c.count > 1 ? 's' : ''}${c.amount ? ` · ${esc(c.amount)}` : ''}<br><a href="${esc(c.href)}">View →</a></div>`);
-      m.on('mouseover', () => m.openPopup());
-      group.addLayer(m);
-    });
-    map.addLayer(group);
-    return () => { map.removeLayer(group); };
-  }, [cities, map]);
-  return null;
-}
-
-// Frame the Golden Horseshoe core on load; far pins stay but don't widen the view.
-function FitCore({ cities }: { cities: MapCity[] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!cities.length) return;
-    const core = cities.filter((c) => c.lat > 42.8 && c.lat < 44.6 && c.lng > -81 && c.lng < -78.2);
-    const frame = core.length ? core : cities;
-    const b = L.latLngBounds(frame.map((c) => [c.lat, c.lng] as [number, number]));
-    map.fitBounds(b.pad(0.3), { maxZoom: 10 });
-  }, [cities, map]);
-  return null;
-}
 
 const CSS = `
 .atag{position:absolute;transform:translate(-50%,-100%);background:#1B3C6C;color:#fff;font-weight:800;font-size:13px;padding:6px 12px;border-radius:16px;white-space:nowrap;box-shadow:0 4px 9px rgba(15,23,42,.35);border:2px solid #fff;font-family:inherit;cursor:pointer}
@@ -89,17 +44,8 @@ export default function GrantsHub() {
       .catch(() => setData({ updatedLabel: '', rows: [], mapCities: [] }));
   }, []);
 
-  // Render the primary tiles straight away, then swap to the fallback if the
-  // probe says the provider is serving a placeholder. See lib/map-tiles.ts.
-  const [tiles, setTiles] = useState<TileProvider>(PRIMARY_TILES);
-  useEffect(() => {
-    probeTiles(PRIMARY_TILES).then((problem) => {
-      if (problem) {
-        console.warn(`[grants map] ${PRIMARY_TILES.name} unusable (${problem}); using ${FALLBACK_TILES.name}`);
-        setTiles(FALLBACK_TILES);
-      }
-    });
-  }, []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const rows = data?.rows ?? [];
   const mapCities = data?.mapCities ?? [];
@@ -145,11 +91,13 @@ export default function GrantsHub() {
         <p className="mt-1 text-slate-600">Hover a marker to see the programs available in that city.</p>
         {/* z-0 keeps Leaflet's high internal z-indexes contained below the sticky header (z-50). */}
         <div className="relative z-0 mt-6">
-          <MapContainer center={[43.95, -79.2]} zoom={8} scrollWheelZoom={false} className="grantmapbox">
-            {tiles.layers.map((l) => <TileLayer key={l.url} url={l.url} attribution={l.attribution} maxZoom={l.maxZoom} />)}
-            <ClusterLayer cities={mapCities} />
-            <FitCore cities={mapCities} />
-          </MapContainer>
+          {mounted ? (
+            <Suspense fallback={<div className="grantmapbox bg-slate-100" />}>
+              <GrantsMap cities={mapCities} />
+            </Suspense>
+          ) : (
+            <div className="grantmapbox bg-slate-100" />
+          )}
           <a className="grantmap-brand" href="/"><img src="/logo.png" alt="OntarioReno" /></a>
         </div>
       </section>
