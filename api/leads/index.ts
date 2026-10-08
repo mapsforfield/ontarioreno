@@ -399,6 +399,14 @@ function leadWelcomeSender(): string {
 }
 
 function leadBookingUrl(room: WelcomeRoom = 'basement'): string {
+  if (room === 'london_aru') {
+    // ?src= marks the lead that books through the form as having come from
+    // this text, in the portal's Source column.
+    return (
+      process.env.LEAD_WELCOME_LONDON_BOOKING_URL ??
+      'https://ontarioreno.ca/consultation/london-aru?src=meta-form-sms'
+    );
+  }
   if (room === 'bathroom') {
     return (
       process.env.LEAD_WELCOME_BATHROOM_BOOKING_URL ??

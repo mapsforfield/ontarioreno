@@ -522,3 +522,30 @@ test('an archive address equal to the team inbox is not mailed twice', () => {
   ).filter((n) => n.kind === 'team_alert');
   assert.equal(alerts.length, 1);
 });
+
+// ─── London ARU (Meta instant form → sheet → this text) ───────────────────────
+
+const LONDON = {
+  ...WELCOME,
+  room: 'london_aru' as const,
+  bookingUrl: 'https://ontarioreno.ca/consultation/london-aru?src=meta-form-sms',
+};
+
+test('a London ad lead gets the London text, whatever else the name says', () => {
+  assert.equal(welcomeRoomForAd('London'), 'london_aru');
+  assert.equal(welcomeRoomForAd('London ARU E'), 'london_aru');
+  assert.equal(welcomeRoomForAd('Bathroom'), 'bathroom', 'the bathroom ad is unchanged');
+  assert.equal(welcomeRoomForAd('Basement Winter'), 'basement', 'the basement ad is unchanged');
+  assert.equal(welcomeRoomForAd(''), 'basement', 'a blank name still defaults to basement');
+});
+
+test('the London text sends them to the qualifying form, honestly', () => {
+  const body = smsLeadWelcome(LONDON);
+  assert.match(body, /^Hi Dennis, this is Michael from OntarioReno/);
+  assert.match(body, /\$45,000 0% interest loan/);
+  assert.ok(body.trim().endsWith(LONDON.bookingUrl), 'the link is the ask, and nothing follows it');
+  // A repayable loan, and the first consultation is a call.
+  assert.doesNotMatch(body, /grant|forgiv|free money/i);
+  assert.doesNotMatch(body, /come take a look|visit your|site visit/i);
+  assert.ok(body.length <= 306, `london welcome sms is ${body.length} characters`);
+});
