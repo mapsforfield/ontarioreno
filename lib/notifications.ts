@@ -192,6 +192,18 @@ export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const sender = (c.senderName ?? '').trim() || DEFAULT_WELCOME_SENDER;
   // "Hi Sarah," or a bare "Hi," — never "Hi undefined,".
   const greeting = name ? `Hi ${name}, ` : 'Hi, ';
+  // London ARU leads come from a Meta instant form with no qualifying
+  // questions, so this text has a different job: send them to the London form,
+  // which asks the City's conditions before it offers a call. No "come take a
+  // look" — the first consultation is a phone call, never a visit — and never
+  // "grant" or "forgivable": it is a repayable 0% loan.
+  if (c.room === 'london_aru') {
+    return (
+      `${greeting}this is ${sender} from OntarioReno about the City of London's $45,000 0% interest loan ` +
+      `to build a legal basement suite. Take the quick check to see if your home qualifies and book your free call: ` +
+      `${c.bookingUrl}`
+    );
+  }
   const about = c.room === 'bathroom' ? 'your bathroom renovation' : 'your basement';
   return (
     `${greeting}this is ${sender} from OntarioReno about ${about}. ` +
@@ -351,7 +363,7 @@ export type LeadWelcomeContext = {
   room?: WelcomeRoom;
 };
 
-export type WelcomeRoom = 'basement' | 'bathroom';
+export type WelcomeRoom = 'basement' | 'bathroom' | 'london_aru';
 
 /**
  * Which room a Meta lead is about, read from the sheet's `ad_name` column.
@@ -363,6 +375,10 @@ export type WelcomeRoom = 'basement' | 'bathroom';
  * before, so an older script keeps behaving exactly as it did.
  */
 export function welcomeRoomForAd(adName: string | null | undefined): WelcomeRoom {
+  // London first: the London ARU ad is named "London", and a London bathroom ad
+  // is not a thing anyone is running. If one ever is, give it a name without
+  // "London" in it or change this order deliberately.
+  if (/london/i.test(adName ?? '')) return 'london_aru';
   return /bath/i.test(adName ?? '') ? 'bathroom' : 'basement';
 }
 
