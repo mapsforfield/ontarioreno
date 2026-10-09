@@ -21,6 +21,8 @@ import { mergeNotes, seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { randomUUID } from 'node:crypto';
 import { arrivalWindowOf, atTimeOrWindow } from '../../lib/arrival-window.js';
+import { payDayMessage } from '../../lib/payday.js';
+import { balanceClock } from '../../src/portal/data/balanceClock.js';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
 const CREATE_CLIENT_VIDEO_TABLE =
@@ -300,6 +302,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sent = results.filter((r) => r.status === 'fulfilled').length;
     }
 
+    // ── Pay Day: a 45-day balance clock reached its due date today ──
+    // Pushes "💰 It's Pay Day!" to every admin (with the amount still owed) and
+    // the deal's rep (no amount — see lib/payday.ts). Fires only on the due
+    // date itself, so it goes out once; the per-commission tag means a re-run
+    // replaces the notification on the phone rather than stacking a second one.
+    let payDayPushesSent = 0;
+    try {
+      const clocks = await prisma.commission.findMany({
+        where: { balanceClockStartedAt: { not: '' }, balanceSettledAt: '' },
+      });
+      const dueToday = clocks
+        .map((commission) => ({ commission, clock: balanceClock(commission, today) }))
+        .filter(({ clock }) => clock.status === 'due');
+
+      if (dueToday.length > 0) {
+        const deals = await prisma.deal.findMany({
+          where: { id: { in: dueToday.map(({ commission }) => commission.dealId) } },
+          select: { id: true, homeownerName: true, projectType: true, assignedRepId: true },
+        });
+        const dealsById = new Map(deals.map((deal) => [deal.id, deal]));
+        const admins = await prisma.user.findMany({
+          where: { role: 'admin', active: true },
+          select: { id: true },
+        });
+        const adminIds = new Set(admins.map((admin) => admin.id));
+
+        const pushes: Array<{ userId: string; payload: object }> = [];
+        for (const { commission, clock } of dueToday) {
+          const deal = dealsById.get(commission.dealId);
+          if (!deal) continue;
+          const tag = `payday-${commission.id}`;
+          const outstanding = Math.max(
+            (commission.adminNetCommission ?? 0) - (commission.adminNetPaidCommission ?? 0),
+            0
+          );
+          for (const userId of adminIds) {
+            pushes.push({
+              userId,
+              payload: {
+                ...payDayMessage({ homeownerName: deal.homeownerName, projectType: deal.projectType, days: clock.days, audience: 'admin', outstanding }),
+                url: '/portal/commissions',
+                tag,
+              },
+            });
+          }
+          // The rep on the deal — and the rep on the commission, if they differ.
+          // An admin who is also the rep already got the admin version.
+          const repIds = new Set([deal.assignedRepId, commission.repId].filter(Boolean));
+          for (const userId of repIds) {
+            if (adminIds.has(userId)) continue;
+            pushes.push({
+              userId,
+              payload: {
+                ...payDayMessage({ homeownerName: deal.homeownerName, projectType: deal.projectType, days: clock.days, audience: 'rep' }),
+                url: '/portal/dashboard',
+                tag,
+              },
+            });
+          }
+        }
+
+        const subs = await prisma.pushSubscription.findMany({
+          where: { userId: { in: [...new Set(pushes.map((p) => p.userId))] } },
+        });
+        const results = await Promise.allSettled(
+          pushes.flatMap(({ userId, payload }) =>
+            subs
+              .filter((sub) => sub.userId === userId)
+              .map((sub) => sendPush(sub.endpoint, sub.p256dh, sub.auth, payload))
+          )
+        );
+        payDayPushesSent = results.filter((r) => r.status === 'fulfilled').length;
+      }
+    } catch (err) {
+      console.error('[morning-brief] pay day push failed:', err);
+    }
+
     // ── Follow-up digest: email each rep their deals due (or overdue) today ──
     let followUpEmailsSent = 0;
     try {
@@ -444,7 +523,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[morning-brief] task reminders failed:', err);
     }
 
-    return res.status(200).json({ ok: true, sent, followUpEmailsSent, taskEmailsSent });
+    return res.status(200).json({ ok: true, sent, payDayPushesSent, followUpEmailsSent, taskEmailsSent });
   }
 
   // ── Daily business recap cron — emails the business inbox a portal briefing ──

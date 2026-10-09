@@ -14,7 +14,7 @@
 // Most deals have no clock. A blank `balanceClockStartedAt` means exactly
 // that, and every function here returns the inactive state for it.
 
-import type { Commission, Deal } from './types';
+import type { Commission, Deal } from './types.js';
 
 /** Default term. Stored per-commission so a different deal can differ. */
 export const DEFAULT_BALANCE_CLOCK_DAYS = 45;
