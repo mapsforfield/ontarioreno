@@ -27,8 +27,12 @@ const FIELD_MAP = {
   phone: ['phone', 'phonenumber', 'mobile'],
   address: ['streetaddress', 'address', 'propertyaddress'],
   submittedAt: ['createdtime', 'timestamp', 'submitted', 'submissiondate', 'date'],
-  // Which Meta ad the lead answered — picks the basement vs bathroom first text.
+  // Which Meta ad the lead answered — picks the basement vs bathroom vs London
+  // first text.
   adName: ['adname'],
+  // Fallback for adName when the ad name is blank — Meta test leads, and leads
+  // from a form not attached to an ad, carry only the form's name.
+  formName: ['formname'],
 };
 
 // ONLY these extra columns are captured as qualifying "answers" on the lead —
@@ -98,7 +102,7 @@ function syncNewLeads() {
       source: CONFIG.SOURCE,
       sourceDetail: get('sourceDetail'),
       submittedAt: get('submittedAt'),
-      adName: get('adName'),
+      adName: get('adName') || get('formName'),
       extraAnswers: extraAnswers,
     };
 
