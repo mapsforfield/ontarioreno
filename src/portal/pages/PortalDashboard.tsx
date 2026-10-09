@@ -10,6 +10,7 @@ import {
   Plus,
   Trophy,
   TrendingUp,
+  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -28,6 +29,7 @@ import { usePortalData } from '../data/store';
 import { countUnworkedSubmissions } from '../data/submissions';
 import { ConsultationStage } from '../data/types';
 import { torontoToday } from '../lib/time';
+import { payDayMessage } from '../../../lib/payday';
 import EarningPotentialCard from '../components/EarningPotentialCard';
 
 function formatDate(iso: string) {
@@ -208,7 +210,7 @@ export default function PortalDashboard() {
         subtitle:
           clock.status === 'overdue'
             ? `${Math.abs(clock.daysRemaining)}d overdue · was due ${formatDateKey(clock.dueOn)}`
-            : `Day ${clock.days} · remainder owed today`,
+            : `💰 Pay Day · day ${clock.days} reached`,
         href: '/portal/commissions',
         urgent: true,
         sort: clock.dueOn,
@@ -230,12 +232,38 @@ export default function PortalDashboard() {
     canSeeAmounts: isAdmin,
   });
   const balanceClockTotal = pendingBalanceClockTotal(balanceClockRows);
+  // ── Pay Day: clocks that reach their due date today ──────────────────────
+  // The same rows as the panel below, narrowed to today. Each gets a banner at
+  // the top of the dashboard — once per person per clock: dismissing it is
+  // remembered in this browser, keyed on the due date so a re-started clock
+  // would celebrate again. Wording comes from lib/payday.ts, shared with the
+  // 9am phone push, and a rep's version carries no amount.
+  const payDayRows = balanceClockRows.filter(({ clock }) => clock.status === 'due');
+  const payDayKey = (commissionId: string, dueOn: string) => `or-payday-seen:${commissionId}:${dueOn}`;
+  const [dismissedPayDays, setDismissedPayDays] = useState<string[]>([]);
+  const visiblePayDays = payDayRows.filter(({ commission, clock }) => {
+    const key = payDayKey(commission.id, clock.dueOn);
+    if (dismissedPayDays.includes(key)) return false;
+    try {
+      return localStorage.getItem(key) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const dismissPayDay = (key: string) => {
+    try {
+      localStorage.setItem(key, '1');
+    } catch {
+      // Storage blocked — it still hides for this visit.
+    }
+    setDismissedPayDays((prev) => [...prev, key]);
+  };
   // Grey / amber / orange / red, matching the badge on the deal itself so the
   // two screens never disagree about how urgent something is.
   const balanceClockTone: Record<string, string> = {
     running: 'bg-slate-100 text-slate-600',
     due_soon: 'bg-amber-100 text-amber-700',
-    due: 'bg-orange-100 text-orange-700',
+    due: 'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.55)]',
     overdue: 'bg-red-100 text-red-700',
   };
 
@@ -304,6 +332,47 @@ export default function PortalDashboard() {
 
   return (
     <div className="space-y-6">
+      {visiblePayDays.map(({ commission, clock, deal, outstanding }) => {
+        const key = payDayKey(commission.id, clock.dueOn);
+        const msg = payDayMessage({
+          homeownerName: deal.homeownerName,
+          projectType: deal.projectType,
+          days: clock.days,
+          audience: isAdmin ? 'admin' : 'rep',
+          outstanding,
+        });
+        return (
+          <section
+            key={key}
+            role="status"
+            className="flex items-center gap-4 rounded-[0.5rem] border border-emerald-300 bg-[linear-gradient(135deg,#ecfdf5_0%,#d1fae5_100%)] p-4 shadow-[0_8px_28px_rgba(16,185,129,0.25)] sm:p-5"
+          >
+            <span
+              className="flex h-12 w-12 shrink-0 animate-bounce items-center justify-center rounded-full bg-emerald-500 text-2xl shadow-[0_0_18px_rgba(16,185,129,0.6)]"
+              aria-hidden
+            >
+              💰
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/portal/commissions')}
+              className="min-w-0 flex-1 text-left"
+            >
+              {/* The bag is already the icon on the left; the push keeps it in the title. */}
+              <p className="text-lg font-black text-emerald-900">{msg.title.replace(/^💰\s*/u, '')}</p>
+              <p className="mt-0.5 text-sm font-bold text-emerald-800">{msg.body}</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => dismissPayDay(key)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-emerald-700 transition hover:bg-emerald-200/60"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </section>
+        );
+      })}
       <section className="rounded-[0.5rem] border border-white bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_55%,#ecf4fd_100%)] p-5 shadow-md sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -405,7 +474,11 @@ export default function PortalDashboard() {
                   type="button"
                   onClick={() => navigate('/portal/commissions')}
                   title={`Paid ${formatDateKey(clock.startedOn)} → due ${formatDateKey(clock.dueOn)}`}
-                  className="flex w-full items-center gap-2.5 rounded-[0.4rem] border border-slate-100 bg-[#fbfdff] px-2.5 py-2 text-left transition hover:bg-[#f6faff]"
+                  className={`flex w-full items-center gap-2.5 rounded-[0.4rem] border px-2.5 py-2 text-left transition ${
+                    clock.status === 'due'
+                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70'
+                      : 'border-slate-100 bg-[#fbfdff] hover:bg-[#f6faff]'
+                  }`}
                 >
                   <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-900">
                     {deal.homeownerName || 'Deal'}
@@ -416,7 +489,7 @@ export default function PortalDashboard() {
                         clock.status === 'overdue'
                           ? 'bg-red-400'
                           : clock.status === 'due'
-                            ? 'bg-orange-400'
+                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
                             : clock.status === 'due_soon'
                               ? 'bg-amber-400'
                               : 'bg-[#1B3C6C]'
@@ -433,12 +506,12 @@ export default function PortalDashboard() {
                     </span>
                   )}
                   <span
-                    className={`w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-[0.65rem] font-black ${balanceClockTone[clock.status]}`}
+                    className={`${clock.status === 'due' ? 'w-20' : 'w-14'} shrink-0 rounded-full px-2 py-0.5 text-center text-[0.65rem] font-black ${balanceClockTone[clock.status]}`}
                   >
                     {clock.status === 'overdue'
                       ? `${Math.abs(clock.daysRemaining)}d late`
                       : clock.status === 'due'
-                        ? 'Due'
+                        ? '💰 Pay Day'
                         : `${clock.daysRemaining}d`}
                   </span>
                 </button>

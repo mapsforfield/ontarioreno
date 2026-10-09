@@ -33,7 +33,8 @@ type Props = {
 const tone: Record<BalanceClockStatus, string> = {
   running: 'border-slate-200 bg-slate-50 text-slate-600',
   due_soon: 'border-amber-200 bg-amber-50 text-amber-700',
-  due: 'border-orange-200 bg-orange-50 text-orange-700',
+  // Pay Day — solid green so it reads as the payoff, not as a warning.
+  due: 'border-emerald-500 bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.55)]',
   overdue: 'border-red-200 bg-red-50 text-red-700',
   settled: 'border-emerald-200 bg-emerald-50 text-emerald-700',
 };
@@ -41,7 +42,7 @@ const tone: Record<BalanceClockStatus, string> = {
 const label: Record<BalanceClockStatus, string> = {
   running: 'Balance clock',
   due_soon: 'Balance due soon',
-  due: 'Balance due today',
+  due: 'Pay Day — balance due today',
   overdue: 'Balance overdue',
   settled: 'Balance settled',
 };
@@ -124,7 +125,7 @@ export default function BalanceClockControl({
       : clock.status === 'overdue'
         ? `${Math.abs(clock.daysRemaining)}d overdue`
         : clock.status === 'due'
-          ? 'Due today'
+          ? '💰 Pay Day'
           : `${clock.daysRemaining}d left`;
 
   return (
