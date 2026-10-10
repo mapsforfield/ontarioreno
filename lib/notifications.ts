@@ -163,18 +163,16 @@ export function smsBookingConfirmation(c: BookingContext): string {
 /**
  * First contact for a lead that came from an external form.
  *
- * One job: get a REPLY. The previous version spent itself on the booking link
- * and asked for nothing, so a lead who was interested but not ready to open a
- * calendar had no smaller step to take and took none.
+ * One job: get the lead onto the consultation form. The link IS the ask.
  *
- * So it leads with a named human and one binary question. "Weekdays or
- * weekends" is answerable in a word, presumes the visit is happening, and its
- * answer is genuinely useful — but the point is that answering starts a
- * conversation a person can finish by hand.
+ * History: an earlier version led with a binary question ("weekdays or
+ * weekends?") to start a conversation and offered the link as a low-key
+ * alternative. In practice that created friction — replies became a manual
+ * back-and-forth that rarely ended in a booking — so (October 2026) the user
+ * switched back to sending the lead straight to the form, which qualifies and
+ * books them without a rep in the loop.
  *
- * The link stays, last and low-key, as an alternative rather than the ask. It
- * costs nothing, serves the lead who would rather self-serve, and which one
- * they use is measurable.
+ * Still a named human, still nothing after the link.
  *
  * No STOP footer. That was here because the old message was one of hundreds in
  * a bulk send; this is a handful a day from a named sender who replies, and the
@@ -207,8 +205,7 @@ export function smsLeadWelcome(c: LeadWelcomeContext): string {
   const about = c.room === 'bathroom' ? 'your bathroom renovation' : 'your basement';
   return (
     `${greeting}this is ${sender} from OntarioReno about ${about}. ` +
-    `Quick question, are weekdays or weekends better for us to come take a look? ` +
-    `If you prefer to book directly instead please visit: ${c.bookingUrl}`
+    `To get started, book your free in-home consultation here: ${c.bookingUrl}`
   );
 }
 
