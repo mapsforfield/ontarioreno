@@ -388,24 +388,13 @@ test('the welcome text greets by first name and names a real sender', () => {
   assert.match(body, /OntarioReno/, 'name ourselves early, or it arrives as an unknown sender');
 });
 
-test('the welcome text asks one binary question', () => {
-  // The whole reason this message changed: the old one asked for nothing, so a
-  // lead who was interested but not ready to open a calendar had no smaller
-  // step to take. A question that can be answered in one word is that step.
+test('the welcome text sends the lead straight to the consultation form', () => {
+  // The "weekdays or weekends?" question created friction: replies turned into
+  // manual back-and-forth that rarely booked. The form is the one ask now.
   const body = smsLeadWelcome(WELCOME);
-  assert.match(body, /weekdays or weekends/i, 'the ask is a reply, not a click');
-  assert.match(body, /\?/, 'it has to actually be a question');
-});
-
-test('the booking link is offered last, as the alternative', () => {
-  // Kept because it costs nothing and serves the lead who would rather
-  // self-serve — but it trails the question rather than replacing it.
-  const body = smsLeadWelcome(WELCOME);
-  assert.ok(body.includes(WELCOME.bookingUrl), 'the link is still there');
-  assert.ok(
-    body.indexOf('weekdays') < body.indexOf(WELCOME.bookingUrl),
-    'the question comes before the link, or the link is the ask again'
-  );
+  assert.match(body, /book your free in-home consultation here: /i, 'the link is the ask');
+  assert.ok(!/weekdays or weekends/i.test(body), 'no competing question');
+  assert.ok(!/\?/.test(body.replace(WELCOME.bookingUrl, '')), 'nothing that invites a reply instead of a click');
   assert.ok(body.trim().endsWith(WELCOME.bookingUrl), 'nothing follows the link');
 });
 
