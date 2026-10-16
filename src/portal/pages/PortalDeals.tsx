@@ -4,6 +4,7 @@ import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { dealWonDate } from '../../../lib/deal-won-date';
+import { type BoardPeriod, isDealInPeriod, periodLabel } from '../../../lib/deal-period';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
@@ -333,6 +334,21 @@ export default function PortalDeals() {
   const [wonRange, setWonRange] = useState<RangeFilter>('year');
   const [lostRange, setLostRange] = useState<RangeFilter>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
+  // Admin-only board-wide period ("everything from this month"). 'all' is the
+  // board as it has always been; the Won/Lost column toggles only apply then.
+  const [boardPeriodChoice, setBoardPeriodChoice] = useState<BoardPeriod>(() => {
+    try {
+      const saved = localStorage.getItem('deals.boardPeriod');
+      if (saved === 'month' || saved === 'last_month' || saved === 'quarter' || saved === 'year') return saved;
+    } catch { /* storage unavailable */ }
+    return 'all';
+  });
+  const setBoardPeriod = (period: BoardPeriod) => {
+    setBoardPeriodChoice(period);
+    try { localStorage.setItem('deals.boardPeriod', period); } catch { /* ignore */ }
+  };
+  const boardPeriod: BoardPeriod = isAdmin ? boardPeriodChoice : 'all';
+  const boardPeriodActive = boardPeriod !== 'all';
 
   // ── Drag-and-drop + context menu ──────────────────────────────
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
@@ -445,6 +461,25 @@ export default function PortalDeals() {
     if (staleOnly && !getDealRot(deal)) return false;
     return true;
   });
+  // What the board actually shows: the filters above, then the admin period.
+  const boardDeals = boardPeriodActive
+    ? filteredDeals.filter((deal) => isDealInPeriod(deal, boardPeriod))
+    : filteredDeals;
+  const periodSummary = (() => {
+    const open = boardDeals.filter((d) => openDealStatuses.includes(d.status));
+    const won = boardDeals.filter((d) => d.status === 'won');
+    const lost = boardDeals.filter((d) => d.status === 'lost');
+    const sum = (list: Deal[]) => list.reduce((total, d) => total + (d.estimatedJobValue || 0), 0);
+    const decided = won.length + lost.length;
+    return {
+      openCount: open.length,
+      openValue: sum(open),
+      wonCount: won.length,
+      wonValue: sum(won),
+      lostCount: lost.length,
+      winRate: decided > 0 ? Math.round((won.length / decided) * 100) : null,
+    };
+  })();
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -1154,6 +1189,7 @@ OntarioReno Broker Portal`;
         );
       })()}
 
+      <div className="grid gap-4 xl:grid-cols-2">
       <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2.5 transition focus-within:border-[#1B3C6C] focus-within:bg-white">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -1162,7 +1198,7 @@ OntarioReno Broker Portal`;
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search by name, city, project type, address…"
-            className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+            className="w-full rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0 font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
           {searchQuery && (
             <button
@@ -1181,7 +1217,7 @@ OntarioReno Broker Portal`;
               value={repFilter}
               onChange={(event) => setRepFilter(event.target.value)}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+                'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
                 repFilter !== 'all'
                   ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                   : 'border-slate-200 bg-white text-slate-600'
@@ -1199,7 +1235,7 @@ OntarioReno Broker Portal`;
             value={contractorFilter}
             onChange={(event) => setContractorFilter(event.target.value)}
             className={cn(
-              'max-w-[11rem] rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              'w-auto max-w-[11rem] rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
               contractorFilter !== 'all'
                 ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                 : 'border-slate-200 bg-white text-slate-600'
@@ -1217,7 +1253,7 @@ OntarioReno Broker Portal`;
             value={valueFilter}
             onChange={(event) => setValueFilter(event.target.value as ValueFilter)}
             className={cn(
-              'rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
               valueFilter !== 'all'
                 ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                 : 'border-slate-200 bg-white text-slate-600'
@@ -1248,11 +1284,89 @@ OntarioReno Broker Portal`;
               className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-slate-400 transition hover:text-slate-600"
             >
               <X className="h-3 w-3" />
-              Clear ({filteredDeals.length} of {visibleDeals.length} shown)
+              Clear ({boardDeals.length} of {visibleDeals.length} shown)
             </button>
           )}
         </div>
       </section>
+
+      {/* ── Admin: board-wide period + what happened in it ── */}
+      {isAdmin && (
+        <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-[#32639b]" />
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                Period
+              </p>
+              <span className="text-sm font-black text-slate-900">{periodLabel(boardPeriod)}</span>
+            </div>
+            <div className="flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+              {([
+                { label: 'All time', value: 'all' },
+                { label: 'This month', value: 'month' },
+                { label: 'Last month', value: 'last_month' },
+                { label: 'Quarter', value: 'quarter' },
+                { label: 'Year', value: 'year' },
+              ] as Array<{ label: string; value: BoardPeriod }>).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setBoardPeriod(option.value)}
+                  className={cn(
+                    'whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition',
+                    boardPeriod === option.value
+                      ? 'bg-[#1B3C6C] text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              {
+                label: boardPeriodActive ? 'New in pipeline' : 'Open pipeline',
+                value: formatCurrency(periodSummary.openValue),
+                sub: `${periodSummary.openCount} deal${periodSummary.openCount !== 1 ? 's' : ''}`,
+                tone: 'text-[#1B3C6C]',
+              },
+              {
+                label: 'Won',
+                value: formatCurrency(periodSummary.wonValue),
+                sub: `${periodSummary.wonCount} deal${periodSummary.wonCount !== 1 ? 's' : ''}`,
+                tone: 'text-emerald-700',
+              },
+              {
+                label: 'Lost',
+                value: String(periodSummary.lostCount),
+                sub: `deal${periodSummary.lostCount !== 1 ? 's' : ''}`,
+                tone: 'text-slate-700',
+              },
+              {
+                label: 'Win rate',
+                value: periodSummary.winRate === null ? '—' : `${periodSummary.winRate}%`,
+                sub: 'won ÷ (won + lost)',
+                tone: 'text-slate-900',
+              },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-[0.5rem] border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.12em] text-slate-400">{stat.label}</p>
+                <p className={cn('mt-0.5 text-lg font-black leading-tight', stat.tone)}>{stat.value}</p>
+                <p className="text-[0.68rem] font-semibold text-slate-400">{stat.sub}</p>
+              </div>
+            ))}
+          </div>
+          {boardPeriodActive && (
+            <p className="mt-2 text-[0.68rem] font-semibold text-slate-400">
+              Open deals by date created · Won by win date · Lost by last update
+            </p>
+          )}
+        </section>
+      )}
+      </div>
 
       {/* ── Mobile pipeline strip ──────────────────────────────── */}
       <section className="lg:hidden">
@@ -1276,12 +1390,12 @@ OntarioReno Broker Portal`;
                   mobileStageFilter === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                 )}
               >
-                {filteredDeals.length}
+                {boardDeals.length}
               </span>
             </button>
 
             {columns.map((col, colIndex) => {
-              const stageCount = filteredDeals.filter((d) => d.status === col.status).length;
+              const stageCount = boardDeals.filter((d) => d.status === col.status).length;
               const isActive = mobileStageFilter === col.status;
               const isWon = col.status === 'won';
               const isLost = col.status === 'lost';
@@ -1331,7 +1445,7 @@ OntarioReno Broker Portal`;
 
         {/* Stage summary when a filter is active */}
         {mobileStageFilter && (() => {
-          const stageDeals = filteredDeals.filter((d) => d.status === mobileStageFilter);
+          const stageDeals = boardDeals.filter((d) => d.status === mobileStageFilter);
           const stageValue = stageDeals.reduce((sum, d) => sum + d.estimatedJobValue, 0);
           const stageLabel = columns.find((c) => c.status === mobileStageFilter)?.label ?? '';
           return (
@@ -1372,16 +1486,17 @@ OntarioReno Broker Portal`;
             const isRangeColumn = isWonColumn || isLostColumn;
             const columnRange = isLostColumn ? lostRange : wonRange;
             const setColumnRange = isLostColumn ? setLostRange : setWonRange;
-            const allColumnDeals = filteredDeals.filter(
+            const allColumnDeals = boardDeals.filter(
               (deal) => deal.status === column.status
             );
             // Won/Lost columns get a Month/Quarter/Year/All toggle; the Won column also
             // collapses deals older than 90 days under "All".
-            const rangeFiltered = isRangeColumn
+            // A board-wide period replaces the per-column toggles while it's set.
+            const rangeFiltered = isRangeColumn && !boardPeriodActive
               ? allColumnDeals.filter((deal) => isDealInRange(deal, columnRange))
               : allColumnDeals;
             const recentDeals =
-              isWonColumn && wonRange === 'all' && !showOlderWon
+              isWonColumn && !boardPeriodActive && wonRange === 'all' && !showOlderWon
                 ? rangeFiltered.filter((deal) => getDaysSinceUpdate(deal) < 90)
                 : rangeFiltered;
             const hiddenOlderCount = rangeFiltered.length - recentDeals.length;
@@ -1433,7 +1548,7 @@ OntarioReno Broker Portal`;
                     {rangeFiltered.length}
                   </span>
                 </div>
-                {isRangeColumn && allColumnDeals.length > 0 && (
+                {isRangeColumn && !boardPeriodActive && allColumnDeals.length > 0 && (
                   <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
                     {([
                       { label: 'Month', value: 'month' },
