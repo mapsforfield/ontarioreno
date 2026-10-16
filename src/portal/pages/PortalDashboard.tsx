@@ -84,6 +84,7 @@ export default function PortalDashboard() {
     leads,
     tasks,
     addTask,
+    updateCommission,
     updateTask,
     users,
   } = usePortalData();
@@ -469,16 +470,19 @@ export default function PortalDashboard() {
               const elapsed = Math.min(Math.max(clock.days - clock.daysRemaining, 0), clock.days);
               const pct = clock.days > 0 ? Math.round((elapsed / clock.days) * 100) : 100;
               return (
-                <button
+                <div
                   key={commission.id}
-                  type="button"
-                  onClick={() => navigate('/portal/commissions')}
-                  title={`Paid ${formatDateKey(clock.startedOn)} → due ${formatDateKey(clock.dueOn)}`}
-                  className={`flex w-full items-center gap-2.5 rounded-[0.4rem] border px-2.5 py-2 text-left transition ${
+                  className={`flex w-full items-center gap-2 rounded-[0.4rem] border pr-2 transition ${
                     clock.status === 'due'
                       ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70'
                       : 'border-slate-100 bg-[#fbfdff] hover:bg-[#f6faff]'
                   }`}
+                >
+                <button
+                  type="button"
+                  onClick={() => navigate('/portal/commissions')}
+                  title={`Paid ${formatDateKey(clock.startedOn)} → due ${formatDateKey(clock.dueOn)}`}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-2.5 text-left"
                 >
                   <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-900">
                     {deal.homeownerName || 'Deal'}
@@ -515,6 +519,27 @@ export default function PortalDashboard() {
                         : `${clock.daysRemaining}d`}
                   </span>
                 </button>
+                {/* Same action as "Mark settled" on the Commissions page —
+                    same store call, so that page updates with it. Admin only,
+                    like the control it mirrors. */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateCommission(commission.id, { balanceSettledAt: today }, currentUser ?? undefined)
+                    }
+                    title="The remainder has been received — stops the countdown"
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-black transition ${
+                      clock.status === 'due' || clock.status === 'overdue'
+                        ? 'border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-700'
+                    }`}
+                  >
+                    <Check className="h-3 w-3" />
+                    Mark settled
+                  </button>
+                )}
+                </div>
               );
             })}
           </div>
