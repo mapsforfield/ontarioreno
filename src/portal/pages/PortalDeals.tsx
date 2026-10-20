@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, MessageSquareText, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -7,7 +7,6 @@ import { dealWonDate } from '../../../lib/deal-won-date';
 import { type BoardPeriod, isDealInPeriod, periodLabel } from '../../../lib/deal-period';
 import { lostReasonLabel, summarizeLostReasons, type LostReasonKey } from '../../../lib/lost-reasons';
 import LostReasonDialog from '../components/LostReasonPicker';
-import SwipeActions, { type SwipeAction } from '../components/SwipeActions';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
@@ -1691,30 +1690,8 @@ OntarioReno Broker Portal`;
                         isOpenDeal && deal.nextFollowUpDate !== '' && deal.nextFollowUpDate < todayIso();
 
                       return (
-                        <SwipeActions
-                          key={deal.id}
-                          enabled={!selectMode}
-                          actions={(() => {
-                            // Phone only (touch): swipe a card left for the
-                            // things a rep does from the list without opening it.
-                            const digits = (deal.phone || '').replace(/[^\d+]/g, '');
-                            const idx = columns.findIndex((c) => c.status === deal.status);
-                            const next = idx >= 0 && idx < columns.length - 1 ? columns[idx + 1] : null;
-                            const list: SwipeAction[] = [];
-                            if (digits) {
-                              list.push({ key: 'call', label: 'Call', icon: <Phone className="h-4 w-4" />, className: 'bg-emerald-600', href: `tel:${digits}` });
-                              list.push({ key: 'text', label: 'Text', icon: <MessageSquareText className="h-4 w-4" />, className: 'bg-sky-600', href: `sms:${digits}` });
-                            }
-                            if (next && next.status !== 'lost' && !['won', 'lost'].includes(deal.status)) {
-                              list.push({ key: 'next', label: next.label.replace('Appointment ', ''), icon: <ChevronRight className="h-4 w-4" />, className: 'bg-[#1B3C6C]', onSelect: () => moveDealToStatus(deal, next.status) });
-                            }
-                            if (!['won', 'lost'].includes(deal.status)) {
-                              list.push({ key: 'lost', label: 'Lost', icon: <XCircle className="h-4 w-4" />, className: 'bg-slate-500', onSelect: () => moveDealToStatus(deal, 'lost') });
-                            }
-                            return list;
-                          })()}
-                        >
                         <div
+                          key={deal.id}
                           role="button"
                           tabIndex={0}
                           draggable={!selectMode}
@@ -1847,7 +1824,6 @@ OntarioReno Broker Portal`;
                             </div>
                           </div>
                         </div>
-                        </SwipeActions>
                       );
                     })}
                     {isWonColumn && hiddenOlderCount > 0 && (
