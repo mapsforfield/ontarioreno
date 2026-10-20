@@ -49,6 +49,13 @@ test('a date that has passed without being closed out needs attention', () => {
   assert.equal(needsAttention(settled({ appointmentDate: '2026-08-01' }), ctx()), true);
 });
 
+test('an open text reply (wants to cancel, running late…) needs attention; a plain "Ok" does not', () => {
+  assert.equal(needsAttention(settled({ smsReplyStatus: 'cancel_requested' }), ctx()), true);
+  assert.equal(needsAttention(settled({ smsReplyStatus: 'running_late' }), ctx()), true);
+  assert.equal(needsAttention(settled({ smsReplyStatus: 'acknowledged' }), ctx()), false);
+  assert.equal(needsAttention(settled({ smsReplyStatus: '' }), ctx()), false);
+});
+
 test('a past no-show or cancellation is closed out, not past due', () => {
   // The 30-second outcome sheet's "No-show" button sets exactly this. If it
   // still counted, the rep would answer the question and the item would stay.

@@ -30,6 +30,7 @@
 // Adding either back here would re-break a complaint that is already closed.
 
 import { followUpSilenced } from './followUps';
+import { OPEN_REPLY_STATUSES } from '../../../lib/sms-reply-resolution';
 import type { Appointment } from './types';
 
 /** How many days ago an ISO timestamp was. Blank/unset reads as today. */
@@ -54,6 +55,7 @@ export type AttentionFields = Pick<
   | 'outcomeSubmitted'
   | 'status'
   | 'updatedAt'
+  | 'smsReplyStatus'
 >;
 
 export type AttentionContext = {
@@ -101,7 +103,10 @@ export function needsAttention(
     stale('estimate_requested') ||
     stale('contractor_review') ||
     // Nobody owns it.
-    !appointment.assignedRepId
+    !appointment.assignedRepId ||
+    // The homeowner texted something a rep has to act on — wants to cancel,
+    // wants to move, running late, a question. See lib/sms-replies.ts.
+    OPEN_REPLY_STATUSES.has(appointment.smsReplyStatus ?? '')
   );
 }
 

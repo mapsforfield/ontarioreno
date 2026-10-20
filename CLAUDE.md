@@ -239,11 +239,28 @@ whole safety property the moment anything is put back behind it. If you retire
 the forward deliberately, remove `SMS_FORWARD_URL` from Vercel in the same
 change so the two cannot disagree.
 
-Only a literal `C`/`R` (or the words "confirm"/"confirmed"/"reschedule") is read
-as an answer. Everything else — "Ok", "thanks", "Cancel", "Running late" — is
-**forwarded to the rep verbatim and interpreted by nobody**. Polite noise once
-counted as a confirmation and told reps something homeowners had not said; the
-fix was to narrow the words AND stop staying silent, not one or the other.
+Only a literal `C`/`R` (or the words "confirm"/"confirmed"/"reschedule") is
+**acted on** as an answer. Polite noise once counted as a confirmation and told
+reps something homeowners had not said; that rule stands.
+
+**Since October 2026, everything else is READ, but still not acted on.** Most
+homeowners type "Please cancel", "Cance", "I want to reschedule, I'll let you
+know". `lib/sms-reply-classify.ts` labels each free-text reply (cancel /
+reschedule / running late / probably confirming / question / acknowledged /
+unclear) and the label is stamped on `smsReplyStatus` (`READ_REPLY_STATUS` in
+`lib/sms-replies.ts`). The rep gets a push and an email that lead with the
+label, and the reply sits in the **Replies box** at the top of Consultations
+with one-tap Cancel / Reschedule / Mark confirmed / Call / Handled.
+
+The hard rules for free text: it **never changes `status` or the date, and
+never texts the homeowner** — only a rep's tap does. A model "confirm" is
+`likely_confirmed`, not `confirmed`. A reaction or "Ok" (`acknowledged`) never
+overwrites an open flag. Any failure (no key, timeout, refusal) degrades to
+`needs_reading`, i.e. exactly the old behaviour. A reply up to 3 hours after a
+visit's start still matches that visit. Any open flag clears when a rep changes
+the status or moves the visit (`OPEN_REPLY_STATUSES` in
+`lib/sms-reply-resolution.ts`). Guarded by `lib/sms-reply-read.test.ts` and
+`lib/sms-inbound.test.ts`.
 
 A **confirm** moves `status` to `'confirmed'` and writes an Activity row
 attributed to the homeowner (`actorRole: 'homeowner'`, `actorName` the

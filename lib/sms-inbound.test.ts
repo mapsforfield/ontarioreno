@@ -81,7 +81,7 @@ function fakeStore(appointment: Record<string, unknown>) {
 }
 
 /** Far enough ahead that the match is never sensitive to when this runs. */
-function upcomingAppointment() {
+function upcomingAppointment(over: Record<string, unknown> = {}) {
   const d = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return {
     id: 'apt-1',
@@ -97,6 +97,7 @@ function upcomingAppointment() {
     assignedRepId: 'rep-steven',
     createdByUserId: 'rep-steven',
     assignedRep: { name: 'Steven', email: 'steven@example.com' },
+    ...over,
   };
 }
 
@@ -145,14 +146,32 @@ test('R never touches the booking status', async () => {
   assert.deepEqual(kinds, ['reply_alert', 'reschedule_ack']);
 });
 
-test('a reply we cannot read changes nothing and alerts the rep', async () => {
+test('a free-text reply is labelled for the rep but never changes the booking', async () => {
+  // No ANTHROPIC_API_KEY in this env, so the reader answers "unclear" — the
+  // same path an outage or a timeout takes.
   const { store, writes } = fakeStore(upcomingAppointment());
   const { res } = fakeRes();
   await handleInboundSms(fakeReq('Cancel'), res, store, env);
 
-  assert.equal(writes.appointmentUpdates.length, 0, 'an unread reply must not stamp anything');
+  assert.equal(writes.appointmentUpdates.length, 1);
+  const update = writes.appointmentUpdates[0];
+  assert.equal(update.smsReplyStatus, 'needs_reading');
+  assert.equal(update.smsReplyBody, 'Cancel');
+  // The rule that survives: free text never moves the booking itself…
+  assert.equal('status' in update, false, 'a free-text reply must never change status');
   assert.equal(writes.activities.length, 0);
+  // …and never texts the homeowner. Only the rep's email is queued.
   assert.deepEqual(writes.outbox.map((o) => o.kind), ['reply_unclear']);
+  assert.equal(writes.outbox.some((o) => o.channel === 'sms'), false);
+});
+
+test('an iMessage reaction is an acknowledgement and does not erase an open request', async () => {
+  const { store, writes } = fakeStore(upcomingAppointment({ smsReplyStatus: 'cancel_requested' }));
+  const { res } = fakeRes();
+  await handleInboundSms(fakeReq('Liked \u201cHi Bino, see you at 6\u201d'), res, store, env);
+  const update = writes.appointmentUpdates[0];
+  assert.equal('smsReplyStatus' in update, false, 'a reaction must not overwrite "wants to cancel"');
+  assert.equal('status' in update, false);
 });
 
 test('an unsigned request is forwarded but acted on by nobody', async () => {

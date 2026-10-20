@@ -87,11 +87,33 @@ export function matchReplyToAppointment(
   nowLocal: string
 ): ReplyCandidate | null {
   const stamp = (a: ReplyCandidate) => `${a.appointmentDate}T${a.appointmentTime || '00:00'}`;
-  const live = candidates
-    .filter((a) => !a.deletedAt && LIVE_STATUSES.has(a.status))
+  const live = candidates.filter((a) => !a.deletedAt && LIVE_STATUSES.has(a.status));
+  const upcoming = live
     .filter((a) => stamp(a) >= nowLocal)
     .sort((a, b) => stamp(a).localeCompare(stamp(b)));
-  return live[0] ?? null;
+  if (upcoming[0]) return upcoming[0];
+
+  // A visit that started a little while ago still owns the reply. "Please
+  // cancel, I can't make it" sent at 6:10 for a 6:00 visit used to match
+  // nothing and fall through to the new-lead branch, so the rep was never
+  // told. Only the last few hours, and still only live statuses: a completed
+  // or cancelled visit is never touched.
+  const cutoff = shiftLocal(nowLocal, -RECENT_START_GRACE_MINUTES);
+  const justStarted = live
+    .filter((a) => stamp(a) < nowLocal && stamp(a) >= cutoff)
+    .sort((a, b) => stamp(b).localeCompare(stamp(a)));
+  return justStarted[0] ?? null;
+}
+
+/** How long after a visit's start a reply still counts as being about it. */
+export const RECENT_START_GRACE_MINUTES = 3 * 60;
+
+/** Shift a "YYYY-MM-DDTHH:MM" wall-clock string by whole minutes. */
+function shiftLocal(local: string, minutes: number): string {
+  const d = new Date(`${local}:00Z`);
+  if (Number.isNaN(d.getTime())) return local;
+  d.setUTCMinutes(d.getUTCMinutes() + minutes);
+  return d.toISOString().slice(0, 16);
 }
 
 /**
@@ -261,6 +283,148 @@ export function rescheduleAckSms(c: { customerName: string; repName: string }): 
   const who = c.repName || 'Your specialist';
   const greeting = c.customerName ? `Thanks ${c.customerName}` : 'Thanks';
   return `${greeting} — no problem. ${who} from OntarioReno will call you shortly to find a new time. Your current appointment is still held until you speak.`;
+}
+
+// ─── Reading a free-text reply ────────────────────────────────────────────────
+// Most homeowners never type a bare C or R. They write "Please cancel. I
+// unable to going home today", "I want to reschedule. I will let you know
+// when", "Cance" then "Cancel", "Ok". Those used to reach the rep as a generic
+// "needs your eyes" email with no sign of which ones mattered tonight.
+//
+// Now each one is READ (lib/sms-reply-classify.ts) and LABELLED — nothing more.
+// The safety rule above is unchanged: a free-text reply never changes a
+// booking and never texts the homeowner. The label goes on the consultation as
+// an open item with one-tap actions, and the rep decides. A wrong label costs
+// the rep one tap; a wrong automatic cancellation costs a customer.
+
+/** What a free-text reply most likely means. `unclear` when not sure. */
+export type ReadIntent =
+  | 'cancel'
+  | 'reschedule'
+  | 'running_late'
+  | 'confirm'
+  | 'question'
+  | 'acknowledged'
+  | 'unclear';
+
+/**
+ * The open-work flag each label leaves on the appointment (smsReplyStatus).
+ *
+ * `reschedule` reuses the literal-R flag, so a rep sees one "Wants to move"
+ * chip whichever way it was said — but only the literal R ever sends the
+ * homeowner the "we'll call you" acknowledgement. `confirm` is a SEPARATE flag
+ * from the literal-C 'confirmed': it does not move `status`; the rep taps
+ * "Mark confirmed" if they agree. `acknowledged` ("Ok", a reaction) is recorded
+ * but asks nobody to do anything.
+ */
+export const READ_REPLY_STATUS: Record<ReadIntent, string> = {
+  cancel: 'cancel_requested',
+  reschedule: 'reschedule_requested',
+  running_late: 'running_late',
+  confirm: 'likely_confirmed',
+  question: 'question',
+  acknowledged: 'acknowledged',
+  unclear: 'needs_reading',
+};
+
+/** Flags that are work for a rep — one list, shared with the portal. */
+export { OPEN_REPLY_STATUSES } from './sms-reply-resolution.js';
+
+export const READ_LABEL: Record<ReadIntent, string> = {
+  cancel: 'Wants to cancel',
+  reschedule: 'Wants to reschedule',
+  running_late: 'Running late',
+  confirm: 'Probably confirming',
+  question: 'Has a question',
+  acknowledged: 'Acknowledged',
+  unclear: 'Needs reading',
+};
+
+/**
+ * iMessage / Android reactions arrive as text: Liked "…", Loved "…",
+ * Emphasized "…", Laughed at "…". They acknowledge OUR message, are never an
+ * instruction, and need no model to recognise.
+ */
+const TAPBACK = /^(liked|loved|emphasi[sz]ed|laughed at|questioned|disliked)\s+["“”']/i;
+
+export function isTapback(raw: string): boolean {
+  return TAPBACK.test((raw ?? '').trim());
+}
+
+function whenPhrase(date: string, time: string): string {
+  return `${friendlyDate(date)} ${friendlyTime(time)}`;
+}
+
+const SUBJECT_LEAD: Record<ReadIntent, string> = {
+  cancel: 'Wants to CANCEL',
+  reschedule: 'Wants to RESCHEDULE',
+  running_late: 'Running late',
+  confirm: 'Probably confirming',
+  question: 'Question',
+  acknowledged: 'Acknowledged',
+  unclear: 'Needs your eyes',
+};
+
+export function readReplySubject(c: { intent: ReadIntent; customerName: string; date: string; time: string }): string {
+  return `${SUBJECT_LEAD[c.intent]}: ${c.customerName} — ${whenPhrase(c.date, c.time)}`;
+}
+
+export function readReplyBody(c: {
+  intent: ReadIntent;
+  repName: string;
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  time: string;
+  address: string;
+  rawBody: string;
+}): string {
+  const read =
+    c.intent === 'unclear'
+      ? "We couldn't tell what they meant."
+      : `We read this as: ${READ_LABEL[c.intent]}.`;
+  return [
+    `Hi ${c.repName || 'there'},`,
+    '',
+    `${c.customerName} texted back about their appointment.`,
+    '',
+    `They wrote: "${c.rawBody.trim()}"`,
+    '',
+    `${read} Nothing has been changed — the booking stays exactly as it is until you act. It's waiting in the Replies box at the top of Consultations, with one-tap buttons.`,
+    '',
+    `Appointment: ${friendlyDate(c.date)} at ${friendlyTime(c.time)}`,
+    `Address: ${c.address || 'No address on file'}`,
+    `Phone: ${c.customerPhone}`,
+  ].join('\n');
+}
+
+const PUSH_TITLE: Record<ReadIntent, (name: string) => string> = {
+  cancel: (n) => `${n} wants to cancel`,
+  reschedule: (n) => `${n} wants to reschedule`,
+  running_late: (n) => `${n} is running late`,
+  confirm: (n) => `${n} replied — probably confirming`,
+  question: (n) => `${n} has a question`,
+  acknowledged: (n) => `${n} replied`,
+  unclear: (n) => `Text from ${n}`,
+};
+
+/** Push to the assigned rep — never to the homeowner. */
+export function readReplyPush(c: {
+  intent: ReadIntent;
+  appointmentId: string;
+  customerName: string;
+  date: string;
+  time: string;
+  rawBody: string;
+}) {
+  const text = c.rawBody.trim();
+  const quote = text.length > 90 ? `${text.slice(0, 87)}…` : text;
+  return {
+    title: PUSH_TITLE[c.intent](c.customerName),
+    body: `${whenPhrase(c.date, c.time)} · "${quote}"`,
+    url: `/portal/appointments?reply=${encodeURIComponent(c.appointmentId)}`,
+    tag: `reply-${c.appointmentId}`,
+  };
 }
 
 // ─── Twilio request authenticity ──────────────────────────────────────────────
