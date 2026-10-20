@@ -987,15 +987,17 @@
         border: none;
         border-radius: 0;
         background: #f3f6f9;
-        visibility: hidden;
-        pointer-events: none;
+        display: none;
       }
 
-      /* visibility, not display: the list keeps its scroll position while
-         a thread is open, so "‹ Chats" lands back where the rep was. */
+      /* display, not visibility. This was visibility: hidden at first, to keep
+         the list's scroll position for free - but iOS still hit-tests a hidden
+         scroll container through its own scrolling layer, so the invisible
+         list sat on top of the thread and swallowed taps on "‹ Chats" until
+         one happened to get through. The scroll position is now saved and
+         restored by setSidebarOpen instead. */
       .sidebar.sidebar-open {
-        visibility: visible;
-        pointer-events: auto;
+        display: flex;
       }
 
       .sidebar-backdrop {
@@ -2651,8 +2653,25 @@
     const sidebarBackdropEl = document.getElementById("sidebarBackdrop");
     const menuBtnEl = document.getElementById("menuBtn");
 
+    // Where the list was scrolled when a thread was opened, so "‹ Chats"
+    // lands back on the same cards. The list is display: none in between,
+    // which forgets its own scroll position (see the 900px CSS).
+    let savedSidebarScrollTop = 0;
+
     function setSidebarOpen(open) {
+      const scroller = document.querySelector(".sidebar-body");
+      const wasOpen = sidebarEl?.classList.contains("sidebar-open");
+
+      if (wasOpen && !open && scroller) {
+        savedSidebarScrollTop = scroller.scrollTop;
+      }
+
       sidebarEl?.classList.toggle("sidebar-open", open);
+
+      if (!wasOpen && open && scroller) {
+        scroller.scrollTop = savedSidebarScrollTop;
+      }
+
       sidebarBackdropEl?.classList.toggle("sidebar-open", open);
       menuBtnEl?.setAttribute("aria-expanded", String(open));
     }
