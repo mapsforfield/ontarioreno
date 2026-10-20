@@ -670,7 +670,7 @@ export default function PortalDashboard() {
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Link to="/portal/financing" className="block rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4 transition hover:border-slate-300 hover:shadow-sm">
+          <Link to="/portal/deals" className="block rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4 transition hover:border-slate-300 hover:shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               Financing Pipeline
             </p>
@@ -678,7 +678,7 @@ export default function PortalDashboard() {
               {formatCurrency(financingPipeline)}
             </p>
           </Link>
-          <Link to="/portal/financing" className="block rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4 transition hover:border-slate-300 hover:shadow-sm">
+          <Link to="/portal/deals" className="block rounded-[0.5rem] border border-slate-200 bg-[#fbfdff] p-4 transition hover:border-slate-300 hover:shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               Financing Required Deals
             </p>
