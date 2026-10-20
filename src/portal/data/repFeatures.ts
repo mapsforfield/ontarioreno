@@ -10,7 +10,6 @@ export type RepFeatureKey =
   | 'consultations'
   | 'clients'
   | 'tasks'
-  | 'financing'
   | 'analytics';
 
 export const REP_FEATURES: Array<{ key: RepFeatureKey; label: string; description: string }> = [
@@ -21,7 +20,6 @@ export const REP_FEATURES: Array<{ key: RepFeatureKey; label: string; descriptio
   { key: 'consultations', label: 'Consultations', description: 'The consultation calendar' },
   { key: 'clients', label: 'Clients', description: 'Client profiles' },
   { key: 'tasks', label: 'Tasks', description: 'Personal to-do list' },
-  { key: 'financing', label: 'Financing', description: 'Financing tools' },
   { key: 'analytics', label: 'Performance', description: 'Performance, leaderboard & their own commissions' },
 ];
 
@@ -39,7 +37,6 @@ export function featureForPath(pathname: string): RepFeatureKey | null {
   if (pathname.startsWith('/portal/appointments')) return 'consultations';
   if (pathname.startsWith('/portal/clients')) return 'clients';
   if (pathname.startsWith('/portal/tasks')) return 'tasks';
-  if (pathname.startsWith('/portal/financing')) return 'financing';
   if (
     pathname.startsWith('/portal/performance') ||
     pathname.startsWith('/portal/leaderboard') ||

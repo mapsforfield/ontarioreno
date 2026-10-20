@@ -1,5 +1,5 @@
 import { lazy, type ReactNode } from 'react';
-import { BrowserRouter, StaticRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, StaticRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LazyRoutes } from './components/RouteChunkBoundary';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
@@ -135,7 +135,6 @@ const PortalDeals = lazy(() => import('./portal/pages/PortalDeals'));
 const PortalWorkspace = lazy(() => import('./portal/pages/PortalWorkspace'));
 const ContractorCalendar = lazy(() => import('./portal/pages/ContractorCalendar'));
 const ContractorClients = lazy(() => import('./portal/pages/ContractorClients'));
-const PortalFinancing = lazy(() => import('./portal/pages/PortalFinancing'));
 const PortalClients = lazy(() => import('./portal/pages/PortalClients'));
 const PortalSubmissions = lazy(() => import('./portal/pages/PortalSubmissions'));
 const PortalConversations = lazy(() => import('./portal/pages/PortalConversations'));
@@ -198,7 +197,8 @@ export default function App({ location }: { location?: string } = {}) {
               <Route path="appointments" element={<PortalAppointments />} />
               <Route path="clients" element={<PortalClients />} />
               <Route path="tasks" element={<PortalTasks />} />
-              <Route path="financing" element={<PortalFinancing />} />
+              {/* Financing page retired Oct 2026 — nobody used it. Old links land on the dashboard. */}
+              <Route path="financing" element={<Navigate to="/portal/dashboard" replace />} />
               {/* Analytics hub — all four render the tabbed PortalAnalytics so
                   existing deep links keep working. */}
               <Route path="sales-tracker" element={<PortalAnalytics />} />
