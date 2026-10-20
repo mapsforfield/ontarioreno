@@ -86,6 +86,19 @@ function serializeVideo(v: VideoRow) {
   };
 }
 
+let lastOpportunisticDrain = 0;
+/** At most once a minute per server instance; never throws, never blocks long. */
+async function maybeDrainOutbox(): Promise<void> {
+  const now = Date.now();
+  if (now - lastOpportunisticDrain < 60_000) return;
+  lastOpportunisticDrain = now;
+  try {
+    await drainOutbox(prisma as never, 50);
+  } catch (err) {
+    console.error('[appointments] opportunistic drain failed:', err);
+  }
+}
+
 async function sendPush(
   endpoint: string,
   p256dh: string,
@@ -1043,6 +1056,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const appointments = await withSchema(() =>
       prisma.appointment.findMany({ where: { deletedAt: null }, orderBy: { appointmentDate: 'desc' } })
     );
+    // Deliver due homeowner reminders (and anything else queued) whenever the
+    // portal loads. The GitHub Actions drain that is meant to run every 15
+    // minutes actually runs every 2-6 hours, so a "day-of" reminder could miss
+    // its window. Same drain, same code path, same production-only gate and
+    // per-row compare-and-set — this only adds more chances to run it.
+    await maybeDrainOutbox();
     // "How did it go?" pushes ride every portal load as well as the drain —
     // the drain's GitHub schedule runs hours apart. See lib/outcome-nudge-send.ts.
     await maybeSendOutcomeNudges();
