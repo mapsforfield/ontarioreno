@@ -728,6 +728,24 @@
       background: rgba(255, 255, 255, 0.08);
     }
 
+    /* A photo shown as a button rather than an inline image — see
+       PHONE_INLINE_IMAGES in the script. */
+    .media-open-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 9px 12px;
+      border: 1px solid rgba(140, 158, 177, 0.3);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      color: inherit;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     .attachment-link {
       display: inline-flex;
       align-items: center;
@@ -918,54 +936,143 @@
       display: none;
     }
 
+    /* ─── Phones and tablets: two screens, not a drawer ───────────────────
+       This used to be a slide-out drawer over a page that scrolled as a
+       whole document inside the portal's iframe. On iOS that meant a fixed,
+       transformed, backdrop-blurred panel inside a scrolling iframe inside a
+       scrolling page: taps landed on the wrong layer, flicks scrolled the
+       page behind the drawer, and the blur on a moving panel is exactly the
+       kind of GPU work that gets an iframe's process killed.
+
+       Now it works like the phone's own Messages app: the conversation list
+       is one full screen, the thread is another, and "‹ Chats" goes back.
+       Both fill the frame exactly; nothing outside them scrolls. Desktop
+       (above 900px) is untouched. */
     @media (max-width: 900px) {
+      html,
       body {
-        height: auto;
-        overflow: auto;
+        height: 100%;
+        overflow: hidden;
       }
 
       .app {
+        position: relative;
         grid-template-columns: 1fr;
-        height: auto;
-        min-height: 100vh;
-        padding: 10px;
-        overflow: visible;
+        height: 100%;
+        padding: 0;
+        gap: 0;
+        overflow: hidden;
+      }
+
+      /* Blur behind an opaque-enough panel is invisible on a phone and
+         costs a compositing layer per panel. */
+      .sidebar,
+      .main {
+        backdrop-filter: none;
+        box-shadow: none;
+      }
+
+      .main {
+        height: 100%;
+        border-radius: 0;
+        border: none;
       }
 
       .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: min(86vw, 340px);
+        position: absolute;
+        inset: 0;
         z-index: 60;
-        border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
-        transform: translateX(-102%);
-        transition: transform 0.24s ease;
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 0;
+        background: #f3f6f9;
+        visibility: hidden;
+        pointer-events: none;
       }
 
+      /* visibility, not display: the list keeps its scroll position while
+         a thread is open, so "‹ Chats" lands back where the rep was. */
       .sidebar.sidebar-open {
-        transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
       }
 
       .sidebar-backdrop {
-        display: block;
-        position: fixed;
-        inset: 0;
-        z-index: 55;
-        background: rgba(15, 23, 42, 0.42);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.24s ease;
+        display: none;
       }
 
-      .sidebar-backdrop.sidebar-open {
-        opacity: 1;
-        pointer-events: auto;
+      .sidebar-header {
+        padding: 12px 12px 10px;
+      }
+
+      .sidebar-title {
+        font-size: 22px;
+        margin: 0 0 8px;
+      }
+
+      .search-wrap {
+        padding: 8px 12px;
+      }
+
+      .from-select,
+      .search-input {
+        font-size: 16px;
+        padding: 10px 12px;
       }
 
       .menu-btn {
         display: inline-flex;
+        width: auto;
+        gap: 4px;
+        padding: 0 12px;
+        color: var(--blue-strong);
+        font-weight: 700;
+        font-size: 15px;
+        white-space: nowrap;
+      }
+
+      .menu-btn-chevron {
+        font-size: 22px;
+        line-height: 1;
+        margin-top: -2px;
+      }
+
+      /* A smooth scroll to the bottom of a long thread animates through
+         every bubble and can stop short on iOS; opening a thread should
+         simply land on the newest message. */
+      .thread-body {
+        scroll-behavior: auto;
+      }
+
+      .drawer-toggle,
+      .drawer-action-btn {
+        min-height: 40px;
+      }
+
+      /* "Done" sits beside the card instead of on a strip above it, which
+         made every waiting reply ~40px taller and the list three cards a
+         screen. A thumb-sized target, vertically centred. */
+      .conversation-item.with-action {
+        padding-top: 11px;
+        padding-right: 78px;
+      }
+
+      .conversation-action-btn {
+        top: 50%;
+        transform: translateY(-50%);
+        min-height: 36px;
+        padding: 0 12px;
+        font-size: 12px;
+      }
+
+      .conversation-action-btn:hover {
+        transform: translateY(-50%);
+      }
+
+      /* The same number again, unformatted, under the formatted one. */
+      .conversation-number {
+        display: none;
       }
 
       .sidebar-resizer {
@@ -1022,15 +1129,11 @@
       }
 
       .thread-header {
-        align-items: flex-start;
+        align-items: center;
       }
 
       .msg-row {
         max-width: 88%;
-      }
-
-      .main {
-        border-radius: 20px;
       }
     }
 
@@ -1162,14 +1265,9 @@
       /* 44px is the smallest target a thumb hits reliably, and this one opens
          the conversation list — the most-tapped control on the page. */
       .menu-btn {
-        width: 44px;
+        min-width: 44px;
         height: 44px;
-        font-size: 18px;
-      }
-
-      /* Full-width drawer — 86vw left a dead strip that swallowed taps. */
-      .sidebar {
-        width: min(94vw, 380px);
+        font-size: 15px;
       }
 
       .conversation-item {
@@ -1212,7 +1310,7 @@
     <main class="main">
       <div class="thread-header">
         <div class="thread-header-main">
-          <button id="menuBtn" class="menu-btn" type="button" aria-label="Show conversations" aria-expanded="false">&#9776;</button>
+          <button id="menuBtn" class="menu-btn" type="button" aria-label="Back to conversations" aria-expanded="false"><span class="menu-btn-chevron" aria-hidden="true">&lsaquo;</span>Chats</button>
           <div class="avatar" id="threadAvatar">?</div>
           <div class="thread-header-copy">
             <div class="thread-title"><span id="threadTitle">No conversation selected</span><span id="threadBadge" class="thread-badge hidden">0</span></div>
@@ -1339,13 +1437,86 @@
     let threadLimitContact = null;
     let activeConversation = null;
     let isLoadingMessages = false;
-    let isHydratingThread = false;
     let isResizingSidebar = false;
     let audioContext = null;
+
+    // ─── Opening a thread ────────────────────────────────────────────────
+    //
+    // This used to be guarded by a single isHydratingThread flag, and that
+    // flag is what made threads impossible to open on a phone. The page
+    // auto-opens a default thread and re-fetches it on every ten-second poll,
+    // so a fetch for SOME thread was nearly always in flight on a slow mobile
+    // connection. Tapping a different contact then:
+    //
+    //   1. returned early, because a fetch was "already running", so the
+    //      thread the rep tapped was never requested at all; and
+    //   2. when the earlier fetch landed, wrote the DEFAULT contact's
+    //      messages into whatever thread was now open, because it looked the
+    //      target up from activeConversation at response time.
+    //
+    // So the rep tapped a reply and got the default thread's messages under
+    // the new number - "stuck on the default". Now every fetch remembers which
+    // thread it was for, a newer tap aborts the older fetch, and a response
+    // for a thread that is no longer open is dropped.
+    let threadFetch = null; // { contact, activeNumber, controller }
+
+    // A thread's own fetch returns up to 200 messages each way; the sidebar's
+    // list holds far fewer per contact. Each poll rebuilds conversations from
+    // the list, which used to swap the open thread back to the short version
+    // for a moment and then forward again - the thread jumped every ten
+    // seconds. The fetched messages are kept here and merged back in.
+    let hydratedThread = null; // { contact, activeNumber, messages }
+
+    // A request that has not answered in this long is not going to; say so,
+    // rather than leaving the rep looking at a thread that never fills in.
+    const THREAD_FETCH_TIMEOUT_MS = 20000;
 
     // Below this the sidebar scrolls as one column and the split does not exist.
     // Kept in step with the 900px media query above.
     const SIDEBAR_SPLIT_MIN_WIDTH = 901;
+
+    // The phone/tablet layout: the list and the thread are separate screens.
+    function isCompactLayout() {
+      return window.innerWidth < SIDEBAR_SPLIT_MIN_WIDTH;
+    }
+
+    // On a phone, only the newest few photos in a thread render inline; older
+    // ones are a "Photo" button that opens the viewer. MMS photos are full
+    // camera resolution and iOS decodes each to a full-size bitmap however
+    // small it is drawn, so a thread with a dozen photos was enough to get the
+    // frame's process killed ("A problem repeatedly occurred") - every time
+    // that thread was opened.
+    const PHONE_INLINE_IMAGES = 4;
+
+    function isImageMedia(item) {
+      return (item?.contentType || "").startsWith("image/");
+    }
+
+    // ─── Don't repaint the list under a thumb ────────────────────────────
+    //
+    // The ten-second poll repaints the drawers with innerHTML. On a phone, a
+    // repaint that lands between touchstart and touchend replaces the card
+    // being pressed, and iOS then never fires the click - the tap simply
+    // vanished, which is a large part of why the list felt finicky. Background
+    // repaints of the list wait until the thumb is off it and scrolling has
+    // settled. Taps the rep makes themself still repaint at once.
+    let sidebarTouching = false;
+    let sidebarScrollSettlesAt = 0;
+    let deferredListRenderTimer = null;
+
+    function sidebarIsBusy() {
+      return sidebarTouching || Date.now() < sidebarScrollSettlesAt;
+    }
+
+    function renderConversationListWhenIdle() {
+      if (!isCompactLayout() || !sidebarIsBusy()) {
+        renderConversationList();
+        return;
+      }
+
+      clearTimeout(deferredListRenderTimer);
+      deferredListRenderTimer = setTimeout(renderConversationListWhenIdle, 400);
+    }
 
     function applySidebarSplitHeight() {
       if (!sidebarTopPanelEl) return;
@@ -1414,6 +1585,7 @@
 
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
+      delete statusEl.dataset.source;
       statusEl.classList.remove("error", "success", "muted");
       if (!text) return;
       statusEl.classList.add(isError ? "error" : "success");
@@ -1421,6 +1593,7 @@
 
     function clearStatus() {
       statusEl.textContent = "";
+      delete statusEl.dataset.source;
       statusEl.classList.remove("error", "success");
       statusEl.classList.add("muted");
     }
@@ -1654,6 +1827,29 @@
       return sortMessagesNewestFirst([...mergedMap.values()]).slice(0, MAX_CACHED_MESSAGES);
     }
 
+    // One thread's messages, oldest first - the order a thread renders in.
+    function mergeThreadMessages(...lists) {
+      const bySid = new Map();
+      lists.forEach((list) => (list || []).forEach((msg) => bySid.set(msg.sid, msg)));
+      return [...bySid.values()].sort((a, b) => new Date(a.dateSent) - new Date(b.dateSent));
+    }
+
+    // The open thread with its fetched history folded back in. Without this,
+    // every list rebuild shrinks it to the handful of messages the list holds.
+    function withHydratedMessages(conv) {
+      if (
+        !conv ||
+        !hydratedThread ||
+        hydratedThread.contact !== conv.contact ||
+        hydratedThread.activeNumber !== fromNumberEl.value
+      ) {
+        return conv;
+      }
+
+      conv.messages = mergeThreadMessages(hydratedThread.messages, conv.messages);
+      return conv;
+    }
+
     function buildConversations(messages, activeNumber) {
       const map = {};
 
@@ -1765,7 +1961,7 @@
           const contact = el.getAttribute("data-contact");
           const found = conversations.find((c) => c.contact === contact);
           if (found) {
-            activeConversation = found;
+            activeConversation = withHydratedMessages(found);
             toNumberEl.value = found.contact;
 
             delete unreadMap[found.contact];
@@ -1968,6 +2164,14 @@
         : activeConversation.messages;
       const threadItems = buildThreadItems(visibleMessages);
 
+      // Counts down through the thread's photos, oldest first, so the newest
+      // PHONE_INLINE_IMAGES are the ones drawn inline on a phone.
+      const inlineEveryImage = !isCompactLayout();
+      let imagesLeft = visibleMessages.reduce(
+        (count, msg) => count + (Array.isArray(msg.media) ? msg.media.filter(isImageMedia).length : 0),
+        0
+      );
+
       const earlierHtml = hiddenCount
         ? `<button id="loadEarlierBtn" class="load-earlier-btn" type="button">Show ${hiddenCount > THREAD_RENDER_LIMIT ? THREAD_RENDER_LIMIT : hiddenCount} earlier ${hiddenCount === 1 ? "message" : "messages"} (${hiddenCount} older)</button>`
         : "";
@@ -1986,7 +2190,14 @@
 
           const mediaHtml = Array.isArray(msg.media) && msg.media.length
             ? msg.media.map((item) => {
-              if ((item.contentType || "").startsWith("image/")) {
+              if (isImageMedia(item)) {
+                const drawInline = inlineEveryImage || imagesLeft <= PHONE_INLINE_IMAGES;
+                imagesLeft -= 1;
+
+                if (!drawInline) {
+                  return `<button type="button" class="media-open-btn" data-media-url="${item.url}">Photo &middot; tap to view</button>`;
+                }
+
                 return `
               <div class="media-card">
                 <img
@@ -2032,7 +2243,7 @@
 
       if (!paint(threadBodyEl, earlierHtml + threadHtml)) return;
 
-      threadBodyEl.querySelectorAll(".media-thumb[data-media-url]").forEach((img) => {
+      threadBodyEl.querySelectorAll(".media-thumb[data-media-url], .media-open-btn[data-media-url]").forEach((img) => {
         img.addEventListener("click", () => openMediaModal(img.getAttribute("data-media-url")));
       });
 
@@ -2049,22 +2260,64 @@
 
       if (contactChanged || wasAtBottom) {
         threadBodyEl.scrollTop = threadBodyEl.scrollHeight;
+
+        // Photos have no height until they load, so a thread scrolled to the
+        // bottom before they arrive ends up a few photos short of the newest
+        // message. Follow each one in - unless the rep has scrolled away.
+        threadBodyEl.querySelectorAll("img.media-thumb").forEach((img) => {
+          if (img.complete) return;
+          img.addEventListener("load", () => {
+            const nearBottom =
+              threadBodyEl.scrollHeight - threadBodyEl.scrollTop - threadBodyEl.clientHeight <
+              img.offsetHeight + 120;
+            if (nearBottom) threadBodyEl.scrollTop = threadBodyEl.scrollHeight;
+          }, { once: true });
+        });
       }
     }
 
     async function hydrateActiveConversation(activeNumber) {
-      if (!activeConversation || !activeNumber || isHydratingThread) return;
+      if (!activeConversation || !activeNumber) return;
+
+      const contact = activeConversation.contact;
+
+      // The same thread is already on its way - a poll landing mid-request
+      // need not start a second one.
+      if (
+        threadFetch &&
+        threadFetch.contact === contact &&
+        threadFetch.activeNumber === activeNumber
+      ) {
+        return;
+      }
+
+      // A different thread was being fetched: the rep has moved on from it.
+      threadFetch?.controller.abort();
+
+      const controller = new AbortController();
+      const thisFetch = { contact, activeNumber, controller, timedOut: false };
+      threadFetch = thisFetch;
+      const timeout = setTimeout(() => {
+        thisFetch.timedOut = true;
+        controller.abort();
+      }, THREAD_FETCH_TIMEOUT_MS);
+
+      // Still the thread on screen, on the same line, and not superseded.
+      const stillWanted = () =>
+        threadFetch === thisFetch &&
+        activeConversation &&
+        activeConversation.contact === contact &&
+        fromNumberEl.value === activeNumber;
 
       try {
-        isHydratingThread = true;
-
         const query = new URLSearchParams({
           activeNumber,
-          contact: activeConversation.contact
+          contact
         });
 
         const res = await fetch(`/api/twilio?twilioResource=thread&${query.toString()}`, {
-          cache: "no-store"
+          cache: "no-store",
+          signal: controller.signal
         });
 
         // Check the status before parsing. A timeout or a 500 answers with an
@@ -2085,20 +2338,43 @@
           throw new Error("Could not load this conversation. Try again.");
         }
 
-        const refreshedConversation = conversations.find((conv) => conv.contact === activeConversation.contact);
+        // The rep opened something else while this was loading. Writing it
+        // now would put this contact's messages under that one's header.
+        if (!stillWanted()) return;
+
+        hydratedThread = { contact, activeNumber, messages: data.messages };
+
+        const refreshedConversation = conversations.find((conv) => conv.contact === contact);
         if (!refreshedConversation) return;
 
-        refreshedConversation.messages = data.messages;
+        withHydratedMessages(refreshedConversation);
         refreshedConversation.lastMessage = data.messages[data.messages.length - 1]?.body || refreshedConversation.lastMessage;
         activeConversation = refreshedConversation;
         renderActiveConversation();
+
+        // A thread that loaded clears the error a previous attempt left.
+        if (statusEl.classList.contains("error") && statusEl.dataset.source === "thread") {
+          clearStatus();
+        }
       } catch (err) {
+        // Aborted because the rep opened another thread: not a failure.
+        if (!stillWanted()) return;
+
         // Reported even on a background refresh. Staying quiet here is what
         // made a failure look like the dashboard glitching rather than like
         // something that had gone wrong and could be retried.
-        setStatus(err.message || "Could not load this conversation.", true);
+        setStatus(
+          thisFetch.timedOut
+            ? "This conversation is taking too long to load. Tap Sync to try again."
+            : err.message || "Could not load this conversation.",
+          true
+        );
+        statusEl.dataset.source = "thread";
       } finally {
-        isHydratingThread = false;
+        clearTimeout(timeout);
+        if (threadFetch === thisFetch) {
+          threadFetch = null;
+        }
       }
     }
 
@@ -2204,18 +2480,29 @@
         // thread for a result identical to the one already in hand.
         conversations = newConversations;
 
+        // On a phone nothing is opened for the rep. The page used to open the
+        // newest thread on load, which on a phone meant landing inside a
+        // conversation nobody chose - and kept a fetch for it running that
+        // the rep's own tap then had to fight (see threadFetch). They start
+        // on the list and open what they came for.
+        const fallback = isCompactLayout() ? null : conversations[0] || null;
+
         if (activeConversation) {
           const refreshed = conversations.find((c) => c.contact === activeConversation.contact);
-          activeConversation = refreshed || conversations[0] || null;
+          activeConversation = withHydratedMessages(refreshed) || fallback;
         } else {
-          activeConversation = conversations[0] || null;
+          activeConversation = fallback;
         }
 
         if (activeConversation) {
           toNumberEl.value = activeConversation.contact;
         }
 
-        renderConversationList();
+        if (silent) {
+          renderConversationListWhenIdle();
+        } else {
+          renderConversationList();
+        }
         renderActiveConversation();
         if (activeConversation) {
           hydrateActiveConversation(activeNumber);
@@ -2386,7 +2673,38 @@
 
     window.addEventListener("resize", () => {
       if (window.innerWidth > 900) closeSidebar();
+      // Shrunk into the phone layout with nothing open: show the list, not
+      // an empty thread screen.
+      else if (!activeConversation) setSidebarOpen(true);
     });
+
+    // Switching lines clears the open thread; on a phone, go back to the
+    // list rather than leave the rep on an empty thread screen.
+    fromNumberEl.addEventListener("change", () => {
+      if (isCompactLayout()) setSidebarOpen(true);
+    });
+
+    // See renderConversationListWhenIdle. Passive: these only observe, so
+    // they never hold up a scroll.
+    const sidebarScrollerEl = document.querySelector(".sidebar-body");
+    sidebarEl?.addEventListener("touchstart", () => {
+      sidebarTouching = true;
+    }, { passive: true });
+    ["touchend", "touchcancel"].forEach((type) => {
+      sidebarEl?.addEventListener(type, () => {
+        sidebarTouching = false;
+        // Momentum keeps the list moving after the finger lifts.
+        sidebarScrollSettlesAt = Math.max(sidebarScrollSettlesAt, Date.now() + 350);
+      }, { passive: true });
+    });
+    sidebarScrollerEl?.addEventListener("scroll", () => {
+      sidebarScrollSettlesAt = Date.now() + 350;
+    }, { passive: true });
+
+    // A phone starts on the conversation list (see loadMessages).
+    if (isCompactLayout()) {
+      setSidebarOpen(true);
+    }
   </script>
 </body>
 
