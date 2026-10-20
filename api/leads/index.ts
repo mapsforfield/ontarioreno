@@ -71,8 +71,7 @@ import { seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { isResubmission } from '../../lib/flow-resubmission.js';
 import { attributionFields } from '../../lib/traffic-attribution.js';
-import { selectOutcomeNudges, torontoNow, outcomeNudgePayload } from '../../lib/outcome-nudge.js';
-import { deliveryEnabled } from '../../lib/app-config.js';
+import { sendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -2992,73 +2991,6 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(404).json({ error: 'Unknown flow action.' });
-}
-
-/**
- * Push "How did it go?" to each rep whose visit ended 15 min – 6 h ago and has
- * no outcome yet. Production only (preview deployments never push), at most
- * once per appointment: the row is claimed by stamping outcomeNudgedAt with a
- * compare-and-set before anything is sent, so overlapping drains cannot both
- * send it.
- */
-async function sendOutcomeNudges(): Promise<{ nudged: number; skipped?: string }> {
-  if (!deliveryEnabled()) return { nudged: 0, skipped: 'not production' };
-  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-    return { nudged: 0, skipped: 'no VAPID keys' };
-  }
-  const { date, minutes } = torontoNow();
-  const candidates = await withTables(() =>
-    prisma.appointment.findMany({
-      where: {
-        appointmentDate: date,
-        outcomeSubmitted: false,
-        outcomeNudgedAt: null,
-        deletedAt: null,
-        status: { in: ['scheduled', 'confirmed', 'completed'] },
-      },
-      select: {
-        id: true,
-        appointmentDate: true,
-        appointmentTime: true,
-        durationMinutes: true,
-        status: true,
-        appointmentType: true,
-        outcomeSubmitted: true,
-        outcomeNudgedAt: true,
-        assignedRepId: true,
-        deletedAt: true,
-        customerName: true,
-        title: true,
-      },
-    })
-  );
-  const due = selectOutcomeNudges(candidates, date, minutes);
-  if (due.length === 0) return { nudged: 0 };
-
-  const webpush = await import('web-push');
-  webpush.default.setVapidDetails(
-    `mailto:${process.env.VAPID_CONTACT_EMAIL ?? 'noreply@ontarioreno.ca'}`,
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-
-  let nudged = 0;
-  for (const apt of due) {
-    const claimed = await prisma.appointment.updateMany({
-      where: { id: apt.id, outcomeNudgedAt: null },
-      data: { outcomeNudgedAt: new Date() },
-    });
-    if (claimed.count === 0) continue;
-    const subs = await prisma.pushSubscription.findMany({ where: { userId: apt.assignedRepId } });
-    const payload = JSON.stringify(outcomeNudgePayload(apt));
-    await Promise.allSettled(
-      subs.map((sub) =>
-        webpush.default.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload)
-      )
-    );
-    nudged += 1;
-  }
-  return { nudged };
 }
 
 // ─── Router (by query param — robust on Vercel, no catch-all) ─────────────────
