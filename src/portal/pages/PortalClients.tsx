@@ -14,7 +14,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
+import { Fragment, useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { dealMatchesClient } from '../data/clientLinks';
 import { usePortalData } from '../data/store';
@@ -278,6 +278,45 @@ export default function PortalClients() {
     );
   }, [clients, q]);
 
+  // Newest-first stays the default. A–Z adds letter headings and a letter rail
+  // so a rep can get to "S" in 668 clients without scrolling the whole list.
+  const [clientSort, setClientSortState] = useState<'recent' | 'az'>(() => {
+    try {
+      return localStorage.getItem('clients.sort') === 'az' ? 'az' : 'recent';
+    } catch {
+      return 'recent';
+    }
+  });
+  const setClientSort = (next: 'recent' | 'az') => {
+    setClientSortState(next);
+    try { localStorage.setItem('clients.sort', next); } catch { /* ignore */ }
+  };
+  const letterOf = (name: string) => {
+    const ch = name.trim().charAt(0).toUpperCase();
+    return ch >= 'A' && ch <= 'Z' ? ch : '#';
+  };
+  const listedClients = useMemo(
+    () =>
+      clientSort === 'az'
+        ? [...filteredClients].sort((a, b) =>
+            a.name.trim().localeCompare(b.name.trim(), 'en', { sensitivity: 'base' })
+          )
+        : filteredClients,
+    [filteredClients, clientSort]
+  );
+  const presentLetters = useMemo(() => {
+    if (clientSort !== 'az') return [];
+    const seen: string[] = [];
+    for (const c of listedClients) {
+      const l = letterOf(c.name);
+      if (!seen.includes(l)) seen.push(l);
+    }
+    return seen;
+  }, [listedClients, clientSort]);
+  const jumpToLetter = (letter: string) => {
+    document.getElementById(`client-letter-${letter}`)?.scrollIntoView({ block: 'start' });
+  };
+
   // Clients eligible to be added to a household being created
   const createMemberCandidates = useMemo(() => {
     const sq = householdMemberSearch.toLowerCase().trim();
@@ -513,16 +552,33 @@ export default function PortalClients() {
         </div>
       </header>
 
-      {/* Search */}
-      <div className="relative">
+      {/* Search + sort. Pinned under the top bar on phones so searching does
+          not mean scrolling back up through hundreds of names. */}
+      <div className="sticky top-20 z-20 -mx-1 flex items-center gap-2 bg-[#eef3f8] px-1 py-1 lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+      <div className="relative min-w-0 flex-1">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
           placeholder="Search by name, email, phone, city, postal code, or project type…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-[#32639b] focus:outline-none"
+          className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-3 pl-10 pr-4 text-base font-semibold text-slate-900 placeholder:text-slate-400 focus:border-[#32639b] focus:outline-none sm:text-sm"
         />
+      </div>
+      <div className="flex shrink-0 rounded-[0.5rem] border border-slate-200 bg-white p-0.5">
+        {([['recent', 'Newest'], ['az', 'A–Z']] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setClientSort(value)}
+            className={`rounded-[0.4rem] px-2.5 py-2 text-xs font-black transition ${
+              clientSort === value ? 'bg-[#1B3C6C] text-white' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       </div>
 
       {/* Stats bar */}
@@ -571,10 +627,22 @@ export default function PortalClients() {
             )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {filteredClients.map((client) => (
+          <div className={`divide-y divide-slate-100 ${clientSort === 'az' ? 'pr-6 sm:pr-0' : ''}`}>
+            {listedClients.map((client, index) => {
+              const letter = letterOf(client.name);
+              const startsLetter =
+                clientSort === 'az' && (index === 0 || letterOf(listedClients[index - 1].name) !== letter);
+              return (
+              <Fragment key={client.id}>
+              {startsLetter && (
+                <div
+                  id={`client-letter-${letter}`}
+                  className="scroll-mt-36 bg-slate-50 px-4 py-1.5 text-xs font-black text-[#32639b] lg:scroll-mt-4"
+                >
+                  {letter}
+                </div>
+              )}
               <button
-                key={client.id}
                 type="button"
                 onClick={() => openEdit(client)}
                 className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition hover:bg-slate-50/80"
@@ -618,10 +686,31 @@ export default function PortalClients() {
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
               </button>
-            ))}
+              </Fragment>
+              );
+            })}
           </div>
         )}
       </section>
+
+      {/* Letter rail: tap a letter to jump to that section (A–Z only). */}
+      {clientSort === 'az' && presentLetters.length > 1 && (
+        <nav
+          aria-label="Jump to letter"
+          className="fixed right-1 top-1/2 z-30 flex max-h-[70vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full bg-white/90 px-0.5 py-1 shadow-sm backdrop-blur-sm"
+        >
+          {presentLetters.map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => jumpToLetter(l)}
+              className="px-1.5 py-[1px] text-[0.62rem] font-black leading-tight text-[#1B3C6C]"
+            >
+              {l}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {/* ── Client slide-in panel ─────────────────────────────────────────── */}
       {isPanelOpen && (

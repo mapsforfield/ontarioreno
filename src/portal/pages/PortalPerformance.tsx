@@ -447,9 +447,11 @@ export default function PortalPerformance() {
                 Productivity and follow-through
               </h2>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-[62rem] w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            {/* Below md each rep reflows into a labelled card (cells name
+                themselves via data-label) instead of a 62rem sideways scroll. */}
+            <div className="md:overflow-x-auto">
+              <table className="block w-full text-left text-sm md:table md:min-w-[62rem]">
+                <thead className="hidden bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500 md:table-header-group">
                   <tr>
                     <th className="px-4 py-3">Rep</th>
                     <th className="px-4 py-3">Pipeline Value</th>
@@ -463,19 +465,19 @@ export default function PortalPerformance() {
                     <th className="px-4 py-3">Closed Volume</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="block divide-y divide-slate-200 md:table-row-group">
                   {repPerformance.map((rep) => (
-                    <tr key={rep.rep.id}>
-                      <td className="px-4 py-4 font-black text-slate-950">{rep.rep.name}</td>
-                      <td className="px-4 py-4 font-bold text-[#1B3C6C]">{formatCurrency(rep.pipelineValue)}</td>
-                      <td className="px-4 py-4 font-semibold">{rep.appointmentsCompleted}</td>
-                      <td className="px-4 py-4 font-semibold">{rep.proposalsSent}</td>
-                      <td className="px-4 py-4 font-semibold">{rep.wonDeals}</td>
-                      <td className="px-4 py-4 font-semibold">{rep.winRate}%</td>
-                      <td className="px-4 py-4 font-semibold">{rep.followUpsDueThisWeek}</td>
-                      <td className="px-4 py-4 font-semibold">{rep.avgDaysToClose > 0 ? `${rep.avgDaysToClose}d` : '—'}</td>
-                      <td className="px-4 py-4 font-bold">{formatCurrency(rep.pendingCommission)}</td>
-                      <td className="px-4 py-4 font-black">{formatCurrency(rep.closedVolume)}</td>
+                    <tr key={rep.rep.id} className="grid grid-cols-3 gap-x-3 gap-y-3 py-4 md:table-row md:py-0">
+                      <td className="col-span-3 block text-base md:table-cell md:px-4 md:py-4 md:text-sm font-black text-slate-950">{rep.rep.name}</td>
+                      <td data-label="Pipeline" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-bold text-[#1B3C6C]">{formatCurrency(rep.pipelineValue)}</td>
+                      <td data-label="Consults done" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.appointmentsCompleted}</td>
+                      <td data-label="Proposals" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.proposalsSent}</td>
+                      <td data-label="Won" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.wonDeals}</td>
+                      <td data-label="Win rate" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.winRate}%</td>
+                      <td data-label="Follow-ups due" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.followUpsDueThisWeek}</td>
+                      <td data-label="Avg days to close" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-semibold">{rep.avgDaysToClose > 0 ? `${rep.avgDaysToClose}d` : '—'}</td>
+                      <td data-label="Pending comm." className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-bold">{formatCurrency(rep.pendingCommission)}</td>
+                      <td data-label="Closed volume" className="block before:mb-0.5 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.08em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:px-4 md:py-4 md:before:hidden font-black">{formatCurrency(rep.closedVolume)}</td>
                     </tr>
                   ))}
                 </tbody>
