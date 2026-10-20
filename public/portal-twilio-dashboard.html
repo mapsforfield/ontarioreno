@@ -17,6 +17,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- iOS turns every phone number on the page into a call link, so a tap on
+       a conversation card opened Copy / Call / Video / Message instead of the
+       thread. Every number here is a contact to open, never one to dial. -->
+  <meta name="format-detection" content="telephone=no" />
   <title>OntarioReno Messages</title>
   <style>
     :root {
@@ -1068,6 +1072,17 @@
 
       .conversation-action-btn:hover {
         transform: translateY(-50%);
+      }
+
+      /* A card is a button. Without these, a press that lasted a moment too
+         long selected the number and raised iOS's text menu instead of
+         opening the thread. */
+      .conversation-item {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
       }
 
       /* The same number again, unformatted, under the formatted one. */
