@@ -173,6 +173,10 @@ export type Appointment = {
   outcomeNotes: string;
   objections: string;
   followUpDate: string;
+  /** Lost outcome reason — key from lib/lost-reasons.ts. */
+  lostReason?: string | null;
+  /** When the "how did it go?" push went to the rep (server-set). */
+  outcomeNudgedAt?: string | null;
   clientId?: string | null;
   /** Set when the consultation was booked from a Lead in the Sales Workspace. */
   leadId?: string | null;
@@ -322,6 +326,9 @@ export type Deal = {
    *  lib/deal-won-date.ts, never updatedAt: updatedAt moves on every edit, so
    *  it used to re-date old wins into the current month. */
   wonAt?: string | null;
+  /** Why it was lost — a key from lib/lost-reasons.ts. Asked on the move to Lost. */
+  lostReason?: string | null;
+  lostReasonNote?: string;
   activity: DealActivity[];
   createdAt: string;
   updatedAt: string;

@@ -49,6 +49,14 @@ test('a date that has passed without being closed out needs attention', () => {
   assert.equal(needsAttention(settled({ appointmentDate: '2026-08-01' }), ctx()), true);
 });
 
+test('a past no-show or cancellation is closed out, not past due', () => {
+  // The 30-second outcome sheet's "No-show" button sets exactly this. If it
+  // still counted, the rep would answer the question and the item would stay.
+  for (const status of ['no_show', 'cancelled'] as const) {
+    assert.equal(needsAttention(settled({ appointmentDate: '2026-08-01', status }), ctx()), false, status);
+  }
+});
+
 test('a hot or warm homeowner with no next step needs attention', () => {
   for (const level of ['hot', 'warm'] as const) {
     assert.equal(
