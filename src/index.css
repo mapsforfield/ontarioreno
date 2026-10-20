@@ -44,6 +44,38 @@
   select {
     background-color: transparent;
   }
+
+  /* A field inside a grid or flex item may never set that item's minimum
+     width. Without this, one wide control widens its whole column past the
+     screen and the page scrolls sideways on a phone. */
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* iOS Safari gives native date/time fields an intrinsic width that ignores
+   width: 100%. That one field pushed the Schedule Consultation form and the
+   Contract Creator wider than the screen, so the whole page slid sideways.
+   Dropping the native appearance lets them size like every other field; tapping
+   still opens the iOS picker. Scoped to iOS so desktop keeps its calendar icon. */
+@supports (-webkit-touch-callout: none) {
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  input[type='month'] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-height: 3.35rem;
+    text-align: left;
+  }
+
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
 }
 
 @layer utilities {
