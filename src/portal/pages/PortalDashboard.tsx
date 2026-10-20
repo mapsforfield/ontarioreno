@@ -31,6 +31,8 @@ import { ConsultationStage } from '../data/types';
 import { torontoToday } from '../lib/time';
 import { payDayMessage } from '../../../lib/payday';
 import EarningPotentialCard from '../components/EarningPotentialCard';
+import { REPLY_LABEL } from '../components/RepliesBox';
+import { OPEN_REPLY_STATUSES } from '../../../lib/sms-reply-resolution';
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -207,6 +209,24 @@ export default function PortalDashboard() {
       }
       items.push({ id: `consult-${a.id}`, kind: 'consult', title: a.customerName || a.title || 'Consultation', subtitle: [fmtTime12(a.appointmentTime), a.city || a.address].filter(Boolean).join(' · ') || 'Consultation today', href: '/portal/appointments', state: { openAppointmentId: a.id }, urgent: false, sort: a.appointmentTime ?? '00:00' });
     });
+    // Homeowner texts a rep has to act on (wants to cancel, running late…).
+    // Same scope as the Replies box: your own, or everyone's for an admin.
+    visibleAppointments
+      .filter((a) => OPEN_REPLY_STATUSES.has(a.smsReplyStatus ?? '') && (isAdmin || a.assignedRepId === currentUser?.id))
+      .forEach((a) => {
+        const label = REPLY_LABEL[a.smsReplyStatus ?? '']?.label ?? 'Texted back';
+        const quote = (a.smsReplyBody ?? '').trim();
+        items.push({
+          id: `reply-${a.id}`,
+          kind: 'consult',
+          title: `${a.customerName || 'Homeowner'} — ${label}`,
+          subtitle: quote ? `“${quote.length > 60 ? `${quote.slice(0, 57)}…` : quote}”` : 'Texted back',
+          href: `/portal/appointments?reply=${encodeURIComponent(a.id)}`,
+          urgent: true,
+          // Ahead of everything else that is urgent.
+          sort: '0',
+        });
+      });
     // Recent visits (last 14 days) still waiting on an outcome.
     const fortnightAgo = (() => {
       const d = new Date(`${today}T12:00:00Z`);

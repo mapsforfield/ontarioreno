@@ -23,6 +23,8 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import QuickOutcomeSheet from '../components/QuickOutcomeSheet';
+import RepliesBox, { REPLY_LABEL } from '../components/RepliesBox';
+import { OPEN_REPLY_STATUSES } from '../../../lib/sms-reply-resolution';
 import { usePortalAuth } from '../auth';
 
 import TrashPanel from '../components/TrashPanel';
@@ -550,6 +552,22 @@ function ReplyChip({
   body?: string;
   tone: 'onColor' | 'onWhite';
 }) {
+  if (status && status !== 'confirmed' && status !== 'reschedule_requested' && REPLY_LABEL[status]) {
+    // Labels read from a free-text reply (lib/sms-replies.ts). A suggestion for
+    // the rep, never a change to the booking.
+    const meta = REPLY_LABEL[status];
+    return (
+      <span
+        title={`Homeowner texted${body ? `: "${body}"` : ''} — nothing has been changed`}
+        className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[0.55rem] font-black uppercase tracking-wide ${
+          tone === 'onColor' ? 'bg-white/25 text-white ring-1 ring-white/40' : `ring-1 ${meta.tone}`
+        }`}
+      >
+        <MessageSquare className="h-2.5 w-2.5" />
+        {meta.label}
+      </span>
+    );
+  }
   if (status !== 'confirmed' && status !== 'reschedule_requested') return null;
   const confirmed = status === 'confirmed';
   const onWhite = confirmed
@@ -823,6 +841,8 @@ export default function PortalAppointments() {
   const [consultTabsAtEnd, setConsultTabsAtEnd] = useState(false);
   // 30-second outcome sheet — declared above the currentUser early return.
   const [quickOutcomeId, setQuickOutcomeId] = useState<string | null>(null);
+  // Push "X wants to cancel" deep-links here with ?reply=<id>.
+  const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
   const [mobileCalMode, setMobileCalMode] = useState<'grid' | 'map'>('grid');
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashedAppointments, setTrashedAppointments] = useState<Appointment[]>([]);
@@ -958,6 +978,14 @@ export default function PortalAppointments() {
     navigate(location.pathname, { replace: true, state: location.state });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, visibleAppointments.length]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('reply');
+    if (!id || !visibleAppointments.some((a) => a.id === id)) return;
+    setHighlightReplyId(id);
+    navigate(location.pathname, { replace: true, state: location.state });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, visibleAppointments.length]);
 
   const matchesConsultationFilter = (appointment: Appointment) => {
     if (consultationFilter === 'all') return true;
@@ -1081,6 +1109,9 @@ export default function PortalAppointments() {
       actions.push('Past due — update status');
     }
     if (!appointment.assignedRepId) actions.push('No rep assigned');
+    if (OPEN_REPLY_STATUSES.has(appointment.smsReplyStatus ?? '')) {
+      actions.push(`Texted: ${REPLY_LABEL[appointment.smsReplyStatus ?? '']?.label ?? 'needs reading'}`);
+    }
 
     let followUp: { label: string; overdue: boolean } | null = null;
     // A deal dragged to Lost stops asking to be followed up — see followUps.ts.
@@ -2549,6 +2580,16 @@ export default function PortalAppointments() {
           </button>
         </div>
       </header>
+
+      <RepliesBox
+        appointments={visibleAppointments}
+        getRepName={getRepName}
+        highlightId={highlightReplyId}
+        onReschedule={(apt) => {
+          openAppointment(apt);
+          setPanelTab('details');
+        }}
+      />
 
       {/* Phones get one compact row; the four full cards filled the first
           screen before a single consultation showed. */}

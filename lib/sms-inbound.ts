@@ -16,14 +16,19 @@ import {
   replyAlertBody,
   replyAlertHtml,
   replyAlertSubject,
-  replyUnclearBody,
-  replyUnclearSubject,
+  readReplyBody,
+  readReplyPush,
+  readReplySubject,
+  READ_REPLY_STATUS,
+  OPEN_REPLY_STATUSES,
   rescheduleAckSms,
   shouldRelayDownstream,
   verifyTwilioSignature,
   type ReplyIntent,
 } from './sms-replies.js';
 import { drainOutbox } from './notification-drain.js';
+import { classifyAppointmentReply } from './sms-reply-classify.js';
+import { deliveryEnabled } from './app-config.js';
 import { handleLeadReply, type LeadInboundStore } from './lead-inbound.js';
 
 /** Empty TwiML — we answer the homeowner through the outbox, not the webhook
@@ -119,7 +124,40 @@ type Store = {
     findMany: (args: unknown) => Promise<Array<Record<string, unknown>>>;
     update: (args: unknown) => Promise<unknown>;
   };
+  pushSubscription?: {
+    findMany: (args: unknown) => Promise<Array<{ endpoint: string; p256dh: string; auth: string }>>;
+  };
 };
+
+/** Push to the assigned rep's devices. Production only; never throws. */
+async function pushToRep(
+  prisma: Store,
+  repId: string,
+  payload: object,
+  env: NodeJS.ProcessEnv
+): Promise<void> {
+  if (!repId || !prisma.pushSubscription || !deliveryEnabled(env)) return;
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
+  try {
+    const webpush = await import('web-push');
+    webpush.default.setVapidDetails(
+      `mailto:${env.VAPID_CONTACT_EMAIL ?? 'noreply@ontarioreno.ca'}`,
+      env.VAPID_PUBLIC_KEY,
+      env.VAPID_PRIVATE_KEY
+    );
+    const subs = await prisma.pushSubscription.findMany({ where: { userId: repId } });
+    await Promise.allSettled(
+      subs.map((sub) =>
+        webpush.default.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          JSON.stringify(payload)
+        )
+      )
+    );
+  } catch (err) {
+    console.error('[sms-inbound] rep push failed:', err);
+  }
+}
 
 /** Ontario wall clock, as the same "YYYY-MM-DDTHH:MM" shape appointments use. */
 export function ontarioNow(at = new Date()): string {
@@ -268,13 +306,38 @@ export async function handleInboundSms(
     rawBody: body,
   } as const;
 
-  // ── An unreadable reply goes straight to the rep, uninterpreted ──
-  // "Cancel", "Running late", "Can we do Friday instead" all land here. We make
-  // no claim about what they mean and change nothing — but silence loses real
-  // messages the night before a visit, so a human sees the words.
+  // ── A free-text reply is READ, labelled, and handed to the rep ──
+  // "Please cancel", "Cance", "I want to reschedule, I'll let you know", "Ok".
+  // lib/sms-reply-classify.ts says what it most likely means; the label goes on
+  // the appointment as an open item with one-tap actions in the portal, the rep
+  // gets a push and an email that lead with it. NOTHING about the booking
+  // changes and the homeowner is NOT texted — that rule from the literal-C/R
+  // design stands. See the "Reading a free-text reply" section of
+  // lib/sms-replies.ts for why.
   if (intent === 'unknown') {
+    const read = await classifyAppointmentReply(body, {
+      customerName: ctx.customerName,
+      whenLabel: `${ctx.date} ${ctx.time}`,
+    }, env);
+    const flag = READ_REPLY_STATUS[read];
+    const existing = String(appointment.smsReplyStatus ?? '');
+    // A trailing "Ok"/"thanks" must not erase "wants to cancel" sent a minute
+    // earlier. Anything with content replaces the previous flag (latest wins).
+    const keepExisting = read === 'acknowledged' && (OPEN_REPLY_STATUSES.has(existing) || existing === 'confirmed');
+    await prisma.appointment
+      .update({
+        where: { id: appointment.id },
+        data: {
+          ...(keepExisting ? {} : { smsReplyStatus: flag }),
+          smsReplyAt: receivedAt,
+          smsReplyBody: body,
+        },
+      })
+      .catch((err: unknown) => console.error('[sms-inbound] could not stamp appointment:', err));
+
     if (rep?.email) {
-      const unclear = {
+      const content = {
+        intent: read,
         repName: rep.name ?? '',
         customerName: ctx.customerName,
         customerPhone: from,
@@ -290,8 +353,8 @@ export async function handleInboundSms(
             channel: 'email',
             kind: 'reply_unclear',
             recipient: rep.email,
-            subject: replyUnclearSubject(unclear),
-            body: replyUnclearBody(unclear),
+            subject: readReplySubject(content),
+            body: readReplyBody(content),
             html: '',
             sendAfter: receivedAt,
             expiresAt: '',
@@ -305,8 +368,21 @@ export async function handleInboundSms(
         console.error('[sms-inbound] inline drain failed:', err);
       }
     }
-    // Deliberately no smsReplyStatus stamp: we do not know what they meant, and
-    // a chip claiming otherwise is worse than no chip.
+    if (OPEN_REPLY_STATUSES.has(flag) && !keepExisting) {
+      await pushToRep(
+        prisma,
+        String(appointment.assignedRepId ?? ''),
+        readReplyPush({
+          intent: read,
+          appointmentId: String(appointment.id),
+          customerName: ctx.customerName,
+          date: ctx.date,
+          time: ctx.time,
+          rawBody: body,
+        }),
+        env
+      );
+    }
     return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
   }
 

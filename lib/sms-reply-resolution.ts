@@ -32,6 +32,22 @@
 /** The chip's "wants to move" state, as stamped by lib/sms-inbound.ts. */
 export const RESCHEDULE_REQUESTED = 'reschedule_requested';
 
+/**
+ * Every reply flag that is work for a rep. Since free-text replies are read
+ * and labelled (lib/sms-replies.ts → READ_REPLY_STATUS), "wants to move" is
+ * one of several; the same two answers end all of them — the rep changed the
+ * status, or moved the visit. Lives here, not in sms-replies.ts, because the
+ * portal imports this module and sms-replies.ts pulls in node:crypto.
+ */
+export const OPEN_REPLY_STATUSES = new Set([
+  'cancel_requested',
+  RESCHEDULE_REQUESTED,
+  'running_late',
+  'likely_confirmed',
+  'question',
+  'needs_reading',
+]);
+
 export type ReplyResolutionBefore = {
   smsReplyStatus?: string | null;
   status?: string | null;
@@ -52,7 +68,7 @@ export function resolvesRescheduleRequest(
   updates: Record<string, unknown>
 ): boolean {
   if (!before) return false;
-  if (before.smsReplyStatus !== RESCHEDULE_REQUESTED) return false;
+  if (!OPEN_REPLY_STATUSES.has(before.smsReplyStatus ?? '')) return false;
 
   // An explicit smsReplyStatus in the payload wins — a caller saying what the
   // flag should be is not something to second-guess.
