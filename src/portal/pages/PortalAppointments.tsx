@@ -2,6 +2,7 @@ import {
   ArrowRightLeft,
   CalendarDays,
   Check,
+  ClipboardCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import QuickOutcomeSheet from '../components/QuickOutcomeSheet';
 import { usePortalAuth } from '../auth';
 
 import TrashPanel from '../components/TrashPanel';
@@ -819,6 +821,8 @@ export default function PortalAppointments() {
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
   const [consultTabsAtEnd, setConsultTabsAtEnd] = useState(false);
+  // 30-second outcome sheet — declared above the currentUser early return.
+  const [quickOutcomeId, setQuickOutcomeId] = useState<string | null>(null);
   const [mobileCalMode, setMobileCalMode] = useState<'grid' | 'map'>('grid');
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashedAppointments, setTrashedAppointments] = useState<Appointment[]>([]);
@@ -937,6 +941,24 @@ export default function PortalAppointments() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, visibleAppointments.length]);
 
+  // ── 30-second outcome sheet ──
+  // Opened by the "How did it go?" push (/portal/appointments?outcome=<id>),
+  // and by the "Log outcome" button on any visit that is over with no outcome.
+  const quickOutcomeAppointment = quickOutcomeId
+    ? visibleAppointments.find((a) => a.id === quickOutcomeId) ?? null
+    : null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('outcome');
+    if (!id) return;
+    // Wait for the consultations to load — same reason as the dashboard link
+    // above: a push tapped on a cold start arrives before the data does.
+    if (!visibleAppointments.some((a) => a.id === id)) return;
+    setQuickOutcomeId(id);
+    navigate(location.pathname, { replace: true, state: location.state });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, visibleAppointments.length]);
+
   const matchesConsultationFilter = (appointment: Appointment) => {
     if (consultationFilter === 'all') return true;
     if (consultationFilter === 'scheduled') {
@@ -1028,6 +1050,19 @@ export default function PortalAppointments() {
     }
   };
   const lostDeals = lostDealIds(deals);
+  /** The visit is over (or marked completed) and nobody has said how it went. */
+  const outcomeDue = (appointment: Appointment) => {
+    if (isEventType(appointment.appointmentType) || appointment.outcomeSubmitted) return false;
+    if (['cancelled', 'no_show', 'rescheduled'].includes(appointment.status)) return false;
+    if (appointment.status === 'completed') return true;
+    if (appointment.appointmentDate < today) return true;
+    if (appointment.appointmentDate > today || !appointment.appointmentTime) return false;
+    const [h, m] = appointment.appointmentTime.split(':').map(Number);
+    const end = h * 60 + m + (appointment.durationMinutes || 60);
+    const nowParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const nowMin = (Number(nowParts.find((x) => x.type === 'hour')?.value ?? 0) % 24) * 60 + Number(nowParts.find((x) => x.type === 'minute')?.value ?? 0);
+    return nowMin >= end;
+  };
   const getAttentionInfo = (appointment: Appointment) => {
     const actions: string[] = [];
     // Events (showroom visit, supplier meeting, etc.) don't have outcome
@@ -1041,7 +1076,7 @@ export default function PortalAppointments() {
     }
     if (
       appointment.appointmentDate < today &&
-      !['completed', 'cancelled'].includes(appointment.status)
+      !['completed', 'cancelled', 'no_show'].includes(appointment.status)
     ) {
       actions.push('Past due — update status');
     }
@@ -2110,6 +2145,19 @@ export default function PortalAppointments() {
           </span>
         </button>
 
+        {canUseRepActions && outcomeDue(appointment) && (
+          <div className="px-4 pb-3">
+            <button
+              type="button"
+              onClick={() => setQuickOutcomeId(appointment.id)}
+              className="flex w-full items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-3 py-2.5 text-sm font-black text-white shadow-sm transition active:scale-[0.99]"
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              How did it go? Log outcome
+            </button>
+          </div>
+        )}
+
         {/* ── Expanded detail panel ── */}
         {isRowExpanded && (
           <div className="border-t border-slate-100 px-4 pb-4 pt-3">
@@ -2409,6 +2457,18 @@ export default function PortalAppointments() {
 
   return (
     <div className="space-y-5">
+      {quickOutcomeAppointment && (
+        <QuickOutcomeSheet
+          appointment={quickOutcomeAppointment}
+          onClose={() => setQuickOutcomeId(null)}
+          onOpenFullForm={() => {
+            const apt = quickOutcomeAppointment;
+            setQuickOutcomeId(null);
+            openAppointment(apt);
+            if (!isEventType(apt.appointmentType)) setPanelTab('outcome');
+          }}
+        />
+      )}
       {/* Notes full-preview modal */}
       {notesModal !== null && (
         <div
@@ -3863,7 +3923,7 @@ export default function PortalAppointments() {
 
       {(isCreating || selectedAppointment) && (
         <div className="fixed inset-0 z-[95] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -5209,7 +5269,7 @@ export default function PortalAppointments() {
 
       {isDispatchPanelOpen && selectedAppointment && (
         <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -5475,7 +5535,7 @@ export default function PortalAppointments() {
       {/* ── Days Off Panel ── */}
       {daysOffPanelOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
             {/* Header */}
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>

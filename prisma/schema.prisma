@@ -154,6 +154,11 @@ model Deal {
   /// Null on deals won before this column existed; scripts/deal-won-date-backfill.ts
   /// recovers those from the status-change entry in the Activity log.
   wonAt                DateTime?
+  /// Why the deal was lost — a key from lib/lost-reasons.ts, asked when a deal
+  /// moves to Lost. Null on deals lost before this existed or when skipped.
+  lostReason           String?
+  /// Optional free text beside the reason ("went with a cousin's company").
+  lostReasonNote       String   @default("")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -290,6 +295,12 @@ model Appointment {
   outcomeNotes             String   @default("")
   objections               String   @default("")
   followUpDate             String   @default("")
+  /// Why the homeowner said no, when the outcome was Lost. One of the keys in
+  /// lib/lost-reasons.ts; null when not lost or not answered.
+  lostReason               String?
+  /// When the "how did the visit go?" push went to the rep. Set once, so the
+  /// 15-minute drain never nudges the same visit twice. See lib/outcome-nudge.ts.
+  outcomeNudgedAt          DateTime?
   clientId                 String?
   /// Soft-delete timestamp — non-null means it's in the trash bin.
   deletedAt                DateTime?

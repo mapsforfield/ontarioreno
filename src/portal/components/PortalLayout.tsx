@@ -26,6 +26,7 @@ import {
   X, MessageSquare
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import PullToRefresh from './PullToRefresh';
 import {
   getPushPermissionState,
   registerPushNotifications,
@@ -310,7 +311,8 @@ export default function PortalLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-[#eef3f8] text-slate-950">
+    <div className="portal-app min-h-screen bg-[#eef3f8] text-slate-950">
+      <PullToRefresh onRefresh={refetch} />
       <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} className="fixed inset-x-0 top-0 z-40 border-b border-white/65 bg-white/88 px-4 pb-3 pt-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between">
           <img src="/logo.png" alt="OntarioReno" className="h-9 w-auto" />
@@ -539,7 +541,19 @@ export default function PortalLayout() {
               </div>
             </div>
           </div>
-          <Outlet />
+          {/* Keyed by route so each page fades in rather than snapping. The
+              four Performance tabs are one page (PortalAnalytics) on four
+              URLs — they share a key so switching tabs does not remount it. */}
+          <div
+            key={
+              ['/portal/performance', '/portal/sales-tracker', '/portal/leaderboard', '/portal/commissions'].includes(location.pathname)
+                ? 'analytics'
+                : location.pathname
+            }
+            className="portal-page"
+          >
+            <Outlet />
+          </div>
         </div>
       </main>
 

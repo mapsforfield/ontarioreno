@@ -91,8 +91,11 @@ export function needsAttention(
     // Interested homeowner with no next step booked — the expensive one to miss.
     (['hot', 'warm'].includes(appointment.homeownerInterestLevel ?? '') &&
       appointment.nextStep === 'no_action') ||
-    // The date has passed and it was never closed out.
-    (appointment.appointmentDate < today && appointment.status !== 'completed') ||
+    // The date has passed and it was never closed out. A no-show or a
+    // cancellation IS closed out — counting them kept a visit the rep had
+    // already answered ("they weren't home") on the list forever.
+    (appointment.appointmentDate < today &&
+      !['completed', 'cancelled', 'no_show'].includes(appointment.status)) ||
     (!quiet && appointment.consultationStage === 'follow_up_required') ||
     // Waiting on us, not on the homeowner.
     stale('estimate_requested') ||

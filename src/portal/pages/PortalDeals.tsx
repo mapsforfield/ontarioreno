@@ -1,10 +1,13 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, MessageSquareText, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { dealWonDate } from '../../../lib/deal-won-date';
 import { type BoardPeriod, isDealInPeriod, periodLabel } from '../../../lib/deal-period';
+import { lostReasonLabel, summarizeLostReasons, type LostReasonKey } from '../../../lib/lost-reasons';
+import LostReasonDialog from '../components/LostReasonPicker';
+import SwipeActions, { type SwipeAction } from '../components/SwipeActions';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
@@ -334,6 +337,12 @@ export default function PortalDeals() {
   // Phones only: the filter row and the admin period card fold behind one
   // button so the first deal is on the first screen. Desktop always shows both.
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Asked whenever a deal moves to Lost (drag, menu, bulk, or the edit panel).
+  // Cancel leaves the deal where it was; Skip still marks it lost.
+  const [lostPrompt, setLostPrompt] = useState<{
+    name: string;
+    apply: (reason: LostReasonKey | null, note: string) => void;
+  } | null>(null);
   const [wonRange, setWonRange] = useState<RangeFilter>('year');
   const [lostRange, setLostRange] = useState<RangeFilter>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
@@ -377,6 +386,18 @@ export default function PortalDeals() {
   };
   const bulkSetStatus = (status: DealStatus) => {
     const n = selectedDealIds.size;
+    if (status === 'lost') {
+      const ids = [...selectedDealIds];
+      setLostPrompt({
+        name: `these ${n} homeowner${n !== 1 ? 's' : ''}`,
+        apply: (lostReason, lostReasonNote) => {
+          ids.forEach((id) => updateDeal(id, { status, nextFollowUpDate: '', lostReason, lostReasonNote }, currentUser ?? undefined));
+          showToast({ variant: 'success', message: `Moved ${n} deal${n !== 1 ? 's' : ''} to lost` });
+          exitSelectMode();
+        },
+      });
+      return;
+    }
     selectedDealIds.forEach((id) => updateDeal(id, { status, nextFollowUpDate: '' }, currentUser ?? undefined));
     showToast({ variant: 'success', message: `Moved ${n} deal${n !== 1 ? 's' : ''} to ${status.replace(/_/g, ' ')}` });
     exitSelectMode();
@@ -480,6 +501,7 @@ export default function PortalDeals() {
       wonCount: won.length,
       wonValue: sum(won),
       lostCount: lost.length,
+      lostReasons: summarizeLostReasons(lost),
       winRate: decided > 0 ? Math.round((won.length / decided) * 100) : null,
     };
   })();
@@ -508,6 +530,14 @@ export default function PortalDeals() {
     setContextMenu(null);
     if (deal.status === status || !currentUser) return;
     celebrateIfWon(deal.status, status, deal);
+    if (status === 'lost') {
+      setLostPrompt({
+        name: deal.homeownerName,
+        apply: (lostReason, lostReasonNote) =>
+          updateDeal(deal.id, { status, nextFollowUpDate: '', lostReason, lostReasonNote }, currentUser),
+      });
+      return;
+    }
     // Moving stages implies the pending follow-up was completed — clear it
     updateDeal(deal.id, { status, nextFollowUpDate: '' }, currentUser);
   };
@@ -824,12 +854,24 @@ export default function PortalDeals() {
       const statusChanged = form.status !== selectedDeal.status;
       const followUpUntouched = form.nextFollowUpDate === selectedDeal.nextFollowUpDate;
       celebrateIfWon(selectedDeal.status, form.status, { ...selectedDeal, estimatedJobValue: Number(form.estimatedJobValue) || selectedDeal.estimatedJobValue });
-      updateDeal(selectedDeal.id, {
+      const edit = {
         ...dealPayload,
         status: form.status,
         nextFollowUpDate:
           statusChanged && followUpUntouched ? '' : form.nextFollowUpDate,
-      }, currentUser);
+      };
+      if (statusChanged && form.status === 'lost') {
+        const dealId = selectedDeal.id;
+        setLostPrompt({
+          name: selectedDeal.homeownerName,
+          apply: (lostReason, lostReasonNote) => {
+            updateDeal(dealId, { ...edit, lostReason, lostReasonNote }, currentUser);
+            closePanel();
+          },
+        });
+        return;
+      }
+      updateDeal(selectedDeal.id, edit, currentUser);
     }
 
     closePanel();
@@ -1108,6 +1150,17 @@ OntarioReno Broker Portal`;
 
   return (
     <div className="space-y-5">
+      {lostPrompt && (
+        <LostReasonDialog
+          dealName={lostPrompt.name}
+          onCancel={() => setLostPrompt(null)}
+          onConfirm={(reason, note) => {
+            const { apply } = lostPrompt;
+            setLostPrompt(null);
+            apply(reason, note);
+          }}
+        />
+      )}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
@@ -1386,6 +1439,27 @@ OntarioReno Broker Portal`;
               </div>
             ))}
           </div>
+          {/* Why we lose — only reasons captured since this was added; older
+              losses are counted as "No reason given" rather than hidden. */}
+          {periodSummary.lostCount > 0 && (
+            <div className="mt-3 rounded-[0.5rem] border border-slate-100 bg-slate-50 px-3 py-2">
+              <p className="text-[0.62rem] font-black uppercase tracking-[0.12em] text-slate-400">Why deals were lost</p>
+              <div className="mt-1.5 space-y-1">
+                {periodSummary.lostReasons.map((r) => (
+                  <div key={r.key ?? 'none'} className="flex items-center gap-2 text-xs font-bold">
+                    <span className={cn('w-40 shrink-0 truncate', r.key ? 'text-slate-700' : 'text-slate-400')}>{r.label}</span>
+                    <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200">
+                      <span
+                        className={cn('block h-full rounded-full', r.key ? 'bg-slate-600' : 'bg-slate-300')}
+                        style={{ width: `${Math.round((r.count / periodSummary.lostCount) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="w-6 shrink-0 text-right tabular-nums text-slate-500">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {boardPeriodActive && (
             <p className="mt-2 text-[0.68rem] font-semibold text-slate-400">
               Open deals by date created · Won by win date · Lost by last update
@@ -1617,8 +1691,30 @@ OntarioReno Broker Portal`;
                         isOpenDeal && deal.nextFollowUpDate !== '' && deal.nextFollowUpDate < todayIso();
 
                       return (
-                        <div
+                        <SwipeActions
                           key={deal.id}
+                          enabled={!selectMode}
+                          actions={(() => {
+                            // Phone only (touch): swipe a card left for the
+                            // things a rep does from the list without opening it.
+                            const digits = (deal.phone || '').replace(/[^\d+]/g, '');
+                            const idx = columns.findIndex((c) => c.status === deal.status);
+                            const next = idx >= 0 && idx < columns.length - 1 ? columns[idx + 1] : null;
+                            const list: SwipeAction[] = [];
+                            if (digits) {
+                              list.push({ key: 'call', label: 'Call', icon: <Phone className="h-4 w-4" />, className: 'bg-emerald-600', href: `tel:${digits}` });
+                              list.push({ key: 'text', label: 'Text', icon: <MessageSquareText className="h-4 w-4" />, className: 'bg-sky-600', href: `sms:${digits}` });
+                            }
+                            if (next && next.status !== 'lost' && !['won', 'lost'].includes(deal.status)) {
+                              list.push({ key: 'next', label: next.label.replace('Appointment ', ''), icon: <ChevronRight className="h-4 w-4" />, className: 'bg-[#1B3C6C]', onSelect: () => moveDealToStatus(deal, next.status) });
+                            }
+                            if (!['won', 'lost'].includes(deal.status)) {
+                              list.push({ key: 'lost', label: 'Lost', icon: <XCircle className="h-4 w-4" />, className: 'bg-slate-500', onSelect: () => moveDealToStatus(deal, 'lost') });
+                            }
+                            return list;
+                          })()}
+                        >
+                        <div
                           role="button"
                           tabIndex={0}
                           draggable={!selectMode}
@@ -1692,6 +1788,12 @@ OntarioReno Broker Portal`;
                               <Clock className="h-2.5 w-2.5" />
                               {daysInStage === 0 ? 'Updated today' : `${daysInStage}d in stage`}
                             </span>
+                            {deal.status === 'lost' && (
+                              <span className="inline-flex items-center gap-1 text-slate-500">
+                                <XCircle className="h-2.5 w-2.5" />
+                                {lostReasonLabel(deal.lostReason)}
+                              </span>
+                            )}
                             {isOpenDeal && deal.nextFollowUpDate && (
                               <span
                                 className={cn(
@@ -1745,6 +1847,7 @@ OntarioReno Broker Portal`;
                             </div>
                           </div>
                         </div>
+                        </SwipeActions>
                       );
                     })}
                     {isWonColumn && hiddenOlderCount > 0 && (
@@ -1889,7 +1992,7 @@ OntarioReno Broker Portal`;
 
       {isPanelOpen && (
         <div className="fixed inset-0 z-[90] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3140,7 +3243,7 @@ OntarioReno Broker Portal`;
 
       {isDispatchPanelOpen && selectedDeal && (
         <div className="fixed inset-0 z-[100] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-l-[0.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3351,7 +3454,7 @@ OntarioReno Broker Portal`;
       {/* ── Trash bin ── */}
       {trashOpen && (
         <div className="fixed inset-0 z-[105] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">
-          <div className="ml-auto flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
+          <div className="portal-sheet ml-auto flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-[0_24px_80px_rgba(15,23,42,0.25)] sm:rounded-[0.5rem]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pb-5" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top, 0px)))' }}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Recently Deleted</p>

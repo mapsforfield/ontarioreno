@@ -180,9 +180,44 @@ export default function PortalDashboard() {
         items.push({ id: `task-${t.id}`, kind: 'task', title: t.title, subtitle: due < today ? 'Task · overdue' : 'Task · due today', href: '/portal/tasks', urgent: due < today, sort: t.dueAt ?? '' });
       }
     });
+    // A visit that is over with no outcome opens the 30-second outcome sheet
+    // instead of the full panel. Own visits only — an outcome is the job of
+    // whoever was in the house.
+    const torontoNowMin = (() => {
+      const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+      return (Number(p.find((x) => x.type === 'hour')?.value ?? 0) % 24) * 60 + Number(p.find((x) => x.type === 'minute')?.value ?? 0);
+    })();
+    const visitOver = (a: (typeof visibleAppointments)[number]) => {
+      if (a.appointmentDate < today) return true;
+      if (a.appointmentDate > today || !a.appointmentTime) return false;
+      const [h, m] = a.appointmentTime.split(':').map(Number);
+      return torontoNowMin >= h * 60 + m + (a.durationMinutes || 60);
+    };
+    const NON_VISITS = ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event'];
+    const outcomeOwed = (a: (typeof visibleAppointments)[number]) =>
+      a.assignedRepId === currentUser?.id &&
+      !a.outcomeSubmitted &&
+      !NON_VISITS.includes(a.appointmentType) &&
+      !['cancelled', 'no_show', 'rescheduled'].includes(a.status) &&
+      (a.status === 'completed' || visitOver(a));
     todayAppointments.forEach((a) => {
+      if (outcomeOwed(a)) {
+        items.push({ id: `consult-${a.id}`, kind: 'consult', title: a.customerName || a.title || 'Consultation', subtitle: 'Visit done · tap to log how it went', href: `/portal/appointments?outcome=${encodeURIComponent(a.id)}`, urgent: true, sort: a.appointmentTime ?? '00:00' });
+        return;
+      }
       items.push({ id: `consult-${a.id}`, kind: 'consult', title: a.customerName || a.title || 'Consultation', subtitle: [fmtTime12(a.appointmentTime), a.city || a.address].filter(Boolean).join(' · ') || 'Consultation today', href: '/portal/appointments', state: { openAppointmentId: a.id }, urgent: false, sort: a.appointmentTime ?? '00:00' });
     });
+    // Recent visits (last 14 days) still waiting on an outcome.
+    const fortnightAgo = (() => {
+      const d = new Date(`${today}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 14);
+      return d.toISOString().slice(0, 10);
+    })();
+    visibleAppointments
+      .filter((a) => a.appointmentDate < today && a.appointmentDate >= fortnightAgo && outcomeOwed(a))
+      .sort((x, y) => y.appointmentDate.localeCompare(x.appointmentDate))
+      .slice(0, 3)
+      .forEach((a) => items.push({ id: `outcome-${a.id}`, kind: 'consult', title: a.customerName || a.title || 'Consultation', subtitle: `Visited ${a.appointmentDate} · log how it went`, href: `/portal/appointments?outcome=${encodeURIComponent(a.id)}`, urgent: true, sort: a.appointmentDate }));
     visibleAppointments.forEach((a) => {
       if (a.appointmentDate === today) return; // already shown above
       if (followUpSilenced(a, lostDeals)) return;
