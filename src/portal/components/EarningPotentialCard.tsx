@@ -15,7 +15,7 @@ import { torontoToday, torontoDateKey } from '../lib/time';
  */
 export default function EarningPotentialCard() {
   const { currentUser, isAdmin } = usePortalAuth();
-  const { deals, getVisibleDealsForUser, defaultCommissionRate } = usePortalData();
+  const { deals, getVisibleDealsForUser, defaultCommissionRate, isLoading } = usePortalData();
 
   const cfg = isAdmin
     ? { max: 24, def: 12, tiers: [6, 12, 18] }
@@ -52,6 +52,31 @@ export default function EarningPotentialCard() {
   }, [currentUser, isAdmin, deals, getVisibleDealsForUser, defaultCommissionRate]);
 
   if (!currentUser || !model) return null;
+
+  // Before the first load the deal list is empty, so the card computed from the
+  // $85k fallback and "No closes yet" — then jumped to the real figures a
+  // second later. Hold the card's shape and show nothing until the data is in.
+  if (isLoading && deals.length === 0) {
+    return (
+      <section
+        aria-busy="true"
+        className="overflow-hidden rounded-[0.6rem] bg-[linear-gradient(135deg,#12294b_0%,#1B3C6C_45%,#2f5da0_100%)] p-5 text-white shadow-md sm:p-6"
+      >
+        <div className="flex items-center gap-2">
+          <Rocket className="h-4 w-4 text-amber-300" />
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Earning Potential</p>
+        </div>
+        <div className="mt-3 h-6 w-4/5 animate-pulse rounded bg-white/15" />
+        <div className="mt-2 h-6 w-1/2 animate-pulse rounded bg-white/15" />
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="h-16 animate-pulse rounded-[0.5rem] bg-white/10" />
+          <div className="h-16 animate-pulse rounded-[0.5rem] bg-white/10" />
+        </div>
+        <div className="mt-5 h-24 animate-pulse rounded-[0.5rem] bg-white/10" />
+      </section>
+    );
+  }
+
   const { perDeal, monthCount, monthEarned } = model;
 
   const monthly = perDeal * dealsPerMonth;

@@ -799,6 +799,11 @@ export default function PortalAppointments() {
   const [consultationFilter, setConsultationFilter] =
     useState<ConsultationFilter>('all');
   const [isCreating, setIsCreating] = useState(false);
+  // Phones, new bookings only: arrival, duration, reminder, status and stage
+  // almost always keep their defaults, so they fold behind one row. Editing an
+  // existing booking always shows them — status is what reps come to change.
+  const [showBookingExtras, setShowBookingExtras] = useState(false);
+  const foldBookingExtras = isCreating && !showBookingExtras;
   const [form, setForm] = useState<AppointmentFormState>(emptyForm);
   const [emailActionMessage, setEmailActionMessage] = useState('');
   const [sendingEmailType, setSendingEmailType] = useState<ConsultationEmailType | null>(null);
@@ -813,6 +818,7 @@ export default function PortalAppointments() {
   const [transferToRepId, setTransferToRepId] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [mobileConsultTab, setMobileConsultTab] = useState<'today' | 'upcoming' | 'attention' | 'calendar' | 'all'>('today');
+  const [consultTabsAtEnd, setConsultTabsAtEnd] = useState(false);
   const [mobileCalMode, setMobileCalMode] = useState<'grid' | 'map'>('grid');
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashedAppointments, setTrashedAppointments] = useState<Appointment[]>([]);
@@ -2022,12 +2028,13 @@ export default function PortalAppointments() {
   };
 
   const metrics = [
-    { detail: 'Scheduled for today', label: "Today's Consultations", value: todayAppointments.length },
-    { detail: 'Scheduled, confirmed, or rescheduled', label: 'Upcoming Consultations', value: upcomingAppointments.length },
-    { detail: 'Consultations completed', label: 'Completed Consultations', value: completedAppointments.length },
+    { detail: 'Scheduled for today', label: "Today's Consultations", short: 'Today', value: todayAppointments.length },
+    { detail: 'Scheduled, confirmed, or rescheduled', label: 'Upcoming Consultations', short: 'Upcoming', value: upcomingAppointments.length },
+    { detail: 'Consultations completed', label: 'Completed Consultations', short: 'Completed', value: completedAppointments.length },
     {
       detail: 'Performance prep',
       label: 'No-Shows',
+      short: 'No-shows',
       value: visibleAppointments.filter((appointment) => appointment.status === 'no_show').length,
     },
   ];
@@ -2427,16 +2434,20 @@ export default function PortalAppointments() {
           </div>
         </div>
       )}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      {/* On a phone the header used to stack three full-width buttons and a
+          two-line title above the list. One row of actions now, so Today is on
+          the first screen. */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
             Consultation Center
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
-            OntarioReno consultation board
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 sm:text-3xl">
+            <span className="sm:hidden">Consultations</span>
+            <span className="hidden sm:inline">OntarioReno consultation board</span>
           </h1>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-row gap-2">
           <button
             type="button"
             onClick={() => {
@@ -2447,14 +2458,14 @@ export default function PortalAppointments() {
               setDaysOffError('');
               setDaysOffPanelOpen(true);
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-5"
           >
             Days Off
           </button>
           <button
             type="button"
             onClick={openTrash}
-            className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="relative inline-flex shrink-0 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-4"
             title="Trash bin"
           >
             <Trash2 className="h-4 w-4" />
@@ -2468,25 +2479,31 @@ export default function PortalAppointments() {
           <button
             type="button"
             onClick={openCreatePanel}
-            className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158]"
+            className="order-first inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#153158] sm:order-none sm:flex-none sm:px-5"
           >
-            <Plus className="h-4 w-4" />
-            + Schedule Consultation
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Schedule</span>
+              <span className="hidden sm:inline">Schedule Consultation</span>
+            </span>
           </button>
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {/* Phones get one compact row; the four full cards filled the first
+          screen before a single consultation showed. */}
+      <section className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-[0.5rem] border border-white bg-white p-5 shadow-sm"
+            className="rounded-[0.5rem] border border-white bg-white px-2 py-2.5 text-center shadow-sm sm:p-5 sm:text-left"
           >
-            <p className="text-sm font-semibold text-slate-500">{metric.label}</p>
-            <p className="mt-3 text-3xl font-black tracking-[-0.02em]">
+            <p className="text-[0.62rem] font-bold uppercase tracking-[0.06em] text-slate-500 sm:hidden">{metric.short}</p>
+            <p className="hidden text-sm font-semibold text-slate-500 sm:block">{metric.label}</p>
+            <p className="mt-0.5 text-xl font-black tracking-[-0.02em] sm:mt-3 sm:text-3xl">
               {metric.value}
             </p>
-            <p className="mt-4 text-sm font-medium text-slate-500">
+            <p className="mt-4 hidden text-sm font-medium text-slate-500 sm:block">
               {metric.detail}
             </p>
           </article>
@@ -2496,7 +2513,18 @@ export default function PortalAppointments() {
       {/* ── Mobile section tab bar ─────────────────────────────── */}
       <div className="lg:hidden">
         <nav className="sticky top-20 z-20 -mx-4 border-b border-slate-100 bg-white/96 px-4 backdrop-blur-sm">
-          <div className="flex overflow-x-auto [scrollbar-width:none]">
+          {/* Five tabs do not fit a phone, and nothing showed the row scrolled:
+              "Calenda" just ended at the edge. The fade says there is more, and
+              goes away once the row is scrolled to its end. */}
+          <div
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              setConsultTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+            }}
+            className={`flex overflow-x-auto [scrollbar-width:none] ${
+              consultTabsAtEnd ? '' : '[mask-image:linear-gradient(to_right,black_80%,transparent)]'
+            }`}
+          >
             {(
               [
                 { key: 'today' as const, label: 'Today', count: todayAppointments.length },
@@ -2512,7 +2540,7 @@ export default function PortalAppointments() {
                   key={tab.key}
                   type="button"
                   onClick={() => setMobileConsultTab(tab.key)}
-                  className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-xs font-black transition ${
+                  className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-black transition ${
                     isActive
                       ? 'border-[#1B3C6C] text-[#1B3C6C]'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -4344,14 +4372,7 @@ export default function PortalAppointments() {
                   Email
                   <input value={form.email} onChange={(event) => updateForm('email', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  City
-                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} />
-                </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-                  Postal Code
-                  <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value)} placeholder="e.g. L6Y 4X2" />
-                </label>
+                {/* Address first: picking a suggestion fills City and Postal Code. */}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700 sm:col-span-2">
                   Address
                   <AddressAutocomplete
@@ -4369,6 +4390,14 @@ export default function PortalAppointments() {
                   <input value={form.unit} onChange={(event) => updateForm('unit', event.target.value)} placeholder="e.g. 12 (condos, townhomes)" />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  City
+                  <input value={form.city} onChange={(event) => updateForm('city', event.target.value)} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                  Postal Code
+                  <input value={form.postalCode} onChange={(event) => updateForm('postalCode', event.target.value)} placeholder="e.g. L6Y 4X2" />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Project Type
                   <input value={form.projectType} onChange={(event) => updateForm('projectType', event.target.value)} />
                 </label>
@@ -4380,22 +4409,35 @@ export default function PortalAppointments() {
                   Consultation Time
                   <input type="time" value={form.appointmentTime} onChange={(event) => updateForm('appointmentTime', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                {isCreating && (
+                  <button
+                    type="button"
+                    onClick={() => setShowBookingExtras((v) => !v)}
+                    className="flex items-center justify-between rounded-[0.5rem] border border-dashed border-slate-300 px-4 py-3 text-sm font-bold text-[#1B3C6C] sm:hidden"
+                    aria-expanded={!foldBookingExtras}
+                  >
+                    {foldBookingExtras
+                      ? 'More options: arrival, duration, reminder, status, stage'
+                      : 'Hide extra options'}
+                    <span aria-hidden="true">{foldBookingExtras ? '+' : '−'}</span>
+                  </button>
+                )}
+                <label className={`gap-1.5 text-sm font-bold text-slate-700 ${foldBookingExtras ? 'hidden sm:grid' : 'grid'}`}>
                   Arrival
                   <select value={form.arrivalWindowMinutes} onChange={(event) => updateForm('arrivalWindowMinutes', event.target.value)}>
                     <option value="0">Exact time</option>
                     <option value="120">2-hour window{form.appointmentTime ? ` (${fmtWhen({ appointmentTime: form.appointmentTime, arrivalWindowMinutes: 120 })})` : ''}</option>
                   </select>
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className={`gap-1.5 text-sm font-bold text-slate-700 ${foldBookingExtras ? 'hidden sm:grid' : 'grid'}`}>
                   Duration (minutes)
                   <input type="number" min={15} step={15} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className={`gap-1.5 text-sm font-bold text-slate-700 ${foldBookingExtras ? 'hidden sm:grid' : 'grid'}`}>
                   Reminder (minutes before)
                   <input type="number" min={5} step={5} value={form.reminderMinutes} onChange={(event) => updateForm('reminderMinutes', event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className={`gap-1.5 text-sm font-bold text-slate-700 ${foldBookingExtras ? 'hidden sm:grid' : 'grid'}`}>
                   Status
                   <select value={form.status} onChange={(event) => updateForm('status', event.target.value as AppointmentStatus)}>
                     {statusOptions.map((option) => (
@@ -4403,7 +4445,7 @@ export default function PortalAppointments() {
                     ))}
                   </select>
                 </label>
-                <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                <label className={`gap-1.5 text-sm font-bold text-slate-700 ${foldBookingExtras ? 'hidden sm:grid' : 'grid'}`}>
                   Consultation Stage
                   <select value={form.consultationStage} onChange={(event) => updateForm('consultationStage', event.target.value as ConsultationStage)}>
                     {stageSelectOptions.map((option) => (
@@ -4454,7 +4496,7 @@ export default function PortalAppointments() {
                           if (!tpl) return;
                           updateForm('customerNotes', form.customerNotes.trim() ? `${form.customerNotes.trim()}\n\n${tpl.body}` : tpl.body);
                         }}
-                        className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-[#1B3C6C]"
+                        className="w-auto rounded-full border border-slate-300 bg-white px-3 py-1 text-base font-bold text-[#1B3C6C] sm:text-xs"
                       >
                         <option value="">Insert template…</option>
                         {noteTemplates.map((t) => (

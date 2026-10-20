@@ -514,7 +514,77 @@ export default function PortalSubmissions() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Phones: one card per submission. The 12-column table needed a
+              sideways scroll and cut the phone number off at the edge. Same
+              rows, same tap target (opens the detail panel), same checkbox. */}
+          <ul className="divide-y divide-slate-100 md:hidden">
+            {visible.map((lead) => {
+              const appointment = lead.appointmentId
+                ? appointmentById.get(lead.appointmentId)
+                : undefined;
+              return (
+                <li
+                  key={lead.id}
+                  onClick={() => setSelectedId(lead.id)}
+                  className={`flex cursor-pointer items-start gap-3 px-4 py-3 ${
+                    selectedIds.has(lead.id) ? 'bg-[#f2f7fd]' : ''
+                  } ${lead.deletedAt ? 'opacity-60' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${lead.name}`}
+                    checked={selectedIds.has(lead.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleOne(lead.id)}
+                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#1B3C6C]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate font-bold text-slate-900">
+                        {lead.name}
+                        {lead.deletedAt ? (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-black text-slate-500">
+                            TRASHED
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 text-xs text-slate-500">{formatDate(lead.submittedAt)}</span>
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-slate-600">
+                      {[lead.phone, lead.resolvedMunicipality].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {lead.routingOutcome ? (
+                        <span
+                          className={`inline-block rounded-full border px-2 py-0.5 text-[0.6rem] font-black ${
+                            OUTCOME_STYLE[lead.routingOutcome] ?? 'border-slate-200 bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {OUTCOME_LABEL[lead.routingOutcome] ?? lead.routingOutcome}
+                        </span>
+                      ) : null}
+                      {lead.submissionContactedAt ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Contacted
+                        </span>
+                      ) : lead.appointmentId ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                          <CalendarCheck className="h-3.5 w-3.5" /> Booked{appointment ? ` · ${appointment.status}` : ''}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
+                          <Circle className="h-3.5 w-3.5" /> Needs contact
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300" />
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
                 <tr>
@@ -676,6 +746,7 @@ export default function PortalSubmissions() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
 
