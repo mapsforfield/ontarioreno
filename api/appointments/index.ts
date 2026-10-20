@@ -7,6 +7,7 @@ import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../.
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
+import { maybeSendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
 import { handleInboundSms } from '../../lib/sms-inbound.js';
 import { handleTwilioDashboard } from '../../lib/twilio-dashboard-api.js';
 import {
@@ -1042,6 +1043,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const appointments = await withSchema(() =>
       prisma.appointment.findMany({ where: { deletedAt: null }, orderBy: { appointmentDate: 'desc' } })
     );
+    // "How did it go?" pushes ride every portal load as well as the drain —
+    // the drain's GitHub schedule runs hours apart. See lib/outcome-nudge-send.ts.
+    await maybeSendOutcomeNudges();
     return res.status(200).json(appointments);
   }
 
