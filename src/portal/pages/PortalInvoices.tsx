@@ -137,8 +137,8 @@ export default function PortalInvoices() {
                 <tr className="border-b border-slate-100 text-left text-xs font-black uppercase tracking-wide text-slate-400">
                   <th className="px-4 py-2">Invoice</th>
                   <th className="px-4 py-2">Client</th>
-                  <th className="px-4 py-2">Subtotal</th>
-                  <th className="px-4 py-2">HST</th>
+                  <th className="hidden px-4 py-2 sm:table-cell">Subtotal</th>
+                  <th className="hidden px-4 py-2 sm:table-cell">HST</th>
                   <th className="px-4 py-2">Total</th>
                   <th className="hidden px-4 py-2 sm:table-cell">Sent to</th>
                   <th className="px-4 py-2">Date</th>
@@ -154,11 +154,11 @@ export default function PortalInvoices() {
                   >
                     <td className="px-4 py-2 font-black text-slate-900">#{row.invoiceNumber ?? '—'}</td>
                     <td className="px-4 py-2 font-bold text-slate-700">{row.customerName}</td>
-                    <td className="px-4 py-2 font-semibold text-slate-600">{money(row.baseAmount)}</td>
-                    <td className="px-4 py-2 font-semibold text-slate-600">{money(row.adjustmentsTotal)}</td>
+                    <td className="hidden px-4 py-2 font-semibold text-slate-600 sm:table-cell">{money(row.baseAmount)}</td>
+                    <td className="hidden px-4 py-2 font-semibold text-slate-600 sm:table-cell">{money(row.adjustmentsTotal)}</td>
                     <td className="px-4 py-2 font-black text-[#1B3C6C]">{money(row.netAmount)}</td>
                     <td className="hidden px-4 py-2 font-semibold text-slate-500 sm:table-cell">{row.sentTo || '—'}</td>
-                    <td className="px-4 py-2 font-semibold text-slate-500">{formatDate(row.createdAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-2 font-semibold text-slate-500">{formatDate(row.createdAt)}</td>
                     <td className="px-4 py-2 text-right">
                       <button
                         type="button"

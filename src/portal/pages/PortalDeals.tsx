@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -331,6 +331,9 @@ export default function PortalDeals() {
   const [contractorFilter, setContractorFilter] = useState('all');
   const [valueFilter, setValueFilter] = useState<ValueFilter>('all');
   const [staleOnly, setStaleOnly] = useState(false);
+  // Phones only: the filter row and the admin period card fold behind one
+  // button so the first deal is on the first screen. Desktop always shows both.
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [wonRange, setWonRange] = useState<RangeFilter>('year');
   const [lostRange, setLostRange] = useState<RangeFilter>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
@@ -1105,12 +1108,12 @@ OntarioReno Broker Portal`;
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
             Deal CRM
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 sm:text-3xl">
             Pipeline workspace
           </h1>
         </div>
@@ -1210,8 +1213,32 @@ OntarioReno Broker Portal`;
               <X className="h-3.5 w-3.5" />
             </button>
           )}
+          {(() => {
+            const activeCount =
+              (repFilter !== 'all' ? 1 : 0) +
+              (contractorFilter !== 'all' ? 1 : 0) +
+              (valueFilter !== 'all' ? 1 : 0) +
+              (staleOnly ? 1 : 0) +
+              (boardPeriodActive ? 1 : 0);
+            return (
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen((open) => !open)}
+                aria-expanded={mobileFiltersOpen}
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition lg:hidden',
+                  mobileFiltersOpen || activeCount > 0
+                    ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
+                    : 'border-slate-200 bg-white text-slate-600'
+                )}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+              </button>
+            );
+          })()}
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className={cn('mt-3 flex-wrap items-center gap-2 lg:flex', mobileFiltersOpen ? 'flex' : 'hidden')}>
           {isAdmin && (
             <select
               value={repFilter}
@@ -1292,7 +1319,7 @@ OntarioReno Broker Portal`;
 
       {/* ── Admin: board-wide period + what happened in it ── */}
       {isAdmin && (
-        <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
+        <section className={cn('rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block', mobileFiltersOpen ? 'block' : 'hidden')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-[#32639b]" />

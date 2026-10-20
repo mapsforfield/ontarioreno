@@ -192,12 +192,19 @@ export default function PortalTasks() {
             placeholder="Add a task — e.g. Call Audley about the quote"
             className="min-w-0 flex-1 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#1B3C6C]"
           />
-          <input
-            type="datetime-local"
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-            className="w-full shrink-0 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 outline-none focus:border-[#1B3C6C] sm:w-52"
-          />
+          {/* iOS renders an empty datetime field as a blank box with no hint,
+              which read as a broken second text field. The label says what it is. */}
+          <label className="flex shrink-0 items-center gap-2 sm:contents">
+            <span className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-slate-400 sm:hidden">Due</span>
+            <input
+              type="datetime-local"
+              value={due}
+              onChange={(e) => setDue(e.target.value)}
+              aria-label="Due date (optional)"
+              className="w-full shrink-0 rounded-[0.5rem] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 outline-none focus:border-[#1B3C6C] sm:w-52"
+            />
+            {!due && <span className="shrink-0 text-xs font-semibold text-slate-400 sm:hidden">optional</span>}
+          </label>
           <button
             type="button"
             onClick={submit}

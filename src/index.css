@@ -61,20 +61,23 @@
    Contract Creator wider than the screen, so the whole page slid sideways.
    Dropping the native appearance lets them size like every other field; tapping
    still opens the iOS picker. Scoped to iOS so desktop keeps its calendar icon. */
-@supports (-webkit-touch-callout: none) {
-  input[type='date'],
-  input[type='time'],
-  input[type='datetime-local'],
-  input[type='month'] {
-    -webkit-appearance: none;
-    appearance: none;
-    display: block;
-    min-height: 3.35rem;
-    text-align: left;
-  }
+@layer base {
+  @supports (-webkit-touch-callout: none) {
+    input[type='date'],
+    input[type='time'],
+    input[type='datetime-local'],
+    input[type='month'] {
+      -webkit-appearance: none;
+      appearance: none;
+      display: block;
+      /* An empty iOS date field otherwise collapses to a sliver. */
+      min-height: 2.75rem;
+      text-align: left;
+    }
 
-  input::-webkit-date-and-time-value {
-    text-align: left;
+    input::-webkit-date-and-time-value {
+      text-align: left;
+    }
   }
 }
 

@@ -532,9 +532,13 @@ export default function PortalCommissions() {
               {rateSaved && <span className="text-sm font-bold text-green-600">Saved!</span>}
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[76rem] w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+          {/* Below md the same cells reflow into one labelled card per deal
+              (each cell names itself via data-label). The 76rem table needed a
+              sideways scroll on a phone; this keeps one copy of the editing
+              logic instead of a second mobile layout that could drift. */}
+          <div className="md:overflow-x-auto">
+            <table className="block w-full text-left text-sm md:table md:min-w-[76rem]">
+              <thead className="hidden bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500 md:table-header-group">
                 <tr>
                   <th className="px-4 py-3">Rep</th>
                   <th className="px-4 py-3">Deal</th>
@@ -548,7 +552,7 @@ export default function PortalCommissions() {
                   <th className="px-4 py-3 bg-[#eef6ff]">Received</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="block divide-y divide-slate-200 md:table-row-group">
                 {sortCommissionRows(filteredRows, sortMode).map(({ commission, deal }) => {
                   if (!deal) return null;
                   const isCustom = commission.customPayout ?? false;
@@ -566,11 +570,11 @@ export default function PortalCommissions() {
                   const adminStatus = derivePayoutStatus(adminReceived, adminNet);
 
                   return (
-                    <tr key={commission.id} className="align-top">
-                      <td className="px-4 py-4 font-bold text-slate-900">
+                    <tr key={commission.id} className="grid grid-cols-2 gap-2 p-4 align-top md:table-row md:p-0">
+                      <td data-label="Rep" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-bold text-slate-900">
                         {getRepName(commission.repId)}
                       </td>
-                      <td className="px-4 py-4">
+                      <td data-label="Deal" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden col-span-2">
                         <p className="font-black text-slate-950">
                           {deal.homeownerName}
                         </p>
@@ -578,10 +582,10 @@ export default function PortalCommissions() {
                           {deal.projectType} - {getContractorName(deal)}
                         </p>
                       </td>
-                      <td className="px-4 py-4 font-semibold text-slate-600">
+                      <td data-label="Status" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-semibold text-slate-600">
                         {formatDealStatus(deal.status)}
                       </td>
-                      <td className="px-4 py-4">
+                      <td data-label="Job Value" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
                         <CommitNumberInput
                           value={deal.estimatedJobValue}
                           round
@@ -592,7 +596,7 @@ export default function PortalCommissions() {
                           }
                         />
                       </td>
-                      <td className="px-4 py-4">
+                      <td data-label="Total Rate" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
                         {isCustom ? (
                           <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
                         ) : (
@@ -613,7 +617,7 @@ export default function PortalCommissions() {
                           {isCustom ? 'Use % rate' : 'Custom'}
                         </button>
                       </td>
-                      <td className="px-4 py-4">
+                      <td data-label="Total Commission" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
                         <CommitNumberInput
                           value={commission.adminTotalEstimatedCommission ?? 0}
                           className="w-28"
@@ -623,7 +627,7 @@ export default function PortalCommissions() {
                         />
                       </td>
                       {/* ── Rep ledger ── */}
-                      <td className="px-4 py-4 bg-[#f6faff]">
+                      <td data-label="Rep Commission" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#f6faff]">
                         {isCustom ? (
                           <CommitNumberInput
                             value={commission.repEstimatedCommission}
@@ -640,7 +644,7 @@ export default function PortalCommissions() {
                           Remaining {formatCurrency(repRemaining)}
                         </p>
                       </td>
-                      <td className="px-4 py-4 bg-[#f6faff]">
+                      <td data-label="Paid to Rep" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#f6faff]">
                         <CommitNumberInput
                           value={commission.repPaidCommission}
                           className="w-28"
@@ -651,13 +655,13 @@ export default function PortalCommissions() {
                         <div><PayoutBadge status={repStatus} /></div>
                       </td>
                       {/* ── Your (admin) ledger ── */}
-                      <td className="px-4 py-4 font-black bg-[#eef6ff]">
+                      <td data-label="Your Net" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-black bg-[#eef6ff]">
                         {formatCurrency(adminNet)}
                         <p className="mt-1 text-xs font-semibold text-slate-500">
                           Remaining {formatCurrency(adminRemaining)}
                         </p>
                       </td>
-                      <td className="px-4 py-4 bg-[#eef6ff]">
+                      <td data-label="Received" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#eef6ff]">
                         <CommitNumberInput
                           value={adminReceived}
                           className="w-28"
@@ -698,7 +702,7 @@ export default function PortalCommissions() {
                   <tr className="border-b border-slate-100 text-left text-xs font-black uppercase tracking-wide text-slate-400">
                     <th className="px-4 py-2">Invoice</th>
                     <th className="px-4 py-2">Customer</th>
-                    <th className="px-4 py-2">Contractor</th>
+                    <th className="hidden px-4 py-2 sm:table-cell">Contractor</th>
                     <th className="px-4 py-2 text-right">Net</th>
                     <th className="hidden px-4 py-2 sm:table-cell">Sent to</th>
                     <th className="px-4 py-2">Date</th>
@@ -713,16 +717,19 @@ export default function PortalCommissions() {
                       className="cursor-pointer border-b border-slate-50 transition hover:bg-[#f6faff]"
                     >
                       <td className="px-4 py-2 font-black text-slate-900">#{inv.invoiceNumber ?? '—'}</td>
-                      <td className="px-4 py-2 font-semibold text-slate-700">{inv.customerName || '—'}</td>
-                      <td className="px-4 py-2 font-semibold text-slate-700">{inv.contractorName || '—'}</td>
+                      <td className="px-4 py-2 font-semibold text-slate-700">
+                        {inv.customerName || '—'}
+                        <span className="block text-xs text-slate-400 sm:hidden">{inv.contractorName || '—'}</span>
+                      </td>
+                      <td className="hidden px-4 py-2 font-semibold text-slate-700 sm:table-cell">{inv.contractorName || '—'}</td>
                       <td className="px-4 py-2 text-right font-black text-slate-900">
                         {formatCurrency(inv.netAmount)}
                         {inv.adjustmentsTotal !== 0 && (
-                          <span className="ml-1 text-xs font-semibold text-slate-400">(adj {formatCurrency(inv.adjustmentsTotal)})</span>
+                          <span className="ml-1 hidden text-xs font-semibold text-slate-400 sm:inline">(adj {formatCurrency(inv.adjustmentsTotal)})</span>
                         )}
                       </td>
                       <td className="hidden px-4 py-2 font-semibold text-slate-500 sm:table-cell">{inv.sentTo || '—'}</td>
-                      <td className="px-4 py-2 font-semibold text-slate-500">
+                      <td className="whitespace-nowrap px-4 py-2 font-semibold text-slate-500">
                         {new Date(inv.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td className="px-4 py-2 text-right">

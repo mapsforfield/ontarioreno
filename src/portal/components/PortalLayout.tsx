@@ -340,44 +340,9 @@ export default function PortalLayout() {
                 className="hidden"
               />
             </label>
-            {(
-              <button
-                type="button"
-                onClick={handleTogglePush}
-                disabled={pushState === 'registering'}
-                title={
-                  pushState === 'granted'
-                    ? 'Notifications on — tap to disable'
-                    : pushState === 'denied'
-                    ? 'Notifications blocked in browser settings'
-                    : pushState === 'unsupported'
-                    ? 'Add to Home Screen to enable push notifications'
-                    : 'Enable push notifications'
-                }
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition',
-                  pushState === 'granted'
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : pushState === 'denied' || pushState === 'unsupported'
-                    ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                    : 'border-slate-200 bg-white text-slate-600 hover:text-[#1B3C6C]'
-                )}
-              >
-                {pushState === 'granted' ? (
-                  <Bell className="h-4 w-4" />
-                ) : (
-                  <BellOff className="h-4 w-4" />
-                )}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-[#1B3C6C]"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            {/* Push toggle and sign out live in the More sheet on phones: a second
+                bell beside the activity bell read as a duplicate, and sign out
+                one tap from everything was too easy to hit by accident. */}
           </div>
         </div>
       </div>
@@ -656,7 +621,7 @@ export default function PortalLayout() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="grid gap-1 p-2">
+            <div className="grid max-h-[min(60vh,32rem)] gap-1 overflow-y-auto p-2">
               {mobileMoreItems.map((item) => (
                 <NavLink
                   key={item.href}
@@ -677,6 +642,40 @@ export default function PortalLayout() {
                   <span>{item.label}</span>
                 </NavLink>
               ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-2">
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                disabled={pushState === 'registering' || pushState === 'denied' || pushState === 'unsupported'}
+                className={cn(
+                  'flex items-center justify-center gap-2 rounded-[0.5rem] border px-3 py-3 text-sm font-bold transition',
+                  pushState === 'granted'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : pushState === 'denied' || pushState === 'unsupported'
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                    : 'border-slate-200 bg-white text-slate-600'
+                )}
+              >
+                {pushState === 'granted' ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+                {pushState === 'granted'
+                  ? 'Alerts on'
+                  : pushState === 'denied'
+                  ? 'Alerts blocked'
+                  : pushState === 'unsupported'
+                  ? 'Add to Home Screen'
+                  : pushState === 'registering'
+                  ? 'Turning on…'
+                  : 'Turn on alerts'}
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-600 transition hover:text-red-700"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
             </div>
           </div>
         </>

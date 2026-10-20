@@ -6,6 +6,7 @@ import {
   MapPin,
   Phone,
   Plus,
+  SlidersHorizontal,
   Star,
   Trash2,
   WalletCards,
@@ -318,6 +319,7 @@ export default function PortalContractors() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState('');
   const [serviceAreaFilter, setServiceAreaFilter] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [financePartnerFilter, setFinancePartnerFilter] = useState('');
   const [isManagingPartners, setIsManagingPartners] = useState(false);
 
@@ -572,13 +574,14 @@ export default function PortalContractors() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
             Contractor network
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
-            Approved contractor placeholders
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 sm:text-3xl">
+            <span className="sm:hidden">Contractors</span>
+            <span className="hidden sm:inline">Approved contractor placeholders</span>
           </h1>
         </div>
         {isAdmin && (
@@ -625,8 +628,23 @@ export default function PortalContractors() {
               {label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+            className={
+              mobileFiltersOpen || financePartnerFilter || projectTypeFilter || serviceAreaFilter
+                ? 'inline-flex items-center gap-1.5 rounded-full border border-[#1B3C6C] bg-[#e8f1fb] px-3 py-2 text-xs font-black text-[#1B3C6C] sm:hidden'
+                : 'inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 sm:hidden'
+            }
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            More filters
+          </button>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {/* Phones: partner / project type / service area fold away so the
+            contractors themselves are on the first screen. */}
+        <div className={`mt-3 gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-3 ${mobileFiltersOpen ? 'grid' : 'hidden'}`}>
           <label className="grid gap-1.5 text-sm font-bold text-slate-700">
             Financing Partner
             <select
@@ -668,10 +686,12 @@ export default function PortalContractors() {
           return (
             <article
               key={contractor.id}
-              className="flex flex-col rounded-[0.5rem] border border-white bg-white p-5 shadow-sm"
+              className="flex flex-col rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5"
             >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[0.5rem] bg-[#071525] text-white">
+            {/* Phones: logo, name and status share one row, and the card drops
+                to roughly a third of a screen (it was a full one). */}
+            <div className="flex items-start justify-between gap-3 sm:gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.5rem] bg-[#071525] text-white sm:h-12 sm:w-12">
                 {contractor.logoUrl ? (
                   <img
                     src={contractor.logoUrl}
@@ -682,13 +702,21 @@ export default function PortalContractors() {
                   <Building2 className="h-5 w-5" />
                 )}
               </div>
+              <div className="min-w-0 flex-1 sm:hidden">
+                <h2 className="truncate text-lg font-black leading-tight tracking-[-0.01em]">
+                  {contractor.companyName}
+                </h2>
+                <p className="truncate text-xs font-semibold text-slate-500">
+                  Contact: {contractor.contactName}
+                </p>
+              </div>
               <span
                 className={
                   contractor.contractorStatus === 'active'
-                    ? 'rounded-full bg-[#edf7ef] px-3 py-1 text-xs font-bold text-[#287247]'
+                    ? 'shrink-0 rounded-full bg-[#edf7ef] px-3 py-1 text-xs font-bold text-[#287247]'
                     : contractor.contractorStatus === 'pending'
-                      ? 'rounded-full bg-[#fff6df] px-3 py-1 text-xs font-bold text-[#8a6418]'
-                      : 'rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500'
+                      ? 'shrink-0 rounded-full bg-[#fff6df] px-3 py-1 text-xs font-bold text-[#8a6418]'
+                      : 'shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500'
                 }
               >
                 {contractor.contractorStatus === 'active'
@@ -698,18 +726,18 @@ export default function PortalContractors() {
                   : 'Inactive'}
               </span>
             </div>
-            <h2 className="mt-5 text-xl font-black tracking-[-0.01em]">
+            <h2 className="mt-5 hidden text-xl font-black tracking-[-0.01em] sm:block">
               {contractor.companyName}
             </h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="mt-1 hidden text-sm font-semibold text-slate-500 sm:block">
               Contact: {contractor.contactName}
             </p>
-            <div className="mt-5">
+            <div className="mt-3 sm:mt-5">
               <span
                 className={
                   contractor.financingStatus === 'financing_available'
-                    ? 'inline-flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-[#b8dfc1] bg-[#eaf8ee] px-3 py-2.5 text-sm font-black text-[#21683d] sm:w-auto'
-                    : 'inline-flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-[#d8d4c7] bg-[#f7f4eb] px-3 py-2.5 text-sm font-black text-[#63573c] sm:w-auto'
+                    ? 'inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-[#b8dfc1] bg-[#eaf8ee] px-3 py-1.5 text-xs font-black text-[#21683d] sm:py-2.5 sm:text-sm'
+                    : 'inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-[#d8d4c7] bg-[#f7f4eb] px-3 py-1.5 text-xs font-black text-[#63573c] sm:py-2.5 sm:text-sm'
                 }
               >
                 <WalletCards className="h-4 w-4" />
@@ -736,7 +764,7 @@ export default function PortalContractors() {
                 </div>
               )}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">
                 <Star className="h-3.5 w-3.5 text-[#d9a72f]" />
                 {contractor.projectTypes[0] ?? 'Project'}
@@ -746,17 +774,17 @@ export default function PortalContractors() {
                 {contractor.serviceAreas[0] ?? 'Ontario'}
               </span>
             </div>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-5 hidden h-1.5 overflow-hidden rounded-full bg-slate-100 sm:block">
               <div
                 className="h-full rounded-full bg-[#1B3C6C]"
                 style={{ width: `${Math.min(contractor.priorityScore, 100)}%` }}
               />
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-200 pt-4">
+            <div className="mt-3 grid grid-cols-4 gap-1.5 border-t border-slate-200 pt-3 sm:mt-5 sm:grid-cols-2 sm:gap-2 sm:pt-4">
               {telHref ? (
                 <a
                   href={telHref}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C]"
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-1 text-xs font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C] sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
                   title={`Call ${contractor.contactName}`}
                 >
                   <Phone className="h-4 w-4" />
@@ -766,7 +794,7 @@ export default function PortalContractors() {
                 <button
                   type="button"
                   disabled
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-400"
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-1 text-xs font-bold text-slate-400 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
                   title="No phone number available"
                 >
                   <Phone className="h-4 w-4" />
@@ -776,29 +804,31 @@ export default function PortalContractors() {
               <button
                 type="button"
                 onClick={() => openProposalPanel(contractor)}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C]"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-1 text-xs font-bold text-slate-600 transition hover:border-[#b8c9dd] hover:bg-white hover:text-[#1B3C6C] sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
               >
-                <Mail className="h-4 w-4" />
-                Send Proposal
+                <Mail className="h-4 w-4 shrink-0" />
+                <span className="sm:hidden">Proposal</span>
+                <span className="hidden sm:inline">Send Proposal</span>
               </button>
               <button
                 type="button"
                 onClick={() => openDetails(contractor)}
                 className={
                   isAdmin
-                    ? 'inline-flex min-h-11 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]'
-                    : 'col-span-2 inline-flex min-h-11 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-3 text-sm font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb]'
+                    ? 'inline-flex min-h-10 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] sm:min-h-11 sm:px-3 sm:text-sm'
+                    : 'col-span-2 inline-flex min-h-10 items-center justify-center rounded-[0.5rem] border border-[#b8c9dd] bg-[#f6faff] px-1 text-xs font-bold text-[#1B3C6C] transition hover:bg-[#e8f1fb] sm:min-h-11 sm:px-3 sm:text-sm'
                 }
               >
-                View Details
+                <span className="sm:hidden">Details</span>
+                <span className="hidden sm:inline">View Details</span>
               </button>
               {isAdmin && (
                 <button
                   type="button"
                   onClick={() => openEditContractor(contractor)}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C]"
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-white px-1 text-xs font-bold text-slate-700 transition hover:border-[#b8c9dd] hover:text-[#1B3C6C] sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Pencil className="h-4 w-4 shrink-0" />
                   Edit
                 </button>
               )}

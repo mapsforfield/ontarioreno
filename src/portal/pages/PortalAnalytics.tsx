@@ -20,12 +20,14 @@ export default function PortalAnalytics() {
 
   return (
     <div className="space-y-5">
-      <div className="-mx-1 flex gap-1 overflow-x-auto rounded-[0.6rem] border border-slate-200 bg-white p-1 shadow-sm">
+      {/* Four equal columns on a phone so "Commissions" is never cut off at the
+          edge; a scrolling row from sm up. */}
+      <div className="-mx-1 grid grid-cols-4 gap-1 rounded-[0.6rem] border border-slate-200 bg-white p-1 shadow-sm sm:flex sm:overflow-x-auto">
         {TABS.map((t) => (
           <Link
             key={t.key}
             to={t.path}
-            className={`shrink-0 rounded-[0.5rem] px-4 py-2 text-sm font-bold transition ${
+            className={`min-w-0 shrink-0 truncate rounded-[0.5rem] px-1 py-2 text-center text-[0.72rem] font-bold transition sm:px-4 sm:text-sm ${
               active === t.key ? 'bg-[#1B3C6C] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
