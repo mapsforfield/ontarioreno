@@ -345,7 +345,7 @@ export default function PortalDeals() {
   const [wonRange, setWonRange] = useState<RangeFilter>('year');
   const [lostRange, setLostRange] = useState<RangeFilter>('year');
   const [showOlderWon, setShowOlderWon] = useState(false);
-  // Admin-only board-wide period ("everything from this month"). 'all' is the
+  // Board-wide period ("everything from this month"). 'all' is the
   // board as it has always been; the Won/Lost column toggles only apply then.
   const [boardPeriodChoice, setBoardPeriodChoice] = useState<BoardPeriod>(() => {
     try {
@@ -358,7 +358,9 @@ export default function PortalDeals() {
     setBoardPeriodChoice(period);
     try { localStorage.setItem('deals.boardPeriod', period); } catch { /* ignore */ }
   };
-  const boardPeriod: BoardPeriod = isAdmin ? boardPeriodChoice : 'all';
+  // Reps get the period view too (Oct 2026). Their board is already scoped to
+  // their own deals, and the card shows values and counts only — no commission.
+  const boardPeriod: BoardPeriod = boardPeriodChoice;
   const boardPeriodActive = boardPeriod !== 'all';
 
   // ── Drag-and-drop + context menu ──────────────────────────────
@@ -1369,8 +1371,8 @@ OntarioReno Broker Portal`;
         </div>
       </section>
 
-      {/* ── Admin: board-wide period + what happened in it ── */}
-      {isAdmin && (
+      {/* ── Board-wide period + what happened in it (admin and reps) ── */}
+      {currentUser && (
         <section className={cn('rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block', mobileFiltersOpen ? 'block' : 'hidden')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
