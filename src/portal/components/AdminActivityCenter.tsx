@@ -98,6 +98,8 @@ function describeActivity(activity: Activity): { text: string } & Visual {
       return { text: `added a note on ${label}`, icon: NotebookPen, accent: 'text-slate-600', ring: 'bg-slate-100' };
     case 'deal_follow_up_changed':
       return { text: `updated the follow-up date for ${label}`, icon: CalendarPlus, accent: 'text-slate-600', ring: 'bg-slate-100' };
+    case 'deal_reassigned':
+      return { text: `reassigned ${label} to another rep`, icon: CalendarPlus, accent: 'text-[#1B3C6C]', ring: 'bg-[#e8f1fb]' };
     case 'commission_updated':
       return { text: `updated commission for ${label}`, icon: Banknote, accent: 'text-emerald-600', ring: 'bg-emerald-50' };
     case 'deal_deleted':
