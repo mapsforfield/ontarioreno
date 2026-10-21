@@ -36,24 +36,32 @@ export type ReminderAppointment = {
    * would tell a virtual homeowner a specialist is on the way.
    */
   remoteConsultation?: boolean | null;
+  /**
+   * 'phone_consultation' / 'video_consultation' also mean a call. Read for
+   * WORDING only — never for scheduling, which stays on remoteConsultation.
+   */
+  appointmentType?: string | null;
   /** Portal arrival window — reminders quote "between 10 and 12" from this. */
   arrivalWindowMinutes?: number | null;
 };
+
+/** Appointment types that are a call, not someone at the door. */
+const CALL_APPOINTMENT_TYPES = ['phone_consultation', 'video_consultation'];
 
 /**
  * Whether an appointment hand-created in the portal should have its reminder
  * texts queued at creation.
  *
- * Only home visits. The reminder wording comes from `remoteConsultation`, which
- * the portal does not set, so a phone or video consultation would be texted
- * that a specialist is coming to the house. Events (showroom, supplier, site
- * check, custom) are not homeowner visits at all.
+ * Home visits and phone/video consultations — the latter get call wording via
+ * `reminderContextFor`. Events (showroom, supplier, site check, custom) are
+ * not homeowner visits at all.
  */
 export function portalBookingGetsReminders(appointment: {
   appointmentType?: string | null;
   status?: string | null;
 }): boolean {
-  if (appointment.appointmentType !== 'home_visit') return false;
+  const type = appointment.appointmentType ?? '';
+  if (type !== 'home_visit' && !CALL_APPOINTMENT_TYPES.includes(type)) return false;
   return !appointment.status || LIVE_STATUSES.includes(appointment.status);
 }
 
@@ -68,7 +76,14 @@ export function reminderContextFor(appointment: ReminderAppointment): ReminderCo
       (appointment.address ?? ''),
     date: appointment.appointmentDate ?? '',
     time: appointment.appointmentTime ?? '',
-    consultationMode: appointment.remoteConsultation ? 'phone' : 'in_person',
+    // A call is a call whether the city made it remote or a rep booked it as
+    // one in the portal (which does not set remoteConsultation). Never tell
+    // someone waiting for a phone call that a specialist is coming over.
+    consultationMode:
+      appointment.remoteConsultation ||
+      CALL_APPOINTMENT_TYPES.includes(appointment.appointmentType ?? '')
+        ? 'phone'
+        : 'in_person',
     arrivalWindowMinutes: appointment.arrivalWindowMinutes ?? 0,
   };
 }
