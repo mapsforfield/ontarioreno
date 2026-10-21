@@ -49,12 +49,22 @@ import type { WindowQuotePath } from '../../lib/window-quote';
  */
 
 /**
- * The hero photograph. Must be a REAL modern GTA home with new black or brown
- * exterior windows (ideally one of our installs, with permission). Until one
- * is supplied the hero shows a marked placeholder rather than a stock photo.
- * Set to e.g. '/images/windows/hero.webp' with its real width and height.
+ * The hero photograph. Ideally a REAL modern GTA home with new black or brown
+ * exterior windows, one of our installs, with permission.
+ *
+ * For now (October 2026) it is the owner-supplied "raked window house" from
+ * public/Windows/Shapes & specialty/: a modern exterior with black windows. It
+ * is not known to be our install, so nothing on the page may say it is. Swap
+ * it for a real job photo when one exists. It is the page's LCP element, so
+ * keep it small: 480w and 800w WebP.
  */
-const HERO_IMAGE: { src: string; alt: string; width: number; height: number } | null = null;
+const HERO_IMAGE: { src: string; srcSet: string; alt: string; width: number; height: number } | null = {
+  src: '/images/windows/hero-800w.webp',
+  srcSet: '/images/windows/hero-480w.webp 480w, /images/windows/hero-800w.webp 800w',
+  alt: 'Modern two-storey house with new black windows, including angled windows in the gable',
+  width: 800,
+  height: 500,
+};
 
 const STEPS = [
   { title: 'Send your quote, or tell us what you need', body: 'Upload the quote you already have, or answer three quick questions if you do not have one yet.' },
@@ -345,6 +355,8 @@ export default function WindowsDoors() {
           {HERO_IMAGE ? (
             <img
               src={HERO_IMAGE.src}
+              srcSet={HERO_IMAGE.srcSet}
+              sizes="(min-width: 1024px) 600px, 100vw"
               alt={HERO_IMAGE.alt}
               width={HERO_IMAGE.width}
               height={HERO_IMAGE.height}
