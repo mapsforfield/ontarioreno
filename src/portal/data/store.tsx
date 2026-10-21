@@ -1853,6 +1853,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               });
             }
 
+            if (
+              updates.assignedRepId !== undefined &&
+              previousDeal.assignedRepId !== nextDeal.assignedRepId
+            ) {
+              const repName = (id: string) =>
+                current.users.find((u) => u.id === id)?.name ?? 'Unassigned';
+              activities = prependActivity(activities, actor, {
+                actionLabel: `Reassigned from ${repName(previousDeal.assignedRepId)} to ${repName(nextDeal.assignedRepId)}`,
+                actionType: 'deal_reassigned',
+                dealId: nextDeal.id,
+                entityId: nextDeal.id,
+                entityLabel: getDealLabel(nextDeal),
+                entityType: 'deal',
+                metadata: { from: previousDeal.assignedRepId, to: nextDeal.assignedRepId },
+              });
+            }
+
             activities = prependActivity(activities, actor, {
               actionLabel: `Deal edited: ${getDealLabel(nextDeal)}`,
               actionType: 'deal_edited',

@@ -2218,6 +2218,37 @@ OntarioReno Broker Portal`;
                     </div>
                   </div>
                 )}
+                {/* Hand a deal to another rep — admin only, same call as the
+                    bulk "Reassign rep…" action. The server ignores a rep
+                    change from anyone but an admin. */}
+                {isAdmin && !isAddingDeal && selectedDeal && (
+                  <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+                    Assigned Rep
+                    <select
+                      value={selectedDeal.assignedRepId}
+                      onChange={(event) => {
+                        const repId = event.target.value;
+                        if (!repId || repId === selectedDeal.assignedRepId) return;
+                        updateDeal(selectedDeal.id, { assignedRepId: repId }, currentUser ?? undefined);
+                        showToast({
+                          variant: 'success',
+                          message: `Deal reassigned to ${users.find((u) => u.id === repId)?.name ?? 'rep'}`,
+                        });
+                      }}
+                    >
+                      {!users.some((u) => u.id === selectedDeal.assignedRepId && u.role === 'rep' && u.active) && (
+                        <option disabled value={selectedDeal.assignedRepId}>
+                          {users.find((u) => u.id === selectedDeal.assignedRepId)?.name ?? 'Unassigned'}
+                        </option>
+                      )}
+                      {reps.map((rep) => (
+                        <option key={rep.id} value={rep.id}>
+                          {rep.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {!isAddingDeal && selectedDeal && (
                   <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                     Assigned Contractor

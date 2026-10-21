@@ -116,6 +116,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // ── Reassignment: the commission follows the deal ──
+      // Commission visibility is scoped by Commission.repId, so without this
+      // the new rep gets a deal with no commission and the old rep keeps
+      // seeing one for a deal they no longer have. Won deals are frozen: an
+      // earned payout stays with the rep who closed it.
+      if (safeData.assignedRepId !== undefined && deal.status !== 'won') {
+        try {
+          await prisma.commission.updateMany({
+            where: { dealId: id },
+            data: { repId: deal.assignedRepId },
+          });
+        } catch {
+          // non-critical; the deal itself is reassigned
+        }
+      }
+
       // ── Notes sync: a deal, its linked consultations, and the client all
       // share one note. Propagate a notes edit to the linked records. ──
       if (safeData.notes !== undefined) {
