@@ -365,18 +365,41 @@ test('a store that throws never propagates out of a resync', async () => {
   assert.deepEqual(summary, { suppressed: 0, queued: 0 });
 });
 
-// A rep-booked home visit used to queue no reminders at all — the homeowner
+// A rep-booked appointment used to queue no reminders at all — the homeowner
 // heard nothing until someone happened to edit the visit.
-test('a portal-booked home visit gets reminders; calls and events do not', () => {
+test('portal-booked visits and calls get reminders; events do not', () => {
   assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'scheduled' }), true);
   assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'confirmed' }), true);
-  // Reminder wording reads remoteConsultation, which the portal does not set,
-  // so these would be told a specialist is coming to the house.
-  assert.equal(portalBookingGetsReminders({ appointmentType: 'phone_consultation', status: 'scheduled' }), false);
-  assert.equal(portalBookingGetsReminders({ appointmentType: 'video_consultation', status: 'scheduled' }), false);
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'phone_consultation', status: 'scheduled' }), true);
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'video_consultation', status: 'scheduled' }), true);
   for (const type of ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event']) {
     assert.equal(portalBookingGetsReminders({ appointmentType: type, status: 'scheduled' }), false);
   }
   assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'completed' }), false);
   assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'cancelled' }), false);
+});
+
+// The portal books calls without setting remoteConsultation. The wording is
+// rebuilt from the row at send time, so the type alone must make it a call.
+test('a phone or video consultation is never texted visit wording', () => {
+  for (const appointmentType of ['phone_consultation', 'video_consultation']) {
+    for (const [kind, at] of [['reminder_24h', DAY_BEFORE], ['reminder_day_of', new Date('2026-08-10T12:30:00Z')]] as const) {
+      const verdict = reconcileReminder(
+        liveAppointment({ appointmentType, remoteConsultation: false }),
+        { kind },
+        at
+      );
+      assert.equal(verdict.action, 'send', `${appointmentType} ${kind}`);
+      if (verdict.action !== 'send') continue;
+      assert.doesNotMatch(verdict.body, /visit/i, `${appointmentType} ${kind}`);
+      assert.match(verdict.body, /call|speaking with you/, `${appointmentType} ${kind}`);
+    }
+  }
+});
+
+test('a home visit keeps visit wording', () => {
+  const verdict = reconcileReminder(liveAppointment({ appointmentType: 'home_visit' }), { kind: 'reminder_24h' }, DAY_BEFORE);
+  assert.equal(verdict.action, 'send');
+  if (verdict.action !== 'send') return;
+  assert.match(verdict.body, /site visit/);
 });
