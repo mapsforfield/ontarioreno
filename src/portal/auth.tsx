@@ -1,6 +1,7 @@
 import {
   createContext,
   ReactNode,
+  startTransition,
   useContext,
   useEffect,
   useMemo,
@@ -39,6 +40,15 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
   // On mount, check if there's an existing JWT session. The view-as header goes
   // out with this too, so that if it is in effect, the portal knows whose name
   // it is wearing from the very first render rather than after a flicker.
+  //
+  // Both state updates go out as transitions. This provider sits ABOVE the
+  // <Suspense> that wraps every route, and a public page arrives pre-rendered
+  // and is hydrated (src/main.tsx). If this context changes while that
+  // boundary is still waiting for its lazy route chunk, an urgent update makes
+  // React throw the server HTML away and client-render the whole page from the
+  // fallback — silently, in React 19. A transition instead waits until the
+  // boundary has hydrated, then applies. Same values, same order; only the
+  // timing on a cold public page load changes.
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include', headers: { ...viewAsHeaders() } })
       .then((res) => {
@@ -50,10 +60,10 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
         // admin. If that happened, drop the stale id so the banner and the data
         // can't disagree.
         if (user && !user.viewAsOf) setViewAsUserId(null);
-        if (user) setCurrentUser(user);
+        if (user) startTransition(() => setCurrentUser(user));
       })
       .catch(() => {/* no session — that's fine */})
-      .finally(() => setIsAuthLoading(false));
+      .finally(() => startTransition(() => setIsAuthLoading(false)));
   }, []);
 
   const value = useMemo<PortalAuthContextValue>(
