@@ -116,6 +116,19 @@ export function presignGetUrl(key: string, expiresIn = 3600): string {
   return presign('GET', key, expiresIn);
 }
 
+/**
+ * Size in bytes of an uploaded object, or null when it is not there.
+ *
+ * A presigned PUT signs an unsigned payload, so it cannot cap the upload size
+ * itself. Public upload flows check the stored size with this afterwards.
+ */
+export async function objectSize(key: string): Promise<number | null> {
+  const res = await fetch(presign('HEAD', key, 120), { method: 'HEAD' });
+  if (!res.ok) return null;
+  const length = Number(res.headers.get('content-length'));
+  return Number.isFinite(length) ? length : null;
+}
+
 /** Delete an object from the bucket (server-side, signed request). */
 export async function deleteObject(key: string): Promise<void> {
   const url = presign('DELETE', key, 120);
