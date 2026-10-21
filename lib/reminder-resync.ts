@@ -40,6 +40,23 @@ export type ReminderAppointment = {
   arrivalWindowMinutes?: number | null;
 };
 
+/**
+ * Whether an appointment hand-created in the portal should have its reminder
+ * texts queued at creation.
+ *
+ * Only home visits. The reminder wording comes from `remoteConsultation`, which
+ * the portal does not set, so a phone or video consultation would be texted
+ * that a specialist is coming to the house. Events (showroom, supplier, site
+ * check, custom) are not homeowner visits at all.
+ */
+export function portalBookingGetsReminders(appointment: {
+  appointmentType?: string | null;
+  status?: string | null;
+}): boolean {
+  if (appointment.appointmentType !== 'home_visit') return false;
+  return !appointment.status || LIVE_STATUSES.includes(appointment.status);
+}
+
 /** Build the reminder inputs from an appointment row. */
 export function reminderContextFor(appointment: ReminderAppointment): ReminderContext {
   return {

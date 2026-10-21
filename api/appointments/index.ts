@@ -22,6 +22,11 @@ import { mergeNotes, seedBookingNotes } from '../../lib/consultation-notes.js';
 import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { randomUUID } from 'node:crypto';
 import { arrivalWindowOf, atTimeOrWindow } from '../../lib/arrival-window.js';
+import {
+  portalBookingGetsReminders,
+  reminderContextFor,
+  resyncAppointmentReminders,
+} from '../../lib/reminder-resync.js';
 import { payDayMessage } from '../../lib/payday.js';
 import { balanceClock } from '../../src/portal/data/balanceClock.js';
 
@@ -1780,6 +1785,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Self-healing: the leadId column may not exist yet on older databases.
       await prisma.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "leadId" TEXT');
       appointment = await prisma.appointment.create({ data: appointmentData });
+    }
+    // ── Queue the 24h and day-of reminder texts ──
+    // The public booking flow queues these; this path used to queue nothing, so
+    // a homeowner booked by a rep heard nothing until someone edited the visit.
+    // Its own try block: a failure here must not lose the appointment.
+    if (portalBookingGetsReminders(appointment)) {
+      try {
+        await resyncAppointmentReminders(prisma, reminderContextFor(appointment), 'portal_booking');
+      } catch (err) {
+        console.error('[appointments/create] reminder queue failed', appointment.id, err);
+      }
     }
     // ── Auto-upsert client profile ──
     // Match by email if provided, otherwise create a new profile.
