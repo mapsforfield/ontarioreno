@@ -187,6 +187,54 @@ const STANDARD = [
   { Icon: Trash2, title: 'Old windows taken away', body: 'Removal and disposal included' },
 ];
 
+/**
+ * Rebates and financing for windows and doors in the GTA and Durham.
+ *
+ * Every line here was read off the program's OFFICIAL page on the date in
+ * REBATES_CHECKED. The grant radar had no window programs in the area, and
+ * contractor blogs disagree with each other, so they were not used as sources.
+ *   - Home Renovation Savings: toronto.ca "Incentives & Rebates to Green Your
+ *     Home" and durhamgreenerhomes.ca both state "$100 per rough opening" and
+ *     a home energy assessment before work. (homerenovationsavings.ca itself
+ *     blocks automated reads.)
+ *   - Toronto HELP: toronto.ca HELP page (applications open, up to $125,000,
+ *     windows and doors eligible, 20-year term for projects with new windows,
+ *     EnerGuide evaluation required).
+ *   - Durham Region Green Retrofit Loan: durhamgreenerhomes.ca (up to
+ *     $125,000 at 2%, windows/skylights/exterior doors eligible, not available
+ *     in Pickering, starts with a free coach consultation).
+ * Not listed because they are closed: the federal Canada Greener Homes Grant
+ * and Loan. Re-check before changing a figure, and never add one that is not
+ * on the official page.
+ */
+const REBATES_CHECKED = 'October 21, 2026';
+const REBATES = [
+  {
+    who: 'All of Ontario',
+    name: 'Home Renovation Savings',
+    headline: '$100 per window or door opening',
+    detail:
+      'A rebate from Enbridge Gas and Save on Energy, for projects that include two or more upgrades. A home energy assessment must be booked before any work begins.',
+    url: 'https://homerenovationsavings.ca',
+  },
+  {
+    who: 'Toronto homeowners',
+    name: 'Home Energy Loan Program (HELP)',
+    headline: 'Borrow up to $125,000',
+    detail:
+      'A City of Toronto loan repaid on your property tax bill. Window and door replacements qualify, and projects with new windows can choose a 20-year term. Requires an EnerGuide home evaluation.',
+    url: 'https://www.toronto.ca/services-payments/water-environment/environmental-grants-incentives/home-energy-loan-program-help/',
+  },
+  {
+    who: 'Durham Region, except Pickering',
+    name: 'Durham Region Green Retrofit Loan',
+    headline: 'Up to $125,000 at 2%',
+    detail:
+      'A low-interest loan that covers window, skylight and exterior door replacements. It starts with a free consultation with a Durham Greener Homes coach.',
+    url: 'https://durhamgreenerhomes.ca/financial/loans/durham-region/',
+  },
+];
+
 const EXTERIOR_COLOURS = [
   { name: 'White', hex: '#f4f4f1' },
   { name: 'Commercial Brown', hex: '#4a3a30' },
@@ -213,8 +261,7 @@ const FAQS: { q: string; a: string; needs?: string }[] = [
   },
   {
     q: 'How long does install take?',
-    a: 'It depends on how many windows and doors you are replacing. We will give you a clear timeline with your quote.',
-    needs: 'typical install time, e.g. days for an average home',
+    a: 'A few windows usually take half a day to a full day. A full home, around 10 to 15 windows and doors, usually takes 1 to 2 days. We confirm the timeline with your quote.',
   },
   {
     q: 'What areas do you serve?',
@@ -508,50 +555,47 @@ export default function WindowsDoors() {
         </div>
       </section>
 
-      {/* ---- 7. Rebates ----
-           The grant radar holds no window or door program for the GTA or
-           Durham as of October 2026 (checked: 110 programs, the only energy
-           rows are Ottawa, Kingston and Whitby non-window items, all dismissed
-           or out of area). So no program is named here. Replace the marker with
-           real names only from the radar or an official source, never amounts
-           that are not on that source. */}
-      <section className="px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="mx-auto max-w-7xl rounded-[1.35rem] border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">Rebates</p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.025em] text-slate-900 md:text-3xl">We check every rebate for your home</h2>
-          <p className="mt-4 max-w-[60ch] text-base leading-7 text-slate-600">
-            Rebates for energy-efficient windows and doors change often and depend on where you live. With every quote we
-            check what is open for your address, and only tell you about programs that are actually accepting
-            applications.
-          </p>
-          <div className="mt-5">
-            <NeedsMarker label="current window/door rebate programs for GTA and Durham, from an official source" />
-          </div>
-        </div>
-      </section>
+      {/* ---- 7. Rebates and financing ----
+           See REBATES above for sources and the rule for editing them.
 
-      {/* ---- 8. Proof ----
-           Nothing here yet on purpose: the site has no window projects,
-           reviews or warranty terms on file, and this page does not invent
-           them. Each block is a marker until the real thing is supplied. */}
-      <section className="border-t border-slate-200/80 bg-white px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+           (Section 8, "Proof", was removed at the owner's request on October
+           21, 2026. It held only placeholders for install photos, reviews and
+           warranty terms, none of which exist yet. Bring it back when there is
+           real content to put in it, never with invented reviews.) */}
+      <section className="px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="mx-auto max-w-7xl">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">Proof</p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.025em] text-slate-900 md:text-3xl">Recent installs and what homeowners said</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">Rebates & financing</p>
+          <h2 className="mt-3 max-w-[26ch] text-2xl font-bold tracking-[-0.025em] text-slate-900 md:text-3xl">
+            Money back and low-interest loans for new windows
+          </h2>
+          <p className="mt-4 max-w-[60ch] text-base leading-7 text-slate-600">
+            These programs are open to GTA and Durham homeowners right now. With your quote we check which ones fit your
+            address and your project, so you are not left to work it out alone.
+          </p>
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
-            <div className="flex min-h-[10rem] flex-col items-start justify-between rounded-[1.35rem] border border-dashed border-slate-300 bg-slate-50 p-6">
-              <p className="font-bold text-slate-900">Project photos</p>
-              <NeedsMarker label="3 to 6 real window/door install photos, before and after" />
-            </div>
-            <div className="flex min-h-[10rem] flex-col items-start justify-between rounded-[1.35rem] border border-dashed border-slate-300 bg-slate-50 p-6">
-              <p className="font-bold text-slate-900">Homeowner reviews</p>
-              <NeedsMarker label="real reviews with first name, city and permission" />
-            </div>
-            <div className="flex min-h-[10rem] flex-col items-start justify-between rounded-[1.35rem] border border-dashed border-slate-300 bg-slate-50 p-6">
-              <p className="font-bold text-slate-900">Warranty</p>
-              <NeedsMarker label="warranty terms: product years, glass, labour" />
-            </div>
+            {REBATES.map((r) => (
+              <article key={r.name} className="flex flex-col rounded-[1.35rem] border border-slate-200/80 bg-white p-6 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{r.who}</p>
+                <h3 className="mt-2 text-lg font-bold tracking-[-0.02em] text-slate-900">{r.name}</h3>
+                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#1B3C6C]">{r.headline}</p>
+                <p className="mt-3 flex-1 text-sm leading-6 text-slate-600">{r.detail}</p>
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#2b5a96] hover:underline"
+                >
+                  Official program page
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </a>
+              </article>
+            ))}
           </div>
+          <p className="mt-5 max-w-[70ch] text-xs leading-5 text-slate-500">
+            Checked against each program's official page on {REBATES_CHECKED}. Programs can change or close without
+            notice, and each one sets its own rules. We confirm what is open for your address before you commit to
+            anything.
+          </p>
         </div>
       </section>
 
