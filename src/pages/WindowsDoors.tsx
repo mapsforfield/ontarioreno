@@ -14,6 +14,7 @@ import {
 import { PageMeta } from '../components/PageMeta';
 import { NeedsMarker } from '../components/project/NeedsMarker';
 import { WindowQuoteForm } from '../components/windows/WindowQuoteForm';
+import { TypePhotos, type TypePhoto } from '../components/windows/TypePhotos';
 import {
   AwningIcon,
   BayBowIcon,
@@ -61,7 +62,22 @@ const STEPS = [
   { title: 'You get a lower price, installed', body: 'Same spec as the quote you have, for less, installed by a local crew.' },
 ];
 
-type WindowType = { name: string; Icon: ComponentType<{ className?: string }>; what: string; where: string; badge?: string };
+type WindowType = {
+  name: string;
+  Icon: ComponentType<{ className?: string }>;
+  what: string;
+  where: string;
+  badge?: string;
+  photos: TypePhoto[];
+};
+
+/**
+ * Photos per type, supplied by the owner in October 2026 (originals in
+ * public/Windows/, cut to 4:3 WebP in public/images/windows/). They illustrate
+ * what each type LOOKS like. Most are stock or rendered images, not our
+ * installs, so no caption or alt text may present them as our work.
+ */
+const photo = (type: string, n: number, alt: string): TypePhoto => ({ src: `/images/windows/${type}/${n}`, alt });
 
 /** In order of how often homeowners order them. */
 const WINDOW_TYPES: WindowType[] = [
@@ -71,12 +87,72 @@ const WINDOW_TYPES: WindowType[] = [
     what: 'A large picture window with an opening crank-out side.',
     where: 'Living rooms, bedrooms, kitchens',
     badge: 'Most popular',
+    photos: [
+      photo('fixed-casement', 1, 'Bedroom with a wide picture window flanked by two opening casements'),
+      photo('fixed-casement', 2, 'Dark grey fixed and casement window on a white rendered house'),
+      photo('fixed-casement', 3, 'New fixed and casement window seen from inside, with the casement on the right'),
+    ],
   },
-  { name: 'Casement', Icon: CasementIcon, what: 'A single window that cranks out on a side hinge.', where: 'Bedrooms, bathrooms, beside doors' },
-  { name: 'Bay & bow', Icon: BayBowIcon, what: 'Three or more units angled out from the wall for light and space.', where: 'Living rooms, dining rooms, front elevations' },
-  { name: 'Shapes & specialty', Icon: ShapesIcon, what: 'Octagons, and angled or sloped tops over casements.', where: 'Stairwells, gables, feature walls' },
-  { name: 'Awning', Icon: AwningIcon, what: 'Hinged at the top and opens out, so it can stay open in light rain.', where: 'Kitchens, bathrooms, basements' },
-  { name: 'Slider', Icon: SliderIcon, what: 'Slides sideways, and the sash tilts in for easy cleaning.', where: 'Small washroom and basement windows' },
+  {
+    name: 'Casement',
+    Icon: CasementIcon,
+    what: 'A single window that cranks out on a side hinge.',
+    where: 'Bedrooms, bathrooms, beside doors',
+    photos: [
+      photo('casement', 1, 'Casement window open on a red brick wall, with colonial grilles'),
+      photo('casement', 2, 'Row of three casement windows in a red brick wall'),
+    ],
+  },
+  {
+    name: 'Bay & bow',
+    Icon: BayBowIcon,
+    what: 'Three or more units angled out from the wall for light and space.',
+    where: 'Living rooms, dining rooms, front elevations',
+    photos: [
+      photo('bay-bow', 1, 'Curved bow window with five units behind a sofa'),
+      photo('bay-bow', 2, 'Living room with a large bow window and a window seat'),
+      photo('bay-bow', 3, 'Empty room with a three-unit bay window'),
+      photo('bay-bow', 4, 'Bow window seen from a covered porch'),
+    ],
+  },
+  {
+    name: 'Shapes & specialty',
+    Icon: ShapesIcon,
+    what: 'Octagons, and angled or sloped tops over casements.',
+    where: 'Stairwells, gables, feature walls',
+    photos: [
+      photo('shapes', 1, 'House with black angled-top windows in the gable'),
+      photo('shapes', 2, 'Large raked window in a timber-clad gable above patio doors'),
+      photo('shapes', 3, 'Bedroom with a sloped-top window under a vaulted ceiling'),
+      photo('shapes', 4, 'Peaked gable window seen from inside'),
+    ],
+  },
+  {
+    name: 'Awning',
+    Icon: AwningIcon,
+    what: 'Hinged at the top and opens out, so it can stay open in light rain.',
+    where: 'Kitchens, bathrooms, basements',
+    photos: [
+      photo('awning', 1, 'Black awning window open above a fixed pane'),
+      photo('awning', 2, 'Pair of black awning windows open outward'),
+      photo('awning', 3, 'Wide black awning window hinged at the top and open'),
+      photo('awning', 4, 'Close-up of an open awning vent in a dark grey frame'),
+      photo('awning', 5, 'Awning window open in the rain'),
+    ],
+  },
+  {
+    name: 'Slider',
+    Icon: SliderIcon,
+    what: 'Slides sideways, and the sash tilts in for easy cleaning.',
+    where: 'Small washroom and basement windows',
+    photos: [
+      photo('slider', 1, 'Wide sliding window above a kitchen sink'),
+      photo('slider', 2, 'White sliding window in a grey brick wall'),
+      photo('slider', 3, 'White sliding window in a red brick wall'),
+      photo('slider', 4, 'White window with side panels on a red brick house'),
+      photo('slider', 5, 'Black sliding window on a white house'),
+    ],
+  },
 ];
 
 const DOORS = [
@@ -312,18 +388,23 @@ export default function WindowsDoors() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">Windows we install</p>
           <h2 className="mt-3 text-2xl font-bold tracking-[-0.025em] text-slate-900 md:text-3xl">Every common style, one standard of glass</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {WINDOW_TYPES.map(({ name, Icon, what, where, badge }) => (
-              <article key={name} className="relative rounded-[1.35rem] border border-slate-200/80 bg-white p-6 shadow-sm">
+            {WINDOW_TYPES.map(({ name, Icon, what, where, badge, photos }) => (
+              <article key={name} className="relative flex flex-col rounded-[1.35rem] border border-slate-200/80 bg-white shadow-sm">
+                <TypePhotos photos={photos} label={name} />
                 {badge && (
-                  <span className="absolute right-4 top-4 rounded-full bg-[#1B3C6C] px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-white">
+                  <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[#1B3C6C] px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-white shadow-sm">
                     {badge}
                   </span>
                 )}
-                <Icon className="h-16 w-24 text-[#1B3C6C]" />
-                <h3 className="mt-4 text-lg font-bold tracking-[-0.02em] text-slate-900">{name}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{what}</p>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Typically</p>
-                <p className="mt-1 text-sm font-medium text-slate-700">{where}</p>
+                <div className="p-6">
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-8 w-12 shrink-0 text-[#1B3C6C]" />
+                    <h3 className="text-lg font-bold tracking-[-0.02em] text-slate-900">{name}</h3>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{what}</p>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Typically</p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">{where}</p>
+                </div>
               </article>
             ))}
           </div>
