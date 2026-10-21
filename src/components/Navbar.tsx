@@ -68,6 +68,10 @@ export default function Navbar() {
       ],
     },
     {
+      label: 'Exterior',
+      items: [{ name: 'Windows & Doors', href: '/windows' }],
+    },
+    {
       label: 'Planning',
       items: [{ name: 'Cost Guides', href: '/costs' }],
     },

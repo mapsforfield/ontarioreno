@@ -668,6 +668,10 @@ model Lead {
   longitude         Float?
   /// Structured qualification answers, keyed to the program's question set.
   answersJson       Json?
+  /// Quote files a homeowner uploaded on /windows: [{ key, name, size, type }].
+  /// Keys live in the private R2 bucket under window-quotes/; opened through
+  /// the admin-only `?quote_file=` route, never linked directly.
+  quoteFiles        Json?
   /// 'DIRECT_CALENDAR' | 'MANUAL_REVIEW' | 'NURTURE' | 'DECLINE'
   routingOutcome    String?
   routingReasonCodes String[]

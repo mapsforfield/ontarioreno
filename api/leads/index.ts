@@ -1,6 +1,18 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth, denyContractor } from '../../lib/auth.js';
+import { requireAuth, requireAdmin, denyContractor, getTokenFromRequest } from '../../lib/auth.js';
+import { randomUUID } from 'node:crypto';
+import { deleteObject, isR2Configured, objectSize, presignGetUrl, presignPutUrl } from '../../lib/r2.js';
+import {
+  isAllowedQuoteFile,
+  parseWindowQuote,
+  QUOTE_FILE_RULES,
+  quoteFileKey,
+  windowQuoteAlert,
+  windowQuoteNotes,
+  windowQuoteSourceDetail,
+  type QuoteFile,
+} from '../../lib/window-quote.js';
 import {
   clientIp,
   createRateLimiter,
@@ -2332,6 +2344,10 @@ const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
   availability_preview: { limit: 30, windowMs: 10 * 60_000 },
   submit: { limit: 10, windowMs: 60 * 60_000 },
   book: { limit: 10, windowMs: 60 * 60_000 },
+  // /windows. One presign per file, at most five files a submission, and a
+  // homeowner retrying a failed upload a few times.
+  windows_presign: { limit: 30, windowMs: 60 * 60_000 },
+  windows_quote: { limit: 10, windowMs: 60 * 60_000 },
 };
 
 const publicLimiter = createRateLimiter();
@@ -2478,6 +2494,157 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(200).json({ ok: true, leadId: lead.id, texted: true, bookingUrl: plan.bookingUrl });
+  }
+
+  // ── /windows: presigned upload for a homeowner's existing quote ──
+  //
+  // Public, so it hands out only what the form needs: one PUT link, ten
+  // minutes, under window-quotes/<random uuid>/. The bucket is private; the
+  // file is readable afterwards only through `?quote_file=`, which needs an
+  // admin login. A presigned PUT cannot cap size, so `windows_quote` re-checks
+  // the stored size before attaching the file to anything.
+  if (flow === 'windows_presign' && req.method === 'POST') {
+    if (!isR2Configured()) {
+      return res.status(503).json({ error: 'Uploads are not available right now. Choose "I need a quote" instead, or try again later.' });
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const type = clean(body.type);
+    const size = Number(body.size ?? 0);
+    if (!isAllowedQuoteFile(type, size)) {
+      return res.status(400).json({ error: `Files must be PDF, JPG or PNG, up to ${QUOTE_FILE_RULES.maxBytes / 1024 / 1024} MB each.` });
+    }
+    const key = quoteFileKey(randomUUID(), clean(body.name));
+    return res.status(200).json({ uploadUrl: presignPutUrl(key), key });
+  }
+
+  // ── /windows: the quote form, both paths → create or enrich a Lead ──
+  //
+  // Same import, dedupe and merge as every other website path. Unassigned on
+  // purpose: these go to the admin, not to a rep. No text to the homeowner
+  // (decided October 2026); the thank-you screen promises a reply within 24
+  // hours and the admin alert below is what makes that true.
+  if (flow === 'windows_quote' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const parsed = parseWindowQuote(body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const q = parsed.value;
+
+    // Every file must actually be in the bucket, at an allowed size. An
+    // oversize object (the one thing the presigned PUT could not stop) is
+    // removed rather than kept.
+    const files: QuoteFile[] = [];
+    for (const f of q.files) {
+      const stored = await objectSize(f.key).catch(() => null);
+      if (stored == null) {
+        return res.status(400).json({ error: `"${f.name || 'A file'}" did not finish uploading. Please add it again.` });
+      }
+      if (stored > QUOTE_FILE_RULES.maxBytes) {
+        await deleteObject(f.key).catch(() => null);
+        return res.status(400).json({ error: `"${f.name || 'A file'}" is over ${QUOTE_FILE_RULES.maxBytes / 1024 / 1024} MB.` });
+      }
+      files.push({ ...f, size: stored });
+    }
+
+    const submittedAt = new Date().toISOString();
+    const incoming = importLeadData({
+      name: q.name,
+      phone: q.phone,
+      email: q.email,
+      postalCode: q.postalCode,
+      projectType: 'Windows & doors',
+      source: 'website_intake',
+      sourceDetail: windowQuoteSourceDetail(q),
+      notes: windowQuoteNotes(q, submittedAt),
+    });
+
+    const lead = await withTables(async () => {
+      const existing = await findExistingLead(incoming);
+      if (existing) {
+        const { patch } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming, false, false);
+        // Appended, never replaced: a homeowner who sends a second quote later
+        // keeps the first one on file, and links in the earlier alert still
+        // point at the same index.
+        const prior = Array.isArray(existing.quoteFiles) ? (existing.quoteFiles as unknown as QuoteFile[]) : [];
+        if (files.length > 0) patch.quoteFiles = [...prior, ...files];
+        if (Object.keys(patch).length > 0) {
+          await prisma.lead.update({ where: { id: existing.id }, data: patch as never });
+        }
+        return { id: existing.id, fileOffset: prior.length };
+      }
+      // Attribution only on a NEW lead, as on every other website path.
+      const created = await prisma.lead.create({
+        data: {
+          ...incoming,
+          ...(files.length > 0 ? { quoteFiles: files } : {}),
+          ...attributionFields(body.attribution, incoming.sourceDetail),
+        } as never,
+      });
+      return { id: created.id, fileOffset: 0 };
+    });
+
+    const alert = windowQuoteAlert(
+      { ...q, files },
+      lead.id,
+      (i) => `https://ontarioreno.ca/api/leads?quote_file=1&lead=${encodeURIComponent(lead.id)}&i=${lead.fileOffset + i}`,
+    );
+    // Admin only: the team inbox, plus the business archive copy every alert
+    // carries (separate rows, so the slow forwarder cannot hold up the fast
+    // one). No rep is alerted and none is assigned.
+    const recipients = [teamInbox(), archiveInbox()].filter((a, i, all) => a && all.indexOf(a) === i);
+    await prisma.notificationOutbox
+      .createMany({
+        data: recipients.map((recipient) => ({
+          leadId: lead.id,
+          channel: 'email',
+          kind: 'lead_alert',
+          recipient,
+          subject: alert.subject,
+          body: alert.body,
+          html: '',
+          sendAfter: submittedAt,
+          // Never expires: a lead is worth hearing about late.
+          expiresAt: '',
+          // Per submission, not per lead: a second quote from the same
+          // homeowner a week later is a second thing to look at. The eventId
+          // makes a double-tapped submit one alert.
+          idempotencyKey: `${lead.id}:email:windows_quote:${clean(body.eventId) || submittedAt}:${recipient}`,
+        })),
+        skipDuplicates: true,
+      })
+      .catch((err) => {
+        console.error('[flow/windows_quote] could not queue alert:', err);
+      });
+
+    // Server copy of the pixel's Lead, deduplicated by eventId.
+    {
+      const { firstName, lastName } = splitName(q.name);
+      const cookies = metaCookies(req);
+      await sendMetaEvent({
+        eventName: 'Lead',
+        eventId: clean(body.eventId) || lead.id,
+        eventSourceUrl: clean(body.pageUrl) || undefined,
+        userData: {
+          email: q.email,
+          phone: q.phone,
+          firstName,
+          lastName,
+          state: 'Ontario',
+          country: 'ca',
+          clientIp: clientIp(req.headers),
+          clientUserAgent: userAgent(req),
+          fbp: cookies.fbp,
+          fbc: cookies.fbc,
+        },
+        customData: {
+          content_name: q.path === 'upload' ? 'windows_quote_upload' : 'windows_quote_request',
+          content_category: 'windows',
+        },
+      });
+    }
+
+    await drainOutbox().catch(() => null);
+    await ringDoorbell();
+    return res.status(201).json({ ok: true, leadRef: lead.id });
   }
 
   // ── Submit qualification → route → create Lead ──
@@ -3006,6 +3173,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleIntake(req, res);
   }
 
+  // /windows quote files: admin only, but must answer a cookieless first click.
+  if (req.query['quote_file'] !== undefined) {
+    return handleQuoteFile(req, res);
+  }
+
   const user = await requireAuth(req, res);
   if (!user) return;
   if (denyContractor(user, res)) return;
@@ -3013,4 +3185,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query['id'] as string | undefined;
   if (id) return handleById(req, res, user, id);
   return handleCollection(req, res, user);
+}
+
+// ─── ?quote_file=1 — open one uploaded /windows quote (admin only) ────────────
+//
+// The admin alert links here rather than to the bucket, so the email never
+// carries a working copy of a homeowner's document on its own. Each open mints
+// a five-minute bucket link.
+//
+// Kept out of handlePublicFlow on purpose: nothing in that handler may touch
+// auth (lib/public-booking.test.ts). This one must, and it must also answer
+// the FIRST click from Gmail, which arrives without the portal cookie because
+// that cookie is SameSite=Strict. A tiny same-origin page re-requests the URL
+// once; that second navigation starts on our own site and carries the cookie.
+async function handleQuoteFile(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+  if (!getTokenFromRequest(req) && req.query['bounce'] === undefined) {
+    const url = String(req.url ?? '');
+    const again = `${url}${url.includes('?') ? '&' : '?'}bounce=1`.replace(/[<>"']/g, '');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res
+      .status(200)
+      .send(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="0;url=${again}"><p>Opening file...</p>`);
+  }
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+  const lead = await prisma.lead.findUnique({
+    where: { id: String(req.query['lead'] ?? '') },
+    select: { quoteFiles: true },
+  });
+  const all = Array.isArray(lead?.quoteFiles) ? (lead.quoteFiles as unknown as QuoteFile[]) : [];
+  const file = all[Number(req.query['i'] ?? -1)];
+  if (!file?.key) return res.status(404).json({ error: 'File not found.' });
+  res.setHeader('Location', presignGetUrl(file.key, 300));
+  return res.status(302).end();
 }
