@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  portalBookingGetsReminders,
   reconcileReminder,
   resyncAppointmentReminders,
   suppressPendingReminders,
@@ -362,4 +363,20 @@ test('a store that throws never propagates out of a resync', async () => {
   const summary = await resyncAppointmentReminders(broken, ctx(), 'appointment_moved');
 
   assert.deepEqual(summary, { suppressed: 0, queued: 0 });
+});
+
+// A rep-booked home visit used to queue no reminders at all — the homeowner
+// heard nothing until someone happened to edit the visit.
+test('a portal-booked home visit gets reminders; calls and events do not', () => {
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'scheduled' }), true);
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'confirmed' }), true);
+  // Reminder wording reads remoteConsultation, which the portal does not set,
+  // so these would be told a specialist is coming to the house.
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'phone_consultation', status: 'scheduled' }), false);
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'video_consultation', status: 'scheduled' }), false);
+  for (const type of ['showroom_visit', 'supplier_meeting', 'site_check', 'custom_event']) {
+    assert.equal(portalBookingGetsReminders({ appointmentType: type, status: 'scheduled' }), false);
+  }
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'completed' }), false);
+  assert.equal(portalBookingGetsReminders({ appointmentType: 'home_visit', status: 'cancelled' }), false);
 });
