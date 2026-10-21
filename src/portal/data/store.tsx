@@ -1,6 +1,7 @@
 import {
   createContext,
   ReactNode,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -936,7 +937,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   // unauthenticated API calls unnecessarily.
   useEffect(() => {
     if (!window.location.pathname.startsWith('/portal')) {
-      setIsLoading(false);
+      // A transition, not an urgent update: on a pre-rendered public page this
+      // runs before the route chunk has hydrated, and an urgent context change
+      // above that <Suspense> makes React discard the server HTML and
+      // client-render the page. See the note in PortalAuthProvider.
+      startTransition(() => setIsLoading(false));
       return;
     }
 
