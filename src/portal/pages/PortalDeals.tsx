@@ -1581,7 +1581,13 @@ OntarioReno Broker Portal`;
         onMouseDown={onBoardMouseDown}
         className="w-full cursor-grab overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]"
       >
-        <div ref={boardInnerRef} className="grid min-w-full gap-4 md:grid-flow-col md:auto-cols-[clamp(300px,calc((100vw-24rem)/5),320px)] md:grid-cols-none">
+        {/* Columns stretch to fill the width on wide screens (flush with the panels
+            above); below 300px each, the board scrolls sideways instead. */}
+        <div
+          ref={boardInnerRef}
+          style={{ '--deal-cols': columnsToRender.length } as React.CSSProperties}
+          className="grid min-w-full gap-4 md:min-w-[calc(var(--deal-cols)*300px+(var(--deal-cols)-1)*1rem)] md:grid-flow-col md:auto-cols-[minmax(300px,1fr)] md:grid-cols-none"
+        >
           {columnsToRender.map((column) => {
             const isWonColumn = column.status === 'won';
             const isLostColumn = column.status === 'lost';
