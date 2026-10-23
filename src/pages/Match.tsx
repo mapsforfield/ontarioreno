@@ -1546,17 +1546,20 @@ export default function Match() {
   const onCalendar = step === 'calendar';
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] py-8 sm:py-12 lg:py-14">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] py-5 sm:py-12 lg:py-14">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-10">
+        {/* On a phone the header shrinks to the pill: the project tiles are the
+            point of the page, and the headline and intro pushed them below the
+            fold. The h1 stays for screen readers and search. */}
+        <div className="mx-auto mb-4 max-w-3xl text-center sm:mb-10">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-[#1B3C6C]">
             <Home className="h-4 w-4" />
             Guided Project Intake
           </div>
-          <h1 className="mx-auto mt-6 max-w-[680px] text-4xl font-bold leading-[1.05] tracking-[-0.04em] text-slate-900 sm:text-5xl sm:leading-[1.02]">
+          <h1 className="sr-only sm:not-sr-only sm:mx-auto sm:mt-6 sm:block sm:max-w-[680px] text-4xl font-bold leading-[1.05] tracking-[-0.04em] text-slate-900 sm:text-5xl sm:leading-[1.02]">
             Start with a proper project review.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
+          <p className="mx-auto mt-5 hidden max-w-xl text-base leading-7 text-slate-600 sm:block sm:text-lg sm:leading-8">
             Tell us what you're planning, share anything you already have, and book a free consultation with a specialist, all in one place.
           </p>
         </div>
@@ -1615,7 +1618,7 @@ export default function Match() {
 
             <main className="p-6 sm:p-8 lg:p-10">
               {step === 'project' && (
-                <div className="mb-8">
+                <div className="mb-8 hidden sm:block">
                   <p className="text-sm leading-7 text-slate-500">
                     This structured intake helps us understand your project before recommending the right next step.
                   </p>
