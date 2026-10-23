@@ -18,7 +18,6 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
-import { HeroHouse } from '../components/HeroHouse';
 import { CostGuideCapture } from '../components/CostGuideCapture';
 import { HUB_CARDS } from '../data/projects/showcase';
 import { buttonStyles } from '../lib/uiStyles';
@@ -146,28 +145,47 @@ export default function Home() {
           guides) for readers who are still researching; the fold is only
           for the review and for exploring costs.
 
-          Same house-and-card frame as the financing heroes, so the site's
-          front door and its money pages read as one product. */}
-      <section className="overflow-hidden border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-14 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-20 lg:pt-16 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          Dark and atmospheric on purpose. A white version of this hero was
+          tried and read as sterile — the dark ground and the construction
+          photo are the brand's first impression. The review card is dark
+          glass so it sits inside that atmosphere rather than on top of it,
+          and the primary CTA is the one saturated colour on the dark, so it
+          is the first thing the eye lands on. */}
+      <section className="relative isolate overflow-hidden bg-[#0B1120] text-white">
+        <div aria-hidden className="absolute inset-0 -z-10">
+          <img
+            src="/hero.jpg"
+            alt=""
+            className="h-full w-full object-cover opacity-55"
+            fetchPriority="high"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0B1120] via-[#0B1120]/85 to-[#0B1120]/35" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-[#0B1120]/40" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_82%_45%,rgba(56,189,248,0.16),transparent_70%)]" />
+        </div>
+
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-16 lg:pt-14">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[0.8rem] font-medium text-[#1B3C6C]">
+            <p className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-400/10 px-3.5 py-1.5 text-[0.8rem] font-medium text-sky-200">
               <ShieldCheck className="h-3.5 w-3.5" />
               Ontario&apos;s independent homeowner guide
             </p>
 
-            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-bold leading-[1.04] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-bold leading-[1.04] tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.35rem]">
               Stop guessing Ontario renovation costs, permit rules, and contractor quotes.
             </h1>
 
-            <p className="mt-6 max-w-xl text-[1.05rem] leading-8 text-slate-600 md:text-[1.15rem]">
+            <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#94A3B8] md:text-[1.15rem]">
               Real cost ranges, the permit path, and a vetted contractor for
               Ontario homeowners planning a basement, legal suite, addition, or
               major renovation.
             </p>
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link to="/match" className={cn(buttonStyles.primary, 'min-h-[3.25rem]')}>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                to="/match"
+                className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-[0.75rem] bg-sky-400 px-7 text-base font-bold tracking-[-0.015em] text-[#0B1120] shadow-[0_0_0_1px_rgba(125,211,252,0.4),0_12px_32px_rgba(56,189,248,0.35)] transition duration-200 hover:bg-sky-300 hover:shadow-[0_0_0_1px_rgba(186,230,253,0.5),0_14px_38px_rgba(56,189,248,0.45)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300/40"
+              >
                 Start Free Project Review
                 <ArrowRight className="h-5 w-5" />
               </Link>
@@ -180,23 +198,23 @@ export default function Home() {
                   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                   target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
                 }}
-                className={cn(buttonStyles.secondary, 'min-h-[3.25rem]')}
+                className={cn(buttonStyles.ghostDark, 'min-h-[3.25rem]')}
               >
                 Explore costs by project
               </a>
             </div>
 
-            <p className="mt-4 text-sm text-slate-500">
+            <p className="mt-4 text-sm text-slate-400">
               Weighing how to pay for it?{' '}
-              <Link to="/financing" className="-my-3 inline-block py-3 font-semibold text-[#1B3C6C] hover:underline">
+              <Link to="/financing" className="-my-3 inline-block py-3 font-semibold text-sky-300 hover:underline">
                 Compare financing paths
               </Link>
             </p>
 
-            <ul className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-600">
+            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-300">
               {['Free for homeowners', 'No obligation to hire', 'Built for Ontario'].map((point) => (
                 <li key={point} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-[#2b5a96]" />
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                   {point}
                 </li>
               ))}
@@ -204,44 +222,43 @@ export default function Home() {
           </div>
 
           <div className="min-w-0">
-            <HeroHouse>
-              <div className="rounded-[1.6rem] bg-[#0F172A] p-6 text-white shadow-[0_30px_70px_rgba(15,23,42,0.28)] sm:p-7">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200">
-                  Your free project review
-                </p>
-                <p className="mt-3 text-[1.35rem] font-bold leading-snug tracking-[-0.02em]">
-                  Know the real number before the first quote.
-                </p>
+            <div className="relative mx-auto w-full max-w-[440px] rounded-[1.6rem] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(30,41,59,0.72)_0%,rgba(15,23,42,0.6)_100%)] p-6 shadow-[0_30px_80px_rgba(2,6,23,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:p-7 lg:mx-0 lg:ml-auto">
+              <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/50 to-transparent" />
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-sky-300">
+                Your free project review
+              </p>
+              <p className="mt-3 text-[1.35rem] font-bold leading-snug tracking-[-0.02em]">
+                Know the real number before the first quote.
+              </p>
 
-                <ul className="mt-6 space-y-3.5">
-                  {[
-                    ['A realistic cost range', 'for your project, in your city'],
-                    ['Your permit path', 'what the work needs, in plain English'],
-                    ['Grants and financing', 'only the ones that apply to you'],
-                    ['A vetted contractor', 'when you are ready, not before'],
-                  ].map(([title, detail]) => (
-                    <li key={title} className="flex gap-3">
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
-                      <span className="text-[0.95rem] leading-6">
-                        <span className="font-semibold text-white">{title}</span>
-                        <span className="block text-slate-400">{detail}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <ul className="mt-6 space-y-3.5">
+                {[
+                  ['A realistic cost range', 'for your project, in your city'],
+                  ['Your permit path', 'what the work needs, in plain English'],
+                  ['Grants and financing', 'only the ones that apply to you'],
+                  ['A vetted contractor', 'when you are ready, not before'],
+                ].map(([title, detail]) => (
+                  <li key={title} className="flex gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
+                    <span className="text-[0.95rem] leading-6">
+                      <span className="font-semibold text-white">{title}</span>
+                      <span className="block text-[#94A3B8]">{detail}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
 
-                <Link
-                  to="/match"
-                  className="mt-7 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[0.95rem] font-bold text-[#0F172A] transition hover:bg-slate-100"
-                >
-                  Start my review
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <p className="mt-3 text-center text-xs text-slate-400">
-                  100% free for homeowners. No obligation to hire.
-                </p>
-              </div>
-            </HeroHouse>
+              <Link
+                to="/match"
+                className="mt-7 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[0.95rem] font-bold text-[#0B1120] transition hover:bg-slate-100"
+              >
+                Start my review
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <p className="mt-3 text-center text-xs text-slate-400">
+                100% free for homeowners. No obligation to hire.
+              </p>
+            </div>
           </div>
         </div>
       </section>
