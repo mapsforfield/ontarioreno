@@ -7,7 +7,7 @@ import {
   PROJECT_TYPES_NO_LINK,
 } from './project-review.js';
 
-// The seven options a homeowner can actually pick, copied from the labels in
+// The eight options a homeowner can actually pick, copied from the labels in
 // src/pages/Match.tsx. If someone rewords an option there and not here, these
 // tests are what notices — a silently unmapped type stops texting anyone.
 const MATCH_FORM_OPTIONS = [
@@ -16,6 +16,7 @@ const MATCH_FORM_OPTIONS = [
   'Garden suite',
   'Kitchen renovation',
   'Bathroom renovation',
+  'Windows & doors',
   'Full home renovation',
   'Not sure yet',
 ];
@@ -26,6 +27,7 @@ test('each project type lands on the form that fits it', () => {
   assert.equal(consultationUrlForProject('Garden suite'), 'https://ontarioreno.ca/consultation/garden-suite');
   assert.equal(consultationUrlForProject('Kitchen renovation'), 'https://ontarioreno.ca/consultation/kitchen');
   assert.equal(consultationUrlForProject('Bathroom renovation'), 'https://ontarioreno.ca/consultation/bathroom');
+  assert.equal(consultationUrlForProject('Windows & doors'), 'https://ontarioreno.ca/consultation/windows-doors');
 });
 
 test('every option on the form is accounted for, one way or the other', () => {

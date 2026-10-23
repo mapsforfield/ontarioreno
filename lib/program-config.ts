@@ -1567,11 +1567,130 @@ export const LONDON_ARU_LOAN_PROGRAM: ProgramConfig = {
   ...SHARED_SCHEDULING,
 };
 
+// ─── Windows & doors consultation ─────────────────────────────────────────────
+// A measure-and-quote visit, not a financing offer, so it is deliberately NOT in
+// FINANCING_PROGRAMS: nothing here may promise a monthly figure, a rate or a
+// term, because no document behind this program says one. Every money field is
+// blank and the copy talks about measuring, not paying.
+//
+// The /windows quote form (lib/window-quote.ts) is unchanged and still goes to
+// admin triage. This is the booking flow that form had nowhere to point at:
+// /consultation/windows-doors, and the calendar at the end of /match.
+//
+// Calendar-early, exactly as the bathroom offer: one question, then the time,
+// then name, mobile and address. Sizing questions move after the booking.
+
+const WINDOWS_DOORS_PROJECT_TYPE: Question = {
+  key: 'projectType',
+  label: 'What are you replacing?',
+  routingRelevant: true,
+  step: 1,
+  // No 'unsure' — on the calendar-early flow it would route to MANUAL_REVIEW
+  // after the homeowner has picked a time. See BATHROOM_PROJECT_TYPE.
+  options: [
+    { value: 'windows', label: 'Windows' },
+    { value: 'doors', label: 'Doors (entry, patio or garden)' },
+    { value: 'windows_and_doors', label: 'Windows and doors' },
+  ],
+};
+
+/**
+ * Asked AFTER booking, no routing weight. Counts reuse the /windows quote
+ * form's buckets so the two sources of windows leads read the same in the
+ * portal.
+ */
+const WINDOWS_DOORS_PREP_QUESTIONS: Question[] = [
+  {
+    key: 'windowCount',
+    label: 'Roughly how many windows?',
+    step: 3,
+    options: [
+      { value: '0', label: 'None, just doors' },
+      { value: '1-5', label: '1–5' },
+      { value: '6-10', label: '6–10' },
+      { value: '11-20', label: '11–20' },
+      { value: '20+', label: 'More than 20' },
+    ],
+  },
+  {
+    key: 'doorCount',
+    label: 'And how many doors?',
+    step: 3,
+    options: [
+      { value: '0', label: 'None, just windows' },
+      { value: '1', label: '1' },
+      { value: '2', label: '2' },
+      { value: '3+', label: '3 or more' },
+    ],
+  },
+  {
+    key: 'existingQuote',
+    label: 'Do you already have a quote from someone else?',
+    help: 'Have it handy at the visit and we will go through it with you.',
+    step: 3,
+    options: [
+      { value: 'yes', label: 'Yes, I have a quote' },
+      { value: 'no', label: 'Not yet' },
+    ],
+  },
+];
+
+export const WINDOWS_DOORS_PROGRAM: ProgramConfig = {
+  key: 'windows-doors',
+  version: 1,
+  schedulingArea: 'ONTARIO',
+  geography: 'ontario_wide',
+  enabled: true,
+  slug: 'windows-doors',
+  areaLabel: 'Ontario',
+  // Blank on purpose — see the header. No amount, no financing line.
+  displayAmountLabel: '',
+  fundingHighlights: [],
+  programTerms: [],
+  whyFreeText:
+    "Window and door prices depend on sizes, styles and how each opening is finished, so a number off a website is a guess. We measure first and go through the options in person. When a project is a good fit, participating installers pay us for access to organized, qualified opportunities instead of chasing leads that go nowhere. That keeps the visit free for you, and you're free to compare or decline any proposal you receive.",
+  // Required by the type, never shown: this program asks no contribution
+  // question, and the guidance screen only follows an 'unsure' answer to one.
+  fundingGuidance: {
+    heading: 'That is what the visit is for',
+    lead: 'Pricing depends on the sizes and styles of each opening.',
+    leadEmphasis: 'We measure first.',
+    milestones: ['Measure', 'Options', 'Quote', 'Install'],
+    highlight: 'Your specialist will measure every opening and walk you through the options before any number is given.',
+    closing: 'Nothing is committed at the visit, and it costs nothing.',
+    continueLabel: 'Continue',
+  },
+  eligibleProjectTypes: ['windows', 'doors', 'windows_and_doors'],
+  nurtureTimelines: [],
+  questions: [WINDOWS_DOORS_PROJECT_TYPE],
+  addressPlacement: 'final',
+  bookingFlow: 'calendar_early',
+  booksWithoutVerifiedAddress: true,
+  capturesOutOfAreaLeads: true,
+  bookingBanner: {
+    src: '/images/windows/hero-800w.webp',
+    alt: 'A modern home exterior with new black-framed windows',
+  },
+  prepQuestions: WINDOWS_DOORS_PREP_QUESTIONS,
+  // Openings are measured on site; nobody quotes a bay window off a photo.
+  consultationMode: 'in_person',
+  appointmentProjectTypeLabel: 'Windows & Doors Consultation',
+  pageTitle: 'Windows & Doors Consultation | OntarioReno',
+  noteTemplateId: '',
+  guideUrl: '',
+  guideLabel: '',
+  officialSourceUrls: [],
+  ...SHARED_SCHEDULING,
+  // A month, as on the other calendar-early offers: no deadline to be early for.
+  bookingHorizonDays: 30,
+};
+
 export const PROGRAMS: ProgramConfig[] = [
   HAMILTON_PROGRAM,
   SIMCOE_PROGRAM,
   ...FINANCING_PROGRAMS,
   LONDON_ARU_LOAN_PROGRAM,
+  WINDOWS_DOORS_PROGRAM,
 ];
 
 /**

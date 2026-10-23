@@ -15,7 +15,7 @@
  * matching on anything looser would silently send the wrong form the first time
  * someone reworded an option.
  *
- * Two of the seven options are deliberately absent — see PROJECT_TYPES_NO_LINK.
+ * Two of the eight options are deliberately absent — see PROJECT_TYPES_NO_LINK.
  */
 const CONSULTATION_SLUG_BY_PROJECT: Record<string, string> = {
   'Basement renovation': 'basement',
@@ -23,6 +23,7 @@ const CONSULTATION_SLUG_BY_PROJECT: Record<string, string> = {
   'Garden suite': 'garden-suite',
   'Kitchen renovation': 'kitchen',
   'Bathroom renovation': 'bathroom',
+  'Windows & doors': 'windows-doors',
 };
 
 /**
@@ -54,6 +55,7 @@ const PROJECT_LABEL: Record<string, string> = {
   'Garden suite': 'garden suite',
   'Kitchen renovation': 'kitchen renovation',
   'Bathroom renovation': 'bathroom renovation',
+  'Windows & doors': 'windows and doors',
 };
 
 export type ProjectReviewContext = {
