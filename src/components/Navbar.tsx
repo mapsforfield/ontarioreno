@@ -79,19 +79,24 @@ export default function Navbar() {
 
   const hubs = hubSections.flatMap((section) => section.items);
 
-  const financingPrimaryLinks = [
-    { name: 'Renovation Financing', href: '/financing' },
-    { name: 'Home Equity Renovation Guide', href: '/financing/home-equity-renovations-ontario' },
+  // The menu shows the ways to pay, not every article. The comparison guides
+  // (HELOC vs refinance, garden suite, phased, etc.) were written for search
+  // and are linked from the /financing hub's "Related guides" line instead —
+  // keep that line complete if a guide is added here or there.
+  const financingPathLinks = [
+    {
+      name: 'Open Loan',
+      description: 'A monthly payment you can pay off early, no penalty',
+      href: '/open-loan-financing',
+    },
+    {
+      name: 'Home Equity',
+      description: 'HELOC, home equity loan, or refinance for bigger projects',
+      href: '/financing/home-equity-renovations-ontario',
+    },
   ];
 
-  const financingSecondaryLinks = [
-    { name: 'HELOC vs Refinance', href: '/financing/heloc-vs-refinance-for-renovations' },
-    { name: 'HELOC vs Renovation Financing', href: '/financing/heloc-vs-contractor-financing' },
-    { name: 'Legal Basement Apartment Financing', href: '/financing/heloc-for-legal-basement-apartment' },
-    { name: 'Garden Suite Financing', href: '/financing/garden-suite-financing-ontario' },
-    { name: 'Phased Renovation Financing', href: '/financing/phased-renovation-financing' },
-    { name: 'Grants & Home Equity', href: '/financing/grants-and-incentives-with-home-equity' },
-  ];
+  const financingHubLink = { name: 'Compare all financing options', href: '/financing' };
 
   const grantLinks = [
     { name: 'All Ontario Grants', href: '/grants' },
@@ -165,7 +170,8 @@ export default function Navbar() {
 
   const isHubsActive = hubs.some((hub) => location.pathname === hub.href);
   const isFinancingActive = location.pathname === '/financing'
-    || location.pathname.startsWith('/financing/');
+    || location.pathname.startsWith('/financing/')
+    || location.pathname === '/open-loan-financing';
   const isGrantsActive = grantLinks.some(
     (grant) => grant.href !== '/grant-eligibility-calculator' && location.pathname === grant.href
   );
@@ -305,60 +311,47 @@ export default function Navbar() {
                   <div className="border-b border-slate-200/80 pb-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Financing cluster
+                        Ways to pay
                       </p>
                       <h3 className="mt-2 text-lg font-bold text-slate-900">
-                        Choose the path after the renovation is clear
+                        More than one way to fund your renovation
                       </h3>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-3.5">
-                    <div>
-                      <p className={sectionLabelClassName}>
-                        Start here
-                      </p>
-                      <div className="space-y-1.5">
-                        {financingPrimaryLinks.map((item, index) => (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            className={cn(
-                              'group flex items-center justify-between rounded-[0.85rem] border px-3.5 py-2.75 transition duration-150',
-                              index === 0
-                                ? 'border-slate-300/90 bg-white text-slate-900 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:border-slate-300 hover:bg-slate-50'
-                                : 'border-slate-200/80 bg-slate-50/60 text-slate-900 hover:border-slate-300 hover:bg-white',
-                              location.pathname === item.href && 'border-slate-300 bg-slate-50 text-[#1B3C6C]'
-                            )}
-                          >
-                            <span className="text-sm font-semibold tracking-[-0.01em]">{item.name}</span>
-                            <ChevronDown className="h-4 w-4 -rotate-90 text-slate-400 transition duration-150 group-hover:translate-x-0.5 group-hover:text-[#1B3C6C]" />
-                          </Link>
-                        ))}
-                      </div>
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-1.5">
+                      {financingPathLinks.map((item) => (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={cn(
+                            'group flex items-center justify-between gap-3 rounded-[0.85rem] border border-slate-200/80 bg-white px-3.5 py-3 text-slate-900 shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition duration-150 hover:border-slate-300 hover:bg-slate-50',
+                            location.pathname === item.href && 'border-slate-300 bg-slate-50 text-[#1B3C6C]'
+                          )}
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold tracking-[-0.01em]">{item.name}</span>
+                            <span className="mt-0.5 block text-xs leading-5 text-slate-500">{item.description}</span>
+                          </span>
+                          <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-slate-400 transition duration-150 group-hover:translate-x-0.5 group-hover:text-[#1B3C6C]" />
+                        </Link>
+                      ))}
                     </div>
 
-                    <div className="border-t border-slate-200/70 pt-3">
-                      <p className={sectionLabelClassName}>
-                        Compare and plan further
-                      </p>
-                      <div className="mt-0.5">
-                        {financingSecondaryLinks.map((item) => (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            className={cn(
-                              'group flex items-center justify-between gap-3 border-b border-slate-200/75 px-2 py-2.5 text-sm transition duration-150 last:border-b-0 hover:bg-slate-50/80',
-                              location.pathname === item.href
-                                ? 'bg-slate-50/75 text-[#1B3C6C]'
-                                : 'text-slate-700 hover:text-[#1B3C6C]'
-                            )}
-                          >
-                            <p className="pr-3 text-sm font-medium tracking-[-0.01em]">{item.name}</p>
-                            <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-slate-400 transition duration-150 group-hover:translate-x-0.5 group-hover:text-[#1B3C6C]" />
-                          </Link>
-                        ))}
-                      </div>
+                    <div className="border-t border-slate-200/70 pt-2">
+                      <Link
+                        to={financingHubLink.href}
+                        className={cn(
+                          'group flex items-center justify-between gap-3 rounded-[0.7rem] px-2 py-2.5 text-sm font-medium tracking-[-0.01em] transition duration-150 hover:bg-slate-50/80',
+                          location.pathname === financingHubLink.href
+                            ? 'text-[#1B3C6C]'
+                            : 'text-slate-700 hover:text-[#1B3C6C]'
+                        )}
+                      >
+                        {financingHubLink.name}
+                        <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-slate-400 transition duration-150 group-hover:translate-x-0.5 group-hover:text-[#1B3C6C]" />
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -589,48 +582,41 @@ export default function Navbar() {
 
                 {isMobileFinancingOpen && (
                   <div className="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/90 p-3">
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                       <div>
                         <p className="px-1 pb-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-slate-400/85">
-                          Start here
+                          Ways to pay
                         </p>
                         <div className="grid gap-2">
-                          {financingPrimaryLinks.map((item) => (
+                          {financingPathLinks.map((item) => (
                             <Link
                               key={item.name}
                               to={item.href}
                               className={cn(
-                              'rounded-[0.9rem] border px-4 py-2.75 text-sm font-semibold tracking-[-0.01em] transition duration-150',
+                              'rounded-[0.9rem] border px-4 py-2.75 tracking-[-0.01em] transition duration-150',
                               location.pathname === item.href
                                 ? 'border-slate-300 bg-slate-50 text-[#1B3C6C]'
                                   : 'border-slate-200/80 bg-white text-slate-900 hover:border-slate-200 hover:bg-slate-100'
                               )}
                             >
-                              {item.name}
+                              <span className="block text-sm font-semibold">{item.name}</span>
+                              <span className="mt-0.5 block text-xs leading-5 text-slate-500">{item.description}</span>
                             </Link>
                           ))}
                         </div>
                       </div>
 
                       <div className="border-t border-slate-200/80 pt-2.5">
-                        <p className="px-1 pb-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-slate-400/85">
-                          Compare and plan further
-                        </p>
-                        <div className="space-y-1">
-                          {financingSecondaryLinks.map((item) => (
-                            <Link
-                              key={item.name}
-                              to={item.href}
-                              className={cn(
-                                'flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-4 py-2.75 text-sm font-medium tracking-[-0.01em] text-slate-700 transition duration-150 last:border-b-0 hover:bg-slate-100 hover:text-[#1B3C6C]',
-                                location.pathname === item.href && 'bg-slate-50 text-[#1B3C6C]'
-                              )}
-                            >
-                              <span className="pr-3">{item.name}</span>
-                              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-slate-400 transition duration-150" />
-                            </Link>
-                          ))}
-                        </div>
+                        <Link
+                          to={financingHubLink.href}
+                          className={cn(
+                            'flex items-center justify-between gap-3 rounded-[0.9rem] bg-white px-4 py-2.75 text-sm font-medium tracking-[-0.01em] text-slate-700 transition duration-150 hover:bg-slate-100 hover:text-[#1B3C6C]',
+                            location.pathname === financingHubLink.href && 'bg-slate-50 text-[#1B3C6C]'
+                          )}
+                        >
+                          <span className="pr-3">{financingHubLink.name}</span>
+                          <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-slate-400 transition duration-150" />
+                        </Link>
                       </div>
                     </div>
                   </div>
