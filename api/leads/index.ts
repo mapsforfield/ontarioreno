@@ -14,6 +14,12 @@ import {
   type QuoteFile,
 } from '../../lib/window-quote.js';
 import {
+  parseProjectFiles,
+  PROJECT_FILE_KINDS,
+  projectFilesAlert,
+  projectFilesNote,
+} from '../../lib/project-intake.js';
+import {
   clientIp,
   createRateLimiter,
   createSharedSpendCap,
@@ -2348,6 +2354,9 @@ const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
   // homeowner retrying a failed upload a few times.
   windows_presign: { limit: 30, windowMs: 60 * 60_000 },
   windows_quote: { limit: 10, windowMs: 60 * 60_000 },
+  // /match documents: the same presign, and one attach per submission.
+  project_presign: { limit: 30, windowMs: 60 * 60_000 },
+  project_files: { limit: 10, windowMs: 60 * 60_000 },
 };
 
 const publicLimiter = createRateLimiter();
@@ -2503,9 +2512,16 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
   // file is readable afterwards only through `?quote_file=`, which needs an
   // admin login. A presigned PUT cannot cap size, so `windows_quote` re-checks
   // the stored size before attaching the file to anything.
-  if (flow === 'windows_presign' && req.method === 'POST') {
+  // /match uses the same presign as `project_presign`; only the wording of the
+  // unavailable message differs, because /match has no "I need a quote" path.
+  if ((flow === 'windows_presign' || flow === 'project_presign') && req.method === 'POST') {
     if (!isR2Configured()) {
-      return res.status(503).json({ error: 'Uploads are not available right now. Choose "I need a quote" instead, or try again later.' });
+      return res.status(503).json({
+        error:
+          flow === 'project_presign'
+            ? 'Uploads are not available right now. You can skip this step and bring your documents to the consultation.'
+            : 'Uploads are not available right now. Choose "I need a quote" instead, or try again later.',
+      });
     }
     const body = (req.body ?? {}) as Record<string, unknown>;
     const type = clean(body.type);
@@ -2645,6 +2661,80 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     await drainOutbox().catch(() => null);
     await ringDoorbell();
     return res.status(201).json({ ok: true, leadRef: lead.id });
+  }
+
+  // ── /match: attach optional documents to the lead the review just created ──
+  //
+  // Called after `submit` or `project_review` has returned a lead id, so the
+  // files can never hold up the submission itself — an upload that fails here
+  // costs the documents, not the lead or the booking. Files are verified in the
+  // bucket exactly as `windows_quote` does, appended (never replaced) to
+  // Lead.quoteFiles, and announced to the admin with links that need a login.
+  if (flow === 'project_files' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const lead = await loadPublicFlowLead(clean(body.leadRef));
+    if (!lead) return res.status(404).json({ error: 'Session not found.' });
+    const parsed = parseProjectFiles(body.files);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const kinds = (Array.isArray(body.kinds) ? body.kinds : [])
+      .map((k) => clean(k))
+      .filter((k) => (PROJECT_FILE_KINDS as readonly string[]).includes(k));
+
+    const files: QuoteFile[] = [];
+    for (const f of parsed.files) {
+      const stored = await objectSize(f.key).catch(() => null);
+      if (stored == null) continue;
+      if (stored > QUOTE_FILE_RULES.maxBytes) {
+        await deleteObject(f.key).catch(() => null);
+        continue;
+      }
+      files.push({ ...f, size: stored });
+    }
+    if (files.length === 0) return res.status(400).json({ error: 'None of the files finished uploading.' });
+
+    const prior = Array.isArray(lead.quoteFiles) ? (lead.quoteFiles as unknown as QuoteFile[]) : [];
+    // A replay of the same attach must not list the files twice.
+    const fresh = files.filter((f) => !prior.some((p) => p.key === f.key));
+    if (fresh.length === 0) return res.status(200).json({ ok: true, attached: 0 });
+    await withTables(() =>
+      prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          quoteFiles: [...prior, ...fresh] as never,
+          notes: mergeNotes(lead.notes, projectFilesNote(fresh, kinds)),
+        },
+      })
+    );
+
+    const alert = projectFilesAlert(
+      { name: lead.name ?? '', phone: lead.phone ?? '', projectType: clean(body.projectType), kinds, files: fresh },
+      lead.id,
+      (i) => `https://ontarioreno.ca/api/leads?quote_file=1&lead=${encodeURIComponent(lead.id)}&i=${prior.length + i}`,
+    );
+    const recipients = [teamInbox(), archiveInbox()].filter((a, i, all) => a && all.indexOf(a) === i);
+    await prisma.notificationOutbox
+      .createMany({
+        data: recipients.map((recipient) => ({
+          leadId: lead.id,
+          channel: 'email',
+          kind: 'lead_alert',
+          recipient,
+          subject: alert.subject,
+          body: alert.body,
+          html: '',
+          sendAfter: new Date().toISOString(),
+          expiresAt: '',
+          // Keyed on the first new file, so a replayed attach is one alert.
+          idempotencyKey: `${lead.id}:email:project_files:${fresh[0].key}:${recipient}`,
+        })),
+        skipDuplicates: true,
+      })
+      .catch((err) => {
+        console.error('[flow/project_files] could not queue alert:', err);
+      });
+    await drainOutbox().catch(() => null);
+    await ringDoorbell();
+    return res.status(200).json({ ok: true, attached: fresh.length });
   }
 
   // ── Submit qualification → route → create Lead ──
