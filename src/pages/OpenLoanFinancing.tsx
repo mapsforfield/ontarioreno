@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -11,7 +11,6 @@ import {
   Percent,
   PiggyBank,
   ShieldCheck,
-  Sparkles,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
@@ -22,40 +21,47 @@ import {
   formatDuration,
   generateAmortizationSchedule,
 } from '../lib/openLoanCalculator';
+import { buttonStyles, eyebrowStyles } from '../lib/uiStyles';
 
 type FaqItem = {
   question: string;
   answer: string;
 };
 
-function SectionHeading({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow?: string;
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="max-w-3xl">
-      {eyebrow && (
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
-          {eyebrow}
-        </p>
-      )}
-      <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-slate-900 md:text-4xl">
-        {title}
-      </h2>
-      {description && (
-        <p className="mt-4 text-lg leading-8 text-slate-600">{description}</p>
-      )}
-    </div>
-  );
-}
+const payoffStrategies = [
+  {
+    title: 'Annual cash events',
+    body: 'Bonuses, commissions, and tax refunds can cut principal meaningfully without changing the monthly structure.',
+  },
+  {
+    title: 'Refinance after the basement is complete',
+    body: 'If the renovation improves the home materially, some homeowners later revisit their borrowing rather than carrying the open loan indefinitely.',
+  },
+  {
+    title: 'Control over timing',
+    body: 'You are not forced into an all-cash decision today, and you are not boxed out of a better payoff path later.',
+  },
+];
+
+const otherPaths = [
+  {
+    title: 'Using home equity',
+    body: 'A HELOC or refinance for bigger projects, and how to tell if the renovation earns it.',
+    href: '/financing/home-equity-renovations-ontario',
+  },
+  {
+    title: 'HELOC vs renovation financing',
+    body: 'Side-by-side: flexible equity access versus a set monthly payment.',
+    href: '/financing/heloc-vs-contractor-financing',
+  },
+  {
+    title: 'All financing options',
+    body: 'Every way to pay for a renovation in Ontario, in one place.',
+    href: '/financing',
+  },
+];
 
 export default function OpenLoanFinancing() {
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [renovationCost, setRenovationCost] = useState(85000);
   const [amortizationMonths, setAmortizationMonths] = useState<
     120 | 180 | 240
@@ -189,6 +195,16 @@ export default function OpenLoanFinancing() {
     },
   ];
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+    })),
+  };
+
   const commonSetupRate = 0.0999;
   const financedAmount = useMemo(
     () => calculateFinancedAmountWithHST(renovationCost),
@@ -209,8 +225,6 @@ export default function OpenLoanFinancing() {
     [amortizationMonths, effectivePrincipal]
   );
   const dailyEquivalent = Math.round(baseMonthlyPayment / 30);
-  const heroExampleMonthlyPayment = 592;
-  const heroExampleDailyEquivalent = Math.round(heroExampleMonthlyPayment / 30);
   const financeBarWidth = Math.min(
     Math.max((baseMonthlyPayment / financedAmount) * 100, 8),
     24
@@ -297,15 +311,10 @@ export default function OpenLoanFinancing() {
     setRenovationCost(clampedValue);
   };
 
-  const lightGlassButtonBase =
-    'border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.84)_0%,rgba(248,250,252,0.64)_100%)] text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.05),inset_0_1px_0_rgba(255,255,255,0.88)] ring-1 ring-white/28 backdrop-blur-xl hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,250,252,0.74)_100%)] hover:shadow-[0_14px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.92)]';
-  const lightGlassButtonActive =
-    'border-sky-100/80 bg-[linear-gradient(180deg,rgba(239,246,255,0.98)_0%,rgba(219,234,254,0.82)_100%)] text-slate-900 shadow-[0_16px_34px_rgba(27,60,108,0.12),inset_0_1px_0_rgba(255,255,255,0.90)] ring-1 ring-blue-200/55 backdrop-blur-xl';
-  const lightMetricCard =
-    'rounded-[1.7rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(248,250,252,0.66)_100%)] shadow-[0_16px_34px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.90)] ring-1 ring-white/40 backdrop-blur-xl';
+  const renovationFill = `${((renovationCost - 10000) / 140000) * 100}%`;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen overflow-x-hidden bg-white">
       <Helmet>
         <title>Open Loan Renovation Financing Ontario | OntarioReno</title>
         <meta
@@ -316,931 +325,603 @@ export default function OpenLoanFinancing() {
           rel="canonical"
           href="https://ontarioreno.ca/open-loan-financing"
         />
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
-      <section className="overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1fr)_540px] lg:gap-14 lg:px-8 lg:py-28">
-          <div className="flex flex-col justify-center">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-[#1B3C6C]">
-              <CreditCard className="h-4 w-4" />
+      {/* Hero — white 60/40. The dark card shares state with the full
+          calculator below, so dragging here moves that one too. */}
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-14 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-20 lg:pt-20">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[0.8rem] font-medium text-[#1B3C6C]">
+              <CreditCard className="h-3.5 w-3.5" />
               Ontario renovation financing guide
-            </div>
+            </p>
 
-            <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] leading-[0.96] text-slate-900 sm:text-5xl md:text-7xl">
-              Finance Your Basement
+            <h1 className="mt-6 max-w-2xl text-[2.45rem] font-bold leading-[1.02] tracking-[-0.045em] text-slate-950 md:text-[3.4rem] lg:text-[3.9rem]">
+              Open Loan Renovation Financing
             </h1>
 
-            <p className="mt-3 max-w-2xl text-2xl font-semibold tracking-[-0.03em] text-slate-700 sm:text-3xl md:text-4xl">
-              with a manageable monthly payment
+            <p className="mt-6 max-w-xl text-[1.05rem] leading-8 text-slate-600 md:text-[1.15rem]">
+              Finish the basement now with a manageable monthly payment, and
+              keep the freedom to pay it off early with no penalty.
             </p>
 
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-              Move forward now without draining all your cash at once, while
-              still keeping the flexibility to pay it down faster later.
-            </p>
-
-            <div className="mt-7 space-y-3 lg:max-w-2xl">
+            <ul className="mt-7 space-y-3">
               {heroBullets.map((bullet) => (
-                <div
-                  key={bullet}
-                  className="flex items-start gap-3"
-                >
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                  <p className="text-sm leading-7 text-slate-700 sm:text-base">{bullet}</p>
-                </div>
+                <li key={bullet} className="flex items-start gap-3 text-[0.98rem] leading-7 text-slate-700">
+                  <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-[#2b5a96]" />
+                  {bullet}
+                </li>
               ))}
-            </div>
+            </ul>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="#calculator-placeholder"
-                className="inline-flex items-center justify-center rounded-xl bg-[#1B3C6C] px-7 py-4 text-base font-bold text-white shadow-[0_16px_32px_rgba(27,60,108,0.18)] transition hover:bg-blue-700 hover:shadow-[0_20px_40px_rgba(27,60,108,0.22)]"
-              >
-                Estimate My Payments
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <a href="#calculator-placeholder" className={buttonStyles.primary}>
+                Estimate my payment
+                <ArrowRight className="h-5 w-5" />
               </a>
-              <a
-                href="#how-open-loans-work"
-                className="inline-flex items-center justify-center rounded-[0.8rem] border border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-7 py-[0.95rem] text-base font-semibold tracking-[-0.015em] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.03),0_12px_24px_rgba(15,23,42,0.05)] transition duration-200 hover:border-slate-400 hover:bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_1px_2px_rgba(15,23,42,0.04),0_14px_28px_rgba(15,23,42,0.06)] active:bg-slate-100 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-              >
-                How Open Loans Work
-              </a>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center lg:justify-end">
-            <div className="w-full max-w-[560px] rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.10)] sm:rounded-[2rem] sm:p-5">
-              <div className="mb-3 flex items-center justify-between px-1 sm:mb-4 sm:px-2">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Smart financing lens
-                </p>
-                <Sparkles className="h-5 w-5 text-[#1B3C6C]" />
-              </div>
-
-              <div className="overflow-hidden rounded-[1.5rem] shadow-[0_20px_50px_rgba(15,23,42,0.16)] sm:rounded-[1.75rem]">
-                <div className="relative">
-                <img
-                  src="/images/modern-wide-angle-basement.jpg"
-                  alt="Finished modern basement with comfortable lounge seating"
-                  className="h-[300px] w-full object-cover object-center sm:h-[360px]"
-                />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(23,37,84,0)_0%,rgba(23,37,84,0.06)_28%,rgba(23,37,84,0.22)_52%,rgba(23,37,84,0.58)_76%,rgba(23,37,84,0.92)_100%)]" />
-
-                <div className="absolute left-4 top-4 rounded-full border border-white/50 bg-white/88 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1B3C6C] shadow-[0_12px_30px_rgba(15,23,42,0.10)] backdrop-blur-md sm:left-5 sm:top-5 sm:px-4 sm:text-xs">
-                  Finished basement outcome
-                </div>
-
-                <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(15,23,42,0)_0%,rgba(15,23,42,0.70)_100%)] px-4 pb-4 pt-12 text-white sm:px-6 sm:pb-6 sm:pt-16">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200 sm:text-xs">
-                    Why this works
-                  </p>
-                  <h2 className="mt-2 max-w-[16rem] text-xl font-bold tracking-[-0.03em] sm:max-w-[22rem] sm:text-3xl">
-                    Get the basement now without draining all your cash today
-                  </h2>
-                  <p className="mt-2 max-w-[22rem] text-xs leading-6 text-slate-200 sm:mt-3 sm:max-w-[28rem] sm:text-sm sm:leading-7">
-                    Use financing to make the project happen now and keep your
-                    savings intact while the space starts working for you sooner.
-                  </p>
-                </div>
-                </div>
-
-                <div className="bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] p-4 text-white sm:p-6">
-                  <div className="grid gap-4 lg:grid-cols-[auto_1fr] lg:items-start">
-                    <div className="rounded-[1.2rem] bg-white px-4 py-4 text-slate-900 shadow-[0_14px_30px_rgba(15,23,42,0.16)] sm:rounded-[1.3rem] sm:px-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
-                        Example payment
-                      </p>
-                      <p className="mt-2 text-3xl font-bold tracking-[-0.04em] sm:text-5xl">
-                        {formatCurrency(heroExampleMonthlyPayment)}
-                        <span className="ml-2 text-sm font-semibold text-slate-500 sm:text-base">
-                          /month
-                        </span>
-                      </p>
-                      <p className="mt-2 text-sm font-semibold text-slate-700">
-                        Approx. {formatCurrency(heroExampleDailyEquivalent)}/day
-                      </p>
-                      <p className="mt-2 text-xs leading-5 text-slate-500">
-                        Deposit example: {formatCurrency(depositAmount)}
-                      </p>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2 text-sm font-semibold text-white sm:gap-3">
-                        <span className="rounded-full border border-white/12 bg-white/8 px-3 py-2 sm:px-4">
-                          Typical project range: $10K - $150K
-                        </span>
-                        <span className="rounded-full border border-white/12 bg-white/8 px-3 py-2 sm:px-4">
-                          Common setup: 60 / 240
-                        </span>
-                      </div>
-
-                      <p className="mt-4 text-sm leading-7 text-slate-300">
-                        You can also review our{' '}
-                        <Link
-                          to="/financing"
-                          className="font-semibold text-white underline underline-offset-4"
-                        >
-                          renovation financing overview
-                        </Link>
-                        .
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
-                At a glance
-              </p>
-              <p className="mt-2 text-lg font-bold tracking-[-0.02em] text-slate-900">
-                The financing setup most homeowners are actually looking at
-              </p>
-            </div>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              These are the core assumptions behind the payment examples on this
-              page, shown in plain English.
-            </p>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
-            {trustPoints.map((point) => {
-              const Icon = point.icon;
-
-              return (
-                <div
-                  key={point.title}
-                  className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-6 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[#1B3C6C]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <p className="mt-5 text-lg font-bold leading-7 text-slate-900">
-                    {point.title}
-                  </p>
-                  <p className="mt-3 max-w-[18rem] text-sm leading-7 text-slate-600">
-                    {point.body}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section id="how-open-loans-work" className="bg-white py-20">
-        <div className="mx-auto grid max-w-7xl gap-16 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:px-8">
-          <div>
-            <SectionHeading
-              eyebrow="Open loan basics"
-              title="What is an open loan?"
-              description="An open loan lets you move forward on a basement renovation now and spread the cost over time without locking yourself into carrying the balance for the full schedule."
-            />
-
-            <div className="mt-8 space-y-5 text-lg leading-8 text-slate-600">
-              <p>
-                That distinction matters. Many homeowners hear a long
-                amortization period and assume they are trapped for the full
-                duration. With an open loan, the setup mostly exists to keep
-                the required monthly payment manageable so the basement can get
-                done now. It does not remove your ability to make extra
-                payments or fully exit early.
-              </p>
-              <p>
-                This is why open-loan financing can work well for basement
-                projects with a smarter payoff plan behind them. You can keep
-                monthly pressure manageable now, then use a bonus, refinance,
-                or early payoff strategy later if it still makes sense.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-8 shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
-              The practical takeaway
-            </p>
-            <div className="mt-6 space-y-4">
-              {[
-                'Renovate now and spread the cost over time',
-                'Keep the required payment manageable',
-                'Make extra payments when cash flow allows',
-                'Pay it off early with no prepayment penalty',
-                'Use financing as a bridge, not necessarily a lifelong balance',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4"
-                >
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                  <p className="text-sm leading-6 text-slate-700">{item}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            eyebrow="Process"
-            title="How it works"
-            description="The financing path is straightforward. The key is understanding how rate support, term, and amortization shape the required monthly."
-          />
-
-            <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {howItWorksSteps.map((step, index) => {
-              const stepCardStyles = [
-                'border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_18px_45px_rgba(59,130,246,0.07)]',
-                'border-sky-100 bg-[linear-gradient(180deg,#ffffff_0%,#f6fbff_100%)] shadow-[0_18px_45px_rgba(14,165,233,0.07)]',
-                'border-cyan-100 bg-[linear-gradient(180deg,#ffffff_0%,#f4fcff_100%)] shadow-[0_18px_45px_rgba(6,182,212,0.07)]',
-                'border-teal-100 bg-[linear-gradient(180deg,#ffffff_0%,#f3fdfb_100%)] shadow-[0_18px_45px_rgba(20,184,166,0.07)]',
-                'border-emerald-100 bg-[linear-gradient(180deg,#ffffff_0%,#f4fdf7_100%)] shadow-[0_18px_45px_rgba(16,185,129,0.07)]',
-                'border-lime-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fdee_100%)] shadow-[0_18px_45px_rgba(132,204,22,0.07)]',
-              ];
-
-              const stepBadgeStyles = [
-                'bg-blue-50 text-blue-700',
-                'bg-sky-50 text-sky-700',
-                'bg-cyan-50 text-cyan-700',
-                'bg-teal-50 text-teal-700',
-                'bg-emerald-50 text-emerald-700',
-                'bg-lime-50 text-lime-700',
-              ];
-
-              return (
-                <div
-                  key={step.title}
-                  className={`rounded-[1.75rem] border p-6 ${stepCardStyles[index]} `}
-                >
-                  <div
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${stepBadgeStyles[index]}`}
-                  >
-                    Step {index + 1}
-                  </div>
-                  <h3 className="mt-4 text-xl font-bold tracking-[-0.02em] text-slate-900">
-                    {step.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    {step.body}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <SectionHeading
-                eyebrow="Why homeowners use it"
-            title="Why homeowners finance a basement instead of waiting"
-            description="The appeal is usually not about borrowing for its own sake. It is about making the project happen sooner without wrecking cash flow."
-          />
-
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            {useCases.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-7 shadow-sm"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#1B3C6C]">
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="mt-5 text-2xl font-bold tracking-[-0.02em] text-slate-900">
-                    {item.title}
-                  </h3>
-                  <p className="mt-3 text-base leading-7 text-slate-600">
-                    {item.body}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="calculator-placeholder"
-        className="overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.10),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(191,219,254,0.14),transparent_30%),linear-gradient(180deg,#fcfdff_0%,#f4f7fb_46%,#eef3f8_100%)] py-20"
-      >
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            eyebrow="Calculator"
-            title="Basement payment calculator"
-            description="Use this to pressure-test what it could look like to finish the basement with a manageable monthly payment instead of waiting until the full cost can be paid in cash."
-          />
-          <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-            This uses a common financing example: 9.99%, a 60-month promo term,
-            monthly payments, and a longer amortization period to keep the
-            required monthly lower.
-          </p>
-
-          <div className="relative z-10 mt-10 rounded-[2.25rem] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76)_0%,rgba(248,250,252,0.60)_100%)] p-3 shadow-[0_34px_100px_rgba(15,23,42,0.13),0_10px_28px_rgba(255,255,255,0.22),inset_0_1px_0_rgba(255,255,255,0.84)] ring-1 ring-slate-200/45 backdrop-blur-2xl sm:p-4">
-            <div className="pointer-events-none absolute inset-0 rounded-[2.25rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.50)_0%,rgba(255,255,255,0.20)_18%,rgba(255,255,255,0.08)_44%,rgba(255,255,255,0.03)_100%)]" />
-            <div className="pointer-events-none absolute inset-0 rounded-[2.25rem] bg-[linear-gradient(120deg,rgba(255,255,255,0.14)_0%,transparent_18%,transparent_62%,rgba(255,255,255,0.05)_100%)]" />
-            <div className="pointer-events-none absolute inset-0 rounded-[2.25rem] bg-[radial-gradient(circle_at_18%_14%,rgba(255,255,255,0.24),transparent_24%),linear-gradient(145deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.03)_46%,rgba(148,163,184,0.05)_100%)]" />
-            <div className="pointer-events-none absolute inset-[1px] rounded-[2.15rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.12),transparent_34%)]" />
-            <div className="pointer-events-none absolute -left-10 -top-10 h-52 w-52 rounded-full bg-white/50 blur-3xl" />
-            <div className="pointer-events-none absolute right-8 top-8 h-32 w-32 rounded-full bg-sky-100/35 blur-3xl" />
-            <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-            <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
-            <div className="relative overflow-hidden rounded-[1.95rem] border border-white/78 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(248,250,252,0.68)_100%)] p-7 shadow-[0_28px_70px_rgba(15,23,42,0.11),0_8px_18px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.94)] ring-1 ring-white/45 backdrop-blur-2xl">
-              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-90" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.05)_100%),radial-gradient(circle_at_top_left,rgba(255,255,255,0.50),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(191,219,254,0.14),transparent_24%)]" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(255,255,255,0.14)_0%,transparent_20%,transparent_66%,rgba(255,255,255,0.06)_100%)]" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_42%,rgba(148,163,184,0.05)_100%)]" />
-              <div className="pointer-events-none absolute inset-[1px] rounded-[1.85rem] bg-[radial-gradient(circle_at_46%_16%,rgba(255,255,255,0.14),transparent_32%)]" />
-                <div className="space-y-5">
-                <div>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <label className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-600">
-                      Renovation cost
-                    </label>
-                    <div className="w-full max-w-[14rem]">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatCurrency(renovationCost)}
-                        onChange={handleRenovationCostInput}
-                        className="w-full rounded-2xl border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,250,252,0.76)_100%)] px-4 py-3 text-right text-lg font-bold text-slate-900 shadow-[0_14px_30px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.98)] ring-1 ring-white/30 backdrop-blur-xl outline-none transition duration-200 focus:border-sky-200 focus:ring-4 focus:ring-blue-100/80"
-                        aria-label="Renovation cost"
-                      />
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min={10000}
-                    max={150000}
-                    step={1000}
-                    value={renovationCost}
-                    onChange={(event) =>
-                      setRenovationCost(Number(event.target.value))
-                    }
-                    className="mt-4 h-3 w-full cursor-pointer appearance-none rounded-full border border-white/75 bg-[linear-gradient(180deg,rgba(226,232,240,0.92)_0%,rgba(255,255,255,0.74)_100%)] accent-[#1B3C6C] shadow-[0_4px_10px_rgba(15,23,42,0.04),inset_0_1px_2px_rgba(255,255,255,0.88)] ring-1 ring-white/30 backdrop-blur-md"
-                  />
-                  <div className="mt-2 flex justify-between text-xs font-medium text-slate-600">
-                    <span>$10,000</span>
-                    <span>$150,000</span>
-                  </div>
-                </div>
-
-                  <div className={`${lightMetricCard} p-5`}>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                          Total financed (incl. HST)
-                        </p>
-                        <p className="mt-2 text-3xl font-bold tracking-[-0.03em] text-slate-900">
-                          {formatCurrency(financedAmount)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowSetupDetails((current) => !current)}
-                        className="inline-flex items-center justify-center rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:bg-white"
-                      >
-                        {showSetupDetails ? 'Hide setup details' : 'Adjust setup details'}
-                      </button>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      Start with the payment first. Open the setup only if you
-                      want to pressure-test the assumptions behind it.
-                    </p>
-                  </div>
-
-                  {showSetupDetails && (
-                    <div className="space-y-6 border-t border-white/60 pt-6">
-                      <div>
-                        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-600">
-                          Amortization period
-                        </p>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                          {([
-                            [120, '120 months'],
-                            [180, '180 months'],
-                            [240, '240 months'],
-                          ] as const).map(([value, label]) => (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => setAmortizationMonths(value)}
-                              className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition duration-200 ${
-                                amortizationMonths === value
-                                  ? 'border-sky-100/85 bg-[linear-gradient(180deg,rgba(27,60,108,0.96)_0%,rgba(37,99,235,0.80)_100%)] text-white shadow-[0_18px_38px_rgba(27,60,108,0.22),inset_0_1px_0_rgba(255,255,255,0.24)] ring-1 ring-white/12 backdrop-blur-xl'
-                                  : lightGlassButtonBase
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="mt-3 text-xs leading-6 text-slate-600">
-                          We usually maximize amortization to keep the monthly
-                          lower. In practice, 240 months is the most common
-                          setup we show.
-                        </p>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                        <div className={`${lightMetricCard} p-4`}>
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                            Rate example
-                          </p>
-                          <p className="mt-2 text-lg font-bold text-slate-900">
-                            9.99%
-                          </p>
-                          <p className="mt-1 text-xs leading-6 text-slate-600">
-                            Our most common representative setup.
-                          </p>
-                        </div>
-                        <div className={`${lightMetricCard} p-4`}>
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                            Payment frequency
-                          </p>
-                          <p className="mt-2 text-lg font-bold text-slate-900">
-                            Monthly
-                          </p>
-                          <p className="mt-1 text-xs leading-6 text-slate-600">
-                            This is how we almost always show it.
-                          </p>
-                        </div>
-                        <div className={`${lightMetricCard} p-4`}>
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                            Promo term
-                          </p>
-                          <p className="mt-2 text-lg font-bold text-slate-900">
-                            60 months
-                          </p>
-                          <p className="mt-1 text-xs leading-6 text-slate-600">
-                            The most common sales setup we present.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-[1.5rem] border border-sky-100/70 bg-[linear-gradient(180deg,rgba(239,246,255,0.98)_0%,rgba(224,242,254,0.78)_100%)] px-5 py-4 shadow-[0_18px_40px_rgba(37,99,235,0.10)]">
-                        <p className="text-sm font-semibold text-[#16345d]">
-                          Why this can work
-                        </p>
-                        <p className="mt-2 text-sm leading-7 text-slate-700">
-                          A basement project often feels much more realistic once
-                          the cost is translated into a monthly payment instead of
-                          one large cash number.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-            </div>
-
-            <div className="relative self-start overflow-hidden rounded-[1.95rem] border border-white/18 bg-[linear-gradient(180deg,rgba(15,23,42,0.78)_0%,rgba(15,23,42,0.58)_100%)] p-7 text-white shadow-[0_32px_90px_rgba(15,23,42,0.28),0_8px_18px_rgba(30,41,59,0.16),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-slate-700/35 backdrop-blur-[22px]">
-              <div
-                className="pointer-events-none absolute inset-0 hidden lg:block"
-                style={{
-                  backgroundImage: "url('/images/calculator-image.jpg')",
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center 72%',
-                  backgroundRepeat: 'no-repeat',
-                  filter: 'blur(1px) saturate(0.92)',
-                  opacity: 0.42,
-                  WebkitMaskImage:
-                    'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 26%, rgba(0,0,0,0.7) 46%, rgba(0,0,0,0.28) 60%, rgba(0,0,0,0) 74%)',
-                  maskImage:
-                    'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 26%, rgba(0,0,0,0.7) 46%, rgba(0,0,0,0.28) 60%, rgba(0,0,0,0) 74%)',
-                }}
-              />
-              <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_92%_16%,rgba(255,255,255,0.10),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.03)_26%,rgba(255,255,255,0.02)_100%),radial-gradient(circle_at_top_left,rgba(96,165,250,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.04),transparent_24%)]" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.08)_0%,transparent_18%,transparent_68%,rgba(255,255,255,0.04)_100%)]" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.02)_40%,rgba(15,23,42,0.10)_100%)]" />
-              <div className="pointer-events-none absolute inset-[1px] rounded-[1.85rem] bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.08),transparent_30%)]" />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(270deg,rgba(15,23,42,0.08)_0%,rgba(15,23,42,0.04)_12%,transparent_28%,transparent_52%),linear-gradient(180deg,rgba(15,23,42,0.01)_0%,rgba(15,23,42,0.06)_100%)]" />
-              <div className="pointer-events-none absolute right-0 top-0 h-44 w-44 rounded-full bg-sky-300/12 blur-3xl" />
-                <div className="relative z-10 flex h-full flex-col">
-                  <div>
-                    <p className="text-sm font-medium tracking-[0.02em] text-sky-100">
-                      Basement payment estimate
-                  </p>
-                  <p className="mt-5 text-5xl font-bold tracking-[-0.04em] text-white sm:text-6xl">
-                    {formatCurrency(baseMonthlyPayment)}
-                    <span className="ml-2 text-lg font-semibold text-slate-300 sm:text-xl">
-                      / month
-                    </span>
-                  </p>
-                    <p className="mt-4 text-xl font-semibold tracking-[-0.02em] text-white">
-                      Approx. {formatCurrency(dailyEquivalent)}/day
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-slate-200">
-                      Instead of putting down {formatCurrency(depositAmount)} today
-                    </p>
-                  </div>
-
-                  <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => setShowComparison((current) => !current)}
-                      className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                    >
-                      {showComparison ? 'Hide comparison' : 'Compare deposit vs monthly'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowExitPlanner((current) => !current)}
-                      className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                    >
-                      {showExitPlanner ? 'Hide exit plan' : 'Plan a faster payoff'}
-                    </button>
-                  </div>
-
-                  {showComparison && (
-                    <div className="mt-8 space-y-6">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-[1.4rem] bg-white/6 p-5 ring-1 ring-white/8">
-                          <p className="text-sm font-medium text-slate-200">
-                            Option A
-                          </p>
-                          <h3 className="mt-2 text-xl font-bold text-white">
-                            Deposit paid today
-                          </h3>
-                          <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">
-                            {formatCurrency(depositAmount)}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">
-                            Example 20% deposit
-                          </p>
-                        </div>
-
-                        <div className="rounded-[1.4rem] bg-[linear-gradient(180deg,rgba(56,189,248,0.18)_0%,rgba(96,165,250,0.12)_100%)] p-5 ring-1 ring-sky-200/20">
-                          <p className="text-sm font-medium text-sky-100">
-                            Option B
-                          </p>
-                          <h3 className="mt-2 text-xl font-bold text-white">
-                            Finance monthly
-                          </h3>
-                          <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">
-                            {formatCurrency(baseMonthlyPayment)}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-200">
-                            Keep your savings intact
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <div className="mb-2 flex items-center justify-between gap-4 text-sm text-slate-300">
-                            <span>Deposit today</span>
-                            <span>{formatCurrency(depositAmount)}</span>
-                          </div>
-                          <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full w-full rounded-full bg-white/70 transition-all duration-700" />
-                          </div>
-                        </div>
-                        <div>
-                          <div className="mb-2 flex items-center justify-between gap-4 text-sm text-slate-300">
-                            <span>Finance monthly</span>
-                            <span>{formatCurrency(baseMonthlyPayment)}/mo</span>
-                          </div>
-                          <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full bg-[linear-gradient(90deg,#38bdf8_0%,#60a5fa_100%)] transition-all duration-700"
-                              style={{ width: `${financeBarWidth}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {showExitPlanner && (
-                    <div className="mt-8 rounded-[1.35rem] bg-white/5 px-5 py-4 ring-1 ring-white/8">
-                      <p className="text-sm font-medium text-white">
-                        Build your exit strategy
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-slate-300">
-                        Keep the lower required payment now, but map out what it
-                        would take to be out faster.
-                      </p>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        {([
-                          [24, '2 years'],
-                          [36, '3 years'],
-                          [60, '5 years'],
-                        ] as const).map(([value, label]) => (
-                          <button
-                            key={label}
-                            type="button"
-                            onClick={() => setTargetPayoffMonths(value)}
-                            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                              targetPayoffMonths === value
-                                ? 'border-sky-200/70 bg-sky-300/15 text-white'
-                                : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-sm font-medium text-slate-300">
-                            Extra monthly needed
-                          </p>
-                          <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-white">
-                            {formatCurrency(exitStrategy.extraMonthly)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-300">
-                            Total monthly target
-                          </p>
-                          <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-white">
-                            {formatCurrency(exitStrategy.totalMonthly)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-sm font-medium text-slate-300">
-                            Or every 6 months
-                          </p>
-                          <p className="mt-1 text-xl font-bold tracking-[-0.02em] text-white">
-                            About {formatCurrency(exitStrategy.sixMonthLumpSum)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-300">
-                            Lifetime interest avoided
-                          </p>
-                          <p className="mt-1 text-xl font-bold tracking-[-0.02em] text-white">
-                            {formatCurrency(exitStrategy.interestAvoided)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-4 text-sm leading-7 text-slate-100">
-                        To target a payoff in about {formatDuration(targetPayoffMonths)},
-                        you would typically want to add about{' '}
-                        {formatCurrency(exitStrategy.extraMonthly)} per month, or
-                        plan for roughly {formatCurrency(exitStrategy.sixMonthLumpSum)}{' '}
-                        every 6 months.
-                      </p>
-                    </div>
-                  )}
-
-                <div className="mt-8 space-y-3">
-                  {[
-                    'Turn a large cost into a manageable payment',
-                    'Keep cash available for emergencies',
-                    'Move forward now instead of waiting years',
-                  ].map((item) => (
-                    <div key={item} className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sky-200" />
-                      <span className="text-sm leading-6 text-slate-100">
-                        {item}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-8">
-                  <Link
-                    to="/match"
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-white px-6 py-3.5 text-base font-bold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Check If You Qualify For This Payment
-                  </Link>
-                </div>
-
-                <details className="mt-5 text-sm text-slate-300">
-                  <summary className="cursor-pointer font-medium text-slate-200 transition hover:text-white">
-                    View details
-                  </summary>
-                  <div className="mt-3 space-y-2 leading-6">
-                    <p>
-                      Typical example shown at 9.99%, 60-month promo term,
-                      monthly payments, and {amortizationMonths}-month
-                      amortization.
-                    </p>
-                    <p>
-                      O.A.C. Illustrative only. Actual rates, terms, and APRs
-                      depend on approval through Financeit.
-                    </p>
-                  </div>
-                </details>
-              </div>
-            </div>
-          </div>
-          </div>
-
-        </div>
-      </section>
-
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
-              <SectionHeading
-                eyebrow="Cost of waiting"
-                title="Waiting has a cost too"
-                description="Financing has a cost, but waiting often has one too. For many homeowners, the more useful question is whether delaying the basement makes life or property plans harder in the meantime."
-              />
-              <div className="mt-8 space-y-5 text-base leading-8 text-slate-600">
-                <p>
-                  A delayed basement often means delayed living space, delayed
-                  rental potential, and more time living with a part of the
-                  house that is not helping the family the way it could.
-                </p>
-                <p>
-                  That is why many homeowners do not frame the decision as
-                  &quot;cash or no project.&quot; They frame it as whether a
-                  manageable monthly payment is worth getting the space now.
-                </p>
-                <p>
-                  The point is not to push financing for its own sake. It is to
-                  understand whether financing helps unlock a basement project
-                  that meaningfully improves daily life, home value, or income
-                  potential sooner.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-8 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
-                Basement decision lens
-              </p>
-              <div className="mt-6 space-y-4">
-                {[
-                  'Get the extra living space now',
-                  'Avoid draining all your savings at once',
-                  'Spread a large project into monthly payments',
-                  'Keep the option to pay down faster later',
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4"
-                  >
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                    <p className="text-sm leading-6 text-slate-700">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section className="bg-white py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-[2.2rem] border border-slate-900 bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] p-8 text-white shadow-[0_28px_80px_rgba(15,23,42,0.24)] md:p-12">
-            <div className="max-w-4xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
-                Smart basement financing
-              </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white md:text-5xl">
-                Open loans work best when they make the project possible now
-              </h2>
-              <p className="mt-5 text-lg leading-8 text-slate-300">
-                The strongest use case is not borrowing forever. It is using
-                financing as a flexible tool to get the basement done now while
-                keeping control over when and how the balance gets reduced.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-3">
-              {[
-                {
-                  title: 'Annual cash events',
-                  body: 'Bonuses, commissions, and tax refunds can be used to reduce principal meaningfully without changing the original monthly structure.',
-                },
-                {
-                  title: 'Refinance after the basement is complete',
-                  body: 'If the renovation improves the home in a material way, some homeowners later revisit their capital stack rather than carrying the open loan indefinitely.',
-                },
-                {
-                  title: 'Control over timing',
-                  body: 'The core advantage is optionality. You are not forced into an all-cash decision today, and you are not boxed out of a better payoff path later.',
-                },
-              ].map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6"
-                >
-                  <p className="text-lg font-bold text-white">{item.title}</p>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">
-                    {item.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
-              <p className="text-base leading-8 text-slate-200">
-                The point is not to glorify debt. The point is to use financing
-                intelligently: make the basement possible now, preserve
-                flexibility, and keep a realistic exit strategy in view from day
-                one.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            eyebrow="FAQ"
-            title="Common questions about open-loan financing"
-            description="Short answers for homeowners trying to decide whether financing is the right way to move ahead on a basement renovation."
-          />
-
-          <div className="mt-10 space-y-4">
-            {faqs.map((faq, index) => {
-              const isOpen = openFaq === index;
-
-              return (
-                <div
-                  key={faq.question}
-                  className="rounded-[1.5rem] border border-slate-200 bg-white shadow-sm"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(isOpen ? null : index)}
-                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
-                  >
-                    <span className="text-lg font-bold text-slate-900">
-                      {faq.question}
-                    </span>
-                    <span className="text-2xl font-light text-slate-400">
-                      {isOpen ? '-' : '+'}
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <div className="border-t border-slate-200 px-6 py-5">
-                      <p className="text-base leading-7 text-slate-600">
-                        {faq.answer}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white py-20">
-        <div className="mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-8 py-12 shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-            <h2 className="text-3xl font-bold tracking-[-0.03em] text-slate-900 md:text-5xl">
-              Use financing to get the basement done sooner, not keep it stuck on hold
-            </h2>
-            <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-              A well-structured open loan can turn a basement renovation from a
-              someday project into a realistic next step while still giving you
-              control over how you reduce the balance later.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <a
-                href="#calculator-placeholder"
-                className="inline-flex items-center justify-center rounded-[0.82rem] border border-slate-800 bg-[linear-gradient(180deg,#1f2937_0%,#0f172a_100%)] px-8 py-[0.98rem] text-lg font-semibold tracking-[-0.018em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_rgba(15,23,42,0.18)] transition duration-200 hover:border-slate-700 hover:bg-[linear-gradient(180deg,#273244_0%,#111c31_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.06),0_18px_36px_rgba(15,23,42,0.22)] active:bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
-              >
-                Estimate My Payments
-              </a>
-              <Link
-                to="/match"
-                className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-8 py-4 text-lg font-semibold text-slate-900 transition hover:bg-slate-50"
-              >
-                Explore Your Financing Options
+              <Link to="/match" className={buttonStyles.secondary}>
+                Start Project Review
               </Link>
             </div>
           </div>
+
+          <div className="min-w-0">
+            <div className="rounded-[1.6rem] bg-[#0F172A] p-6 text-white shadow-[0_30px_70px_rgba(15,23,42,0.28)] sm:p-7">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200">
+                  Quick payment check
+                </p>
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-[0.7rem] font-medium text-slate-300">
+                  Example
+                </span>
+              </div>
+
+              <label className="mt-6 block">
+                <span className="flex items-baseline justify-between gap-4 text-sm">
+                  <span className="text-slate-300">Renovation cost</span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(renovationCost)}</span>
+                </span>
+                <input
+                  type="range"
+                  min={10000}
+                  max={150000}
+                  step={1000}
+                  value={renovationCost}
+                  onChange={(event) => setRenovationCost(Number(event.target.value))}
+                  aria-label="Renovation cost"
+                  style={{ '--fill': renovationFill } as CSSProperties}
+                  className="equity-range mt-4 w-full"
+                />
+              </label>
+
+              <div className="mt-7 rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">Estimated monthly payment</p>
+                <p className="mt-1 text-[2.4rem] font-bold leading-none tracking-[-0.04em] tabular-nums md:text-[2.7rem]">
+                  <span key={Math.round(baseMonthlyPayment)} className="equity-pop">
+                    {formatCurrency(baseMonthlyPayment)}
+                  </span>
+                  <span className="ml-1.5 text-base font-semibold text-slate-400">/mo</span>
+                </p>
+                <p className="mt-2 text-sm text-slate-300">
+                  About {formatCurrency(dailyEquivalent)}/day on{' '}
+                  {formatCurrency(financedAmount)} incl. HST
+                </p>
+                <p className="mt-3 text-xs leading-5 text-slate-400">
+                  Example at 9.99%, 60-month promo term, {amortizationMonths}-month
+                  amortization. O.A.C.
+                </p>
+              </div>
+
+              <a
+                href="#calculator-placeholder"
+                className="mt-5 inline-flex items-center text-sm font-semibold text-sky-300 hover:underline"
+              >
+                See the full breakdown and payoff plan
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* At a glance — the assumptions behind every number on the page. */}
+        <div className="border-t border-slate-200 bg-slate-50/60">
+          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-6 px-4 py-8 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+            {trustPoints.map((point) => {
+              const Icon = point.icon;
+              return (
+                <div key={point.title} className="min-w-0">
+                  <Icon className="h-5 w-5 text-[#2b5a96]" />
+                  <p className="mt-3 text-sm font-semibold text-slate-900">{point.title}</p>
+                  <p className="mt-1 text-[0.8rem] leading-5 text-slate-500">{point.body}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      <section className="bg-slate-950 py-12 text-white">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
-              Disclaimer
+      {/* What it is + how it works — explanation left, connected steps right. */}
+      <section id="how-open-loans-work" className="scroll-mt-24 bg-[#F8FAFC] py-20 lg:py-28">
+        <div className="mx-auto grid max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-16 lg:px-8">
+          <div className="lg:sticky lg:top-28 lg:self-start">
+            <p className={eyebrowStyles}>Open loan basics</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
+              What is an open loan?
+            </h2>
+            <div className="mt-5 space-y-4 text-[1.02rem] leading-8 text-slate-600">
+              <p>
+                An open loan lets you move forward on a basement renovation now
+                and spread the cost over time, without being locked into
+                carrying the balance for the full schedule.
+              </p>
+              <p>
+                A long amortization mostly exists to keep the required monthly
+                payment manageable. It does not stop you making extra payments
+                or paying the whole thing off early.
+              </p>
+            </div>
+          </div>
+
+          <ol className="relative space-y-4">
+            <div aria-hidden className="absolute bottom-8 left-[2.375rem] top-8 w-px bg-gradient-to-b from-[#2b5a96]/50 via-slate-200 to-slate-200" />
+            {howItWorksSteps.map((step, index) => (
+              <li
+                key={step.title}
+                className="relative flex gap-5 rounded-[1.2rem] border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <span
+                  className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-4 ring-white ${
+                    index === howItWorksSteps.length - 1
+                      ? 'bg-[#1B3C6C] text-white'
+                      : 'border border-slate-200 bg-white text-[#1B3C6C]'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <div>
+                  <h3 className="text-[1.05rem] font-semibold tracking-[-0.015em] text-slate-950">
+                    {step.title}
+                  </h3>
+                  <p className="mt-1.5 text-[0.94rem] leading-7 text-slate-600">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* Calculator — dark band; the input card is the brightest thing here. */}
+      <section
+        id="calculator-placeholder"
+        className="relative scroll-mt-24 overflow-hidden bg-[#0F172A] py-20 lg:py-28"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(56,189,248,0.16),transparent_70%)]" />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-300">Calculator</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-white md:text-[2.6rem]">
+              Basement payment calculator
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-[1.05rem] leading-7 text-slate-300">
+              See what finishing the basement could cost per month instead of
+              waiting until you can pay the full amount in cash.
             </p>
-            <p className="mt-4 text-sm leading-7 text-slate-300">
+          </div>
+
+          <div className="mt-12 grid items-start gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            {/* Inputs */}
+            <div className="rounded-[1.6rem] bg-white p-6 shadow-[0_30px_70px_rgba(2,6,23,0.4)] sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <label htmlFor="open-loan-cost" className="text-sm font-semibold text-slate-700">
+                  Renovation cost
+                </label>
+                <input
+                  id="open-loan-cost"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrency(renovationCost)}
+                  onChange={handleRenovationCostInput}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-right text-lg font-bold text-slate-900 outline-none transition hover:border-slate-400 focus:border-[#2b5a96] focus:ring-4 focus:ring-blue-100 sm:max-w-[14rem]"
+                />
+              </div>
+              <input
+                type="range"
+                min={10000}
+                max={150000}
+                step={1000}
+                value={renovationCost}
+                onChange={(event) => setRenovationCost(Number(event.target.value))}
+                aria-label="Renovation cost slider"
+                style={{ '--fill': renovationFill } as CSSProperties}
+                className="equity-range equity-range--light mt-5 w-full"
+              />
+              <div className="mt-2 flex justify-between text-xs font-medium text-slate-500">
+                <span>$10,000</span>
+                <span>$150,000</span>
+              </div>
+
+              <div className="mt-7 flex flex-col gap-4 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Total financed (incl. HST)
+                  </p>
+                  <p className="mt-1 text-[1.9rem] font-bold tracking-[-0.03em] tabular-nums text-slate-950">
+                    {formatCurrency(financedAmount)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSetupDetails((current) => !current)}
+                  aria-expanded={showSetupDetails}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-[#2b5a96] hover:text-[#1B3C6C] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                >
+                  {showSetupDetails ? 'Hide setup details' : 'Adjust setup details'}
+                </button>
+              </div>
+
+              {showSetupDetails && (
+                <div className="mt-6 space-y-6 border-t border-slate-200 pt-6">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Amortization period</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {([
+                        [120, '120 months'],
+                        [180, '180 months'],
+                        [240, '240 months'],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setAmortizationMonths(value)}
+                          aria-pressed={amortizationMonths === value}
+                          className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 ${
+                            amortizationMonths === value
+                              ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
+                              : 'border-slate-300 bg-white text-slate-700 hover:border-[#2b5a96] hover:text-[#1B3C6C]'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs leading-6 text-slate-500">
+                      We usually maximize amortization to keep the monthly
+                      lower. In practice, 240 months is the most common setup we
+                      show.
+                    </p>
+                  </div>
+
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      ['Rate example', '9.99%', 'Our most common representative setup.'],
+                      ['Payment frequency', 'Monthly', 'This is how we almost always show it.'],
+                      ['Promo term', '60 months', 'The most common sales setup we present.'],
+                    ].map(([label, value, note]) => (
+                      <div key={label} className="rounded-xl border border-slate-200 p-4">
+                        <dt className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {label}
+                        </dt>
+                        <dd className="mt-1 text-lg font-bold text-slate-950">{value}</dd>
+                        <dd className="mt-1 text-xs leading-5 text-slate-500">{note}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+            </div>
+
+            {/* Result */}
+            <div className="rounded-[1.6rem] bg-[#1B3C6C] p-6 text-white shadow-[0_30px_70px_rgba(2,6,23,0.4)] ring-1 ring-white/10 sm:p-8">
+              <p className="text-sm font-medium text-sky-100">Basement payment estimate</p>
+              <p className="mt-3 text-[3rem] font-bold leading-none tracking-[-0.04em] tabular-nums sm:text-[3.6rem]">
+                <span key={Math.round(baseMonthlyPayment)} className="equity-pop">
+                  {formatCurrency(baseMonthlyPayment)}
+                </span>
+                <span className="ml-2 text-lg font-semibold text-blue-200">/ month</span>
+              </p>
+              <p className="mt-4 text-lg font-semibold">
+                Approx. {formatCurrency(dailyEquivalent)}/day
+              </p>
+              <p className="mt-1 text-sm text-blue-100">
+                Instead of putting down {formatCurrency(depositAmount)} today
+              </p>
+
+              <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setShowComparison((current) => !current)}
+                  aria-expanded={showComparison}
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/25"
+                >
+                  {showComparison ? 'Hide comparison' : 'Compare deposit vs monthly'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExitPlanner((current) => !current)}
+                  aria-expanded={showExitPlanner}
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/25"
+                >
+                  {showExitPlanner ? 'Hide exit plan' : 'Plan a faster payoff'}
+                </button>
+              </div>
+
+              {showComparison && (
+                <div className="mt-6 space-y-5">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
+                      <p className="text-xs font-medium text-blue-200">Option A</p>
+                      <h3 className="mt-1 font-semibold">Deposit paid today</h3>
+                      <p className="mt-2 text-2xl font-bold tabular-nums">{formatCurrency(depositAmount)}</p>
+                      <p className="mt-1 text-xs text-blue-200">Example 20% deposit</p>
+                    </div>
+                    <div className="rounded-2xl bg-sky-400/15 p-4 ring-1 ring-sky-300/30">
+                      <p className="text-xs font-medium text-sky-100">Option B</p>
+                      <h3 className="mt-1 font-semibold">Finance monthly</h3>
+                      <p className="mt-2 text-2xl font-bold tabular-nums">{formatCurrency(baseMonthlyPayment)}</p>
+                      <p className="mt-1 text-xs text-sky-100">Keep your savings intact</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1.5 flex justify-between text-xs text-blue-100">
+                        <span>Deposit today</span>
+                        <span>{formatCurrency(depositAmount)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/10">
+                        <div className="h-full w-full rounded-full bg-white/70" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1.5 flex justify-between text-xs text-blue-100">
+                        <span>Finance monthly</span>
+                        <span>{formatCurrency(baseMonthlyPayment)}/mo</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-300 transition-all duration-700"
+                          style={{ width: `${financeBarWidth}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showExitPlanner && (
+                <div className="mt-6 rounded-2xl bg-white/[0.07] p-5 ring-1 ring-white/10">
+                  <p className="font-semibold">Build your exit strategy</p>
+                  <p className="mt-1 text-sm leading-6 text-blue-100">
+                    Keep the lower required payment now, but map out what it
+                    would take to be out faster.
+                  </p>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {([
+                      [24, '2 years'],
+                      [36, '3 years'],
+                      [60, '5 years'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setTargetPayoffMonths(value)}
+                        aria-pressed={targetPayoffMonths === value}
+                        className={`rounded-full border px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/25 ${
+                          targetPayoffMonths === value
+                            ? 'border-white bg-white text-[#1B3C6C]'
+                            : 'border-white/20 bg-white/5 text-blue-100 hover:bg-white/10'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <dl className="mt-5 grid grid-cols-2 gap-4">
+                    {[
+                      ['Extra monthly needed', formatCurrency(exitStrategy.extraMonthly)],
+                      ['Total monthly target', formatCurrency(exitStrategy.totalMonthly)],
+                      ['Or every 6 months', `About ${formatCurrency(exitStrategy.sixMonthLumpSum)}`],
+                      ['Lifetime interest avoided', formatCurrency(exitStrategy.interestAvoided)],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-blue-200">{label}</dt>
+                        <dd className="mt-0.5 text-xl font-bold tabular-nums">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-4 text-sm leading-6 text-blue-50">
+                    To target a payoff in about {formatDuration(targetPayoffMonths)},
+                    you would typically want to add about{' '}
+                    {formatCurrency(exitStrategy.extraMonthly)} per month, or plan
+                    for roughly {formatCurrency(exitStrategy.sixMonthLumpSum)} every
+                    6 months.
+                  </p>
+                </div>
+              )}
+
+              <Link
+                to="/match"
+                className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-bold text-[#1B3C6C] shadow-[0_12px_28px_rgba(2,6,23,0.25)] transition hover:bg-slate-100"
+              >
+                Check If You Qualify For This Payment
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+
+              <p className="mt-4 text-xs leading-5 text-blue-200">
+                Typical example shown at 9.99%, 60-month promo term, monthly
+                payments, and {amortizationMonths}-month amortization. O.A.C.
+                Illustrative only. Actual rates, terms, and APRs depend on
+                approval through Financeit.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why finance instead of waiting — the cost-of-waiting argument left,
+          the four reasons right. */}
+      <section className="bg-white py-20 lg:py-28">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16 lg:px-8">
+          <div>
+            <p className={eyebrowStyles}>Why homeowners use it</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
+              Waiting has a cost too
+            </h2>
+            <div className="mt-5 space-y-4 text-[1.02rem] leading-8 text-slate-600">
+              <p>
+                A delayed basement means delayed living space, delayed rental
+                potential, and more time with a part of the house that is not
+                helping the family the way it could.
+              </p>
+              <p>
+                So many homeowners don't frame it as &quot;cash or no
+                project.&quot; They ask whether a manageable monthly payment is
+                worth having the space now.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {useCases.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-[1.3rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1B3C6C] text-white">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-[1.12rem] font-semibold tracking-[-0.02em] text-slate-950">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-[0.94rem] leading-7 text-slate-600">{item.body}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Payoff strategies — branded conversion box on a light band. */}
+      <section className="bg-[#F8FAFC] py-20 lg:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="relative overflow-hidden rounded-[2rem] bg-[#1B3C6C] text-white shadow-[0_40px_80px_rgba(27,60,108,0.3)]">
+            <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl" />
+            <div className="relative grid gap-10 p-8 md:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14 lg:p-14">
+              <div>
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-sky-200">
+                  Smart basement financing
+                </p>
+                <h2 className="mt-3 text-[1.9rem] font-bold leading-[1.1] tracking-[-0.035em] md:text-[2.4rem]">
+                  Open loans work best when they make the project possible now
+                </h2>
+                <p className="mt-4 max-w-md text-[1.02rem] leading-7 text-blue-100">
+                  Not borrowing forever: a flexible tool to get the basement
+                  done now while you control when the balance comes down.
+                </p>
+                <Link
+                  to="/match"
+                  className="mt-8 inline-flex items-center justify-center gap-2 rounded-[0.8rem] bg-white px-7 py-[0.95rem] text-base font-semibold text-[#1B3C6C] shadow-[0_12px_28px_rgba(2,6,23,0.25)] transition hover:bg-slate-100"
+                >
+                  Start Project Review
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+                <p className="mt-4 text-sm text-blue-200">Free and no obligation.</p>
+              </div>
+
+              <ul className="space-y-3">
+                {payoffStrategies.map((item) => (
+                  <li key={item.title} className="rounded-2xl bg-white/[0.07] p-5 ring-1 ring-white/10">
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-blue-100">{item.body}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Other paths — keeps this page linked into the financing cluster. */}
+      <section className="bg-white py-20 lg:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl">
+            <p className={eyebrowStyles}>Other ways to pay</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
+              Not sure an open loan fits?
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {otherPaths.map((path) => (
+              <Link
+                key={path.href}
+                to={path.href}
+                className="group flex flex-col rounded-[1.3rem] border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+              >
+                <h3 className="text-[1.12rem] font-semibold tracking-[-0.02em] text-slate-950">{path.title}</h3>
+                <p className="mt-2 flex-1 text-[0.94rem] leading-7 text-slate-600">{path.body}</p>
+                <span className="mt-5 inline-flex items-center text-sm font-semibold text-[#1B3C6C]">
+                  Read the guide
+                  <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="border-t border-slate-200 bg-[#F8FAFC] py-20 lg:py-28">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16 lg:px-8">
+          <div className="lg:sticky lg:top-28 lg:self-start">
+            <p className={eyebrowStyles}>FAQ</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
+              Common questions about open-loan financing
+            </h2>
+          </div>
+
+          <div className="divide-y divide-slate-200 rounded-[1.4rem] border border-slate-200 bg-white px-6 shadow-sm md:px-8">
+            {faqs.map((faq, index) => (
+              <details key={faq.question} open={index === 0} className="group py-5">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-5 text-left">
+                  <span className="text-[1rem] font-semibold leading-7 tracking-[-0.015em] text-slate-950 md:text-[1.05rem]">
+                    {faq.question}
+                  </span>
+                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-sm text-slate-500 transition group-open:rotate-45 group-open:border-[#1B3C6C] group-open:text-[#1B3C6C]">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 pr-8 text-[0.96rem] leading-7 text-slate-600">{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom CTA + disclaimer */}
+      <section className="bg-[#0F172A] py-20 text-white lg:py-24">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] md:text-[2.6rem]">
+            Get the basement done sooner, not stuck on hold
+          </h2>
+          <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+            <a href="#calculator-placeholder" className={buttonStyles.primary}>
+              Estimate My Payments
+              <ArrowRight className="h-5 w-5" />
+            </a>
+            <Link to="/match" className={buttonStyles.ghostDark}>
+              Explore Your Financing Options
+            </Link>
+          </div>
+          <div className="mx-auto mt-14 max-w-2xl border-t border-white/10 pt-8 text-left text-xs leading-6 text-slate-400">
+            <p>
               O.A.C. (On Approved Credit). Illustrative only. Actual rates,
               terms, and APRs are determined by Financeit based on individual
               credit profiles.
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-400">
+            <p className="mt-2">
               Promotional and contractor-supported financing options may not be
               available in all cases. Deferred payment programs may accrue
               interest during the deferral period.
