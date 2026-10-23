@@ -91,7 +91,29 @@ const downloadGuidePdf = () => {
   link.remove();
 };
 
-export function CostGuideCapture() {
+/**
+ * How the section introduces itself. 'default' is the stand-alone pitch
+ * /costs uses. 'companion' is the home page, where the guide sits mid-page
+ * after the hubs and city guides — no longer the first thing a visitor sees —
+ * so it reads as a planning resource for someone already researching, not a
+ * cold lead magnet. Only the eyebrow and the lead paragraph change; the form,
+ * Turnstile and the download path are identical either way.
+ */
+type GuideFraming = 'default' | 'companion';
+
+const GUIDE_COPY: Record<GuideFraming, { eyebrow: string; lead: string }> = {
+  default: {
+    eyebrow: 'Plan Smarter Before You Renovate',
+    lead: 'Stop guessing on pricing. Download our comprehensive PDF guide breaking down average costs for basements, kitchens, and legal suites across 15+ Ontario cities.',
+  },
+  companion: {
+    eyebrow: 'Want the full breakdown on paper?',
+    lead: 'Take the numbers with you. The 2026 guide puts average costs for basements, kitchens, and legal suites across 15+ Ontario cities in one PDF, so you can check every quote against it.',
+  },
+};
+
+export function CostGuideCapture({ framing = 'default' }: { framing?: GuideFraming } = {}) {
+  const copy = GUIDE_COPY[framing];
   const [guideForm, setGuideForm] = useState({
     name: '',
     email: '',
@@ -381,7 +403,7 @@ export function CostGuideCapture() {
               <div className="max-w-2xl">
                 <h2 className="tracking-[-0.03em] leading-[1.04]">
                   <span className="block text-[15px] sm:text-[17px] font-medium uppercase tracking-[0.12em] text-blue-200 mb-4">
-                    Plan Smarter Before You Renovate
+                    {copy.eyebrow}
                   </span>
 
                   <span className="block text-[2.1rem] sm:text-[2.7rem] md:text-[3.1rem] font-semibold text-white">
@@ -398,9 +420,7 @@ export function CostGuideCapture() {
                 </h2>
 
                 <p className="mt-6 text-[18px] leading-8 text-blue-100 max-w-[700px] mx-auto">
-                  Stop guessing on pricing. Download our comprehensive PDF guide
-                  breaking down average costs for basements, kitchens, and legal suites
-                  across 15+ Ontario cities.
+                  {copy.lead}
                 </p>
 
                 <ul className="mt-7 space-y-4 max-w-[520px] mx-auto text-left">
@@ -576,7 +596,7 @@ export function CostGuideCapture() {
                 <div className="max-w-[760px]">
                   <h2 className="tracking-[-0.035em] leading-[1.02]">
                     <span className="block text-[15px] font-medium uppercase tracking-[0.14em] text-blue-200 mb-5">
-                      Plan Smarter Before You Renovate
+                      {copy.eyebrow}
                     </span>
 
                     <span className="block text-[54px] 2xl:text-[60px] font-semibold text-white">
@@ -593,9 +613,7 @@ export function CostGuideCapture() {
                   </h2>
 
                   <p className="mt-8 text-[21px] leading-9 text-blue-100 max-w-[650px]">
-                    Stop guessing on pricing. Download our comprehensive PDF guide
-                    breaking down average costs for basements, kitchens, and legal suites
-                    across 15+ Ontario cities.
+                    {copy.lead}
                   </p>
 
                   <ul className="mt-8 space-y-4 max-w-[560px]">

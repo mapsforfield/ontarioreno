@@ -390,12 +390,12 @@ export default function BookingFlowDemo({
   return (
     <section
       ref={sectionRef}
-      /* White, not slate-50: this sits between the dark hero and the
-         financing band, and the band is slate-50. Two slate grounds in a
-         row separated by a hairline reads as one section that failed to
-         load a background, which is the exact fault the financing band's
-         own note describes running into. */
-      className="border-b border-slate-100 bg-white py-16 lg:py-20"
+      /* Slate, not white: the home hero above is white now (it was dark
+         when this was set), and the hubs below are white. Two white grounds
+         in a row separated by a hairline read as one section that failed to
+         load a background — the fault this note originally guarded against
+         from the other direction. */
+      className="border-b border-slate-200/70 bg-[#F8FAFC] py-16 lg:py-20"
       aria-labelledby="booking-demo-heading"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">

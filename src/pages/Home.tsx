@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
+import { HeroHouse } from '../components/HeroHouse';
 import { CostGuideCapture } from '../components/CostGuideCapture';
 import { HUB_CARDS } from '../data/projects/showcase';
 import { buttonStyles } from '../lib/uiStyles';
@@ -136,99 +137,111 @@ export default function Home() {
         <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
       </Helmet>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-slate-900 text-white">
-        <div className="absolute inset-0 z-0 opacity-40">
-          <img
-            src="/hero.jpg"
-            alt="Ontario Home Renovation"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
-        </div>
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">
-            <div className="max-w-4xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-[#1B3C6C]/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Ontario&apos;s Independent Homeowner Guide</span>
-              </div>
+      {/* Hero — problem-solving first, no lead magnet.
 
-              <h1 className="mb-6 mt-8 max-w-3xl text-4xl font-bold leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl">
-                Plan Your Renovation with <span className="text-[#7FB0E0]">Confidence.</span>
-              </h1>
+          This used to share the fold with a "Free planning guide" card for
+          the 2026 cost guide PDF. That put an email capture beside the
+          booking CTA, so a homeowner ready to talk was offered a download
+          instead. The guide now sits mid-page (after the hubs and city
+          guides) for readers who are still researching; the fold is only
+          for the review and for exploring costs.
 
-              <p className="mb-4 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-                OntarioReno helps homeowners understand renovation costs, permit requirements, project feasibility, and the right next steps before moving forward.
-              </p>
+          Same house-and-card frame as the financing heroes, so the site's
+          front door and its money pages read as one product. */}
+      <section className="overflow-hidden border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-14 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-20 lg:pt-16 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[0.8rem] font-medium text-[#1B3C6C]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Ontario&apos;s independent homeowner guide
+            </p>
 
-              <p className="mb-10 max-w-2xl text-sm text-slate-400">
-                Independent guidance for Ontario homeowners planning basements, legal suites, permits, grants, and renovation costs.
-              </p>
+            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-bold leading-[1.04] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+              Stop guessing Ontario renovation costs, permit rules, and contractor quotes.
+            </h1>
 
-              <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
+            <p className="mt-6 max-w-xl text-[1.05rem] leading-8 text-slate-600 md:text-[1.15rem]">
+              Real cost ranges, the permit path, and a vetted contractor for
+              Ontario homeowners planning a basement, legal suite, addition, or
+              major renovation.
+            </p>
+
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link to="/match" className={cn(buttonStyles.primary, 'min-h-[3.25rem]')}>
+                Start Free Project Review
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+              <a
+                href="#explore"
+                onClick={(event) => {
+                  const target = document.getElementById('explore');
+                  if (!target) return;
+                  event.preventDefault();
+                  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                  target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+                }}
+                className={cn(buttonStyles.secondary, 'min-h-[3.25rem]')}
+              >
+                Explore costs by project
+              </a>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-500">
+              Weighing how to pay for it?{' '}
+              <Link to="/financing" className="-my-3 inline-block py-3 font-semibold text-[#1B3C6C] hover:underline">
+                Compare financing paths
+              </Link>
+            </p>
+
+            <ul className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-600">
+              {['Free for homeowners', 'No obligation to hire', 'Built for Ontario'].map((point) => (
+                <li key={point} className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-[#2b5a96]" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="min-w-0">
+            <HeroHouse>
+              <div className="rounded-[1.6rem] bg-[#0F172A] p-6 text-white shadow-[0_30px_70px_rgba(15,23,42,0.28)] sm:p-7">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200">
+                  Your free project review
+                </p>
+                <p className="mt-3 text-[1.35rem] font-bold leading-snug tracking-[-0.02em]">
+                  Know the real number before the first quote.
+                </p>
+
+                <ul className="mt-6 space-y-3.5">
+                  {[
+                    ['A realistic cost range', 'for your project, in your city'],
+                    ['Your permit path', 'what the work needs, in plain English'],
+                    ['Grants and financing', 'only the ones that apply to you'],
+                    ['A vetted contractor', 'when you are ready, not before'],
+                  ].map(([title, detail]) => (
+                    <li key={title} className="flex gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
+                      <span className="text-[0.95rem] leading-6">
+                        <span className="font-semibold text-white">{title}</span>
+                        <span className="block text-slate-400">{detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
                 <Link
                   to="/match"
-                  className={buttonStyles.primary}
+                  className="mt-7 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[0.95rem] font-bold text-[#0F172A] transition hover:bg-slate-100"
                 >
-                  Start Project Review <ArrowRight className="w-5 h-5" />
+                  Start my review
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
-                <Link
-                  to="/costs"
-                  className={buttonStyles.ghostDark}
-                >
-                  Explore Renovation Costs
-                </Link>
+                <p className="mt-3 text-center text-xs text-slate-400">
+                  100% free for homeowners. No obligation to hire.
+                </p>
               </div>
-
-              <div className="mt-12 flex flex-wrap items-center gap-6 text-sm font-medium text-slate-400">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Free to use
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Independent guidance
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Built for Ontario homeowners
-                </div>
-              </div>
-            </div>
-
-            <div className="hidden lg:block">
-              <Link
-                to="/#cost-guide"
-                className="group relative block rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.03)_100%)] p-7 shadow-[0_28px_70px_rgba(2,6,23,0.26)] backdrop-blur-sm transition duration-200 hover:border-white/18 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)]"
-              >
-                <div className="absolute inset-x-10 top-10 h-48 rounded-full bg-[#4A8DDA]/18 blur-3xl" />
-                <div className="absolute inset-x-16 top-[7.25rem] h-32 rounded-full bg-[#7FB0E0]/22 blur-2xl" />
-
-                <div className="relative flex justify-center">
-                  <img
-                    src="/ontario-reno-cost-guide-3d-preview.png"
-                    alt="2026 Ontario Renovation Cost Guide booklet preview"
-                    className="relative z-10 h-auto w-[250px] object-contain drop-shadow-[0_26px_36px_rgba(2,6,23,0.34)] transition duration-200 group-hover:-translate-y-1"
-                    loading="eager"
-                  />
-                </div>
-
-                <div className="relative mt-5 border-t border-white/10 pt-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200">
-                    Free planning guide
-                  </p>
-                  <h2 className="mt-3 text-2xl font-bold leading-tight tracking-[-0.03em] text-white">
-                    2026 Ontario Renovation Cost Guide
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">
-                    See how to price basements, kitchens, legal suites, and permit costs before your first quote.
-                  </p>
-                  <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white">
-                    Get the free guide
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-              </Link>
-            </div>
+            </HeroHouse>
           </div>
         </div>
       </section>
@@ -375,7 +388,7 @@ export default function Home() {
           ad for a bathroom had to scroll past four unrelated pitches before
           the page acknowledged bathrooms existed. Now that the cards carry
           the work rather than a coloured icon, they earn the position. */}
-      <section className="py-24 bg-slate-50">
+      <section id="explore" className="scroll-mt-20 bg-white py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Explore Our Renovation Hubs</h2>
@@ -511,6 +524,17 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="hidden md:block">
+        <CitySelectorSection />
+      </div>
+
+      {/* The cost guide, mid-page. It used to be pitched from the hero; it
+          now sits after the hubs and city guides, as a companion for readers
+          still researching. Extracted to a component so /costs can offer it
+          too — see CostGuideCapture for why there must only ever be one
+          implementation of it. */}
+      <CostGuideCapture framing="companion" />
+
       {/* Featured Programs */}
       <section className="border-b border-yellow-100 bg-[linear-gradient(180deg,#fffaf0_0%,#fffdf8_48%,#ffffff_100%)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
@@ -637,15 +661,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <div className="hidden md:block">
-        <CitySelectorSection />
-      </div>
-
-      {/* The cost guide lead magnet. Extracted to a component so /costs
-          can offer it too — see CostGuideCapture for why there must only
-          ever be one implementation of it. */}
-      <CostGuideCapture />
 
       {/* Project Review CTA */}
       <section className="bg-slate-900 py-20 text-white">
