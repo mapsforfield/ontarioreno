@@ -43,7 +43,6 @@ const decisionSteps = [
 const financingPaths = [
   {
     title: 'HELOC',
-    group: 'equity' as const,
     icon: Compass,
     body:
       'Flexible access to equity, drawn as you need it. A natural fit when the renovation is defined and has long-term value.',
@@ -53,7 +52,6 @@ const financingPaths = [
   },
   {
     title: 'Refinance',
-    group: 'equity' as const,
     icon: Landmark,
     body:
       'Resets the mortgage to free up a larger amount. Makes more sense for big projects on a home you plan to keep.',
@@ -63,7 +61,6 @@ const financingPaths = [
   },
   {
     title: 'Open Loan',
-    group: 'other' as const,
     icon: Wrench,
     body:
       'A set monthly payment you can pay down or clear early with no prepayment penalty. Approval depends on your profile and the lender.',
@@ -73,7 +70,6 @@ const financingPaths = [
   },
   {
     title: 'Phased approach',
-    group: 'other' as const,
     icon: Layers3,
     body:
       'Sometimes the answer is not more borrowing but a better order: must-do work first, finishes later.',
@@ -83,20 +79,48 @@ const financingPaths = [
   },
 ];
 
-const rentalGuides = [
+const heroPoints = [
+  'Borrow up to 80% of your home’s value, minus what you still owe.',
+  'With a HELOC, you pay interest only on what you actually draw.',
+];
+
+// Qualitative on purpose: no ROI, rent, or payback figures without a source.
+const projectScenarios = [
   {
-    title: 'Legal basement apartment',
-    body: 'HELOC and refinance options for a legal secondary suite.',
+    title: 'Legal secondary suite',
+    tag: 'Rental income',
+    body: 'A legal unit can bring in rent and add lasting value, the strongest case for using equity.',
     href: '/financing/heloc-for-legal-basement-apartment',
-    image: '/images/modern-wide-angle-basement.jpg',
-    alt: 'Finished modern basement suite with open living space',
+    linkText: 'Legal suite financing',
+    image: '/images/after-image-hero.jpg',
+    alt: 'Finished basement suite with living and dining area',
   },
   {
     title: 'Garden suite',
-    body: 'Paying for a backyard unit, from servicing to finish.',
+    tag: 'Rental or family',
+    body: 'A backyard unit for rent or family. Servicing and site fit decide whether it pencils out.',
     href: '/financing/garden-suite-financing-ontario',
+    linkText: 'Garden suite financing',
     image: '/images/garden-suite.jpg',
     alt: 'Detached garden suite in an Ontario backyard',
+  },
+  {
+    title: 'Basement finish',
+    tag: 'Living space',
+    body: 'More usable space for the household. Works best when the scope is clear and you plan to stay.',
+    href: '/basements',
+    linkText: 'Plan a basement',
+    image: '/images/workspace-renovation-interior.jpg',
+    alt: 'Finished basement with built-in office storage',
+  },
+  {
+    title: 'Addition or major overhaul',
+    tag: 'Long-term value',
+    body: 'Large structural projects on a home you will keep are where a refinance is often compared.',
+    href: '/financing/heloc-vs-refinance-for-renovations',
+    linkText: 'HELOC vs refinance',
+    image: '/images/unfinished-basement-framing.jpg',
+    alt: 'Wood framing during a major renovation',
   },
 ];
 
@@ -326,6 +350,9 @@ export default function HomeEquityRenovationsOntario() {
   const [fitResult, setFitResult] = useState<FitResult | null>(null);
   const [fitValidationMessage, setFitValidationMessage] = useState('');
   const fitResultRef = useRef<HTMLDivElement | null>(null);
+  const [quickHomeValue, setQuickHomeValue] = useState(950000);
+  const [quickMortgage, setQuickMortgage] = useState(420000);
+  const quickUsableEquity = Math.max(quickHomeValue * 0.8 - quickMortgage, 0);
 
   useEffect(() => {
     if (!showFitPreview || !fitResult || typeof window === 'undefined') return;
@@ -686,162 +713,131 @@ export default function HomeEquityRenovationsOntario() {
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
-      {/* Hero — dark, so the page opens with weight; the light sections that
-          follow read as a deliberate step down rather than more of the same. */}
-      <section className="relative overflow-hidden bg-[#0b1628] text-white">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_85%_20%,rgba(59,130,246,0.22),transparent_70%),radial-gradient(ellipse_60%_50%_at_0%_100%,rgba(43,90,150,0.28),transparent_70%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
-
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-center lg:gap-16 lg:px-8 lg:pb-24 lg:pt-20">
+      {/* A · Hero — white, 60/40. The right card is live: drag the sliders and
+          the usable-equity figure updates, so the page gives value before it
+          asks for anything. */}
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-24 lg:pt-20">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-[0.8rem] font-medium text-blue-100">
+            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[0.8rem] font-medium text-[#1B3C6C]">
               <Scale className="h-3.5 w-3.5" />
               Ontario homeowner planning guide
             </p>
 
-            <h1 className="mt-6 max-w-xl text-[2.45rem] font-bold leading-[1.02] tracking-[-0.045em] md:text-[3.4rem] lg:text-[3.9rem]">
+            <h1 className="mt-6 max-w-2xl text-[2.45rem] font-bold leading-[1.02] tracking-[-0.045em] text-slate-950 md:text-[3.4rem] lg:text-[3.9rem]">
               Using Home Equity for Renovations in Ontario
             </h1>
 
-            <p className="mt-6 max-w-lg text-[1.05rem] leading-8 text-slate-300 md:text-[1.15rem]">
+            <p className="mt-6 max-w-xl text-[1.05rem] leading-8 text-slate-600 md:text-[1.15rem]">
               A HELOC or refinance can fund a bigger project. First, make sure
               the renovation itself is worth borrowing against your home for.
             </p>
 
+            <ul className="mt-7 space-y-3">
+              {heroPoints.map((point) => (
+                <li key={point} className="flex items-start gap-3 text-[0.98rem] leading-7 text-slate-700">
+                  <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-[#2b5a96]" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <a href="#calculator" className={buttonStyles.primary}>
-                Check your fit
+                Calculate my equity limit
                 <ArrowRight className="h-5 w-5" />
               </a>
-              <Link to="/match" className={buttonStyles.ghostDark}>
+              <Link to="/match" className={buttonStyles.secondary}>
                 Start Project Review
               </Link>
             </div>
-
-            <p className="mt-6 text-sm text-slate-400">
-              Free, takes about two minutes. OntarioReno is not a lender.
-            </p>
           </div>
 
-          {/* Worked example: the one number every homeowner wants first. */}
           <div className="min-w-0">
-            <div className="rounded-[1.6rem] border border-white/12 bg-white/[0.06] p-6 shadow-[0_40px_80px_rgba(2,6,23,0.45)] backdrop-blur-md sm:p-8">
+            <div className="rounded-[1.6rem] bg-[#0F172A] p-6 text-white shadow-[0_30px_70px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5 sm:p-7">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200/90">
-                  How much can you use?
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200">
+                  Quick equity check
                 </p>
                 <span className="rounded-full bg-white/10 px-2.5 py-1 text-[0.7rem] font-medium text-slate-300">
-                  Example
+                  Estimate
                 </span>
               </div>
 
-              <dl className="mt-6 space-y-4 text-[0.98rem]">
-                <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-slate-300">Home value</dt>
-                  <dd className="font-semibold tabular-nums">{formatCadCurrency(950000)}</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-slate-300">80% borrowing limit</dt>
-                  <dd className="font-semibold tabular-nums">{formatCadCurrency(760000)}</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-slate-300">Less your mortgage</dt>
-                  <dd className="font-semibold tabular-nums text-slate-300">−{formatCadCurrency(420000)}</dd>
-                </div>
-              </dl>
+              <div className="mt-6 space-y-6">
+                <label className="block">
+                  <span className="flex items-baseline justify-between gap-4 text-sm">
+                    <span className="text-slate-300">Home value</span>
+                    <span className="font-semibold tabular-nums">{formatCadCurrency(quickHomeValue)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={300000}
+                    max={3000000}
+                    step={10000}
+                    value={quickHomeValue}
+                    onChange={(event) => setQuickHomeValue(Number(event.target.value))}
+                    className="mt-3 w-full cursor-pointer accent-sky-400"
+                  />
+                </label>
 
-              <div className="mt-6 border-t border-white/12 pt-6">
-                <p className="text-sm text-slate-300">Estimated usable equity</p>
-                <p className="mt-1 text-[2.6rem] font-bold leading-none tracking-[-0.04em] tabular-nums text-white md:text-[3rem]">
-                  {formatCadCurrency(340000)}
+                <label className="block">
+                  <span className="flex items-baseline justify-between gap-4 text-sm">
+                    <span className="text-slate-300">Mortgage owing</span>
+                    <span className="font-semibold tabular-nums">{formatCadCurrency(quickMortgage)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={2500000}
+                    step={5000}
+                    value={quickMortgage}
+                    onChange={(event) => setQuickMortgage(Number(event.target.value))}
+                    className="mt-3 w-full cursor-pointer accent-sky-400"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-7 rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">Estimated equity access</p>
+                <p className="mt-1 text-[2.4rem] font-bold leading-none tracking-[-0.04em] tabular-nums md:text-[2.7rem]">
+                  {formatCadCurrency(quickUsableEquity)}
                 </p>
-                <p className="mt-4 text-xs leading-5 text-slate-400">
-                  Lenders generally cap total borrowing at 80% of value. Your
-                  number depends on appraisal and approval.
+                <p className="mt-3 text-xs leading-5 text-slate-400">
+                  80% of value minus your mortgage. Your real limit depends on
+                  appraisal and lender approval.
                 </p>
               </div>
+
+              <a
+                href="#calculator"
+                className="mt-5 inline-flex items-center text-sm font-semibold text-sky-300 hover:underline"
+              >
+                Is this project worth it? Run the full fit check
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </a>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Decision path — a connected sequence, not four loose boxes. */}
-      <section id="home-equity-guide" className="scroll-mt-24 bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className={eyebrowStyles}>Before you borrow</p>
-            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
-              Is equity right for this project?
-            </h2>
-            <p className="mt-4 text-[1.05rem] leading-7 text-slate-600">
-              Work through these in order. How you pay comes last, once the
-              renovation itself makes sense.
-            </p>
-          </div>
-
-          <ol className="relative mt-14 grid gap-10 lg:grid-cols-4 lg:gap-6">
-            <div
-              aria-hidden
-              className="absolute bottom-6 left-[1.4rem] top-6 w-px bg-gradient-to-b from-[#2b5a96]/40 via-slate-200 to-slate-200 lg:bottom-auto lg:left-[12.5%] lg:right-[12.5%] lg:top-[1.4rem] lg:h-px lg:w-auto lg:bg-gradient-to-r"
-            />
-            {decisionSteps.map((item, index) => (
-              <li
-                key={item.title}
-                className="relative grid grid-cols-[2.8rem_minmax(0,1fr)] gap-5 lg:block lg:text-center"
-              >
-                <span
-                  className={`relative z-10 flex h-[2.8rem] w-[2.8rem] items-center justify-center rounded-full text-sm font-bold ring-8 ring-white lg:mx-auto ${
-                    index === decisionSteps.length - 1
-                      ? 'bg-[#1B3C6C] text-white'
-                      : 'border border-slate-200 bg-white text-[#1B3C6C]'
-                  }`}
-                >
-                  {item.step}
-                </span>
-                <div className="lg:mt-6">
-                  <h3 className="text-[1.1rem] font-semibold tracking-[-0.02em] text-slate-950">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-[0.95rem] leading-7 text-slate-600 lg:mx-auto lg:max-w-[15rem]">
-                    {item.body}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <p className="mt-14 text-center text-sm text-slate-500">
-            Not sure what the project will cost yet?{' '}
-            <Link to="/costs" className="font-semibold text-[#1B3C6C] hover:underline">
-              See Ontario renovation costs
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      {/* HELOC renovation fit calculator */}
+      {/* B · HELOC fit calculator — dark band so the tool reads as a tool: the
+          light card inside it is the highest-contrast object on the page. */}
       <section
         id="calculator"
-        className="relative overflow-hidden bg-[radial-gradient(circle_at_76%_18%,rgba(115,136,166,0.32),transparent_28%),radial-gradient(circle_at_16%_84%,rgba(247,236,220,0.72),transparent_30%),linear-gradient(180deg,#e7eef6_0%,#dde7f0_46%,#e8eff6_100%)] py-16 scroll-mt-24 lg:py-24 lg:scroll-mt-28"
+        className="relative scroll-mt-24 overflow-hidden bg-[#0F172A] py-20 lg:scroll-mt-28 lg:py-28"
       >
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/85 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-slate-200/55 to-transparent" />
-          <div className="absolute left-[4%] top-10 h-[520px] w-[520px] rounded-full bg-white/46 blur-[135px]" />
-          <div className="absolute right-[9%] top-8 h-[420px] w-[420px] rounded-full bg-slate-400/22 blur-[135px]" />
-          <div className="absolute left-[9%] bottom-6 h-[280px] w-[280px] rounded-full bg-orange-100/78 blur-[120px]" />
-            <div className="absolute left-1/2 top-[17%] h-[62%] w-[78%] -translate-x-1/2 border-x border-slate-200/24" />
-        </div>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(56,189,248,0.16),transparent_70%)]" />
 
-        <div className="mx-auto max-w-[1360px] px-4 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-[1360px] px-4 sm:px-6 lg:px-8">
           <div className="mx-auto min-w-0 max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-300">
               Planning tool
             </p>
-            <h2 className="mt-3 break-words text-[1.9rem] font-bold leading-[1.08] tracking-[-0.035em] text-slate-950 md:text-[2.5rem]">
+            <h2 className="mt-3 break-words text-[1.9rem] font-bold leading-[1.08] tracking-[-0.035em] text-white md:text-[2.6rem]">
               HELOC Renovation Fit Calculator
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-[1.05rem] leading-7 text-slate-600 md:text-[1.08rem] md:leading-8">
+            <p className="mx-auto mt-4 max-w-xl text-[1.05rem] leading-7 text-slate-300 md:text-[1.08rem] md:leading-8">
               A planning tool to help you judge whether home equity belongs in the
               renovation.
             </p>
@@ -859,8 +855,7 @@ export default function HomeEquityRenovationsOntario() {
                 showFitPreview ? 'w-full' : 'w-full max-w-[760px]'
               }`}
             >
-              <div className="absolute left-0 top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent lg:block" />
-              <div className="min-w-0 pl-0 lg:pl-10">
+              <div className="min-w-0">
                   <div className="relative rounded-[1.7rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.98),rgba(255,255,255,0.95)_36%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_58%,rgba(242,246,250,0.98)_100%)] px-4 py-4 shadow-[0_34px_78px_rgba(15,23,42,0.15)] ring-1 ring-slate-300/85 backdrop-blur-[2px] md:rounded-[2rem] md:px-8 md:py-8">
                     <div className="pointer-events-none absolute inset-0 rounded-[1.7rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.46)_0%,transparent_22%,rgba(148,163,184,0.045)_100%)] md:rounded-[2rem]" />
                   <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
@@ -1330,11 +1325,11 @@ export default function HomeEquityRenovationsOntario() {
         </div>
       </section>
 
-      {/* Compare your options — split by whether the home is the collateral,
-          which is the distinction a homeowner actually cares about. */}
-      <section className="bg-[#f6f8fb] py-20 lg:py-28">
+      {/* C · Compare — three columns, HELOC highlighted. Phased stays linked
+          underneath so that guide keeps its link from this page. */}
+      <section className="bg-[#F8FAFC] py-20 lg:py-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
+          <div className="mx-auto max-w-2xl text-center">
             <p className={eyebrowStyles}>Your options</p>
             <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
               Compare the ways to pay
@@ -1344,152 +1339,196 @@ export default function HomeEquityRenovationsOntario() {
             </p>
           </div>
 
-          <div className="mt-12 space-y-12">
-            {(
-              [
-                ['equity', 'Borrow against your home'],
-                ['other', 'Other ways to pay'],
-              ] as const
-            ).map(([group, label]) => (
-              <div key={group}>
-                <div className="flex items-center gap-4">
-                  <p className="shrink-0 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    {label}
-                  </p>
-                  <span className="h-px flex-1 bg-slate-200" />
-                </div>
-                <div className="mt-5 grid gap-5 md:grid-cols-2">
-                  {financingPaths
-                    .filter((path) => path.group === group)
-                    .map((path) => {
-                      const Icon = path.icon;
-                      return (
-                        <Link
-                          key={path.title}
-                          to={path.href}
-                          className="group flex flex-col rounded-[1.4rem] border border-slate-200/90 bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_40px_rgba(15,23,42,0.08)]"
-                        >
-                          <div className="flex items-center gap-3.5">
-                            <span
-                              className={`flex h-11 w-11 items-center justify-center rounded-xl ${
-                                group === 'equity'
-                                  ? 'bg-[#1B3C6C] text-white'
-                                  : 'bg-slate-100 text-[#1B3C6C]'
-                              }`}
-                            >
-                              <Icon className="h-5 w-5" />
-                            </span>
-                            <h3 className="text-[1.25rem] font-semibold tracking-[-0.02em] text-slate-950">
-                              {path.title}
-                            </h3>
-                          </div>
-                          <p className="mt-5 text-[0.97rem] leading-7 text-slate-600">{path.body}</p>
-                          <p className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-                            <span className="font-semibold text-slate-900">Best for:</span>{' '}
-                            {path.bestFor}
-                          </p>
-                          <span className="mt-6 inline-flex items-center text-sm font-semibold text-[#1B3C6C]">
-                            {path.linkText}
-                            <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
-                          </span>
-                        </Link>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
+          <div className="mt-14 grid gap-6 lg:grid-cols-3 lg:items-stretch">
+            {financingPaths
+              .filter((path) => path.title !== 'Phased approach')
+              .map((path) => {
+                const Icon = path.icon;
+                const featured = path.title === 'HELOC';
+                return (
+                  <Link
+                    key={path.title}
+                    to={path.href}
+                    className={`group relative flex flex-col rounded-[1.4rem] border bg-white p-7 transition-all duration-200 hover:-translate-y-1 ${
+                      featured
+                        ? 'border-[#2b5a96] shadow-[0_24px_50px_rgba(43,90,150,0.18)] ring-1 ring-[#2b5a96] lg:-mt-3 lg:pb-10'
+                        : 'border-slate-200 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    {featured && (
+                      <span className="absolute -top-3 left-7 rounded-full bg-[#2b5a96] px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-white">
+                        Most flexible for phased builds
+                      </span>
+                    )}
+                    <span
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+                        featured ? 'bg-[#2b5a96] text-white' : 'bg-slate-100 text-[#1B3C6C]'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="mt-5 text-[1.35rem] font-semibold tracking-[-0.02em] text-slate-950">
+                      {path.title}
+                    </h3>
+                    <p className="mt-3 flex-1 text-[0.97rem] leading-7 text-slate-600">{path.body}</p>
+                    <p className="mt-6 border-t border-slate-100 pt-5 text-sm leading-6 text-slate-600">
+                      <span className="block text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Best for
+                      </span>
+                      <span className="mt-1 block font-medium text-slate-800">{path.bestFor}</span>
+                    </p>
+                    <span className="mt-6 inline-flex items-center text-sm font-semibold text-[#1B3C6C]">
+                      {path.linkText}
+                      <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+                    </span>
+                  </Link>
+                );
+              })}
           </div>
+
+          <p className="mt-10 text-center text-sm text-slate-600">
+            Rather stage the work than borrow more up front?{' '}
+            <Link
+              to="/financing/phased-renovation-financing"
+              className="font-semibold text-[#1B3C6C] hover:underline"
+            >
+              Phased renovation financing
+            </Link>
+          </p>
         </div>
       </section>
 
-      {/* Rental builds — the projects where equity most often earns its keep. */}
+      {/* D · Project scenarios — 2×2, image-led. No ROI or income figures: we
+          don't have a source for them, and this page must not promise money. */}
       <section className="bg-white py-20 lg:py-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-14">
-            <div>
-              <p className={eyebrowStyles}>Building a rental unit?</p>
-              <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
-                Where equity tends to make the most sense
-              </h2>
-              <p className="mt-4 text-[1.05rem] leading-7 text-slate-600">
-                A legal suite or garden suite can add rental income and long-term
-                value, which is the strongest case for borrowing against your
-                home. It still has to pass permits and cost first.
-              </p>
-              <div className="mt-8 rounded-[1.2rem] border border-slate-200 bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-900">
-                  Grants can lower what you borrow
-                </p>
-                <p className="mt-1.5 text-sm leading-6 text-slate-600">
-                  See{' '}
-                  <Link
-                    to="/financing/grants-and-incentives-with-home-equity"
-                    className="font-semibold text-[#1B3C6C] hover:underline"
-                  >
-                    using grants with home equity
-                  </Link>{' '}
-                  or{' '}
-                  <Link to="/grants" className="font-semibold text-[#1B3C6C] hover:underline">
-                    Ontario grants open now
-                  </Link>
-                  .
-                </p>
-              </div>
-            </div>
+          <div className="max-w-2xl">
+            <p className={eyebrowStyles}>Project scenarios</p>
+            <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
+              Where equity tends to make sense
+            </h2>
+            <p className="mt-4 text-[1.05rem] leading-7 text-slate-600">
+              The strongest cases add rental income or lasting value. Each still
+              has to pass permits and cost first.
+            </p>
+          </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              {rentalGuides.map((guide) => (
-                <Link
-                  key={guide.href}
-                  to={guide.href}
-                  className="group relative block aspect-[4/3] overflow-hidden sm:aspect-[4/5] rounded-[1.4rem] bg-slate-900"
-                >
+          <div className="mt-12 grid gap-6 sm:grid-cols-2">
+            {projectScenarios.map((scenario) => (
+              <Link
+                key={scenario.title}
+                to={scenario.href}
+                className="group overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.1)]"
+              >
+                <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
                   <img
-                    src={guide.image}
-                    alt={guide.alt}
+                    src={scenario.image}
+                    alt={scenario.alt}
                     loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b1628] from-10% via-[#0b1628]/70 via-45% to-[#0b1628]/5" />
-                  <div className="absolute inset-x-0 bottom-0 p-6 text-white">
-                    <h3 className="text-[1.3rem] font-semibold tracking-[-0.02em]">{guide.title}</h3>
-                    <p className="mt-1.5 text-sm leading-6 text-slate-200">{guide.body}</p>
-                    <span className="mt-4 inline-flex items-center text-sm font-semibold text-blue-200">
-                      Read the guide
-                      <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
-                    </span>
-                  </div>
+                  <span className="absolute left-4 top-4 rounded-full bg-white/92 px-3 py-1 text-[0.72rem] font-semibold text-[#1B3C6C] shadow-sm">
+                    {scenario.tag}
+                  </span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-[1.2rem] font-semibold tracking-[-0.02em] text-slate-950">
+                    {scenario.title}
+                  </h3>
+                  <p className="mt-2 text-[0.95rem] leading-7 text-slate-600">{scenario.body}</p>
+                  <span className="mt-4 inline-flex items-center text-sm font-semibold text-[#1B3C6C]">
+                    {scenario.linkText}
+                    <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <p className="mt-10 text-sm text-slate-600">
+            Grants can lower what you borrow. See{' '}
+            <Link
+              to="/financing/grants-and-incentives-with-home-equity"
+              className="font-semibold text-[#1B3C6C] hover:underline"
+            >
+              using grants with home equity
+            </Link>{' '}
+            or{' '}
+            <Link to="/grants" className="font-semibold text-[#1B3C6C] hover:underline">
+              Ontario grants open now
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
+
+      {/* E · Conversion module — a branded box on a light band, so it reads as
+          the one place to act rather than another paragraph. */}
+      <section className="bg-[#F8FAFC] py-20 lg:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="relative overflow-hidden rounded-[2rem] bg-[#1B3C6C] text-white shadow-[0_40px_80px_rgba(27,60,108,0.3)]">
+            <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl" />
+            <div className="relative grid gap-10 p-8 md:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14 lg:p-14">
+              <div>
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-sky-200">
+                  Free project review
+                </p>
+                <h2 className="mt-3 text-[1.9rem] font-bold leading-[1.1] tracking-[-0.035em] md:text-[2.4rem]">
+                  Know the project is sound before you borrow a dollar
+                </h2>
+                <p className="mt-4 max-w-md text-[1.02rem] leading-7 text-blue-100">
+                  Tell us about the renovation and we'll look at it with you
+                  before any financing decision.
+                </p>
+                <Link
+                  to="/match"
+                  className="mt-8 inline-flex items-center justify-center gap-2 rounded-[0.8rem] bg-white px-7 py-[0.95rem] text-base font-semibold text-[#1B3C6C] shadow-[0_12px_28px_rgba(2,6,23,0.25)] transition hover:bg-slate-100"
+                >
+                  Start Project Review
+                  <ArrowRight className="h-5 w-5" />
                 </Link>
-              ))}
+                <p className="mt-4 text-sm text-blue-200">Free and no obligation.</p>
+              </div>
+
+              <ol className="space-y-3">
+                {decisionSteps.map((item) => (
+                  <li
+                    key={item.title}
+                    className="flex gap-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 text-sm font-bold">
+                      {item.step}
+                    </span>
+                    <div>
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="mt-0.5 text-sm leading-6 text-blue-100">{item.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-slate-200/70 bg-[#f6f8fb] py-20 lg:py-28">
+      <section className="bg-white py-20 lg:py-28">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16 lg:px-8">
           <div className="lg:sticky lg:top-28 lg:self-start">
             <p className={eyebrowStyles}>Frequently asked questions</p>
             <h2 className="mt-3 text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 md:text-[2.6rem]">
               Questions before using home equity
             </h2>
-            <div className="mt-8 hidden rounded-[1.2rem] bg-[#0b1628] p-6 text-white lg:block">
-              <p className="font-semibold">Want a second opinion first?</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                We look at scope, permits and cost before any financing talk.
-              </p>
-              <Link
-                to="/match"
-                className="mt-5 inline-flex items-center text-sm font-semibold text-blue-200 hover:underline"
-              >
-                Start Project Review
-                <ArrowRight className="ml-2 h-4 w-4" />
+            <p className="mt-4 text-[1rem] leading-7 text-slate-600">
+              Not sure what the project will cost yet?{' '}
+              <Link to="/costs" className="font-semibold text-[#1B3C6C] hover:underline">
+                See Ontario renovation costs
               </Link>
-            </div>
+              .
+            </p>
           </div>
 
-          <div className="divide-y divide-slate-200 rounded-[1.4rem] border border-slate-200 bg-white px-6 md:px-8">
+          <div className="divide-y divide-slate-200 rounded-[1.4rem] border border-slate-200 bg-white px-6 shadow-sm md:px-8">
             {faqItems.map((item) => (
               <details key={item.question} className="group py-5">
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-5 text-left">
@@ -1509,17 +1548,12 @@ export default function HomeEquityRenovationsOntario() {
         </div>
       </section>
 
-      {/* Final CTA — bookends the dark hero. */}
-      <section className="relative overflow-hidden bg-[#0b1628] py-20 text-white lg:py-28">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_0%,rgba(59,130,246,0.22),transparent_70%)]" />
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] md:text-[2.8rem]">
+      {/* Bottom CTA — dark slate, bookends the calculator band. */}
+      <section className="bg-[#0F172A] py-20 text-white lg:py-24">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.035em] md:text-[2.6rem]">
             Plan the renovation before you commit the equity
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-[1.05rem] leading-8 text-slate-300">
-            We review the scope, permit path and cost with you first, so you
-            know whether equity belongs in the plan.
-          </p>
           <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
             <Link to="/match" className={buttonStyles.primary}>
               Start Project Review
