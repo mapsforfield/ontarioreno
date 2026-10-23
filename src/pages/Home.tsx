@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
-import { HeroEstimator } from '../components/HeroEstimator';
+import { HeroSweep } from '../components/HeroSweep';
 import { CostGuideCapture } from '../components/CostGuideCapture';
 import { HUB_CARDS } from '../data/projects/showcase';
 import { buttonStyles } from '../lib/uiStyles';
@@ -137,112 +137,61 @@ export default function Home() {
         <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
       </Helmet>
 
-      {/* Hero — problem-solving first, no lead magnet.
+      {/* Hero — full-bleed transformation.
 
-          The fold is for two things only: seeing real numbers for your
-          project, and booking the visit that firms them up. The 2026 cost
-          guide PDF used to share this space; it now sits mid-page for readers
-          still researching.
+          The whole hero is one real basement, unfinished on one side of the
+          seam and finished on the other, edge to edge; the copy sits on the
+          unfinished side under a warm vignette (see HeroSweep). Earlier
+          versions — a dark glass card, a tabbed estimator, a boxed photo on
+          beige — read as a fintech dashboard or a design blog. The
+          photograph is the argument; the copy only has to be clear.
 
-          The right side is a live estimator, not a picture: tap a project and
-          the cost range, permit position and financing change in place (see
-          HeroEstimator for where every figure comes from). Its CTA is the
-          hero's one saturated button, so the left column carries copy, trust
-          points and quiet secondary routes only.
+          The fold carries the review CTA only. The 2026 cost guide lives
+          mid-page (see CostGuideCapture). */}
+      <HeroSweep>
+        <p className="hidden text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-white/70 sm:block">
+          Independent renovation advisory · Ontario
+        </p>
 
-          Mobile order is copy → estimator → trust points: the card is the
-          value, so it comes before the reassurance. */}
-      {/* overflow-clip, not overflow-hidden: a hidden box is still scrollable by
-          script, and focusing a tab scrolled it 160px sideways to chase the
-          corner light. clip cannot be scrolled at all. */}
-      <section className="relative isolate overflow-clip bg-[#070B14] text-white">
-        <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
-          <div className="hero-blueprint absolute inset-0" />
-          <div className="hero-breathe absolute -right-40 -top-40 h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(56,189,248,0.22),rgba(37,99,235,0.08)_55%,transparent)]" />
-          <div className="absolute -bottom-48 -left-40 h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]" />
+        <h1 className="text-[2.2rem] font-extrabold leading-[1.0] tracking-[-0.045em] text-white sm:mt-4 sm:text-[3.4rem] lg:text-[4.1rem]">
+          Stop dreading the reno.
+          <span className="block text-white/80">Build your Ontario home right.</span>
+        </h1>
+
+        <p className="mt-4 max-w-lg text-[0.98rem] leading-7 text-white/80 sm:mt-5 sm:text-[1.12rem] sm:leading-8">
+          Real costs before the first quote, the permits your city will
+          actually ask for, and honest financing, from one independent team
+          that comes to see the space for free.
+        </p>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <Link
+            to="/match"
+            className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl bg-white px-7 text-base font-bold tracking-[-0.015em] text-[#14100C] shadow-[0_14px_34px_rgba(0,0,0,0.35)] transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+          >
+            Start your free project review
+            <ArrowRight className="h-5 w-5" />
+          </Link>
+          <a
+            href="#explore"
+            onClick={(event) => {
+              const target = document.getElementById('explore');
+              if (!target) return;
+              event.preventDefault();
+              const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+            }}
+            className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-white/35 bg-white/10 px-7 text-base font-semibold tracking-[-0.015em] text-white backdrop-blur-sm transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30"
+          >
+            See costs by project
+          </a>
         </div>
 
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-16 lg:pt-14">
-          <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-[0.78rem] font-medium text-slate-300">
-              <ShieldCheck className="h-3.5 w-3.5 text-sky-300" />
-              Ontario&apos;s independent homeowner guide
-            </p>
-
-            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-extrabold leading-[1.03] tracking-[-0.05em] text-white sm:text-[2.9rem] lg:text-[3.3rem]">
-              Stop guessing Ontario renovation costs, permit rules, and financing.
-            </h1>
-
-            <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#94A3B8] md:text-[1.1rem]">
-              OntarioReno shows you what your project really costs, what the
-              city will require, and how to pay for it, then confirms it all
-              with a free site visit. Independent, and free for homeowners.
-            </p>
-
-            <ul className="mt-7 hidden flex-wrap gap-x-7 gap-y-3 lg:flex">
-              {[
-                ['100%', 'Independent'],
-                ['$0', 'To get a site visit'],
-                ['No-lien', 'Financing paths'],
-              ].map(([figure, label]) => (
-                <li key={label} className="border-l border-white/10 pl-4 first:border-l-0 first:pl-0">
-                  <p className="text-[1.15rem] font-bold tracking-[-0.02em] text-white">{figure}</p>
-                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-8 hidden flex-wrap items-center gap-x-6 gap-y-2 text-sm lg:flex">
-              <Link to="/match" className="inline-flex items-center gap-1.5 py-2 font-semibold text-white hover:text-sky-300">
-                Start a free project review
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <a
-                href="#explore"
-                onClick={(event) => {
-                  const target = document.getElementById('explore');
-                  if (!target) return;
-                  event.preventDefault();
-                  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                  target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-                }}
-                className="py-2 font-medium text-slate-400 hover:text-white"
-              >
-                Explore costs by project
-              </a>
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div className="mx-auto w-full max-w-[480px] lg:ml-auto lg:mr-0">
-              <HeroEstimator />
-            </div>
-
-            {/* Mobile-only: the trust points and secondary routes follow the
-                card instead of sitting between the headline and it. */}
-            <ul className="mt-7 flex flex-wrap justify-between gap-y-3 lg:hidden">
-              {[
-                ['100%', 'Independent'],
-                ['$0', 'Site visit'],
-                ['No-lien', 'Financing'],
-              ].map(([figure, label]) => (
-                <li key={label} className="text-center">
-                  <p className="text-[1.05rem] font-bold text-white">{figure}</p>
-                  <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-slate-500">{label}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6 flex flex-col gap-2 lg:hidden">
-              <Link to="/match" className={cn(buttonStyles.ghostDark, 'min-h-[3rem]')}>
-                Start a free project review
-              </Link>
-              <a href="#explore" className="py-3 text-center text-sm font-medium text-slate-400">
-                Explore costs by project
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+        <p className="mt-6 text-sm font-medium text-white/75 sm:mt-7">
+          Independent <span aria-hidden className="px-1.5 text-white/35">·</span> Ontario-local{' '}
+          <span aria-hidden className="px-1.5 text-white/35">·</span> Zero-lien financing paths
+        </p>
+      </HeroSweep>
 
       {/* The booking demo, first thing after the hero.
 

@@ -235,6 +235,26 @@
   .equity-range::-webkit-slider-thumb { transition: none; }
 }
 
+/* ── Home hero: full-bleed before/after sweep ──────────────────────────────
+   The seam handle: a frosted disc on a hairline. It eases out of the way of
+   the copy on touch screens by being the only draggable part there. */
+.hero-sweep-handle {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* "Drag me": a soft glow ring that swells off the handle while the intro
+   sweep runs. Removed the moment the visitor takes the seam. */
+@keyframes hero-sweep-pulse {
+  0%, 100% { box-shadow: 0 12px 30px rgb(0 0 0 / 0.35), 0 0 0 0 rgb(255 255 255 / 0.45); }
+  50% { box-shadow: 0 12px 30px rgb(0 0 0 / 0.35), 0 0 0 12px rgb(255 255 255 / 0); }
+}
+.hero-sweep-pulse {
+  animation: hero-sweep-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-sweep-pulse { animation: none; }
+}
+
 /* ── Home hero: estimator card + canvas ────────────────────────────────────
    The card's 1px border is its wrapper's background showing through the
    padding. At rest it is a quiet slate edge with a cyan highlight in one
