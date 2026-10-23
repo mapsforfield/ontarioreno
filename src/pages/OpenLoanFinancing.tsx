@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import { HeroHouse } from '../components/HeroHouse';
 import {
   ArrowRight,
   CheckCircle2,
@@ -331,7 +332,7 @@ export default function OpenLoanFinancing() {
       {/* Hero — white 60/40. The dark card shares state with the full
           calculator below, so dragging here moves that one too. */}
       <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-14 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-20 lg:pt-20">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-14 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-20 lg:pt-20">
           <div className="min-w-0">
             <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-[0.8rem] font-medium text-[#1B3C6C]">
               <CreditCard className="h-3.5 w-3.5" />
@@ -368,6 +369,7 @@ export default function OpenLoanFinancing() {
           </div>
 
           <div className="min-w-0">
+            <HeroHouse>
             <div className="rounded-[1.6rem] bg-[#0F172A] p-6 text-white shadow-[0_30px_70px_rgba(15,23,42,0.28)] sm:p-7">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-blue-200">
@@ -422,6 +424,7 @@ export default function OpenLoanFinancing() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </div>
+            </HeroHouse>
           </div>
         </div>
 
