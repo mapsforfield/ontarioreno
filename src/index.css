@@ -235,6 +235,53 @@
   .equity-range::-webkit-slider-thumb { transition: none; }
 }
 
+/* ── Home hero: estimator card + canvas ────────────────────────────────────
+   The card's 1px border is its wrapper's background showing through the
+   padding. At rest it is a quiet slate edge with a cyan highlight in one
+   corner; on hover the gradient slides so the light travels round to the
+   card's top, which reads as weight shifting rather than a colour change. */
+.hero-estimator {
+  background: linear-gradient(135deg, rgb(56 189 248 / 0.55), rgb(51 65 85 / 0.7) 35%, rgb(51 65 85 / 0.5) 65%, rgb(125 211 252 / 0.35));
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+  transition: background-position 600ms ease, transform 300ms ease, box-shadow 300ms ease;
+}
+.hero-estimator:hover {
+  background-position: 100% 100%;
+  box-shadow: 0 0 60px rgb(56 189 248 / 0.12);
+}
+@keyframes hero-estimate-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-estimate-in {
+  animation: hero-estimate-in 220ms ease-out;
+}
+/* The corner light breathes: a 9s swell, slow enough to read as ambient. */
+@keyframes hero-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.06); }
+}
+.hero-breathe {
+  animation: hero-breathe 9s ease-in-out infinite;
+}
+/* Blueprint grid at ~3%: a fine 24px grid with a heavier line every 120px,
+   masked so it fades out toward the edges instead of tiling hard. */
+.hero-blueprint {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(rgb(125 211 252 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(125 211 252 / 0.05) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 30%, transparent 80%);
+  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 30%, transparent 80%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-estimate-in, .hero-breathe { animation: none; }
+  .hero-estimator { transition: none; }
+}
+
 /* ── Portal: native-app feel ─────────────────────────────────────────────────
    Small things a phone user notices without being able to name: no grey flash
    on tap, a press state, sheets that rise from the bottom, pages that fade in
