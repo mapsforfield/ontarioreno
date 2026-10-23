@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
+import { HeroEstimator } from '../components/HeroEstimator';
 import { CostGuideCapture } from '../components/CostGuideCapture';
 import { HUB_CARDS } from '../data/projects/showcase';
 import { buttonStyles } from '../lib/uiStyles';
@@ -138,56 +139,63 @@ export default function Home() {
 
       {/* Hero — problem-solving first, no lead magnet.
 
-          This used to share the fold with a "Free planning guide" card for
-          the 2026 cost guide PDF. That put an email capture beside the
-          booking CTA, so a homeowner ready to talk was offered a download
-          instead. The guide now sits mid-page (after the hubs and city
-          guides) for readers who are still researching; the fold is only
-          for the review and for exploring costs.
+          The fold is for two things only: seeing real numbers for your
+          project, and booking the visit that firms them up. The 2026 cost
+          guide PDF used to share this space; it now sits mid-page for readers
+          still researching.
 
-          Dark and atmospheric on purpose. A white version of this hero was
-          tried and read as sterile — the dark ground and the construction
-          photo are the brand's first impression. The review card is dark
-          glass so it sits inside that atmosphere rather than on top of it,
-          and the primary CTA is the one saturated colour on the dark, so it
-          is the first thing the eye lands on. */}
-      <section className="relative isolate overflow-hidden bg-[#0B1120] text-white">
-        <div aria-hidden className="absolute inset-0 -z-10">
-          <img
-            src="/hero.jpg"
-            alt=""
-            className="h-full w-full object-cover opacity-55"
-            fetchPriority="high"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0B1120] via-[#0B1120]/85 to-[#0B1120]/35" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-[#0B1120]/40" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_60%_at_82%_45%,rgba(56,189,248,0.16),transparent_70%)]" />
+          The right side is a live estimator, not a picture: tap a project and
+          the cost range, permit position and financing change in place (see
+          HeroEstimator for where every figure comes from). Its CTA is the
+          hero's one saturated button, so the left column carries copy, trust
+          points and quiet secondary routes only.
+
+          Mobile order is copy → estimator → trust points: the card is the
+          value, so it comes before the reassurance. */}
+      {/* overflow-clip, not overflow-hidden: a hidden box is still scrollable by
+          script, and focusing a tab scrolled it 160px sideways to chase the
+          corner light. clip cannot be scrolled at all. */}
+      <section className="relative isolate overflow-clip bg-[#070B14] text-white">
+        <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="hero-blueprint absolute inset-0" />
+          <div className="hero-breathe absolute -right-40 -top-40 h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(56,189,248,0.22),rgba(37,99,235,0.08)_55%,transparent)]" />
+          <div className="absolute -bottom-48 -left-40 h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]" />
         </div>
 
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-16 lg:pt-14">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-8 lg:pb-16 lg:pt-14">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-400/10 px-3.5 py-1.5 text-[0.8rem] font-medium text-sky-200">
-              <ShieldCheck className="h-3.5 w-3.5" />
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-[0.78rem] font-medium text-slate-300">
+              <ShieldCheck className="h-3.5 w-3.5 text-sky-300" />
               Ontario&apos;s independent homeowner guide
             </p>
 
-            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-bold leading-[1.04] tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.35rem]">
-              Stop guessing Ontario renovation costs, permit rules, and contractor quotes.
+            <h1 className="mt-6 max-w-2xl text-[2.3rem] font-extrabold leading-[1.03] tracking-[-0.05em] text-white sm:text-[2.9rem] lg:text-[3.3rem]">
+              Stop guessing Ontario renovation costs, permit rules, and financing.
             </h1>
 
-            <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#94A3B8] md:text-[1.15rem]">
-              Real cost ranges, the permit path, and a vetted contractor for
-              Ontario homeowners planning a basement, legal suite, addition, or
-              major renovation.
+            <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#94A3B8] md:text-[1.1rem]">
+              OntarioReno shows you what your project really costs, what the
+              city will require, and how to pay for it, then confirms it all
+              with a free site visit. Independent, and free for homeowners.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/match"
-                className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-[0.75rem] bg-sky-400 px-7 text-base font-bold tracking-[-0.015em] text-[#0B1120] shadow-[0_0_0_1px_rgba(125,211,252,0.4),0_12px_32px_rgba(56,189,248,0.35)] transition duration-200 hover:bg-sky-300 hover:shadow-[0_0_0_1px_rgba(186,230,253,0.5),0_14px_38px_rgba(56,189,248,0.45)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300/40"
-              >
-                Start Free Project Review
-                <ArrowRight className="h-5 w-5" />
+            <ul className="mt-7 hidden flex-wrap gap-x-7 gap-y-3 lg:flex">
+              {[
+                ['100%', 'Independent'],
+                ['$0', 'To get a site visit'],
+                ['No-lien', 'Financing paths'],
+              ].map(([figure, label]) => (
+                <li key={label} className="border-l border-white/10 pl-4 first:border-l-0 first:pl-0">
+                  <p className="text-[1.15rem] font-bold tracking-[-0.02em] text-white">{figure}</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{label}</p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-8 hidden flex-wrap items-center gap-x-6 gap-y-2 text-sm lg:flex">
+              <Link to="/match" className="inline-flex items-center gap-1.5 py-2 font-semibold text-white hover:text-sky-300">
+                Start a free project review
+                <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#explore"
@@ -198,66 +206,39 @@ export default function Home() {
                   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                   target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
                 }}
-                className={cn(buttonStyles.ghostDark, 'min-h-[3.25rem]')}
+                className="py-2 font-medium text-slate-400 hover:text-white"
               >
                 Explore costs by project
               </a>
             </div>
-
-            <p className="mt-4 text-sm text-slate-400">
-              Weighing how to pay for it?{' '}
-              <Link to="/financing" className="-my-3 inline-block py-3 font-semibold text-sky-300 hover:underline">
-                Compare financing paths
-              </Link>
-            </p>
-
-            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-300">
-              {['Free for homeowners', 'No obligation to hire', 'Built for Ontario'].map((point) => (
-                <li key={point} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                  {point}
-                </li>
-              ))}
-            </ul>
           </div>
 
           <div className="min-w-0">
-            <div className="relative mx-auto w-full max-w-[440px] rounded-[1.6rem] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(30,41,59,0.72)_0%,rgba(15,23,42,0.6)_100%)] p-6 shadow-[0_30px_80px_rgba(2,6,23,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:p-7 lg:mx-0 lg:ml-auto">
-              <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/50 to-transparent" />
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-sky-300">
-                Your free project review
-              </p>
-              <p className="mt-3 text-[1.35rem] font-bold leading-snug tracking-[-0.02em]">
-                Know the real number before the first quote.
-              </p>
+            <div className="mx-auto w-full max-w-[480px] lg:ml-auto lg:mr-0">
+              <HeroEstimator />
+            </div>
 
-              <ul className="mt-6 space-y-3.5">
-                {[
-                  ['A realistic cost range', 'for your project, in your city'],
-                  ['Your permit path', 'what the work needs, in plain English'],
-                  ['Grants and financing', 'only the ones that apply to you'],
-                  ['A vetted contractor', 'when you are ready, not before'],
-                ].map(([title, detail]) => (
-                  <li key={title} className="flex gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
-                    <span className="text-[0.95rem] leading-6">
-                      <span className="font-semibold text-white">{title}</span>
-                      <span className="block text-[#94A3B8]">{detail}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                to="/match"
-                className="mt-7 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[0.95rem] font-bold text-[#0B1120] transition hover:bg-slate-100"
-              >
-                Start my review
-                <ArrowRight className="h-4 w-4" />
+            {/* Mobile-only: the trust points and secondary routes follow the
+                card instead of sitting between the headline and it. */}
+            <ul className="mt-7 flex flex-wrap justify-between gap-y-3 lg:hidden">
+              {[
+                ['100%', 'Independent'],
+                ['$0', 'Site visit'],
+                ['No-lien', 'Financing'],
+              ].map(([figure, label]) => (
+                <li key={label} className="text-center">
+                  <p className="text-[1.05rem] font-bold text-white">{figure}</p>
+                  <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-slate-500">{label}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex flex-col gap-2 lg:hidden">
+              <Link to="/match" className={cn(buttonStyles.ghostDark, 'min-h-[3rem]')}>
+                Start a free project review
               </Link>
-              <p className="mt-3 text-center text-xs text-slate-400">
-                100% free for homeowners. No obligation to hire.
-              </p>
+              <a href="#explore" className="py-3 text-center text-sm font-medium text-slate-400">
+                Explore costs by project
+              </a>
             </div>
           </div>
         </div>
