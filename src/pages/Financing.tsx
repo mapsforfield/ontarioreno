@@ -306,12 +306,33 @@ export default function Financing() {
                   >
                     HELOC vs renovation financing
                   </Link>
-                  , and{' '}
+                  ,{' '}
                   <Link
                     to="/financing/phased-renovation-financing"
                     className="font-medium text-[#1B3C6C] hover:underline"
                   >
                     phased renovation financing
+                  </Link>
+                  ,{' '}
+                  <Link
+                    to="/financing/heloc-for-legal-basement-apartment"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    legal basement apartment financing
+                  </Link>
+                  ,{' '}
+                  <Link
+                    to="/financing/garden-suite-financing-ontario"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    garden suite financing
+                  </Link>
+                  , and{' '}
+                  <Link
+                    to="/financing/grants-and-incentives-with-home-equity"
+                    className="font-medium text-[#1B3C6C] hover:underline"
+                  >
+                    grants with home equity
                   </Link>
                   .
                 </p>
