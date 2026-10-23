@@ -165,6 +165,61 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ── Equity slider (home equity page hero) ─────────────────────────────────
+   A native range input reads as a thin line nobody thinks to drag. This gives
+   it a thick track filled up to the thumb (set via --fill), a large thumb, a
+   visible keyboard focus ring, and a pop on the result when the value moves. */
+.equity-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgb(56 189 248) 0 var(--fill, 50%), rgb(255 255 255 / 0.14) var(--fill, 50%) 100%);
+  cursor: pointer;
+}
+.equity-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #fff;
+  border: 4px solid rgb(56 189 248);
+  box-shadow: 0 4px 12px rgb(2 6 23 / 0.45);
+  transition: transform 120ms ease;
+}
+.equity-range::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: #fff;
+  border: 4px solid rgb(56 189 248);
+  box-shadow: 0 4px 12px rgb(2 6 23 / 0.45);
+}
+.equity-range:hover::-webkit-slider-thumb,
+.equity-range:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+.equity-range:focus {
+  outline: none;
+}
+.equity-range:focus-visible {
+  box-shadow: 0 0 0 4px rgb(56 189 248 / 0.35);
+}
+@keyframes equity-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.045); color: rgb(125 211 252); }
+  100% { transform: scale(1); }
+}
+.equity-pop {
+  display: inline-block;
+  transform-origin: left center;
+  animation: equity-pop 280ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .equity-pop { animation: none; }
+  .equity-range::-webkit-slider-thumb { transition: none; }
+}
+
 /* ── Portal: native-app feel ─────────────────────────────────────────────────
    Small things a phone user notices without being able to name: no grey flash
    on tap, a press state, sheets that rise from the bottom, pages that fade in

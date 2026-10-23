@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -258,10 +258,10 @@ function SegmentedControl({
               key={option}
               type="button"
               onClick={() => onChange(option)}
-              className={`max-w-full min-w-0 whitespace-normal break-words rounded-full border px-4 py-2 text-center text-sm font-medium leading-5 transition ${
+              className={`max-w-full min-w-0 whitespace-normal break-words rounded-full border px-4 py-2 text-center text-sm font-medium leading-5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 ${
                 isActive
                   ? 'border-slate-900 bg-slate-900 text-white shadow-[0_10px_22px_rgba(15,23,42,0.12)]'
-                  : 'border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.94)_100%)] text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#2b5a96] hover:text-[#1B3C6C]'
               }`}
               aria-pressed={isActive}
             >
@@ -777,7 +777,9 @@ export default function HomeEquityRenovationsOntario() {
                     step={10000}
                     value={quickHomeValue}
                     onChange={(event) => setQuickHomeValue(Number(event.target.value))}
-                    className="mt-3 w-full cursor-pointer accent-sky-400"
+                    aria-label="Home value"
+                    style={{ '--fill': `${((quickHomeValue - 300000) / 2700000) * 100}%` } as CSSProperties}
+                    className="equity-range mt-4 w-full"
                   />
                 </label>
 
@@ -793,7 +795,9 @@ export default function HomeEquityRenovationsOntario() {
                     step={5000}
                     value={quickMortgage}
                     onChange={(event) => setQuickMortgage(Number(event.target.value))}
-                    className="mt-3 w-full cursor-pointer accent-sky-400"
+                    aria-label="Mortgage owing"
+                    style={{ '--fill': `${((quickMortgage - 0) / 2500000) * 100}%` } as CSSProperties}
+                    className="equity-range mt-4 w-full"
                   />
                 </label>
               </div>
@@ -801,7 +805,9 @@ export default function HomeEquityRenovationsOntario() {
               <div className="mt-7 rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10">
                 <p className="text-sm text-slate-300">Estimated equity access</p>
                 <p className="mt-1 text-[2.4rem] font-bold leading-none tracking-[-0.04em] tabular-nums md:text-[2.7rem]">
-                  {formatCadCurrency(quickUsableEquity)}
+                  <span key={quickUsableEquity} className="equity-pop">
+                    {formatCadCurrency(quickUsableEquity)}
+                  </span>
                 </p>
                 <p className="mt-3 text-xs leading-5 text-slate-400">
                   80% of value minus your mortgage. Your real limit depends on
@@ -906,7 +912,7 @@ export default function HomeEquityRenovationsOntario() {
                                 updateFitField('homeValue', event.target.value)
                               }
                               placeholder="$950,000"
-                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
+                                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -925,7 +931,7 @@ export default function HomeEquityRenovationsOntario() {
                                 )
                               }
                               placeholder="$420,000"
-                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
+                                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -944,7 +950,7 @@ export default function HomeEquityRenovationsOntario() {
                                 )
                               }
                               placeholder="$180,000"
-                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
+                                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:mt-3 md:py-3.5"
                             />
                           </label>
 
@@ -961,7 +967,7 @@ export default function HomeEquityRenovationsOntario() {
                                   updateFitField('helocRate', event.target.value)
                                 }
                                 placeholder="6.4"
-                                  className="w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 pr-10 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:py-3.5"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-10 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:py-3.5"
                               />
                               <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-medium text-slate-400">
                                 %
@@ -1003,7 +1009,7 @@ export default function HomeEquityRenovationsOntario() {
                                   event.target.value
                                 )
                               }
-                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
+                                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:mt-3 md:py-3.5"
                             >
                               {renovationTypeOptions.map((option) => (
                                 <option key={option} value={option}>
@@ -1025,7 +1031,7 @@ export default function HomeEquityRenovationsOntario() {
                                   event.target.value
                                 )
                               }
-                                className="mt-2 w-full rounded-2xl border border-slate-200/75 bg-[linear-gradient(180deg,#fffdfa_0%,#ffffff_100%)] px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-400/28 md:mt-3 md:py-3.5"
+                                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_10px_22px_rgba(148,163,184,0.07)] outline-none transition hover:border-slate-400 focus:border-[#2b5a96] focus:bg-white focus:ring-4 focus:ring-blue-100 md:mt-3 md:py-3.5"
                             >
                               {ownershipTimelineOptions.map((option) => (
                                 <option key={option} value={option}>
