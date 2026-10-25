@@ -383,19 +383,19 @@ export function CostGuideCapture({ framing = 'default' }: { framing?: GuideFrami
   return (
         <section
           id="cost-guide"
-          className="relative overflow-visible xl:overflow-hidden bg-[#1F477F] py-24 xl:py-28 text-white"
+          className="relative overflow-visible xl:overflow-hidden bg-[#1F477F] py-14 sm:py-24 xl:py-28 text-white"
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(96,165,250,0.16),transparent_22%),radial-gradient(circle_at_52%_48%,rgba(96,165,250,0.14),transparent_26%),radial-gradient(circle_at_86%_50%,rgba(59,130,246,0.16),transparent_20%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_20%,rgba(255,255,255,0)_80%,rgba(255,255,255,0.02))]" />
 
           <div className="relative z-10 max-w-[1800px] mx-auto px-6 lg:px-10 xl:px-14">
             {!isDesktopGuideLayout ? (
-            <div className="flex flex-col items-center text-center gap-8">
+            <div className="flex flex-col items-center text-center gap-6 sm:gap-8">
               <div className="relative isolate flex justify-center">
                 <img
                   src="/ontario-reno-cost-guide-3d-preview.png"
                   alt="2026 Ontario Renovation Cost Guide booklet preview"
-                  className="relative z-10 w-[230px] sm:w-[275px] md:w-[320px] h-auto object-contain drop-shadow-[0_18px_34px_rgba(0,0,0,0.18)]"
+                  className="relative z-10 w-[170px] sm:w-[275px] md:w-[320px] h-auto object-contain drop-shadow-[0_18px_34px_rgba(0,0,0,0.18)]"
                   loading="lazy"
                 />
               </div>
@@ -440,7 +440,7 @@ export function CostGuideCapture({ framing = 'default' }: { framing?: GuideFrami
               </div>
 
               <div className="w-full max-w-[440px]">
-                <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-8 sm:p-9 text-left">
+                <div className="rounded-[24px] bg-white text-slate-900 shadow-[0_24px_70px_rgba(0,0,0,0.22)] p-6 sm:p-9 text-left">
                   <h3 className="text-[1.9rem] leading-tight font-bold">Get Instant Access</h3>
                   <p className="mt-2 text-[15px] text-slate-500">
                     Join 15,000+ Ontario homeowners planning smarter.

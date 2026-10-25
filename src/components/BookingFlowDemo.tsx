@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Check, ChevronRight, Clock, MapPin, RotateCw } from 'lucide-react';
+import { SERVICE_PICKER_HREF } from '../lib/bookingRoutes';
 
 /**
  * A self-running preview of the real /consultation booking flow.
@@ -470,11 +471,14 @@ export default function BookingFlowDemo({
 
           {/* ── the buttons ── full width under both columns on mobile */}
           <div className="col-span-2 flex flex-wrap items-center gap-3 sm:col-span-1 lg:col-start-1 lg:row-start-3">
+            {/* The service picker, not bare /consultation. Bare /consultation
+                is the basement flow, so a kitchen or bathroom visitor who
+                pressed this used to land in a basement booking. */}
             <Link
-              to="/consultation"
+              to={SERVICE_PICKER_HREF}
               className="inline-flex items-center gap-2 rounded-xl bg-[#1B3C6C] px-6 py-3.5 text-base font-bold text-white shadow-[0_10px_22px_rgba(27,60,108,0.26)] transition hover:bg-[#153158]"
             >
-              Book your free consultation
+              Book a free consultation
               <ArrowRight className="h-4 w-4" />
             </Link>
             {/* Desktop only. On a phone this is a second button competing

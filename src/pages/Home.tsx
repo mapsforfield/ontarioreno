@@ -13,6 +13,7 @@ import {
   PaintBucket,
   Bath,
   Landmark,
+  MapPin,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
@@ -20,12 +21,46 @@ import BookingFlowDemo from '../components/BookingFlowDemo';
 import CitySelectorSection from '../components/CitySelectorSection';
 import { HeroSweep } from '../components/HeroSweep';
 import { CostGuideCapture } from '../components/CostGuideCapture';
+import MobileBookingBar from '../components/MobileBookingBar';
+import ServicePicker from '../components/ServicePicker';
 import { HUB_CARDS } from '../data/projects/showcase';
-import { buttonStyles } from '../lib/uiStyles';
+import { cityDirectory } from '../lib/cities';
 import {
   BASEMENT_FINANCING_OFFER,
   isGrantCityClosed,
 } from '../lib/programClosures';
+
+const HOME_TITLE = 'Basement, Kitchen & Bathroom Renovations in Ontario | OntarioReno';
+const HOME_DESCRIPTION =
+  'Basement, kitchen, bathroom and garden suite renovations across the GTA and Ontario. Real costs, the permits your city requires, and financing. Book a free consultation.';
+
+/**
+ * Who OntarioReno is, for search engines. No phone number or street address:
+ * there is no public line, and the business deliberately has no Google
+ * Business Profile, so nothing here should look like a local listing.
+ */
+const ORGANIZATION_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://ontarioreno.ca/#organization',
+      name: 'OntarioReno',
+      url: 'https://ontarioreno.ca/',
+      logo: 'https://ontarioreno.ca/logo.png',
+      description:
+        'Independent Ontario renovation team: free consultations, real costs, permit guidance and financing for basements, legal suites, kitchens, bathrooms and garden suites.',
+      areaServed: { '@type': 'AdministrativeArea', name: 'Ontario, Canada' },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://ontarioreno.ca/#website',
+      name: 'OntarioReno',
+      url: 'https://ontarioreno.ca/',
+      publisher: { '@id': 'https://ontarioreno.ca/#organization' },
+    },
+  ],
+};
 
 
 /**
@@ -40,6 +75,15 @@ import {
  *
  * Open programs are listed first — the featured slot belongs to money a reader
  * can actually apply for.
+ *
+ * Only OPEN programs render as cards. A closed one drops to the short
+ * "Closed to new applications" list under them, decided by isGrantCityClosed
+ * at render time — so a program that closes moves itself out of the cards the
+ * moment its city is added to CLOSED_GRANT_CITIES. Two of three cards used to
+ * be closed grants, which is a strange way to lead a section about funding.
+ *
+ * Barrie's figures are its own page's (BarrieSecondarySuiteFunding.tsx), word
+ * for word: county up to $50,000, plus a possible $15,000 city top-up.
  */
 const featuredPrograms = [
   {
@@ -53,6 +97,18 @@ const featuredPrograms = [
     primaryHref: '/burlington-aru-incentive-program',
     secondaryLabel: 'Burlington Cost Guide',
     secondaryHref: '/basement-renovation-cost-burlington',
+  },
+  {
+    city: 'Barrie',
+    eyebrow: 'Funding Program',
+    title: 'Barrie Secondary Suite Funding',
+    highlight: 'Up to $65,000 combined',
+    description:
+      'Simcoe County offers up to $50,000 for eligible secondary or garden suites, and Barrie may add a $15,000 top-up for approved projects, subject to affordable-rental and program requirements.',
+    primaryLabel: 'View Barrie Funding',
+    primaryHref: '/barrie-secondary-suite-funding',
+    secondaryLabel: 'Barrie Suite Costs',
+    secondaryHref: '/barrie-secondary-suite-costs',
   },
   {
     city: 'Hamilton',
@@ -104,37 +160,28 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Title and description lead with the work people search for. The old
+          title, "Ontario Reno | Ontario Renovation Guides, Costs & Project
+          Reviews", named no project at all, and the description still sold
+          basement grants after the two biggest had closed. */}
       <Helmet>
-        <title>Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews</title>
+        <title>{HOME_TITLE}</title>
 
-        <meta
-          name="description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
-        />
+        <meta name="description" content={HOME_DESCRIPTION} />
 
         <link rel="canonical" href="https://ontarioreno.ca/" />
 
-        <meta
-          property="og:title"
-          content="Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews"
-        />
-        <meta
-          property="og:description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
-        />
+        <meta property="og:title" content={HOME_TITLE} />
+        <meta property="og:description" content={HOME_DESCRIPTION} />
         <meta property="og:url" content="https://ontarioreno.ca/" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ontarioreno.ca/preview.jpg" />
 
-        <meta
-          name="twitter:title"
-          content="Ontario Reno | Ontario Renovation Guides, Costs & Project Reviews"
-        />
-        <meta
-          name="twitter:description"
-          content="Plan your Ontario renovation the right way. Understand permits, legal suites, basement grants, real project costs, and review your project before hiring."
-        />
+        <meta name="twitter:title" content={HOME_TITLE} />
+        <meta name="twitter:description" content={HOME_DESCRIPTION} />
         <meta name="twitter:image" content="https://ontarioreno.ca/preview.jpg" />
+
+        <script type="application/ld+json">{JSON.stringify(ORGANIZATION_SCHEMA)}</script>
       </Helmet>
 
       {/* Hero — full-bleed transformation.
@@ -146,32 +193,45 @@ export default function Home() {
           beige — read as a fintech dashboard or a design blog. The
           photograph is the argument; the copy only has to be clear.
 
-          The fold carries the review CTA only. The 2026 cost guide lives
-          mid-page (see CostGuideCapture). */}
+          The fold carries the booking CTA only. The 2026 cost guide lives
+          mid-page (see CostGuideCapture).
+
+          The eyebrow names the work. It used to read "Independent renovation
+          advisory", so the first screen never said basement, kitchen or
+          bathroom. It stays off phones, where the picker's tiles name the
+          work a few lines further down and every line pushes them toward the
+          fold. "Independent" still leads the trust line. */}
       <HeroSweep>
-        <p className="hidden text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-white/70 sm:block">
-          Independent renovation advisory · Ontario
+        <p className="hidden text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-white/75 sm:block">
+          Basement, kitchen &amp; bathroom renovations · Ontario
         </p>
 
-        <h1 className="text-[2.2rem] font-extrabold leading-[1.0] tracking-[-0.045em] text-white sm:mt-4 sm:text-[3.4rem] lg:text-[4.1rem]">
+        <h1 className="text-[2rem] font-extrabold [text-wrap:balance] sm:[text-wrap:wrap] leading-[1.0] tracking-[-0.045em] text-white sm:mt-4 sm:text-[3.4rem] lg:text-[4.1rem]">
           Stop dreading the reno.
           <span className="block text-white/80">Build your Ontario home right.</span>
         </h1>
 
-        <p className="mt-4 max-w-lg text-[0.98rem] leading-7 text-white/80 sm:mt-5 sm:text-[1.12rem] sm:leading-8">
+        <p className="mt-3 max-w-lg text-[0.98rem] leading-7 text-white/80 sm:mt-5 sm:text-[1.12rem] sm:leading-8">
           Real costs before the first quote, the permits your city will
           actually ask for, and honest financing, from one independent team
           that comes to see the space for free.
         </p>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/match"
-            className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl bg-white px-7 text-base font-bold tracking-[-0.015em] text-[#14100C] shadow-[0_14px_34px_rgba(0,0,0,0.35)] transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
-          >
-            Start your free project review
-            <ArrowRight className="h-5 w-5" />
-          </Link>
+        {/* The service picker replaces the single "Start your free project
+            review" button, which opened /match. See ServicePicker for the
+            numbers behind that. Both of the old buttons are still here:
+            /match is the picker's "Not sure yet?" link, and "See costs by
+            project" sits beside the trust line below. */}
+        <ServicePicker compact source="home-hero" className="mt-5 sm:mt-6" />
+
+        <p className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1.5 text-xs font-medium text-white/75 sm:mt-4 sm:gap-y-2 sm:text-sm">
+          <span>
+            Independent <span aria-hidden className="px-1.5 text-white/35">·</span> Ontario-local{' '}
+            <span aria-hidden className="px-1.5 text-white/35">·</span> Zero-lien financing paths
+          </span>
+          {/* On a phone the link wraps to its own line; a separator there
+              would dangle at the end of the first. */}
+          <span aria-hidden className="hidden px-1.5 text-white/35 sm:inline">·</span>
           <a
             href="#explore"
             onClick={(event) => {
@@ -181,15 +241,10 @@ export default function Home() {
               const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
               target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
             }}
-            className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-white/35 bg-white/10 px-7 text-base font-semibold tracking-[-0.015em] text-white backdrop-blur-sm transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30"
+            className="font-semibold text-white underline decoration-white/50 underline-offset-4 hover:decoration-white"
           >
             See costs by project
           </a>
-        </div>
-
-        <p className="mt-6 text-sm font-medium text-white/75 sm:mt-7">
-          Independent <span aria-hidden className="px-1.5 text-white/35">·</span> Ontario-local{' '}
-          <span aria-hidden className="px-1.5 text-white/35">·</span> Zero-lien financing paths
         </p>
       </HeroSweep>
 
@@ -335,9 +390,9 @@ export default function Home() {
           ad for a bathroom had to scroll past four unrelated pitches before
           the page acknowledged bathrooms existed. Now that the cards carry
           the work rather than a coloured icon, they earn the position. */}
-      <section id="explore" className="scroll-mt-20 bg-white py-24">
+      <section id="explore" className="scroll-mt-20 bg-white py-14 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Explore Our Renovation Hubs</h2>
             <p className="text-lg text-slate-600">
               Comprehensive guides, cost breakdowns, and expert advice for Ontario&apos;s most popular home improvement projects.
@@ -364,8 +419,13 @@ export default function Home() {
               recognises theirs instantly.
 
               Nothing else in the section changed: same four links, same
-              titles, same body copy, same order. */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+              titles, same body copy, same order.
+
+              Two across on a phone. One across stacked four 4:3 photos into
+              ~2,200px — the longest section on the page, for four links. At
+              two across the body copy has no room, so it shows from `sm` up;
+              the photo and the title do the routing. */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
             {HUB_CARDS.map((hub) => (
               <Link
                 key={hub.to}
@@ -376,22 +436,22 @@ export default function Home() {
                   <img
                     src={hub.photo.src}
                     srcSet={hub.photo.srcSet}
-                    sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 100vw"
+                    sizes="(min-width: 1024px) 22vw, 50vw"
                     alt={hub.photo.alt}
                     loading="lazy"
                     decoding="async"
                     className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                   />
                   {/* Region, not a town — same privacy rule as the hub pages. */}
-                  <span className="absolute bottom-3 left-3 rounded-full bg-slate-900/75 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.06em] text-white">
+                  <span className="absolute bottom-2 left-2 hidden rounded-full bg-slate-900/75 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.06em] text-white sm:bottom-3 sm:left-3 sm:inline">
                     {hub.photo.region}
                   </span>
                 </div>
 
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="text-xl font-bold text-slate-900">{hub.title}</h3>
-                  <p className="mt-2 flex-grow text-sm text-slate-600">{hub.body}</p>
-                  <div className="mt-6 flex items-center text-sm font-semibold text-[#1B3C6C]">
+                <div className="flex flex-1 flex-col p-4 sm:p-6">
+                  <h3 className="text-base font-bold leading-snug text-slate-900 sm:text-xl">{hub.title}</h3>
+                  <p className="mt-2 hidden flex-grow text-sm text-slate-600 sm:block">{hub.body}</p>
+                  <div className="mt-auto flex items-center pt-3 text-sm font-semibold text-[#1B3C6C] sm:pt-6">
                     Explore Hub
                     <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </div>
@@ -405,6 +465,15 @@ export default function Home() {
       <section className="border-b border-slate-100 bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-12 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-16">
+            {/* The three steps are the real ones now: book, consultation,
+                build. They used to describe a planning exercise ("Avoid Costly
+                Planning Mistakes", "Choose the Right Next Step") that matched
+                nothing a homeowner actually goes through, under three
+                paragraphs that said the same sentence three ways.
+
+                The remote line matters: Windsor, Niagara Falls and Thorold
+                book a call, not a visit (lib/remote-consultation.ts), and a
+                remote booking must never be described as a visit. */}
             <div className="max-w-xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
                 <FileText className="h-4 w-4" />
@@ -414,13 +483,10 @@ export default function Home() {
                 Avoid costly renovation mistakes before committing.
               </h2>
               <p className="mt-4 text-base leading-8 text-slate-600 md:text-lg">
-                OntarioReno helps Ontario homeowners understand renovation costs, permit requirements, project feasibility, and the right next steps before moving forward.
-              </p>
-              <p className="mt-4 text-base leading-8 text-slate-500 md:text-lg">
-                Most homeowners make decisions based on incomplete information — which leads to costly mistakes later.
-              </p>
-              <p className="mt-5 max-w-lg text-sm leading-7 text-slate-500 sm:text-base">
-                Built to help homeowners make informed renovation decisions before moving forward.
+                Most expensive renovation mistakes start with incomplete
+                information. We get you the real cost, the permits your city
+                will ask for, and your financing options before you sign
+                anything.
               </p>
             </div>
 
@@ -429,21 +495,21 @@ export default function Home() {
               {[
                 {
                   step: '01',
-                  title: 'Review Your Project',
+                  title: 'Book a Free Consultation',
                   description:
-                    'Share the basics of your renovation, property, budget, and timeline.',
+                    'Pick your project and a time online in a few taps. We confirm by text.',
                 },
                 {
                   step: '02',
-                  title: 'Avoid Costly Planning Mistakes',
+                  title: 'We Scope and Price It',
                   description:
-                    'Identify cost, permit, and design decisions that commonly lead to delays, rework, or budget overruns.',
+                    'A consultant comes to see the space — or calls, if you are outside our travel area — and lays out a realistic cost, the permits involved, and your financing options.',
                 },
                 {
                   step: '03',
-                  title: 'Choose the Right Next Step',
+                  title: 'A Vetted Contractor Builds It',
                   description:
-                    'Determine the appropriate next step based on your scope, location, and project requirements.',
+                    'If you go ahead, a vetted Ontario contractor from our partner network does the work under a written contract with you. No obligation until you sign.',
                 },
               ].map((item, index, array) => (
                 <div
@@ -475,6 +541,41 @@ export default function Home() {
         <CitySelectorSection />
       </div>
 
+      {/* Phones get a compact city row. The full selector stays desktop-only —
+          at phone width it runs well over a screen — but hiding it left phone
+          visitors no way to reach their city's guide from the homepage. Same
+          list (lib/cities.ts), so the two cannot disagree. */}
+      <section className="bg-white py-12 md:hidden">
+        <div className="px-4">
+          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B3C6C]">
+            <MapPin className="h-4 w-4" aria-hidden="true" />
+            City guides
+          </p>
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.03em] text-slate-900">Find your city</h2>
+          <p className="mt-2 text-base leading-7 text-slate-600">
+            Costs, permits, and legal basement rules where you live.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {cityDirectory.map((city) => (
+              <Link
+                key={city.name}
+                to={city.href}
+                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-[#1B3C6C] hover:text-[#1B3C6C] active:scale-[0.98]"
+              >
+                {city.name}
+              </Link>
+            ))}
+          </div>
+          <Link
+            to="/cities"
+            className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B3C6C]"
+          >
+            View all cities
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+
       {/* The cost guide, mid-page. It used to be pitched from the hero; it
           now sits after the hubs and city guides, as a companion for readers
           still researching. Extracted to a component so /costs can offer it
@@ -495,14 +596,15 @@ export default function Home() {
               </h2>
               <p className="mt-4 max-w-2xl text-base md:text-lg text-slate-700 leading-relaxed">
                 Burlington&apos;s ARU incentive is the strongest program open to new
-                applications today. Hamilton and St. Catharines have both closed their
-                grants — their guides stay up for permits, costs, and legal-suite
-                requirements, and the build can still be financed in full.
+                applications today, and Barrie homeowners may qualify for combined
+                county and city funding. Hamilton and St. Catharines have both closed
+                their grants — their guides stay up for permits, costs, and
+                legal-suite requirements, and the build can still be financed in full.
               </p>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-3">
-            {featuredPrograms.map((program, index) => (
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            {featuredPrograms.filter((program) => !isGrantCityClosed(program.city)).map((program) => (
               <div
                 key={program.title}
                 className={cn(
@@ -558,6 +660,42 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {/* Closed programs: one short list, links kept, no gold card. */}
+          {featuredPrograms.some((program) => isGrantCityClosed(program.city)) && (
+            <div className="mt-6 rounded-[1.1rem] border border-slate-200/90 bg-white/80 px-5 py-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Closed to new applications
+              </p>
+              <ul className="mt-1 divide-y divide-slate-100">
+                {featuredPrograms.filter((program) => isGrantCityClosed(program.city)).map((program) => (
+                  <li
+                    key={program.title}
+                    className="flex flex-col gap-2 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-8"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{program.title}</p>
+                      <p className="mt-0.5 text-sm leading-6 text-slate-500">{program.description}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-x-5 gap-y-1 text-sm font-semibold">
+                      <Link
+                        to={program.primaryHref}
+                        className="text-[#1B3C6C] underline underline-offset-4 hover:text-[#16325a]"
+                      >
+                        {program.primaryLabel}
+                      </Link>
+                      <Link
+                        to={program.secondaryHref}
+                        className="text-[#1B3C6C] underline underline-offset-4 hover:text-[#16325a]"
+                      >
+                        {program.secondaryLabel}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 
@@ -618,15 +756,12 @@ export default function Home() {
             </div>
             <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-[-0.04em]">Ready to start your project?</h2>
             <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-              Start with a clear project review built around scope, budget, and real track record. No random referrals, and no marketplace-style noise.
+              Book a free consultation built around your scope, budget, and timeline. No random referrals, and no marketplace-style noise.
             </p>
+            {/* The service picker, like the hero. This button opened /match;
+                the project review is still one tap away as "Not sure yet?". */}
             <div className="flex flex-col items-center gap-4">
-              <Link
-                to="/match"
-                className={buttonStyles.primary}
-              >
-                Start Project Review
-              </Link>
+              <ServicePicker source="home-footer-cta" className="w-full max-w-xl text-left" />
               <p className="text-sm text-slate-400">100% free for homeowners. No obligation to hire.</p>
             </div>
           </div>
@@ -642,18 +777,25 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
+            {/* The first three answers now tell the same story as the hero:
+                one independent team that comes to see the space, with a vetted
+                partner contractor doing the build under its own contract with
+                the homeowner (src/portal/lib/contractPdf.ts — the Contractor is
+                the second party). They used to describe a "matching service"
+                and a "resource platform", which contradicted the page above.
+                The referral-fee disclosure stays, word for word. */}
             {[
               {
                 q: "Is OntarioReno a contracting company?",
-                a: "No. OntarioReno is an independent homeowner resource platform. We provide educational content, cost guides, and a matching service to help homeowners make better decisions before hiring. We do not perform the renovation work ourselves."
+                a: "No. We are an independent renovation team that handles everything before the build. One of our consultants comes to see the space for free, then lays out a realistic cost, the permits your city will ask for, and your financing options. The construction itself is done by a vetted Ontario contractor from our partner network, under a written contract with you."
               },
               {
-                q: "How much does it cost to use your matching service?",
-                a: "Our project review process is 100% free for homeowners. We may earn a referral fee from contractors in our network, but our positioning is based on project fit, not random placement or homeowner-facing bias."
+                q: "How much does it cost to use OntarioReno?",
+                a: "Nothing. The consultation is 100% free for homeowners, with no obligation to hire. We may earn a referral fee from contractors in our network, but our positioning is based on project fit, not random placement or homeowner-facing bias."
               },
               {
-                q: "How does the project review process work?",
-                a: "We look at project scope, budget fit, location, and contractor track record. The goal is not to flood you with options. It is to help point you toward the next step that makes the most sense for your specific project."
+                q: "How does the free consultation work?",
+                a: "Pick your project and a time online, and we confirm by text. A consultant comes to see the space — or calls, if you are outside our travel area — and looks at scope, budget, location, and timeline. The goal is not to flood you with options. It is one clear plan and one vetted contractor that fits your project."
               },
               {
                 q: "Do I really need a permit to finish my basement?",
@@ -702,6 +844,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <MobileBookingBar />
     </div>
   );
 }

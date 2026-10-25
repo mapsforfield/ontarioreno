@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { bookingHrefFor } from '../lib/bookingRoutes';
+import { SERVICE_PICKER_HREF, bookingHrefFor } from '../lib/bookingRoutes';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { buttonStyles } from '../lib/uiStyles';
@@ -19,6 +19,10 @@ export default function Navbar() {
   // The header CTA opens the calendar for the service this page is about;
   // see src/lib/bookingRoutes.ts.
   const bookingHref = bookingHrefFor(location.pathname);
+  // Where the button opens the service picker (the homepage), it says what
+  // the homepage's other booking buttons say. Elsewhere it keeps its label.
+  const bookingLabel =
+    bookingHref === SERVICE_PICKER_HREF ? 'Book a Free Consultation' : 'Start Project Review';
 
   useEffect(() => {
     if (!isOpen) {
@@ -469,7 +473,7 @@ export default function Navbar() {
               to={bookingHref}
               className={cn(buttonStyles.primary, 'px-6 py-[0.82rem] text-sm')}
             >
-              Start Project Review
+              {bookingLabel}
             </Link>
           </div>
 
@@ -716,7 +720,7 @@ export default function Navbar() {
                     to={bookingHref}
                     className={cn(buttonStyles.primary, 'w-full px-6 py-[0.92rem] text-center text-base')}
                   >
-                    Start Project Review
+                    {bookingLabel}
                   </Link>
                 </div>
               </div>
