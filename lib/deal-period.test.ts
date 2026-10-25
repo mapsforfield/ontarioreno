@@ -31,6 +31,14 @@ test('historical imports only appear under all time', () => {
   assert.equal(isDealInPeriod(deal, 'all', NOW), true);
 });
 
+test('today is the current local calendar day only', () => {
+  const lead = { status: 'new', createdAt: new Date(2026, 9, 16, 0, 5).toISOString(), updatedAt: at(2026, 9, 16) };
+  const yesterday = { status: 'new', createdAt: new Date(2026, 9, 15, 23, 55).toISOString(), updatedAt: at(2026, 9, 16) };
+  assert.equal(isDealInPeriod(lead, 'today', NOW), true);
+  assert.equal(isDealInPeriod(yesterday, 'today', NOW), false);
+  assert.equal(periodLabel('today', NOW), 'Today · October 16');
+});
+
 test('labels', () => {
   assert.equal(periodLabel('month', NOW), 'October 2026');
   assert.equal(periodLabel('quarter', NOW), 'Q4 2026');

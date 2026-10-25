@@ -350,7 +350,7 @@ export default function PortalDeals() {
   const [boardPeriodChoice, setBoardPeriodChoice] = useState<BoardPeriod>(() => {
     try {
       const saved = localStorage.getItem('deals.boardPeriod');
-      if (saved === 'month' || saved === 'last_month' || saved === 'quarter' || saved === 'year') return saved;
+      if (saved === 'today' || saved === 'month' || saved === 'last_month' || saved === 'quarter' || saved === 'year') return saved;
     } catch { /* storage unavailable */ }
     return 'all';
   });
@@ -1385,6 +1385,7 @@ OntarioReno Broker Portal`;
             <div className="flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
               {([
                 { label: 'All time', value: 'all' },
+                { label: 'Today', value: 'today' },
                 { label: 'This month', value: 'month' },
                 { label: 'Last month', value: 'last_month' },
                 { label: 'Quarter', value: 'quarter' },
