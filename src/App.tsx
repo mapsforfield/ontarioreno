@@ -42,6 +42,7 @@ const BathroomRenovationsNext = lazy(() => import('./pages/BathroomRenovationsNe
 const WindowsDoors = lazy(() => import('./pages/WindowsDoors'));
 const Costs = lazy(() => import('./pages/Costs'));
 const Match = lazy(() => import('./pages/Match'));
+const BookConsultation = lazy(() => import('./pages/BookConsultation'));
 const Cities = lazy(() => import('./pages/Cities'));
 const Financing = lazy(() => import('./pages/Financing'));
 const HomeEquityRenovationsOntario = lazy(() => import('./pages/HomeEquityRenovationsOntario'));
@@ -255,6 +256,7 @@ export default function App({ location }: { location?: string } = {}) {
           <Route path="windows" element={<WindowsDoors />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
+          <Route path="book" element={<BookConsultation />} />
           <Route path="cities" element={<Cities />} />
           <Route path="financing" element={<Financing />} />
           <Route

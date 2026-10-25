@@ -10,9 +10,11 @@ export const cityDirectory: CityEntry[] = [
   {
     name: 'Hamilton',
     href: '/basement-renovation-cost-hamilton',
-    descriptor: 'Costs, permits, and grant guidance',
+    // Hamilton's ADU grant closed August 6, 2026 (src/lib/programClosures.ts),
+    // so this card no longer offers grant guidance it cannot deliver.
+    descriptor: 'Costs, permits, and legal suites',
     summary:
-      'Strong starting point for Hamilton basement pricing, permit planning, and grant research.',
+      'Strong starting point for Hamilton basement pricing, permit planning, and legal-suite requirements.',
     featured: true,
   },
   {
@@ -26,9 +28,10 @@ export const cityDirectory: CityEntry[] = [
   {
     name: 'St. Catharines',
     href: '/st-catharines',
-    descriptor: 'ADU grants, costs, and legal suites',
+    // St. Catharines' ADU grant closed August 6, 2026 — see Hamilton above.
+    descriptor: 'ADU costs, permits, and legal suites',
     summary:
-      'Strong starting point for homeowners comparing St. Catharines ADU grants, realistic costs, and legal suite requirements.',
+      'Strong starting point for St. Catharines homeowners comparing realistic ADU costs, permits, and legal suite requirements.',
     featured: true,
   },
   {

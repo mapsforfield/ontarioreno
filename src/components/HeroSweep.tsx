@@ -3,7 +3,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 /**
  * Full-bleed before/after hero: one real basement, unfinished on the left of
  * the seam and finished on the right, spanning the whole hero edge to edge.
- * The copy (children) sits over the unfinished side under a warm vignette.
+ * From `sm` up the copy (children) sits over the unfinished side under a warm
+ * vignette.
+ *
+ * On phones the copy sits BELOW the photograph instead, on the hero's own dark
+ * ground. Laid over a 375px-wide photo, the headline ran into the Unfinished /
+ * Finished labels and the handle sat on the text — the copy is taller than a
+ * phone hero can hold once the service picker is in it, and the comparison is
+ * the one thing in the hero that must not be covered. The photo is 16:9 there,
+ * a light crop of its own 3:2: the full 3:2 pushed the service picker's first
+ * row just under the fold on a 667px-tall phone.
  *
  * Moving the seam:
  *  - drag anywhere on the photograph (not on the copy, so the CTAs stay
@@ -125,7 +134,7 @@ export function HeroSweep({ children }: { children: ReactNode }) {
     <section className="relative isolate overflow-clip bg-[#14100C] text-white">
       <div
         ref={canvasRef}
-        className={`relative h-[calc(100svh-4.75rem)] min-h-[600px] max-h-[880px] touch-pan-y select-none ${dragging ? 'cursor-grabbing' : 'cursor-ew-resize'}`}
+        className={`relative aspect-[16/9] touch-pan-y select-none sm:aspect-auto sm:h-[calc(100svh-4.75rem)] sm:min-h-[600px] sm:max-h-[880px] ${dragging ? 'cursor-grabbing' : 'cursor-ew-resize'}`}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest('[data-hero-copy]')) return;
           stopRef.current();
@@ -187,8 +196,10 @@ export function HeroSweep({ children }: { children: ReactNode }) {
         </div>
 
         {/* Vignette: warm and dark where the copy sits — left on desktop,
-            bottom on phones — clear over the finished room. */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(0deg,rgba(14,10,7,0.96)_0%,rgba(14,10,7,0.9)_42%,rgba(14,10,7,0.55)_58%,rgba(14,10,7,0.1)_75%,rgba(14,10,7,0.3)_100%)] lg:bg-[linear-gradient(90deg,rgba(14,10,7,0.9)_0%,rgba(14,10,7,0.78)_30%,rgba(14,10,7,0.25)_52%,rgba(14,10,7,0)_70%)]" />
+            bottom on tablets — clear over the finished room. On phones the
+            copy is below the photo, so only the bottom edge darkens, enough
+            to run the photo into the dark ground under it without a seam. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(0deg,rgba(20,16,12,0.9)_0%,rgba(20,16,12,0)_28%)] sm:bg-[linear-gradient(0deg,rgba(14,10,7,0.96)_0%,rgba(14,10,7,0.9)_42%,rgba(14,10,7,0.55)_58%,rgba(14,10,7,0.1)_75%,rgba(14,10,7,0.3)_100%)] lg:bg-[linear-gradient(90deg,rgba(14,10,7,0.9)_0%,rgba(14,10,7,0.78)_30%,rgba(14,10,7,0.25)_52%,rgba(14,10,7,0)_70%)]" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[rgba(14,10,7,0.45)] to-transparent" />
 
         {/* Keyboard + screen readers. Visually hidden; the handle shows focus. */}
@@ -212,16 +223,17 @@ export function HeroSweep({ children }: { children: ReactNode }) {
           className="pointer-events-none absolute inset-y-0 z-10"
           style={{ left: `${split}%` }}
         >
-          {/* On phones the copy spans both sides, so the line fades out before it
-              reaches the text; on desktop it runs the full height. */}
-          <div className="absolute inset-y-0 w-px -translate-x-1/2 bg-white/80 shadow-[0_0_18px_rgba(255,255,255,0.45)] [mask-image:linear-gradient(180deg,black_0%,black_40%,transparent_55%)] lg:[mask-image:none]" />
+          {/* On tablets the copy spans both sides, so the line fades out before
+              it reaches the text. On desktop, and on phones (copy below the
+              photo), it runs the full height. */}
+          <div className="absolute inset-y-0 w-px -translate-x-1/2 bg-white/80 shadow-[0_0_18px_rgba(255,255,255,0.45)] sm:[mask-image:linear-gradient(180deg,black_0%,black_40%,transparent_55%)] lg:[mask-image:none]" />
           <span className="absolute left-0 top-6 -translate-x-[calc(100%+10px)] whitespace-nowrap rounded-full bg-black/40 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">
             Unfinished
           </span>
           <span className="absolute left-0 top-6 translate-x-[10px] whitespace-nowrap rounded-full bg-white/80 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#14100C] backdrop-blur-sm">
             Finished
           </span>
-          <div className={`hero-sweep-handle ${autoplay ? 'hero-sweep-pulse' : ''} absolute left-0 top-[22%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/20 shadow-[0_12px_30px_rgba(0,0,0,0.35)] lg:top-1/2`}>
+          <div className={`hero-sweep-handle ${autoplay ? 'hero-sweep-pulse' : ''} absolute left-0 top-[55%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/20 shadow-[0_12px_30px_rgba(0,0,0,0.35)] sm:top-[22%] lg:top-1/2`}>
             <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 6l-6 6 6 6M15 6l6 6-6 6" />
             </svg>
@@ -240,13 +252,20 @@ export function HeroSweep({ children }: { children: ReactNode }) {
           <span className="mt-1 block text-sm font-semibold text-white">Typically $50,000 – $70,000</span>
           From $399/month, nothing upfront, no lien. On approved credit.
         </p>
+      </div>
 
-        {/* Copy */}
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-end lg:items-center">
-          <div className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6 lg:px-8 lg:pb-0">
-            <div data-hero-copy className="pointer-events-auto max-w-xl cursor-auto select-text">
-              {children}
-            </div>
+      {/* Copy. A sibling of the photograph, not inside it: on phones it flows
+          below the photo; from `sm` up it is laid over the photo, which is
+          what this section's `relative` is for. Pointer events pass through
+          the overlay to the photo, so the drag still works around the copy.
+
+          On desktop it is centred in the space BELOW the Unfinished /
+          Finished labels (lg:pt-14), not in the whole hero — centred in the
+          whole hero, a 720px-tall laptop put the eyebrow on the labels. */}
+      <div className="relative z-20 sm:pointer-events-none sm:absolute sm:inset-0 sm:flex sm:items-end lg:items-center lg:pt-14">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 sm:pb-8 sm:pt-0 lg:px-8 lg:pb-0">
+          <div data-hero-copy className="max-w-xl cursor-auto select-text sm:pointer-events-auto">
+            {children}
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bookingHrefFor } from '../src/lib/bookingRoutes.js';
+import { BOOKING_SERVICES, SERVICE_PICKER_HREF, bookingHrefFor } from '../src/lib/bookingRoutes.js';
 import { programBySlug } from './program-config.js';
 
 test('service pages open their own calendar flow', () => {
@@ -18,10 +18,25 @@ test('service pages open their own calendar flow', () => {
 });
 
 test('general pages and grant pages keep the project review', () => {
-  for (const p of ['/', '/costs', '/financing', '/grants', '/grants/ajax-adu-grant', '/hamilton-grant-guide',
+  for (const p of ['/costs', '/financing', '/grants', '/grants/ajax-adu-grant', '/hamilton-grant-guide',
     '/hamilton-basement-grant', '/burlington-aru-incentive-program', '/barrie-secondary-suite-funding',
     '/barrie-aru-permit-rebate', '/st-catharines-adu-grant', '/contractor-partners', '/cities']) {
     assert.equal(bookingHrefFor(p), '/match', p);
+  }
+});
+
+// The homepage moved off /match in Oct 2026: it asks which project and opens
+// that calendar. /book is the same question for a button that cannot ask it.
+test('the homepage opens the service picker, not the project review', () => {
+  assert.equal(bookingHrefFor('/'), SERVICE_PICKER_HREF);
+  assert.equal(SERVICE_PICKER_HREF, '/book');
+});
+
+test('every service the picker offers is an enabled calendar flow', () => {
+  for (const { slug } of BOOKING_SERVICES) {
+    const program = programBySlug(slug);
+    assert.ok(program, `the service picker offers /consultation/${slug}, which has no program`);
+    assert.equal(program.enabled, true, `the service picker offers /consultation/${slug}, which is disabled`);
   }
 });
 
