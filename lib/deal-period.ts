@@ -16,7 +16,7 @@
  */
 import { dealWonDate } from './deal-won-date.ts';
 
-export type BoardPeriod = 'all' | 'month' | 'last_month' | 'quarter' | 'year';
+export type BoardPeriod = 'all' | 'today' | 'month' | 'last_month' | 'quarter' | 'year';
 
 export type DealPeriodFields = {
   status: string;
@@ -39,6 +39,8 @@ export function periodBounds(period: BoardPeriod, now = new Date()): [Date, Date
   switch (period) {
     case 'all':
       return null;
+    case 'today':
+      return [new Date(y, m, now.getDate()), new Date(y, m, now.getDate() + 1)];
     case 'month':
       return [new Date(y, m, 1), new Date(y, m + 1, 1)];
     case 'last_month':
@@ -65,6 +67,9 @@ export function periodLabel(period: BoardPeriod, now = new Date()): string {
   const bounds = periodBounds(period, now);
   if (!bounds) return 'All time';
   const [start] = bounds;
+  if (period === 'today') {
+    return `Today · ${new Intl.DateTimeFormat('en-CA', { month: 'long', day: 'numeric' }).format(start)}`;
+  }
   if (period === 'month' || period === 'last_month') {
     return new Intl.DateTimeFormat('en-CA', { month: 'long', year: 'numeric' }).format(start);
   }
