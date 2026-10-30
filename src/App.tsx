@@ -144,6 +144,7 @@ const PortalConversations = lazy(() => import('./portal/pages/PortalConversation
 const PortalInvoices = lazy(() => import('./portal/pages/PortalInvoices'));
 const PortalMessages = lazy(() => import('./portal/pages/PortalMessages'));
 const PortalTasks = lazy(() => import('./portal/pages/PortalTasks'));
+const PortalAdvertising = lazy(() => import('./portal/pages/PortalAdvertising'));
 const PortalLogin = lazy(() => import('./portal/pages/PortalLogin'));
 const ConsultationReschedule = lazy(() => import('./portal/pages/ConsultationReschedule'));
 const ConsultationCancel = lazy(() => import('./portal/pages/ConsultationCancel'));
@@ -200,6 +201,7 @@ export default function App({ location }: { location?: string } = {}) {
               <Route path="appointments" element={<PortalAppointments />} />
               <Route path="clients" element={<PortalClients />} />
               <Route path="tasks" element={<PortalTasks />} />
+              <Route path="advertising" element={<PortalAdvertising />} />
               {/* Financing page retired Oct 2026 — nobody used it. Old links land on the dashboard. */}
               <Route path="financing" element={<Navigate to="/portal/dashboard" replace />} />
               {/* Analytics hub — all four render the tabbed PortalAnalytics so
