@@ -16,6 +16,9 @@ export default function PortalAdvertising() {
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  // A blocked or missing file used to fail silently — a play button that did
+  // nothing. Say so instead.
+  const [loadFailed, setLoadFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   // Only a tap on a thumbnail should start playback — not the first render.
   const autoplayNext = useRef(false);
@@ -25,10 +28,11 @@ export default function PortalAdvertising() {
   useEffect(() => {
     setProgress(0);
     setPlaying(false);
+    setLoadFailed(false);
     const video = videoRef.current;
     if (video && autoplayNext.current) {
       autoplayNext.current = false;
-      video.play().catch(() => setPlaying(false));
+      play(video);
     }
   }, [selectedId]);
 
@@ -41,10 +45,19 @@ export default function PortalAdvertising() {
     setSelectedId(id);
   };
 
+  const play = (video: HTMLVideoElement) => {
+    setLoadFailed(false);
+    video.play().catch((err: unknown) => {
+      setPlaying(false);
+      // NotAllowedError is the browser's autoplay rule, not a broken file.
+      if (!(err instanceof DOMException && err.name === 'NotAllowedError')) setLoadFailed(true);
+    });
+  };
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play().catch(() => setPlaying(false));
+    if (video.paused) play(video);
     else video.pause();
   };
 
@@ -77,6 +90,10 @@ export default function PortalAdvertising() {
               loop
               muted={muted}
               onPlay={() => setPlaying(true)}
+              onError={() => {
+                setPlaying(false);
+                setLoadFailed(true);
+              }}
               onPause={() => setPlaying(false)}
               onTimeUpdate={(e) => {
                 const v = e.currentTarget;
@@ -88,6 +105,12 @@ export default function PortalAdvertising() {
 
             {/* Dynamic island */}
             <div className="pointer-events-none absolute left-1/2 top-2 h-[18px] w-[70px] -translate-x-1/2 rounded-full bg-black" />
+
+            {loadFailed && (
+              <div className="absolute inset-x-3 top-12 z-10 rounded-xl bg-white/95 p-3 text-center text-xs font-semibold text-slate-700 shadow-lg">
+                This video couldn't load. If you use an ad blocker, pause it for ontarioreno.ca and try again.
+              </div>
+            )}
 
             {!playing && (
               <button
