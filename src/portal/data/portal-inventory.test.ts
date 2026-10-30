@@ -46,6 +46,9 @@ const PORTAL_FEATURES: PortalFeature[] = [
   { navLabel: 'Clients', route: 'clients', page: 'src/portal/pages/PortalClients.tsx', component: 'PortalClients' },
   { navLabel: 'Tasks', route: 'tasks', page: 'src/portal/pages/PortalTasks.tsx', component: 'PortalTasks' },
   { navLabel: 'Performance', route: 'performance', page: 'src/portal/pages/PortalAnalytics.tsx', component: 'PortalAnalytics' },
+  // The ads currently running, so reps know what a homeowner was shown.
+  // Open to every rep; the list itself is data/ads.ts.
+  { navLabel: 'Advertising', route: 'advertising', page: 'src/portal/pages/PortalAdvertising.tsx', component: 'PortalAdvertising' },
   { navLabel: 'Call Queue', route: 'workspace', page: 'src/portal/pages/PortalWorkspace.tsx', component: 'PortalWorkspace' },
   { navLabel: 'Conversations', route: 'conversations', page: 'src/portal/pages/PortalConversations.tsx', component: 'PortalConversations' },
   { navLabel: 'Submissions', route: 'submissions', page: 'src/portal/pages/PortalSubmissions.tsx', component: 'PortalSubmissions' },
@@ -82,6 +85,8 @@ const REQUIRED_MODULES = [
   'src/portal/lib/contractPdf.ts',
   'src/portal/lib/contractFonts.ts',
   'src/portal/lib/brandColor.ts',
+  // The Advertising page's list of running ads.
+  'src/portal/data/ads.ts',
   // Both invoice generators. The commission one is reachable only from a Deal,
   // so it has no route of its own to protect it.
   'src/portal/components/CommissionInvoice.tsx',
