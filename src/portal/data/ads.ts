@@ -2,8 +2,12 @@
 // Shown to reps on /portal/advertising so the first conversation picks up
 // where the ad left off.
 //
-// To swap an ad: drop a compressed copy in public/ads/ (720px wide MP4 with
-// +faststart, plus a small .webp poster frame) and edit this list. Order here
+// To swap an ad: drop a compressed copy in public/reels/ (720px wide MP4 with
+// +faststart, plus a small .webp poster frame) and edit this list.
+//
+// Keep "ad" out of the folder and file names. Ad-block lists hide any URL
+// with /ads/ or -ad- in it, so a rep with a blocker saw a black phone and no
+// thumbnails when these lived at /ads/basement-ad-1.mp4. Order here
 // is the order on the page; the first entry is selected on open.
 
 export type RunningAd = {
@@ -24,8 +28,8 @@ export const RUNNING_ADS: RunningAd[] = [
     title: 'Basement Ad #1',
     angle: 'No money down, from $399/mo · side entrance included · free call-back',
     category: 'Basement',
-    video: '/ads/basement-ad-1.mp4',
-    poster: '/ads/basement-ad-1.webp',
+    video: '/reels/basement-1.mp4',
+    poster: '/reels/basement-1.webp',
     duration: 11,
   },
   {
@@ -33,8 +37,8 @@ export const RUNNING_ADS: RunningAd[] = [
     title: 'Basement Ad #2',
     angle: 'From $399/mo, $0 down · move it to your mortgage at renewal · GTA',
     category: 'Basement',
-    video: '/ads/basement-ad-2.mp4',
-    poster: '/ads/basement-ad-2.webp',
+    video: '/reels/basement-2.mp4',
+    poster: '/reels/basement-2.webp',
     duration: 12,
   },
   {
@@ -42,8 +46,8 @@ export const RUNNING_ADS: RunningAd[] = [
     title: 'Bathroom Ad',
     angle: 'No money down, from $99/mo · before and after',
     category: 'Bathroom',
-    video: '/ads/bathroom-ad.mp4',
-    poster: '/ads/bathroom-ad.webp',
+    video: '/reels/bathroom-1.mp4',
+    poster: '/reels/bathroom-1.webp',
     duration: 11,
   },
 ];
