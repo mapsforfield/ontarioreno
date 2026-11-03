@@ -420,7 +420,7 @@ export default function PortalLayout() {
               <div>
                 <p className="text-sm font-bold">{currentUser?.name}</p>
                 <p className="text-xs font-medium text-blue-100/70">
-                  {currentUser?.role === 'admin' ? 'Admin' : 'Sales Rep'}
+                  {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'contractor' ? 'Contractor partner' : 'Sales Rep'}
                 </p>
               </div>
             </div>
