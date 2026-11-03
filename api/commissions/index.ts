@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
+import { reconcileLedger } from '../../lib/commission-ledger.js';
 import {
   canReadCommission,
   commissionScopeFor,
@@ -44,7 +45,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!id) return res.status(400).json({ error: 'Missing id.' });
     const { id: _id, dealId: _dealId, ...data } = req.body;
     void _id; void _dealId;
-    const commission = await prisma.commission.update({ where: { id }, data });
+    // The portal sends only the field that changed. Re-derive total, net and
+    // the clamped paid amounts here, so a rate edit can't leave the stored
+    // total at the old rate — see lib/commission-ledger.ts.
+    const existing = await prisma.commission.findUnique({
+      where: { id },
+      include: { deal: { select: { estimatedJobValue: true, financeFeePercent: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Not found.' });
+    const { deal, ...row } = existing;
+    const commission = await prisma.commission.update({
+      where: { id },
+      data: { ...data, ...reconcileLedger(row, data, deal) },
+    });
     return res.status(200).json(commission);
   }
 

@@ -23,6 +23,7 @@ import {
   formatDateKey,
   pendingBalanceClocks,
   pendingBalanceClockTotal,
+  settledPaymentUpdates,
 } from '../data/balanceClock';
 import { needsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
@@ -268,6 +269,7 @@ export default function PortalDashboard() {
             ? `${Math.abs(clock.daysRemaining)}d overdue · was due ${formatDateKey(clock.dueOn)}`
             : `💰 Pay Day · day ${clock.days} reached`,
         href: '/portal/commissions',
+        state: { focusCommissionId: commission.id },
         urgent: true,
         sort: clock.dueOn,
       });
@@ -411,7 +413,7 @@ export default function PortalDashboard() {
             </span>
             <button
               type="button"
-              onClick={() => navigate('/portal/commissions')}
+              onClick={() => navigate('/portal/commissions', { state: { focusCommissionId: commission.id } })}
               className="min-w-0 flex-1 text-left"
             >
               {/* The bag is already the icon on the left; the push keeps it in the title. */}
@@ -535,7 +537,7 @@ export default function PortalDashboard() {
                 >
                 <button
                   type="button"
-                  onClick={() => navigate('/portal/commissions')}
+                  onClick={() => navigate('/portal/commissions', { state: { focusCommissionId: commission.id } })}
                   title={`Paid ${formatDateKey(clock.startedOn)} → due ${formatDateKey(clock.dueOn)}`}
                   className="flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-2.5 text-left"
                 >
@@ -581,9 +583,13 @@ export default function PortalDashboard() {
                   <button
                     type="button"
                     onClick={() =>
-                      updateCommission(commission.id, { balanceSettledAt: today }, currentUser ?? undefined)
+                      updateCommission(
+                        commission.id,
+                        { balanceSettledAt: today, ...settledPaymentUpdates(commission) },
+                        currentUser ?? undefined
+                      )
                     }
-                    title="The remainder has been received — stops the countdown"
+                    title="The remainder has been received: stops the countdown and marks the rep and you paid in full"
                     className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-black transition ${
                       clock.status === 'due' || clock.status === 'overdue'
                         ? 'border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600'

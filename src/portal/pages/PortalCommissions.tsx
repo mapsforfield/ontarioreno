@@ -1,15 +1,30 @@
 import {
+  AlarmClock,
   ArrowUpDown,
   BadgeDollarSign,
   Banknote,
+  ChevronDown,
   CircleDollarSign,
+  ExternalLink,
   HandCoins,
+  Search,
+  Settings2,
   Trash2,
   TrendingUp,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import BalanceClockControl from '../components/BalanceClockControl';
+import {
+  balanceClock,
+  DEFAULT_BALANCE_CLOCK_DAYS,
+  paidFraction,
+  pendingBalanceClocks,
+  upfrontPaymentUpdates,
+  UPFRONT_PRESETS,
+  type BalanceClockStatus,
+} from '../data/balanceClock';
 import { dealWonDate } from '../../../lib/deal-won-date';
 
 /** The year a deal belongs to: when it was won, else its last edit. */
@@ -198,6 +213,94 @@ function CommitNumberInput({
   );
 }
 
+// ─── Admin layout pieces ─────────────────────────────────────────────────────
+// The admin table used to be ten always-editable columns across 125 rows. Now
+// each deal is one read-only line (who, status, value, rate, how much of each
+// ledger is paid, clock) that opens into the same editors on click, and the
+// deals are grouped by what they need from you.
+
+type SectionKey = 'awaiting' | 'pipeline' | 'paid' | 'lost';
+
+const sectionOrder: SectionKey[] = ['awaiting', 'pipeline', 'paid', 'lost'];
+
+const sectionMeta: Record<SectionKey, { title: string; hint: string }> = {
+  awaiting: { title: 'Awaiting payment', hint: 'Won — money still owed to the rep or to you' },
+  pipeline: { title: 'Pipeline', hint: 'Open deals — projected commission' },
+  paid: { title: 'Paid in full', hint: 'Won — settled on both sides' },
+  lost: { title: 'Lost', hint: 'No commission owed' },
+};
+
+function sectionFor(commission: Commission, deal: Deal): SectionKey {
+  if (deal.status === 'lost') return 'lost';
+  if (deal.status !== 'won') return 'pipeline';
+  return overallPaymentStatus(commission, deal) === 'paid' ? 'paid' : 'awaiting';
+}
+
+function matchesSearch(query: string, haystack: Array<string | undefined | null>): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return haystack.some((value) => (value ?? '').toLowerCase().includes(q));
+}
+
+/** 0.085 → "8.5%", 0.1 → "10%". The old input rounded 8.5 up to 9. */
+function formatRate(rate: number): string {
+  return `${Number((rate * 100).toFixed(2))}%`;
+}
+
+function statusTone(status: DealStatus): string {
+  if (status === 'won') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'lost') return 'bg-slate-100 text-slate-500';
+  return 'bg-[#e8f1fb] text-[#1B3C6C]';
+}
+
+const clockChipTone: Record<BalanceClockStatus, string> = {
+  running: 'bg-slate-100 text-slate-600',
+  due_soon: 'bg-amber-100 text-amber-700',
+  due: 'bg-emerald-500 text-white',
+  overdue: 'bg-red-100 text-red-700',
+  settled: 'bg-emerald-100 text-emerald-700',
+};
+
+function LedgerProgress({ label, paid, owed }: { label: string; paid: number; owed: number }) {
+  const pct = owed > 0 ? Math.min(Math.round((paid / owed) * 100), 100) : 0;
+  const done = owed > 0 && paid >= owed - 0.005;
+  return (
+    <div className="min-w-0">
+      <p className="text-sm font-black text-slate-900">
+        <span className="mr-1 text-[0.6rem] font-black uppercase tracking-wide text-slate-400 md:hidden">{label}</span>
+        {formatCurrency(owed)}
+      </p>
+      <div className="mt-1 h-1.5 w-full max-w-[9rem] overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={`h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-[#32639b]'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[0.68rem] font-semibold text-slate-500">
+        {owed <= 0 ? '—' : done ? 'Paid in full' : paid > 0 ? `${formatCurrency(paid)} paid · ${pct}%` : 'Nothing paid'}
+      </p>
+    </div>
+  );
+}
+
+function EditorField({
+  label,
+  tone,
+  children,
+}: {
+  label: string;
+  tone?: 'rep' | 'me';
+  children: ReactNode;
+}) {
+  const bg = tone === 'rep' ? 'bg-[#f6faff]' : tone === 'me' ? 'bg-[#eef6ff]' : '';
+  return (
+    <div className={`rounded-[0.4rem] ${bg} ${tone ? 'p-2' : 'py-2'}`}>
+      <p className="mb-1 text-[0.6rem] font-black uppercase tracking-[0.1em] text-slate-400">{label}</p>
+      {children}
+    </div>
+  );
+}
+
 function metricCard(
   label: string,
   value: string,
@@ -245,7 +348,7 @@ export default function PortalCommissions() {
     updateDeal,
     users,
   } = usePortalData();
-  const [rateInput, setRateInput] = useState(String(Math.round(defaultCommissionRate * 100)));
+  const [rateInput, setRateInput] = useState(String(Number((defaultCommissionRate * 100).toFixed(2))));
   const [rateSaved, setRateSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DealStatus | 'all'>('all');
   const [yearFilter, setYearFilter] = useState<number | 'all'>(() => Number(torontoToday().slice(0, 4)));
@@ -254,6 +357,45 @@ export default function PortalCommissions() {
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<SectionKey[]>(['paid', 'lost']);
+  const [showRateSettings, setShowRateSettings] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const today = torontoToday();
+
+  // Open one deal's row: clear anything that could hide it, expand it, and
+  // flash it so the eye lands on it. Used by the dashboard's 45-day list and
+  // Pay Day banner (via router state) and by the shortcuts on this page.
+  const focusCommission = (commissionId: string) => {
+    setStatusFilter('all');
+    setYearFilter('all');
+    setPaymentFilter('all');
+    setSearch('');
+    setExpandedId(commissionId);
+    setHighlightId(commissionId);
+  };
+
+  useEffect(() => {
+    const focusId = (location.state as { focusCommissionId?: string } | null)?.focusCommissionId;
+    // Wait for the commission to load — arriving before the data would focus
+    // nothing and then never try again (same trap as PortalDeals' openDealId).
+    if (!focusId || !commissions.some((c) => c.id === focusId)) return;
+    focusCommission(focusId);
+    navigate(location.pathname, { replace: true, state: null });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, commissions]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    document
+      .getElementById(`commission-${highlightId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = setTimeout(() => setHighlightId(null), 2500);
+    return () => clearTimeout(timer);
+  }, [highlightId]);
 
   const handleDeleteInvoice = async (inv: CommissionInvoiceRecord) => {
     if (!window.confirm(`Remove invoice #${inv.invoiceNumber ?? ''} (${inv.customerName}) from the history?`)) return;
@@ -330,7 +472,17 @@ export default function PortalCommissions() {
       (row) =>
         (statusFilter === 'all' || row.deal!.status === statusFilter) &&
         (yearFilter === 'all' || dealYear(row.deal!) === yearFilter) &&
-        (paymentFilter === 'all' || overallPaymentStatus(row.commission, row.deal!) === paymentFilter)
+        (paymentFilter === 'all' || overallPaymentStatus(row.commission, row.deal!) === paymentFilter) &&
+        matchesSearch(search, [
+          row.deal!.homeownerName,
+          row.deal!.projectType,
+          row.deal!.city,
+          row.deal!.address,
+          row.deal!.phone,
+          row.deal!.email,
+          getRepName(row.commission.repId),
+          getContractorName(row.deal),
+        ])
     );
 
     const totals = filteredRows.reduce(
@@ -361,70 +513,275 @@ export default function PortalCommissions() {
     const filterLabel =
       statusFilterOptions.find((o) => o.value === statusFilter)?.label ?? 'All statuses';
     const isFiltered = statusFilter !== 'all';
+    const searching = search.trim() !== '';
+
+    // Group what's left after filtering into the four questions an admin
+    // actually opens this page with: who still owes / is owed, what's coming,
+    // what's done, what fell through. The last two start collapsed.
+    const grouped = sectionOrder.map((key) => ({
+      key,
+      rows: sortCommissionRows(
+        filteredRows.filter((row) => sectionFor(row.commission, row.deal!) === key),
+        sortMode
+      ),
+    }));
+
+    // Every deal still waiting on its second payment, soonest first — the same
+    // list the dashboard shows, as one-tap shortcuts into the table.
+    const clockShortcuts = pendingBalanceClocks(commissions, deals, today, { canSeeAmounts: true });
+
+    const selectClass =
+      'rounded-[0.5rem] border border-slate-200 bg-white py-1.5 pl-2.5 pr-7 text-sm font-bold text-slate-700 focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20';
+
+    const renderRow = ({ commission, deal }: { commission: Commission; deal?: Deal }) => {
+      if (!deal) return null;
+      const isCustom = commission.customPayout ?? false;
+      // Rep ledger: what the rep is owed vs. what you've paid them.
+      // Custom payouts use the manually-entered rep cut, not 5% of job.
+      const repEstimatedCommission = isCustom
+        ? commission.repEstimatedCommission
+        : calculateRepEstimatedCommission(deal);
+      const repStatus = derivePayoutStatus(commission.repPaidCommission, repEstimatedCommission);
+      // Your ledger: your net vs. what you've collected from the contractor.
+      const adminNet = (commission.adminTotalEstimatedCommission ?? 0) - repEstimatedCommission;
+      const adminReceived = commission.adminNetPaidCommission ?? 0;
+      const adminStatus = derivePayoutStatus(adminReceived, adminNet);
+      const ledger = { repEstimatedCommission, adminNetCommission: adminNet };
+      const paidPercent = Math.round(
+        paidFraction({ repEstimatedCommission, repPaidCommission: commission.repPaidCommission }) * 100
+      );
+      const clock = balanceClock(commission, today);
+      const isOpen = expandedId === commission.id;
+      const recordShare = (fraction: number) =>
+        updateCommission(commission.id, upfrontPaymentUpdates(ledger, fraction), currentUser);
+
+      return (
+        <div
+          key={commission.id}
+          id={`commission-${commission.id}`}
+          className={`scroll-mt-24 transition ${
+            highlightId === commission.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-300' : isOpen ? 'bg-[#fbfdff]' : ''
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setExpandedId(isOpen ? null : commission.id)}
+            aria-expanded={isOpen}
+            className="grid w-full grid-cols-2 items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition hover:bg-[#f6faff] md:grid-cols-[minmax(0,2.2fr)_6.5rem_6.5rem_4rem_minmax(0,1.2fr)_minmax(0,1.2fr)_6.5rem_1rem]"
+          >
+            <div className="col-span-2 min-w-0 md:col-span-1">
+              <p className="truncate font-black text-slate-950">{deal.homeownerName}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                {deal.projectType} · {getContractorName(deal)} · <span className="text-slate-700">{getRepName(commission.repId)}</span>
+              </p>
+            </div>
+            <div>
+              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[0.65rem] font-black ${statusTone(deal.status)}`}>
+                {formatDealStatus(deal.status)}
+              </span>
+            </div>
+            <div className="text-sm font-black text-[#1B3C6C]">
+              <span className="mr-1 text-[0.6rem] font-black uppercase tracking-wide text-slate-400 md:hidden">Job</span>
+              {formatCurrency(deal.estimatedJobValue)}
+            </div>
+            <div className="text-sm font-bold text-slate-600">
+              <span className="mr-1 text-[0.6rem] font-black uppercase tracking-wide text-slate-400 md:hidden">Rate</span>
+              {isCustom ? 'Custom' : formatRate(commission.adminTotalCommissionRate ?? 0)}
+            </div>
+            <LedgerProgress label="Rep" paid={commission.repPaidCommission} owed={repEstimatedCommission} />
+            <LedgerProgress label="You" paid={adminReceived} owed={adminNet} />
+            <div>
+              {clock.active && (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-black ${clockChipTone[clock.status]}`}>
+                  <AlarmClock className="h-3 w-3" />
+                  {clock.status === 'settled'
+                    ? 'Settled'
+                    : clock.status === 'overdue'
+                      ? `${Math.abs(clock.daysRemaining)}d late`
+                      : clock.status === 'due'
+                        ? 'Pay Day'
+                        : `${clock.daysRemaining}d left`}
+                </span>
+              )}
+            </div>
+            <ChevronDown
+              className={`hidden h-4 w-4 text-slate-400 transition md:block ${isOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {isOpen && (
+            <div className="space-y-4 border-t border-slate-100 px-4 pb-5 pt-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <EditorField label="Job value">
+                  <CommitNumberInput
+                    value={deal.estimatedJobValue}
+                    round
+                    className="w-full font-black text-[#1B3C6C]"
+                    title="Sales price — edit to correct it; all commissions recalculate"
+                    onCommit={(next) => updateDeal(deal.id, { estimatedJobValue: next }, currentUser)}
+                  />
+                </EditorField>
+                <EditorField label="Total rate %">
+                  {isCustom ? (
+                    <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
+                  ) : (
+                    <CommitNumberInput
+                      value={(commission.adminTotalCommissionRate ?? 0) * 100}
+                      step={0.5}
+                      className="w-full"
+                      onCommit={(v) =>
+                        updateCommission(commission.id, { adminTotalCommissionRate: v / 100 }, currentUser)
+                      }
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => updateCommission(commission.id, { customPayout: !isCustom }, currentUser)}
+                    className="mt-1 block text-[0.6rem] font-black uppercase tracking-wide text-slate-400 transition hover:text-[#1B3C6C]"
+                  >
+                    {isCustom ? 'Use % rate' : 'Custom'}
+                  </button>
+                </EditorField>
+                <EditorField label="Total commission">
+                  <CommitNumberInput
+                    value={commission.adminTotalEstimatedCommission ?? 0}
+                    className="w-full"
+                    onCommit={(v) =>
+                      updateCommission(commission.id, { adminTotalEstimatedCommission: v }, currentUser)
+                    }
+                  />
+                </EditorField>
+                <EditorField label="Rep commission" tone="rep">
+                  {isCustom ? (
+                    <CommitNumberInput
+                      value={commission.repEstimatedCommission}
+                      className="w-full font-black text-slate-900"
+                      title="Rep's cut on this custom deal"
+                      onCommit={(v) =>
+                        updateCommission(commission.id, { repEstimatedCommission: v }, currentUser)
+                      }
+                    />
+                  ) : (
+                    <p className="py-1.5 font-black">{formatCurrency(repEstimatedCommission)}</p>
+                  )}
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    Remaining {formatCurrency(Math.max(repEstimatedCommission - commission.repPaidCommission, 0))}
+                  </p>
+                </EditorField>
+                <EditorField label="Paid to rep" tone="rep">
+                  <CommitNumberInput
+                    value={commission.repPaidCommission}
+                    className="w-full"
+                    onCommit={(v) => updateCommission(commission.id, { repPaidCommission: v }, currentUser)}
+                  />
+                  <div><PayoutBadge status={repStatus} /></div>
+                </EditorField>
+                <EditorField label="You received" tone="me">
+                  <CommitNumberInput
+                    value={adminReceived}
+                    className="w-full"
+                    onCommit={(v) => updateCommission(commission.id, { adminNetPaidCommission: v }, currentUser)}
+                  />
+                  <div><PayoutBadge status={adminStatus} /></div>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    Your net {formatCurrency(adminNet)} · remaining {formatCurrency(Math.max(adminNet - adminReceived, 0))}
+                  </p>
+                </EditorField>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                {/* One share applied to both ledgers — the rep's cut and your
+                    net — so the two can't be filled in out of step. */}
+                <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
+                  <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-[#32639b]">
+                    Commission paid so far
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {[0, ...UPFRONT_PRESETS, 1].map((fraction) => {
+                      const value = Math.round(fraction * 100);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => recordShare(fraction)}
+                          className={
+                            paidPercent === value
+                              ? 'rounded-full bg-[#1B3C6C] px-3 py-1 text-xs font-black text-white'
+                              : 'rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
+                          }
+                        >
+                          {value === 100 ? 'Paid in full' : `${value}%`}
+                        </button>
+                      );
+                    })}
+                    <span className="inline-flex items-center gap-1 text-xs font-black text-slate-500">
+                      <CommitNumberInput
+                        value={paidPercent}
+                        step={1}
+                        className="w-16 py-1 text-xs"
+                        title="Custom share paid, applied to the rep and to you"
+                        onCommit={(v) => recordShare(Math.min(v, 100) / 100)}
+                      />
+                      %
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[0.68rem] font-semibold leading-4 text-slate-500">
+                    Sets the rep's paid amount and yours to the same share of each.
+                  </p>
+                </div>
+                <div className="rounded-[0.5rem] border border-slate-200 bg-white p-3">
+                  <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-[#32639b]">
+                    {DEFAULT_BALANCE_CLOCK_DAYS}-day balance clock
+                  </p>
+                  <div className="mt-2">
+                    <BalanceClockControl
+                      variant="panel"
+                      commission={{ ...commission, ...ledger }}
+                      canEdit={currentUser?.role === 'admin'}
+                      onChange={(updates) => updateCommission(commission.id, updates, currentUser)}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/portal/deals', { state: { openDealId: deal.id } })}
+                    className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-[#32639b] hover:text-[#1B3C6C]"
+                  >
+                    Open deal
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
 
     return (
       <div className="space-y-6">
-        <header>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
-            Commission Center
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
-            Admin payout visibility
-          </h1>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#32639b]">
+              Commission Center
+            </p>
+            <h1 className="mt-2 text-3xl font-black tracking-[-0.02em]">
+              Admin payout visibility
+            </h1>
+          </div>
+          <label className="relative w-full sm:w-80">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search homeowner, rep, contractor…"
+              aria-label="Search commissions"
+              className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm font-semibold shadow-sm focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20"
+            />
+          </label>
         </header>
-
-        {/* Status filter — drives both the cards and the table */}
-        <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
-          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Showing</span>
-          {statusFilterOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setStatusFilter(option.value)}
-              className={
-                statusFilter === option.value
-                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
-                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-
-          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
-          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Year</span>
-          {([{ label: 'All years', value: 'all' as const }, ...availableYears.map((y) => ({ label: String(y), value: y }))] as Array<{ label: string; value: number | 'all' }>).map((option) => (
-            <button
-              key={String(option.value)}
-              type="button"
-              onClick={() => setYearFilter(option.value)}
-              className={
-                yearFilter === option.value
-                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
-                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-
-          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" aria-hidden />
-          <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Payment</span>
-          {paymentFilterOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setPaymentFilter(option.value)}
-              className={
-                paymentFilter === option.value
-                  ? 'rounded-full bg-[#1B3C6C] px-3.5 py-1.5 text-xs font-black text-white'
-                  : 'rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-600 transition hover:text-[#1B3C6C]'
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-        </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {metricCard(
@@ -480,16 +837,81 @@ export default function PortalCommissions() {
           </article>
         </section>
 
-        <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-4">
-            <h2 className="text-lg font-black tracking-[-0.01em]">
-              Commission table
-              <span className="ml-2 text-sm font-bold text-slate-400">
-                {filteredRows.length} {isFiltered ? filterLabel.toLowerCase() : ''} deal{filteredRows.length !== 1 ? 's' : ''}{yearFilter !== 'all' ? ` · ${yearFilter}` : ''}{paymentFilter !== 'all' ? ` · ${paymentFilter}` : ''}
-              </span>
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <SortButton mode={sortMode} onClick={() => setSortMode(nextSortMode(sortMode))} />
+        {clockShortcuts.length > 0 && (
+          <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#32639b]">
+              {DEFAULT_BALANCE_CLOCK_DAYS}-Day Payouts · {clockShortcuts.length}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {clockShortcuts.map(({ commission, deal, clock, outstanding }) => (
+                <button
+                  key={commission.id}
+                  type="button"
+                  onClick={() => focusCommission(commission.id)}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[#fbfdff] py-1 pl-3 pr-1 text-xs font-black text-slate-800 transition hover:border-[#32639b] hover:bg-[#f6faff]"
+                >
+                  {deal.homeownerName || 'Deal'}
+                  {outstanding !== null && (
+                    <span className="font-bold text-slate-500">{formatCurrency(outstanding)}</span>
+                  )}
+                  <span className={`rounded-full px-2 py-0.5 text-[0.65rem] ${clockChipTone[clock.status]}`}>
+                    {clock.status === 'overdue'
+                      ? `${Math.abs(clock.daysRemaining)}d late`
+                      : clock.status === 'due'
+                        ? 'Pay Day'
+                        : `${clock.daysRemaining}d`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Filters — drive the cards and every section below. */}
+        <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
+          <label className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+            Status
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DealStatus | 'all')} className={selectClass}>
+              {statusFilterOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+            Year
+            <select
+              value={String(yearFilter)}
+              onChange={(e) => setYearFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className={selectClass}
+            >
+              <option value="all">All years</option>
+              {availableYears.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+            Payment
+            <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)} className={selectClass}>
+              {paymentFilterOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <SortButton mode={sortMode} onClick={() => setSortMode(nextSortMode(sortMode))} />
+          <span className="ml-auto text-sm font-bold text-slate-400">
+            {filteredRows.length} deal{filteredRows.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowRateSettings((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-[0.5rem] border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Settings2 className="h-4 w-4 text-slate-400" />
+            Default rate {formatRate(defaultCommissionRate)}
+          </button>
+          {showRateSettings && (
+            <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
               <span className="text-sm font-semibold text-slate-500">Default rate:</span>
               <div className="relative w-28">
                 <input
@@ -509,13 +931,17 @@ export default function PortalCommissions() {
                   const val = parseFloat(rateInput);
                   if (isNaN(val) || val < 0 || val > 100) return;
                   const rate = val / 100;
-                  setDefaultCommissionRate(rate);
-                  // Update every commission row to the new rate — but leave
-                  // custom one-off payouts untouched.
-                  visibleCommissions.forEach((c) => {
-                    if (c.customPayout) return;
+                  // Historical deals carry the rate they were actually paid
+                  // at (7%, 7.5%, 8%) — rewriting those rewrites history.
+                  // Custom one-off payouts are left alone too.
+                  const targets = visibleCommissions.filter((c) => {
                     const deal = getDeal(c.dealId);
-                    if (!deal) return;
+                    return deal && !c.customPayout && !deal.isHistorical;
+                  });
+                  if (!window.confirm(`Set ${targets.length} deals to ${val}%? Historical and custom-payout deals are left as they are.`)) return;
+                  setDefaultCommissionRate(rate);
+                  targets.forEach((c) => {
+                    const deal = getDeal(c.dealId)!;
                     const newTotal = Math.round(commissionableValue(deal) * rate);
                     updateCommission(c.id, {
                       adminTotalCommissionRate: rate,
@@ -531,164 +957,74 @@ export default function PortalCommissions() {
               </button>
               {rateSaved && <span className="text-sm font-bold text-green-600">Saved!</span>}
             </div>
-          </div>
-          {/* Below md the same cells reflow into one labelled card per deal
-              (each cell names itself via data-label). The 76rem table needed a
-              sideways scroll on a phone; this keeps one copy of the editing
-              logic instead of a second mobile layout that could drift. */}
-          <div className="md:overflow-x-auto">
-            <table className="block w-full text-left text-sm md:table md:min-w-[76rem]">
-              <thead className="hidden bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500 md:table-header-group">
-                <tr>
-                  <th className="px-4 py-3">Rep</th>
-                  <th className="px-4 py-3">Deal</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Job Value</th>
-                  <th className="px-4 py-3">Total Rate</th>
-                  <th className="px-4 py-3">Total Commission</th>
-                  <th className="px-4 py-3 bg-[#f6faff]">Rep Commission</th>
-                  <th className="px-4 py-3 bg-[#f6faff]">Paid to Rep</th>
-                  <th className="px-4 py-3 bg-[#eef6ff]">Your Net</th>
-                  <th className="px-4 py-3 bg-[#eef6ff]">Received</th>
-                </tr>
-              </thead>
-              <tbody className="block divide-y divide-slate-200 md:table-row-group">
-                {sortCommissionRows(filteredRows, sortMode).map(({ commission, deal }) => {
-                  if (!deal) return null;
-                  const isCustom = commission.customPayout ?? false;
-                  // Rep ledger: what the rep is owed vs. what you've paid them.
-                  // Custom payouts use the manually-entered rep cut, not 5% of job.
-                  const repEstimatedCommission = isCustom
-                    ? commission.repEstimatedCommission
-                    : calculateRepEstimatedCommission(deal);
-                  const repRemaining = Math.max(repEstimatedCommission - commission.repPaidCommission, 0);
-                  const repStatus = derivePayoutStatus(commission.repPaidCommission, repEstimatedCommission);
-                  // Your ledger: your net vs. what you've collected from the contractor.
-                  const adminNet = (commission.adminTotalEstimatedCommission ?? 0) - repEstimatedCommission;
-                  const adminReceived = commission.adminNetPaidCommission ?? 0;
-                  const adminRemaining = Math.max(adminNet - adminReceived, 0);
-                  const adminStatus = derivePayoutStatus(adminReceived, adminNet);
-
-                  return (
-                    <tr key={commission.id} className="grid grid-cols-2 gap-2 p-4 align-top md:table-row md:p-0">
-                      <td data-label="Rep" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-bold text-slate-900">
-                        {getRepName(commission.repId)}
-                      </td>
-                      <td data-label="Deal" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden col-span-2">
-                        <p className="font-black text-slate-950">
-                          {deal.homeownerName}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {deal.projectType} - {getContractorName(deal)}
-                        </p>
-                      </td>
-                      <td data-label="Status" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-semibold text-slate-600">
-                        {formatDealStatus(deal.status)}
-                      </td>
-                      <td data-label="Job Value" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
-                        <CommitNumberInput
-                          value={deal.estimatedJobValue}
-                          round
-                          className="w-32 font-black text-[#1B3C6C]"
-                          title="Sales price — edit to correct it; all commissions recalculate"
-                          onCommit={(next) =>
-                            updateDeal(deal.id, { estimatedJobValue: next }, currentUser)
-                          }
-                        />
-                      </td>
-                      <td data-label="Total Rate" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
-                        {isCustom ? (
-                          <span className="inline-block rounded-full bg-[#eef6ff] px-2.5 py-1 text-xs font-black text-[#1B3C6C]">Custom</span>
-                        ) : (
-                          <CommitNumberInput
-                            value={(commission.adminTotalCommissionRate ?? 0) * 100}
-                            step={0.5}
-                            className="w-20"
-                            onCommit={(v) =>
-                              updateCommission(commission.id, { adminTotalCommissionRate: v / 100 }, currentUser)
-                            }
-                          />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => updateCommission(commission.id, { customPayout: !isCustom }, currentUser)}
-                          className="mt-1 block text-[0.6rem] font-black uppercase tracking-wide text-slate-400 transition hover:text-[#1B3C6C]"
-                        >
-                          {isCustom ? 'Use % rate' : 'Custom'}
-                        </button>
-                      </td>
-                      <td data-label="Total Commission" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden">
-                        <CommitNumberInput
-                          value={commission.adminTotalEstimatedCommission ?? 0}
-                          className="w-28"
-                          onCommit={(v) =>
-                            updateCommission(commission.id, { adminTotalEstimatedCommission: v }, currentUser)
-                          }
-                        />
-                      </td>
-                      {/* ── Rep ledger ── */}
-                      <td data-label="Rep Commission" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#f6faff]">
-                        {isCustom ? (
-                          <CommitNumberInput
-                            value={commission.repEstimatedCommission}
-                            className="w-24 font-black text-slate-900"
-                            title="Rep's cut on this custom deal"
-                            onCommit={(v) =>
-                              updateCommission(commission.id, { repEstimatedCommission: v }, currentUser)
-                            }
-                          />
-                        ) : (
-                          <span className="font-black">{formatCurrency(repEstimatedCommission)}</span>
-                        )}
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          Remaining {formatCurrency(repRemaining)}
-                        </p>
-                      </td>
-                      <td data-label="Paid to Rep" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#f6faff]">
-                        <CommitNumberInput
-                          value={commission.repPaidCommission}
-                          className="w-28"
-                          onCommit={(v) =>
-                            updateCommission(commission.id, { repPaidCommission: v }, currentUser)
-                          }
-                        />
-                        <div><PayoutBadge status={repStatus} /></div>
-                      </td>
-                      {/* ── Your (admin) ledger ── */}
-                      <td data-label="Your Net" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden font-black bg-[#eef6ff]">
-                        {formatCurrency(adminNet)}
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          Remaining {formatCurrency(adminRemaining)}
-                        </p>
-                      </td>
-                      <td data-label="Received" className="block rounded-[0.4rem] p-2 before:mb-1 before:block before:text-[0.6rem] before:font-black before:uppercase before:tracking-[0.1em] before:text-slate-400 before:content-[attr(data-label)] md:table-cell md:rounded-none md:px-4 md:py-4 md:before:hidden bg-[#eef6ff]">
-                        <CommitNumberInput
-                          value={adminReceived}
-                          className="w-28"
-                          onCommit={(v) =>
-                            updateCommission(commission.id, { adminNetPaidCommission: v }, currentUser)
-                          }
-                        />
-                        <div><PayoutBadge status={adminStatus} /></div>
-                        {/* 45-day balance clock — only shows a control when a
-                            deal is actually paid in two parts. */}
-                        <div className="mt-2">
-                          <BalanceClockControl
-                            commission={commission}
-                            canEdit={currentUser?.role === 'admin'}
-                            onChange={(updates) =>
-                              updateCommission(commission.id, updates, currentUser)
-                            }
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          )}
         </section>
+
+        {filteredRows.length === 0 && (
+          <p className="rounded-[0.5rem] border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+            {searching ? `No deals match "${search.trim()}".` : 'No deals match these filters.'}
+          </p>
+        )}
+
+        {grouped.map(({ key, rows }) => {
+          if (rows.length === 0) return null;
+          const meta = sectionMeta[key];
+          // A section opens itself while searching, or when it holds the deal
+          // you just jumped to — a collapsed section must never hide that.
+          const open =
+            searching || !collapsed.includes(key) || rows.some((r) => r.commission.id === expandedId);
+          const owedRep = rows.reduce(
+            (sum, { commission, deal }) =>
+              sum + Math.max(
+                (commission.customPayout ? commission.repEstimatedCommission : calculateRepEstimatedCommission(deal!)) -
+                  commission.repPaidCommission,
+                0
+              ),
+            0
+          );
+          const owedMe = rows.reduce((sum, { commission, deal }) => {
+            const repEst = commission.customPayout ? commission.repEstimatedCommission : calculateRepEstimatedCommission(deal!);
+            const net = (commission.adminTotalEstimatedCommission ?? 0) - repEst;
+            return sum + Math.max(net - (commission.adminNetPaidCommission ?? 0), 0);
+          }, 0);
+          return (
+            <section key={key} className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsed((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
+                }
+                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-4 py-3 text-left transition hover:bg-slate-50"
+              >
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? '' : '-rotate-90'}`} />
+                <h2 className="text-lg font-black tracking-[-0.01em]">{meta.title}</h2>
+                <span className="rounded-full bg-[#e8f1fb] px-2 py-0.5 text-xs font-black text-[#1B3C6C]">{rows.length}</span>
+                <span className="text-sm font-semibold text-slate-400">{meta.hint}</span>
+                {key === 'awaiting' && (
+                  <span className="ml-auto text-sm font-bold text-slate-500">
+                    Owed to reps <span className="font-black text-slate-900">{formatCurrency(owedRep)}</span>
+                    {' · '}to you <span className="font-black text-slate-900">{formatCurrency(owedMe)}</span>
+                  </span>
+                )}
+              </button>
+              {open && (
+                <>
+                  <div className="hidden grid-cols-[minmax(0,2.2fr)_6.5rem_6.5rem_4rem_minmax(0,1.2fr)_minmax(0,1.2fr)_6.5rem_1rem] gap-x-4 bg-slate-50 px-4 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-slate-500 md:grid">
+                    <span>Deal · contractor · rep</span>
+                    <span>Status</span>
+                    <span>Job value</span>
+                    <span>Rate</span>
+                    <span>Rep 5%</span>
+                    <span>Your net</span>
+                    <span>Clock</span>
+                    <span />
+                  </div>
+                  <div className="divide-y divide-slate-100">{rows.map(renderRow)}</div>
+                </>
+              )}
+            </section>
+          );
+        })}
 
         {invoices.length > 0 && (
           <section className="overflow-hidden rounded-[0.5rem] border border-white bg-white shadow-sm">
@@ -775,9 +1111,17 @@ export default function PortalCommissions() {
     (row) =>
       (statusFilter === 'all' || row.deal!.status === statusFilter) &&
       (yearFilter === 'all' || new Date(row.deal!.updatedAt).getFullYear() === yearFilter) &&
-      (paymentFilter === 'all' || repPaymentStatus(row.commission, row.deal!) === paymentFilter)
+      (paymentFilter === 'all' || repPaymentStatus(row.commission, row.deal!) === paymentFilter) &&
+      matchesSearch(search, [
+        row.deal!.homeownerName,
+        row.deal!.projectType,
+        row.deal!.city,
+        row.deal!.address,
+        getContractorName(row.deal),
+      ])
   );
-  const repIsFiltered = statusFilter !== 'all' || yearFilter !== 'all' || paymentFilter !== 'all';
+  const repIsFiltered =
+    statusFilter !== 'all' || yearFilter !== 'all' || paymentFilter !== 'all' || search.trim() !== '';
   const repFilterLabel =
     statusFilterOptions.find((o) => o.value === statusFilter)?.label ?? 'All statuses';
 
@@ -825,6 +1169,17 @@ export default function PortalCommissions() {
 
       {/* Status / Year / Payment filters — drive both the cards and the deal list */}
       <section className="flex flex-wrap items-center gap-2 rounded-[0.5rem] border border-white bg-white p-3 shadow-sm">
+        <label className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search homeowner, project, contractor…"
+            aria-label="Search your commissions"
+            className="w-full rounded-[0.5rem] border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-semibold focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20"
+          />
+        </label>
         <span className="mr-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">Showing</span>
         {statusFilterOptions.map((option) => (
           <button

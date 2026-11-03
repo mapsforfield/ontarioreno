@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { nextWonAt } from '../../lib/deal-won-date.js';
+import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { del, issueSignedToken, presignUrl } from '@vercel/blob';
@@ -78,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const repEst = Math.round(jobValue * 0.05);
           // The contractor's negotiated rate locks in at assignment time.
           // Won deals are frozen — reassignment never rewrites a closed payout.
-          let totalRate = commission?.adminTotalCommissionRate ?? 0.1;
+          let totalRate = commission?.adminTotalCommissionRate ?? DEFAULT_TOTAL_COMMISSION_RATE;
           const needsRateLookup =
             deal.assignedContractorId &&
             deal.status !== 'won' &&
