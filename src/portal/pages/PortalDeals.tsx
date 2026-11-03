@@ -4,7 +4,7 @@ import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { dealWonDate } from '../../../lib/deal-won-date';
-import { type BoardPeriod, isDealInPeriod, periodLabel } from '../../../lib/deal-period';
+import { type BoardPeriod, dayPeriod, isDealInPeriod, periodDay, periodLabel } from '../../../lib/deal-period';
 import { lostReasonLabel, summarizeLostReasons, type LostReasonKey } from '../../../lib/lost-reasons';
 import LostReasonDialog from '../components/LostReasonPicker';
 import { celebrateWin } from '../lib/celebrate';
@@ -396,8 +396,12 @@ export default function PortalDeals() {
   });
   const setBoardPeriod = (period: BoardPeriod) => {
     setBoardPeriodChoice(period);
+    // A picked day is a one-off look, not a setting — remembering it would
+    // open the board on last Tuesday next week.
+    if (periodDay(period)) return;
     try { localStorage.setItem('deals.boardPeriod', period); } catch { /* ignore */ }
   };
+  const pickedDay = periodDay(boardPeriodChoice);
   // Reps get the period view too (Oct 2026). Their board is already scoped to
   // their own deals, and the card shows values and counts only — no commission.
   const boardPeriod: BoardPeriod = boardPeriodChoice;
@@ -1446,6 +1450,33 @@ OntarioReno Broker Portal`;
                   {option.label}
                 </button>
               ))}
+              {/* Any single day — yesterday, last Friday — without a button each. */}
+              <label
+                className={cn(
+                  'relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition',
+                  pickedDay ? 'bg-[#1B3C6C] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                )}
+                title="Pick a day"
+              >
+                <CalendarDays className="h-3 w-3" />
+                {pickedDay
+                  ? new Intl.DateTimeFormat('en-CA', { month: 'short', day: 'numeric' }).format(new Date(`${pickedDay}T12:00:00`))
+                  : 'Pick day'}
+                <input
+                  type="date"
+                  value={pickedDay ?? ''}
+                  max={todayIso()}
+                  onChange={(event) => {
+                    if (event.target.value) setBoardPeriod(dayPeriod(event.target.value));
+                  }}
+                  onClick={(event) => {
+                    // Open the calendar on a tap anywhere on the pill.
+                    try { (event.currentTarget as HTMLInputElement).showPicker?.(); } catch { /* older browsers */ }
+                  }}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label="Pick a day"
+                />
+              </label>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">

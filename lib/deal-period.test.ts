@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isDealInPeriod, periodLabel } from './deal-period.ts';
+import { describe, it } from 'node:test';
+import { dayPeriod, isDealInPeriod, periodBounds, periodDay, periodLabel } from './deal-period.ts';
 
 const NOW = new Date(2026, 9, 16, 13, 0); // Oct 16 2026, local
 const at = (y: number, m: number, d: number) => new Date(y, m, d, 12).toISOString();
@@ -44,4 +45,26 @@ test('labels', () => {
   assert.equal(periodLabel('quarter', NOW), 'Q4 2026');
   assert.equal(periodLabel('year', NOW), '2026');
   assert.equal(periodLabel('all', NOW), 'All time');
+});
+
+describe('a picked day', () => {
+  const now = new Date(2026, 10, 3, 10);
+  it('covers exactly that calendar day', () => {
+    const [start, end] = periodBounds(dayPeriod('2026-11-02'), now)!;
+    assert.equal(start.getTime(), new Date(2026, 10, 2).getTime());
+    assert.equal(end.getTime(), new Date(2026, 10, 3).getTime());
+  });
+  it('places deals by the same dates as the other periods', () => {
+    const lead = { status: 'new_lead', createdAt: new Date(2026, 10, 2, 21).toISOString(), updatedAt: now.toISOString() };
+    assert.equal(isDealInPeriod(lead, dayPeriod('2026-11-02'), now), true);
+    assert.equal(isDealInPeriod(lead, dayPeriod('2026-11-03'), now), false);
+  });
+  it('labels yesterday as yesterday', () => {
+    assert.match(periodLabel(dayPeriod('2026-11-02'), now), /^Yesterday · /);
+    assert.doesNotMatch(periodLabel(dayPeriod('2026-10-30'), now), /Yesterday/);
+  });
+  it('reads back the day', () => {
+    assert.equal(periodDay(dayPeriod('2026-11-02')), '2026-11-02');
+    assert.equal(periodDay('month'), null);
+  });
 });

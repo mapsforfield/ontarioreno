@@ -50,7 +50,6 @@ const PORTAL_FEATURES: PortalFeature[] = [
   // Open to every rep; the list itself is data/ads.ts.
   { navLabel: 'Advertising', route: 'advertising', page: 'src/portal/pages/PortalAdvertising.tsx', component: 'PortalAdvertising' },
   { navLabel: 'Call Queue', route: 'workspace', page: 'src/portal/pages/PortalWorkspace.tsx', component: 'PortalWorkspace' },
-  { navLabel: 'Conversations', route: 'conversations', page: 'src/portal/pages/PortalConversations.tsx', component: 'PortalConversations' },
   { navLabel: 'Submissions', route: 'submissions', page: 'src/portal/pages/PortalSubmissions.tsx', component: 'PortalSubmissions' },
   { navLabel: 'Invoices', route: 'invoices', page: 'src/portal/pages/PortalInvoices.tsx', component: 'PortalInvoices' },
   { navLabel: 'Admin', route: 'admin', page: 'src/portal/pages/PortalAdmin.tsx', component: 'PortalAdmin' },
