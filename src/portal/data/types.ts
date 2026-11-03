@@ -329,6 +329,8 @@ export type Deal = {
   /** Why it was lost — a key from lib/lost-reasons.ts. Asked on the move to Lost. */
   lostReason?: string | null;
   lostReasonNote?: string;
+  /** Set on a change order: the original job's deal id. See lib/change-orders.ts. */
+  parentDealId?: string | null;
   activity: DealActivity[];
   createdAt: string;
   updatedAt: string;

@@ -159,6 +159,18 @@ model Deal {
   lostReason           String?
   /// Optional free text beside the reason ("went with a cousin's company").
   lostReasonNote       String   @default("")
+  /// Set on a CHANGE ORDER: an add-on sold after the original job (a closet
+  /// colour change on a basement). The original deal's id.
+  ///
+  /// A change order is its own deal on purpose, not an edit to the original's
+  /// value: it has its own invoice to the contractor, its own commission row,
+  /// its own payments and its own win date. Folding it into the original
+  /// would re-bill the whole job under the original invoice number, and
+  /// would move the add-on's sale into the month the original closed.
+  ///
+  /// Linked deals are counted as ONE job in won-deal counts and close rate
+  /// (lib/change-orders.ts); their value still counts in sales volume.
+  parentDealId         String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

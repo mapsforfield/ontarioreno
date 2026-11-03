@@ -3,6 +3,8 @@ import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
 import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
+import { linkProblem } from '../../lib/change-orders.js';
+import { stripAdminLedger } from '../../lib/commission-scope.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing ledger of commission invoices that were generated / sent.
@@ -459,6 +461,115 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prisma.contractPreset.create({ data: { ...fields, ownerUserId: user.id } })
       );
       return res.status(201).json(created);
+    }
+
+    // ── Change orders (see lib/change-orders.ts) ──
+    // An add-on sold after the original job. Created server-side from the
+    // original so the homeowner, contact, rep and contractor can't drift from
+    // it, and so it lands already WON with its own commission row.
+    if (data._action === 'add_change_order') {
+      const parentId = String(data.parentDealId ?? '');
+      const description = String(data.description ?? '').trim().slice(0, 200);
+      const amount = Math.round(Number(data.amount) * 100) / 100;
+      const signedOn = typeof data.signedOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.signedOn)
+        ? data.signedOn
+        : '';
+      if (!description) return res.status(400).json({ error: 'Describe the change order.' });
+      // Credits stay as adjustments on the next invoice: a negative deal would
+      // run negative through every commission and payout figure.
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ error: 'The amount must be more than $0.' });
+      }
+      const parent = await withSchema(() => prisma.deal.findUnique({ where: { id: parentId } }));
+      if (!parent || parent.deletedAt) return res.status(404).json({ error: 'Original deal not found.' });
+      if (user.role !== 'admin' && parent.assignedRepId !== user.id) {
+        return res.status(403).json({ error: 'You can only add change orders to your own deals.' });
+      }
+      if (parent.status !== 'won') {
+        return res.status(400).json({ error: 'Change orders are for won deals. Edit the price on an open deal instead.' });
+      }
+      if (parent.parentDealId) {
+        return res.status(400).json({ error: 'Add it to the original job, not to another change order.' });
+      }
+
+      // Same rate as the original job: it is the same contract with the same
+      // contractor. A custom one-off payout on the original has no rate to
+      // inherit, so fall back to the contractor's.
+      const parentCommission = await prisma.commission.findUnique({ where: { dealId: parent.id } });
+      let totalRate = DEFAULT_TOTAL_COMMISSION_RATE;
+      if (parentCommission && !parentCommission.customPayout && parentCommission.adminTotalCommissionRate > 0) {
+        totalRate = parentCommission.adminTotalCommissionRate;
+      } else if (parent.assignedContractorId) {
+        const contractor = await prisma.contractor
+          .findUnique({ where: { id: parent.assignedContractorId }, select: { commissionRate: true } })
+          .catch(() => null);
+        if (contractor?.commissionRate != null) totalRate = contractor.commissionRate;
+      }
+      const repEst = Math.round(amount * 0.05);
+      const adminTotalEst = Math.round(amount * totalRate);
+
+      const deal = await withSchema(() =>
+        prisma.deal.create({
+          data: {
+            clientId: parent.clientId,
+            homeownerName: parent.homeownerName,
+            phone: parent.phone,
+            email: parent.email,
+            address: parent.address,
+            city: parent.city,
+            postalCode: parent.postalCode,
+            projectType: description,
+            estimatedJobValue: amount,
+            assignedRepId: parent.assignedRepId,
+            assignedContractorId: parent.assignedContractorId,
+            status: 'won',
+            // The day it was signed, at midday Toronto, so it lands in the
+            // right month whatever the server's clock zone.
+            wonAt: signedOn ? new Date(`${signedOn}T16:00:00Z`) : new Date(),
+            notes: '',
+            nextFollowUpDate: '',
+            parentDealId: parent.id,
+          },
+          include: { activity: true, proposals: true, dispatches: true },
+        })
+      );
+      const commission = await prisma.commission.create({
+        data: {
+          dealId: deal.id,
+          repId: deal.assignedRepId,
+          repCommissionRate: 0.05,
+          repEstimatedCommission: repEst,
+          repPaidCommission: 0,
+          payoutStatus: 'pending',
+          adminTotalCommissionRate: totalRate,
+          adminTotalEstimatedCommission: adminTotalEst,
+          adminNetCommission: adminTotalEst - repEst,
+        },
+      });
+      return res.status(201).json({ deal, commission: stripAdminLedger(user, commission) });
+    }
+
+    // Admin: attach an existing deal to its original job, or detach it. For the
+    // add-ons entered as separate deals before change orders existed. Changes
+    // the link only — value, invoices, commission and payments are untouched.
+    if (data._action === 'link_change_order') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only.' });
+      const childId = String(data.dealId ?? '');
+      const parentId = data.parentDealId ? String(data.parentDealId) : null;
+      const child = await withSchema(() => prisma.deal.findUnique({ where: { id: childId } }));
+      if (!child) return res.status(404).json({ error: 'Deal not found.' });
+      if (parentId) {
+        const parent = await prisma.deal.findUnique({ where: { id: parentId } });
+        const hasChildren = (await prisma.deal.count({ where: { parentDealId: childId, deletedAt: null } })) > 0;
+        const problem = linkProblem(child, parent ?? undefined, hasChildren);
+        if (problem) return res.status(400).json({ error: problem });
+      }
+      const updated = await prisma.deal.update({
+        where: { id: childId },
+        data: { parentDealId: parentId },
+        include: { activity: { orderBy: { createdAt: 'desc' }, take: 30 } },
+      });
+      return res.status(200).json(updated);
     }
 
     if (data._action === 'delete_contract_preset') {

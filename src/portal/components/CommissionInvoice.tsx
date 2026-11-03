@@ -375,7 +375,11 @@ export default function CommissionInvoice({
     toCompany: contractor?.companyName ?? '',
     toAddr1: contractor?.address ?? '',
     toAddr2: [contractor?.city, contractor?.province, contractor?.postalCode].filter(Boolean).join(' '),
-    customerName: deal.homeownerName,
+    // A change order is billed on its own invoice; name it as one so the
+    // contractor can match it to the original job.
+    customerName: deal.parentDealId
+      ? `${deal.homeownerName} — change order: ${deal.projectType}`
+      : deal.homeownerName,
     customerAddress: [deal.address, deal.city, deal.postalCode].filter(Boolean).join(', '),
     salesPrice: deal.estimatedJobValue,
     commissionRate: rate,

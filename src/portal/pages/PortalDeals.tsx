@@ -11,6 +11,15 @@ import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
 import BalanceClockControl from '../components/BalanceClockControl';
+import ChangeOrdersPanel, { InvoiceBadge } from '../components/ChangeOrdersPanel';
+import {
+  changeOrdersOf,
+  countableJobs,
+  isChangeOrder,
+  isContractorInvoice,
+  sameHomeowner,
+  type InvoiceLedgerRow,
+} from '../../../lib/change-orders';
 import { getRecommendedContractors } from '../data/recommendations';
 import {
   formatCurrency,
@@ -289,6 +298,10 @@ export default function PortalDeals() {
     getVisibleDealsForUser,
     updateContractorDispatch,
     updateDeal,
+    addChangeOrder,
+    linkChangeOrder,
+    listInvoices,
+    recordInvoice,
     updateAppointment,
     users,
     calculateHistoricalSalesTotal,
@@ -303,6 +316,33 @@ export default function PortalDeals() {
     deleteSalesAgreement,
   } = usePortalData();
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
+  // Contractor invoice ledger, for the "Not invoiced" check on won deals.
+  // Admin only — invoices to the contractor carry the total commission.
+  // Null until loaded, so nothing is flagged on an empty list.
+  const [invoiceLedger, setInvoiceLedger] = useState<InvoiceLedgerRow[] | null>(null);
+  const refreshInvoiceLedger = () => {
+    if (!isAdmin) return;
+    listInvoices()
+      .then((rows) => setInvoiceLedger(rows.filter(isContractorInvoice)))
+      .catch(() => {});
+  };
+  useEffect(refreshInvoiceLedger, [isAdmin, listInvoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  const markBilledElsewhere = async (deal: Deal, invoiceNumber: number | null) => {
+    await recordInvoice({
+      invoiceNumber,
+      dealId: deal.id,
+      contractorId: deal.assignedContractorId ?? null,
+      customerName: deal.parentDealId ? `${deal.homeownerName} — change order: ${deal.projectType}` : deal.homeownerName,
+      contractorName: contractors.find((c) => c.id === deal.assignedContractorId)?.companyName ?? '',
+      salesPrice: deal.estimatedJobValue,
+      commissionRate: 0,
+      baseAmount: 0,
+      adjustmentsTotal: 0,
+      netAmount: 0,
+      sentTo: invoiceNumber ? `Billed on invoice #${invoiceNumber}` : 'Billed on another invoice',
+    });
+    refreshInvoiceLedger();
+  };
   const visibleActivities = currentUser ? getActivitiesForUser(currentUser) : [];
   const selectableContractors = isAdmin
     ? contractors
@@ -495,11 +535,12 @@ export default function PortalDeals() {
     const won = boardDeals.filter((d) => d.status === 'won');
     const lost = boardDeals.filter((d) => d.status === 'lost');
     const sum = (list: Deal[]) => list.reduce((total, d) => total + (d.estimatedJobValue || 0), 0);
-    const decided = won.length + lost.length;
+    // Change orders are add-ons to a job already counted: in the value, not the count.
+    const decided = countableJobs(won).length + countableJobs(lost).length;
     return {
       openCount: open.length,
       openValue: sum(open),
-      wonCount: won.length,
+      wonCount: countableJobs(won).length,
       wonValue: sum(won),
       lostCount: lost.length,
       lostReasons: summarizeLostReasons(lost),
@@ -1764,11 +1805,27 @@ OntarioReno Broker Portal`;
                                   Pre-portal
                                 </span>
                               )}
+                              {isChangeOrder(deal) && (
+                                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-violet-700">
+                                  Change order
+                                </span>
+                              )}
+                              {isAdmin && <InvoiceBadge deal={deal} invoices={invoiceLedger} />}
                             </div>
                           </div>
                           <p className="mt-1 text-xs font-semibold text-slate-500">
                             {deal.city} - {deal.projectType}
                           </p>
+                          {(() => {
+                            const addOns = changeOrdersOf(visibleDeals, deal.id);
+                            if (addOns.length === 0) return null;
+                            const extra = addOns.reduce((sum, d) => sum + d.estimatedJobValue, 0);
+                            return (
+                              <p className="mt-1 text-[0.68rem] font-bold text-violet-700">
+                                + {formatCurrency(extra)} in {addOns.length} change order{addOns.length !== 1 ? 's' : ''} · job total {formatCurrency(deal.estimatedJobValue + extra)}
+                              </p>
+                            );
+                          })()}
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] font-bold text-slate-400">
                             <span className="inline-flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5" />
@@ -2068,6 +2125,40 @@ OntarioReno Broker Portal`;
                     })()}
                   </div>
                 )}
+                {isAddingDeal && (() => {
+                  // Same homeowner already has a won job? Most likely this is
+                  // an add-on. Asked, never assumed: the Melos have two real
+                  // jobs under one phone number.
+                  const existing = visibleDeals.find(
+                    (d) =>
+                      d.status === 'won' &&
+                      !isChangeOrder(d) &&
+                      (form.homeownerName.trim() || form.phone.trim() || form.email.trim()) &&
+                      sameHomeowner(d, {
+                        homeownerName: form.homeownerName,
+                        phone: form.phone,
+                        email: form.email,
+                      })
+                  );
+                  if (!existing) return null;
+                  return (
+                    <div className="sm:col-span-2 rounded-[0.5rem] border border-violet-200 bg-violet-50 p-3">
+                      <p className="text-sm font-black text-violet-900">
+                        {existing.homeownerName} already has a won job: {existing.projectType} ({formatCurrency(existing.estimatedJobValue)})
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-violet-800">
+                        If this is an extra or a price change on that job, add it as a change order there so it gets invoiced. If it's a separate job, carry on here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => openDeal(existing)}
+                        className="mt-2 rounded-[0.5rem] bg-violet-700 px-3 py-1.5 text-xs font-black text-white transition hover:bg-violet-800"
+                      >
+                        Open that job to add a change order
+                      </button>
+                    </div>
+                  );
+                })()}
                 <label className="grid gap-1.5 text-sm font-bold text-slate-700">
                   Homeowner Name
                   <input
@@ -2224,6 +2315,19 @@ OntarioReno Broker Portal`;
                       />
                     </div>
                   </div>
+                )}
+                {!isAddingDeal && selectedDeal && (
+                  <ChangeOrdersPanel
+                    deal={selectedDeal}
+                    deals={visibleDeals}
+                    isAdmin={isAdmin}
+                    invoices={invoiceLedger}
+                    onMarkBilledElsewhere={markBilledElsewhere}
+                    currentUser={currentUser ?? undefined}
+                    onOpenDeal={openDeal}
+                    addChangeOrder={addChangeOrder}
+                    linkChangeOrder={linkChangeOrder}
+                  />
                 )}
                 {/* Hand a deal to another rep — admin only, same call as the
                     bulk "Reassign rep…" action. The server ignores a rep
@@ -3462,7 +3566,10 @@ OntarioReno Broker Portal`;
           <CommissionInvoice
             deal={selectedDeal}
             contractor={contractors.find((c) => c.id === selectedDeal.assignedContractorId)}
-            onClose={() => setInvoiceOpen(false)}
+            onClose={() => {
+              setInvoiceOpen(false);
+              refreshInvoiceLedger();
+            }}
           />
         </Suspense>
       )}
