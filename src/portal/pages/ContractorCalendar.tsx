@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, User, Wrench, Phone, Mail, MapPin, Star, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, User, Wrench, Phone, Mail, MapPin, CalendarDays } from 'lucide-react';
 import { usePortalData } from '../data/store';
 import { torontoToday } from '../lib/time';
 import type { Appointment } from '../data/types';
 import { formatTimeOrWindow } from '../../../lib/arrival-window';
 
 // Appointments loaded for a contractor carry a server-added `repName`. Contact
-// fields (phone/email/address) are present ONLY on the contractor's own jobs,
-// flagged `isOwnJob` — the server decides that (lib/contractor-visibility.ts)
-// and strips them from everyone else's, so there is nothing to recover here.
+// fields (phone/email/address) are present ONLY on the contractor's own jobs —
+// the server decides that (lib/contractor-visibility.ts) and strips them from
+// everyone else's, so there is nothing to recover here.
+//
+// That difference is shown QUIETLY: an entry simply has contact details or it
+// doesn't. No badge, star, ring, filter or legend marks which jobs are his —
+// the admin was explicit that this must not be announced.
 type CxAppt = Appointment & { repName?: string; isOwnJob?: boolean };
 
 function fmt12(t?: string | null) {
@@ -87,20 +91,6 @@ function StatusPill({ a }: { a: Appointment }) {
   );
 }
 
-function OwnBadge({ compact = false }: { compact?: boolean }) {
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-300 font-black uppercase tracking-wide text-amber-950 ${
-        compact ? 'px-1 py-px text-[0.5rem]' : 'px-2 py-0.5 text-[0.6rem]'
-      }`}
-      title="Your job"
-    >
-      <Star className={compact ? 'h-2 w-2' : 'h-2.5 w-2.5'} fill="currentColor" />
-      {compact ? '' : 'Your job'}
-    </span>
-  );
-}
-
 function DetailRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 py-2.5">
@@ -128,12 +118,9 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
         <div className={`${c.bg} px-5 py-4`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className={`text-[0.68rem] font-bold uppercase tracking-wide ${c.light ? 'text-white/70' : 'text-slate-700/70'}`}>
-                  {STATUS_LABEL[appt.status] ?? appt.status}
-                </p>
-                {appt.isOwnJob && <OwnBadge />}
-              </div>
+              <p className={`text-[0.68rem] font-bold uppercase tracking-wide ${c.light ? 'text-white/70' : 'text-slate-700/70'}`}>
+                {STATUS_LABEL[appt.status] ?? appt.status}
+              </p>
               <h2 className={`mt-0.5 truncate text-lg font-black tracking-[-0.01em] ${c.light ? 'text-white' : 'text-slate-900'}`}>
                 {appt.customerName || 'Consultation'}
               </h2>
@@ -151,7 +138,7 @@ function AppointmentDetail({ appt, onClose }: { appt: CxAppt; onClose: () => voi
           </div>
         </div>
 
-        {/* One-tap contact, on the contractor's own jobs only. */}
+        {/* One-tap contact — present only where the details are. */}
         {appt.isOwnJob && (tel || appt.email || fullAddress) && (
           <div className="grid grid-cols-3 gap-2 border-b border-slate-100 px-5 py-3">
             {[
@@ -230,18 +217,13 @@ function AgendaCard({ a, onOpen }: { a: CxAppt; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full items-stretch gap-3 rounded-xl border bg-white p-3 text-left shadow-sm transition active:scale-[0.99] hover:shadow-md ${
-        a.isOwnJob ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'
-      }`}
+      className="flex w-full items-stretch gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99] hover:shadow-md"
     >
       <span className={`w-1.5 shrink-0 rounded-full ${c.bg}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-black text-slate-900">{fmt12(a.appointmentTime) || 'Time TBD'}</span>
-          <span className="flex items-center gap-1.5">
-            {a.isOwnJob && <OwnBadge />}
-            <StatusPill a={a} />
-          </span>
+          <StatusPill a={a} />
         </div>
         <p className="mt-1 truncate text-[0.95rem] font-bold text-slate-900">{a.customerName || 'Consultation'}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs font-semibold text-slate-500">
@@ -268,11 +250,9 @@ export default function ContractorCalendar() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   // Desktop: the day panel opened from a cell's "+N more" or its date.
   const [dayPanel, setDayPanel] = useState<string | null>(null);
-  const [onlyOwn, setOnlyOwn] = useState(false);
 
   const all = appointments as CxAppt[];
-  const hasOwn = all.some((a) => a.isOwnJob);
-  const visible = onlyOwn ? all.filter((a) => a.isOwnJob) : all;
+  const visible = all;
 
   const byDate = useMemo(() => {
     const m = new Map<string, CxAppt[]>();
@@ -381,26 +361,8 @@ export default function ContractorCalendar() {
         ))}
       </div>
 
-      {/* ── Filter + legend ────────────────────────────────────────────── */}
+      {/* ── Legend ─────────────────────────────────────────────────────── */}
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        {hasOwn && (
-          <div className="flex rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
-            {[
-              { label: 'Everyone', value: false },
-              { label: 'Your jobs', value: true },
-            ].map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                onClick={() => setOnlyOwn(o.value)}
-                className={`rounded-full px-3 py-1.5 text-xs font-black transition ${onlyOwn === o.value ? 'bg-[#1B3C6C] text-white' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                {o.value && <Star className="mr-1 inline h-3 w-3" fill="currentColor" />}
-                {o.label}
-              </button>
-            ))}
-          </div>
-        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {LEGEND.map((l) => (
             <span key={l.status} className="inline-flex items-center gap-1.5 text-[0.68rem] font-bold text-slate-500">
@@ -408,11 +370,6 @@ export default function ContractorCalendar() {
               {l.label}
             </span>
           ))}
-          {hasOwn && (
-            <span className="inline-flex items-center gap-1.5 text-[0.68rem] font-bold text-slate-500">
-              <OwnBadge compact /> Your job
-            </span>
-          )}
         </div>
       </div>
 
@@ -476,13 +433,10 @@ export default function ContractorCalendar() {
                         type="button"
                         key={a.id}
                         onClick={() => setSelectedId(a.id)}
-                        className={`relative w-full rounded-md ${c.bg} px-1.5 py-1 text-left transition hover:brightness-110 hover:ring-2 hover:ring-slate-900/10 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]/40 ${a.isOwnJob ? 'ring-2 ring-amber-300' : ''}`}
+                        className={`relative w-full rounded-md ${c.bg} px-1.5 py-1 text-left transition hover:brightness-110 hover:ring-2 hover:ring-slate-900/10 focus:outline-none focus:ring-2 focus:ring-[#1B3C6C]/40`}
                         title={`${fmt12(a.appointmentTime)} · ${a.customerName}${a.projectType ? ` · ${a.projectType}` : ''}${a.repName ? ` · Rep: ${a.repName}` : ''}`}
                       >
-                        <span className="flex items-center justify-between gap-1">
-                          <span className={`truncate text-[0.6rem] font-bold ${c.light ? 'text-white/80' : 'text-slate-700'}`}>{fmt12(a.appointmentTime)}</span>
-                          {a.isOwnJob && <OwnBadge compact />}
-                        </span>
+                        <span className={`block truncate text-[0.6rem] font-bold ${c.light ? 'text-white/80' : 'text-slate-700'}`}>{fmt12(a.appointmentTime)}</span>
                         <p className={`truncate text-[0.7rem] font-black leading-tight ${c.light ? 'text-white' : 'text-slate-900'}`}>{a.customerName || 'Consultation'}</p>
                       </button>
                     );
@@ -517,7 +471,6 @@ export default function ContractorCalendar() {
               const appts = byDate.get(key) ?? [];
               const isToday = key === todayKey;
               const isSel = key === effectiveDay;
-              const own = appts.some((a) => a.isOwnJob);
               return (
                 <div key={key} className="flex justify-center py-0.5">
                   <button
@@ -533,7 +486,6 @@ export default function ContractorCalendar() {
                         <span key={a.id} className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : statusColor(a).bg}`} />
                       ))}
                     </span>
-                    {own && !isSel && <Star className="absolute right-0.5 top-0.5 h-2.5 w-2.5 text-amber-400" fill="currentColor" />}
                   </button>
                 </div>
               );
@@ -561,7 +513,7 @@ export default function ContractorCalendar() {
       </div>
 
       <p className="mt-4 text-xs font-semibold text-slate-400">
-        Read-only view of the sales team's consultation schedule.{hasOwn ? ' Contact details are shown on your jobs.' : ''}
+        Read-only view of the sales team's consultation schedule.
       </p>
 
       {/* Desktop day panel: every consultation on one day. */}
