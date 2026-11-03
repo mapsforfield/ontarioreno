@@ -17,7 +17,7 @@ import { money, useContractorPayments } from '../data/contractorPayments';
 
 export default function ContractorPaymentAlert() {
   const navigate = useNavigate();
-  const rows = useContractorPayments(true);
+  const { rows } = useContractorPayments(true);
   const due = (rows ?? []).filter((r) => r.clock.status === 'due' || r.clock.status === 'overdue');
   const soon = (rows ?? []).filter((r) => r.clock.status === 'due_soon');
   const dueKey = `or-cx-due-seen:${due.map((r) => `${r.dealId}@${r.clock.dueOn}`).join(',')}`;

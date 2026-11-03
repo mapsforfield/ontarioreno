@@ -81,8 +81,9 @@ const navItems: NavItem[] = [
 
 // Contractor accounts get a tiny, read-only nav: just their scoped calendar + clients.
 const contractorNavItems: NavItem[] = [
-  { label: 'Payments', href: '/portal/cx-payments', icon: Wallet },
+  { label: 'Dashboard', href: '/portal/cx-dashboard', icon: Gauge },
   { label: 'Calendar', href: '/portal/cx-calendar', icon: CalendarDays },
+  { label: 'Payments', href: '/portal/cx-payments', icon: Wallet },
   { label: 'Clients', href: '/portal/cx-clients', icon: UserRound },
 ];
 
@@ -197,11 +198,11 @@ export default function PortalLayout() {
     }
   }, [currentUser, isAdmin, isContractor, location.pathname, repAccess, navigate]);
   // Contractors can only ever be on their scoped cx- pages — anything else
-  // (dashboard, deep links, etc.) bounces to Payments, their dashboard.
+  // (dashboard, deep links, etc.) bounces to their own dashboard.
   useEffect(() => {
     if (!currentUser || !isContractor) return;
     if (!location.pathname.startsWith('/portal/cx-')) {
-      navigate('/portal/cx-payments', { replace: true });
+      navigate('/portal/cx-dashboard', { replace: true });
     }
   }, [currentUser, isContractor, location.pathname, navigate]);
   const mobilePrimaryHrefs = [
