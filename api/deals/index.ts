@@ -2,6 +2,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
+import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
 import { randomUUID } from 'node:crypto';
 
 // Self-healing ledger of commission invoices that were generated / sent.
@@ -488,8 +489,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const commissionBase = Math.round(jobValue * (1 - feePct / 100));
     const repEst = Math.round(commissionBase * 0.05);
     // Total rate comes from the assigned contractor's negotiated rate;
-    // falls back to 10% until a contractor is assigned
-    let totalRate = 0.1;
+    // falls back to the standard 8.5% until a contractor is assigned
+    let totalRate = DEFAULT_TOTAL_COMMISSION_RATE;
     if (data.assignedContractorId) {
       const contractor = await prisma.contractor
         .findUnique({
@@ -540,7 +541,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         repEstimatedCommission: repEst,
         repPaidCommission: 0,
         payoutStatus: 'pending',
-        adminTotalCommissionRate: 0.1,
+        // The rate the total was actually computed at. This was a literal 0.1,
+        // and the portal re-derives the total from the stored rate, so every
+        // new deal showed 10% however it had been priced.
+        adminTotalCommissionRate: totalRate,
         adminTotalEstimatedCommission: adminTotalEst,
         adminNetCommission: adminTotalEst - repEst,
       },

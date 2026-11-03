@@ -215,3 +215,57 @@ export function pendingBalanceClocks(
 export function pendingBalanceClockTotal(rows: PendingBalanceClock[]): number {
   return rows.reduce((sum, row) => sum + (row.outstanding ?? 0), 0);
 }
+
+// ─── Recording the up-front payment ──────────────────────────────────────────
+
+/** The splits offered when a clock starts. Galaxy paid 25% first; since the
+ *  autumn of 2026 they pay 50%. Anything else is typed in as a custom %. */
+export const UPFRONT_PRESETS = [0.25, 0.5] as const;
+
+/** The two amounts a split is applied to: the rep's cut and the house's net. */
+export type PaymentLedger = Pick<Commission, 'repEstimatedCommission' | 'adminNetCommission'>;
+
+const toCents = (amount: number) => Math.round(amount * 100) / 100;
+
+/**
+ * What "X% of the commission has been paid" means for each ledger.
+ *
+ * The contractor pays a share of the whole commission, and that share applies
+ * equally to both sides of it: on a 50% payment the rep has been paid half of
+ * their 5% and the house has collected half of its net. Recording it as one
+ * fraction — rather than two numbers typed by hand — is what keeps the rep's
+ * column and the admin's column from drifting apart, which is how the Galaxy
+ * deals came to show 0 paid with half the money already in.
+ *
+ * Admin-only by construction: it needs the admin's net, which a rep's client
+ * never holds (see withoutAdminLedger in store.tsx).
+ */
+export function upfrontPaymentUpdates(
+  ledger: PaymentLedger,
+  fraction: number
+): Pick<Commission, 'repPaidCommission' | 'adminNetPaidCommission'> {
+  const share = Math.min(Math.max(Number.isFinite(fraction) ? fraction : 0, 0), 1);
+  return {
+    repPaidCommission: toCents(Math.max(ledger.repEstimatedCommission, 0) * share),
+    adminNetPaidCommission: toCents(Math.max(ledger.adminNetCommission ?? 0, 0) * share),
+  };
+}
+
+/** Settling the clock means the remainder is in: both ledgers paid in full. */
+export function settledPaymentUpdates(
+  ledger: PaymentLedger
+): Pick<Commission, 'repPaidCommission' | 'adminNetPaidCommission'> {
+  return upfrontPaymentUpdates(ledger, 1);
+}
+
+/**
+ * The share of the commission recorded as paid so far, from the rep's ledger
+ * (the one every viewer has). 0.5 for a half-paid deal; 0 when nothing is owed.
+ */
+export function paidFraction(
+  commission: Pick<Commission, 'repEstimatedCommission' | 'repPaidCommission'>
+): number {
+  const owed = commission.repEstimatedCommission;
+  if (!(owed > 0)) return 0;
+  return Math.min(Math.max(commission.repPaidCommission / owed, 0), 1);
+}

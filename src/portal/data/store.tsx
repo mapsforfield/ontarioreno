@@ -56,6 +56,7 @@ import {
 } from './types';
 import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 import { mergeNotes } from '../../../lib/consultation-notes';
+import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../../lib/commission-ledger';
 import {
   schedulingDefaults,
   type SchedulingSettings,
@@ -389,7 +390,7 @@ function loadDefaultCommissionRate(): number {
     const v = localStorage.getItem(DEFAULT_COMMISSION_RATE_KEY);
     if (v !== null) return Math.min(1, Math.max(0, Number(v)));
   } catch {}
-  return 0.1;
+  return DEFAULT_TOTAL_COMMISSION_RATE;
 }
 
 const emptyState: PortalDataState = {
@@ -733,7 +734,7 @@ function withoutAdminLedger(commission: Commission): Commission {
  * rather than just re-stating the API.
  *
  * The sync below FILLS IN a commission for any won deal that doesn't have one,
- * using the rate from localStorage — which on a rep's machine is the 0.1
+ * using the rate from localStorage — which on a rep's machine is the default
  * fallback, not the real rate. That would drop a fabricated total and net into
  * a rep's client for a row the server never sent. Wrong numbers in devtools are
  * not better than right ones; they still describe the shape of the

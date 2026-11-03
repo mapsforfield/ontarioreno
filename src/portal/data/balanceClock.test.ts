@@ -7,7 +7,10 @@ import {
   daysBetween,
   formatBalanceClock,
   pendingBalanceClocks,
+  paidFraction,
   pendingBalanceClockTotal,
+  settledPaymentUpdates,
+  upfrontPaymentUpdates,
 } from './balanceClock.ts';
 
 const clockOf = (
@@ -230,5 +233,47 @@ describe('pendingBalanceClocks', () => {
       rows.map((r) => r.commission.id),
       ['sooner', 'later']
     );
+  });
+});
+
+describe('recording the up-front payment', () => {
+  // Nithin Ahuja: $55,420 commissionable at 8.5% — rep 5% = $2,771, net 3.5%.
+  const ledger = { repEstimatedCommission: 2771, adminNetCommission: 1940 };
+
+  it('applies the same share to the rep and the house', () => {
+    assert.deepEqual(upfrontPaymentUpdates(ledger, 0.5), {
+      repPaidCommission: 1385.5,
+      adminNetPaidCommission: 970,
+    });
+  });
+
+  it('handles the old 25% split', () => {
+    assert.deepEqual(upfrontPaymentUpdates(ledger, 0.25), {
+      repPaidCommission: 692.75,
+      adminNetPaidCommission: 485,
+    });
+  });
+
+  it('clamps nonsense to 0–100%', () => {
+    assert.deepEqual(upfrontPaymentUpdates(ledger, 1.7), {
+      repPaidCommission: 2771,
+      adminNetPaidCommission: 1940,
+    });
+    assert.deepEqual(upfrontPaymentUpdates(ledger, Number.NaN), {
+      repPaidCommission: 0,
+      adminNetPaidCommission: 0,
+    });
+  });
+
+  it('settling pays both ledgers in full', () => {
+    assert.deepEqual(settledPaymentUpdates(ledger), {
+      repPaidCommission: 2771,
+      adminNetPaidCommission: 1940,
+    });
+  });
+
+  it('reads the paid share from the rep ledger', () => {
+    assert.equal(paidFraction({ repEstimatedCommission: 2771, repPaidCommission: 1385.5 }), 0.5);
+    assert.equal(paidFraction({ repEstimatedCommission: 0, repPaidCommission: 10 }), 0);
   });
 });
