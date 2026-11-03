@@ -16,6 +16,8 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import BalanceClockControl from '../components/BalanceClockControl';
+import { InvoiceBadge } from '../components/ChangeOrdersPanel';
+import { invoiceCheck, isChangeOrder, isContractorInvoice } from '../../../lib/change-orders';
 import {
   balanceClock,
   DEFAULT_BALANCE_CLOCK_DAYS,
@@ -356,6 +358,9 @@ export default function PortalCommissions() {
   const [payoutView, setPayoutView] = useState<'reps' | 'me'>('reps');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [invoices, setInvoices] = useState<CommissionInvoiceRecord[]>([]);
+  // The invoice check needs to know the ledger actually arrived: on an empty
+  // list every won deal would read Not invoiced.
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceData | null>(null);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -419,15 +424,13 @@ export default function PortalCommissions() {
     // Client invoices (Portal → Invoices) share this ledger but have a different
     // snapshot shape, and would re-render through the commission builder as a
     // blank commission. They have their own history on their own page.
-    const isCommissionRow = (row: CommissionInvoiceRecord) => {
-      if (!row.snapshot) return true; // predates snapshots — commission by definition
-      try {
-        return (JSON.parse(row.snapshot) as { kind?: string })?.kind !== 'client';
-      } catch {
-        return true;
-      }
-    };
-    if (isAdmin) listInvoices().then((rows) => setInvoices(rows.filter(isCommissionRow))).catch(() => {});
+    if (isAdmin)
+      listInvoices()
+        .then((rows) => {
+          setInvoices(rows.filter(isContractorInvoice));
+          setInvoicesLoaded(true);
+        })
+        .catch(() => {});
   }, [isAdmin, listInvoices]);
 
   if (!currentUser) return null;
@@ -530,6 +533,13 @@ export default function PortalCommissions() {
     // list the dashboard shows, as one-tap shortcuts into the table.
     const clockShortcuts = pendingBalanceClocks(commissions, deals, today, { canSeeAmounts: true });
 
+    // Won sales with no invoice to the contractor, or invoiced at a different
+    // price than the deal shows now — money that will never arrive unless
+    // someone sends PJ an invoice. See lib/change-orders.ts.
+    const needsInvoice = (invoicesLoaded ? adminRows : [])
+      .map(({ commission, deal }) => ({ commission, deal: deal!, check: invoiceCheck(deal!, invoices) }))
+      .filter((row) => row.check.state === 'never_invoiced' || row.check.state === 'mismatch');
+
     const selectClass =
       'rounded-[0.5rem] border border-slate-200 bg-white py-1.5 pl-2.5 pr-7 text-sm font-bold text-slate-700 focus:border-[#32639b] focus:outline-none focus:ring-2 focus:ring-[#32639b]/20';
 
@@ -570,7 +580,15 @@ export default function PortalCommissions() {
             className="grid w-full grid-cols-2 items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition hover:bg-[#f6faff] md:grid-cols-[minmax(0,2.2fr)_6.5rem_6.5rem_4rem_minmax(0,1.2fr)_minmax(0,1.2fr)_6.5rem_1rem]"
           >
             <div className="col-span-2 min-w-0 md:col-span-1">
-              <p className="truncate font-black text-slate-950">{deal.homeownerName}</p>
+              <p className="flex flex-wrap items-center gap-1.5 font-black text-slate-950">
+                <span className="truncate">{deal.homeownerName}</span>
+                {isChangeOrder(deal) && (
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide text-violet-700">
+                    Change order
+                  </span>
+                )}
+                <InvoiceBadge deal={deal} invoices={invoicesLoaded ? invoices : null} />
+              </p>
               <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
                 {deal.projectType} · {getContractorName(deal)} · <span className="text-slate-700">{getRepName(commission.repId)}</span>
               </p>
@@ -836,6 +854,39 @@ export default function PortalCommissions() {
             </p>
           </article>
         </section>
+
+        {needsInvoice.length > 0 && (
+          <section className="rounded-[0.5rem] border border-red-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600">
+              Needs invoicing · {needsInvoice.length}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Won, but never invoiced to the contractor, or invoiced at a different price than the deal shows now.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {needsInvoice.map(({ commission, deal, check }) => (
+                <button
+                  key={commission.id}
+                  type="button"
+                  onClick={() => focusCommission(commission.id)}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[#fbfdff] py-1 pl-3 pr-1 text-xs font-black text-slate-800 transition hover:border-red-300 hover:bg-red-50"
+                >
+                  {deal.homeownerName}
+                  <span className="font-semibold text-slate-500">
+                    {deal.projectType} · {formatCurrency(deal.estimatedJobValue)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[0.65rem] ${
+                      check.state === 'never_invoiced' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {check.state === 'mismatch' ? `invoiced ${formatCurrency(check.invoicedPrice)}` : 'not invoiced'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {clockShortcuts.length > 0 && (
           <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">

@@ -7,6 +7,7 @@ import { contractors } from './contractors';
 import { deals } from './deals';
 import { users } from './users';
 import { Commission, Contractor, Deal, DealStatus, User } from './types';
+import { countableJobs } from '../../../lib/change-orders';
 
 const openDealStatuses: DealStatus[] = [
   'new_lead',
@@ -74,7 +75,7 @@ export function calculatePipelineValue(repId: string): number {
 }
 
 export function calculateWonDeals(repId: string): number {
-  return getDealsForRep(repId).filter((deal) => deal.status === 'won').length;
+  return countableJobs(getDealsForRep(repId)).filter((deal) => deal.status === 'won').length;
 }
 
 export function calculateClosedVolume(repId: string): number {
@@ -102,7 +103,7 @@ export function calculateVisibleWonDeals(user: User): number {
     return calculateWonDeals(user.id);
   }
 
-  return getVisibleDealsForUser(user).filter((deal) => deal.status === 'won')
+  return countableJobs(getVisibleDealsForUser(user)).filter((deal) => deal.status === 'won')
     .length;
 }
 

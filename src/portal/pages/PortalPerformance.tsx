@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { usePortalAuth } from '../auth';
 import { dealWonDate } from '../../../lib/deal-won-date';
 import { formatCurrency } from '../data/selectors';
+import { countableJobs } from '../../../lib/change-orders';
 import { commissionableValue, usePortalData } from '../data/store';
 import { Appointment, Commission, Deal, ProposalHistory, User } from '../data/types';
 
@@ -156,7 +157,10 @@ function buildRepPerformance({
   );
   const wonDeals = repDeals.filter((deal) => deal.status === 'won');
   const lostDeals = repDeals.filter((deal) => deal.status === 'lost');
-  const closedDeals = wonDeals.length + lostDeals.length;
+  // Close rate counts jobs: a change order is an add-on to a job already
+  // won, so it would read as an extra win. Volume below still includes it.
+  const wonJobs = countableJobs(wonDeals);
+  const closedDeals = wonJobs.length + countableJobs(lostDeals).length;
   const closedVolume = wonDeals.reduce(
     (total, deal) => total + deal.estimatedJobValue,
     0
@@ -190,7 +194,7 @@ function buildRepPerformance({
   }));
 
   return {
-    avgDaysToClose: calculateAvgDaysToClose(wonDeals),
+    avgDaysToClose: calculateAvgDaysToClose(wonJobs),
     followUpsDueThisWeek: countFollowUpsDueThisWeek(repDeals),
     stageCounts,
     appointmentsAssigned: repAppointments.length,
@@ -232,8 +236,8 @@ function buildRepPerformance({
     warmLeads: repAppointments.filter(
       (appointment) => appointment.homeownerInterestLevel === 'warm'
     ).length,
-    winRate: closedDeals > 0 ? Math.round((wonDeals.length / closedDeals) * 100) : 0,
-    wonDeals: wonDeals.length,
+    winRate: closedDeals > 0 ? Math.round((wonJobs.length / closedDeals) * 100) : 0,
+    wonDeals: wonJobs.length,
   };
 }
 

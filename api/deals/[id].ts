@@ -31,8 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!rawBody || typeof rawBody !== 'object') {
       return res.status(400).json({ error: 'Invalid or missing request body.' });
     }
-    const { activity: _act, createdAt: _ca, updatedAt: _ua, id: _id, proposals: _p, dispatches: _d, assignedRepId: _repId, ...data } = rawBody;
-    void _act; void _ca; void _ua; void _id; void _p; void _d;
+    // parentDealId only changes through the change-order actions in
+    // api/deals/index.ts, which check the link — never through a plain edit.
+    const { activity: _act, createdAt: _ca, updatedAt: _ua, id: _id, proposals: _p, dispatches: _d, assignedRepId: _repId, parentDealId: _parent, ...data } = rawBody;
+    void _act; void _ca; void _ua; void _id; void _p; void _d; void _parent;
     // Only admins may reassign a deal to a different rep
     const safeData = user.role === 'admin' && _repId ? { ...data, assignedRepId: _repId } : data;
 

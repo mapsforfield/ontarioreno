@@ -57,6 +57,7 @@ import {
 import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 import { mergeNotes } from '../../../lib/consultation-notes';
 import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../../lib/commission-ledger';
+import { countableJobs } from '../../../lib/change-orders';
 import {
   schedulingDefaults,
   type SchedulingSettings,
@@ -169,6 +170,14 @@ type PortalDataContextValue = PortalDataState & {
   deleteFinancePartner: (partnerId: string) => void;
   addDeal: (deal: DealDraft, repId: string, actor?: User) => void;
   updateDeal: (dealId: string, updates: Partial<Deal>, actor?: User) => void;
+  /** Add-on sold after a won job. Resolves to an error message, or null. */
+  addChangeOrder: (
+    parentDealId: string,
+    input: { description: string; amount: number; signedOn: string },
+    actor?: User
+  ) => Promise<string | null>;
+  /** Admin: attach a deal to its original job (or detach with null). */
+  linkChangeOrder: (dealId: string, parentDealId: string | null) => Promise<string | null>;
   deleteDeal: (dealId: string, actor?: User) => void;
   restoreDeal: (dealId: string) => Promise<void>;
   purgeDeal: (dealId: string) => Promise<void>;
@@ -1240,8 +1249,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       );
 
     // Historical deals are excluded from all leaderboard metrics
+    // Change orders are add-ons to a job already counted — value yes, count no.
     const calculateWonDeals = (repId: string) =>
-      getDealsForRep(repId).filter((deal) => deal.status === 'won' && !deal.isHistorical).length;
+      countableJobs(getDealsForRep(repId)).filter((deal) => deal.status === 'won' && !deal.isHistorical).length;
 
     const calculateClosedVolume = (repId: string) =>
       getDealsForRep(repId)
@@ -1255,7 +1265,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         .reduce((total, deal) => total + deal.estimatedJobValue, 0);
 
     const calculateHistoricalSalesCount = (repId: string) =>
-      getDealsForRep(repId).filter((deal) => deal.isHistorical && deal.status === 'won').length;
+      countableJobs(getDealsForRep(repId)).filter((deal) => deal.isHistorical && deal.status === 'won').length;
 
     const calculateOpenDealsForUser = (user: User) =>
       getVisibleDealsForUser(user).filter((deal) =>
@@ -1271,7 +1281,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     };
 
     const calculateVisibleWonDeals = (user: User) =>
-      getVisibleDealsForUser(user).filter((deal) => deal.status === 'won')
+      countableJobs(getVisibleDealsForUser(user)).filter((deal) => deal.status === 'won')
         .length;
 
     return {
@@ -1780,6 +1790,61 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             trackerRows,
           }));
         });
+      },
+
+      addChangeOrder: async (parentDealId, input, actor) => {
+        const res = await fetch('/api/deals', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...viewAsHeaders() },
+          body: JSON.stringify({ _action: 'add_change_order', parentDealId, ...input }),
+        }).catch(() => null);
+        if (!res) return 'Could not reach the server.';
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          deal?: Deal;
+          commission?: Commission;
+        };
+        if (!res.ok || !body.deal) return body.error ?? 'Could not save the change order.';
+        const deal = normalizeDeal(body.deal);
+        setState((current) => {
+          const parent = current.deals.find((d) => d.id === parentDealId);
+          return {
+            ...current,
+            activities: prependActivity(current.activities, actor, {
+              actionLabel: `Change order added to ${getDealLabel(parent ?? deal)}: ${deal.projectType} (${new Intl.NumberFormat('en-CA', { currency: 'CAD', maximumFractionDigits: 0, style: 'currency' }).format(deal.estimatedJobValue)})`,
+              actionType: 'deal_created',
+              dealId: deal.id,
+              entityId: deal.id,
+              entityLabel: getDealLabel(deal),
+              entityType: 'deal',
+            }),
+            deals: [...current.deals, deal],
+            commissions: body.commission
+              ? [...current.commissions.filter((c) => c.dealId !== deal.id), body.commission]
+              : current.commissions,
+          };
+        });
+        changePublisher?.();
+        return null;
+      },
+
+      linkChangeOrder: async (dealId, parentDealId) => {
+        const res = await fetch('/api/deals', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...viewAsHeaders() },
+          body: JSON.stringify({ _action: 'link_change_order', dealId, parentDealId }),
+        }).catch(() => null);
+        if (!res) return 'Could not reach the server.';
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) return body.error ?? 'Could not link the deal.';
+        setState((current) => ({
+          ...current,
+          deals: current.deals.map((d) => (d.id === dealId ? { ...d, parentDealId } : d)),
+        }));
+        changePublisher?.();
+        return null;
       },
 
       updateDeal: (dealId, updates, actor) => {
