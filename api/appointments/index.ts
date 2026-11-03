@@ -7,6 +7,7 @@ import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../.
 import { ensureSchema, withSchema } from '../../lib/schema.js';
 import { reconcileLedger } from '../../lib/commission-ledger.js';
 import { toContractorPayment } from '../../lib/contractor-payments.js';
+import { buildOwnershipIndex, isOwnAppointment, isOwnClient, type OwnershipIndex } from '../../lib/contractor-visibility.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
 import { maybeSendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
@@ -129,6 +130,11 @@ async function sendPush(
 // deliberately ANONYMIZED: no client contact details (phone/email/address), no
 // contractor attribution (they must not see which jobs belong to whom), and no
 // notes of any kind. Only enough to show that a consultation exists.
+//
+// Exception (Nov 2026): on the contractor's OWN jobs — see
+// lib/contractor-visibility.ts for exactly what counts — the homeowner's phone,
+// email and address are included, with `isOwnJob: true`. Everyone else's stay
+// scrubbed, and the flag is never set on another contractor's work.
 // The scrub happens server-side so these fields never leave the database for a
 // contractor account — there is nothing to recover in dev tools.
 // Consultation types shared with contractor accounts for EVERY rep/contractor.
@@ -138,8 +144,18 @@ async function sendPush(
 // event can expose a specific high-value closing client that isn't theirs.
 const CONTRACTOR_VISIBLE_TYPES = ['home_visit', 'phone_consultation', 'video_consultation'];
 
-function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string) {
+function scrubAppointmentForContractor(a: Record<string, unknown>, repName: string, own = false) {
   return {
+    ...(own
+      ? {
+          isOwnJob: true,
+          phone: a.phone,
+          email: a.email,
+          address: a.address,
+          city: a.city,
+          postalCode: a.postalCode,
+        }
+      : {}),
     id: a.id,
     customerName: a.customerName,
     projectType: a.projectType,
@@ -153,12 +169,32 @@ function scrubAppointmentForContractor(a: Record<string, unknown>, repName: stri
   };
 }
 
-function scrubClientForContractor(c: Record<string, unknown>) {
+function scrubClientForContractor(c: Record<string, unknown>, own = false) {
   return {
     id: c.id,
     name: c.name,
     projectTypes: c.projectTypes,
+    ...(own
+      ? {
+          isOwnJob: true,
+          phone: c.phone,
+          email: c.email,
+          address: c.address,
+          city: c.city,
+          postalCode: c.postalCode,
+        }
+      : {}),
   };
+}
+
+/** Which jobs are this contractor's own — every live deal's assignment. */
+async function contractorOwnership(contractorId: string | null): Promise<OwnershipIndex | null> {
+  if (!contractorId) return null;
+  const deals = await prisma.deal.findMany({
+    where: { deletedAt: null },
+    select: { id: true, clientId: true, assignedContractorId: true },
+  });
+  return buildOwnershipIndex(contractorId, deals);
 }
 
 async function handleContractorGet(req: VercelRequest, res: VercelResponse, contractorId: string | null) {
@@ -168,7 +204,10 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse, cont
   // Client roster: every client, names only (no phone/email/address).
   if (req.query['_resource'] === 'clients') {
     const clients = await withSchema(() => prisma.client.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } }));
-    return res.status(200).json(clients.map((c) => scrubClientForContractor(c as unknown as Record<string, unknown>)));
+    const ownership = await contractorOwnership(contractorId);
+    return res.status(200).json(
+      clients.map((c) => scrubClientForContractor(c as unknown as Record<string, unknown>, isOwnClient(c.id, ownership)))
+    );
   }
 
   // Payments: the 45-day balances this contractor owes on its OWN won deals —
@@ -224,7 +263,16 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse, cont
   const repIds = [...new Set(appts.map((a) => a.assignedRepId).filter(Boolean))] as string[];
   const reps = repIds.length ? await prisma.user.findMany({ where: { id: { in: repIds } }, select: { id: true, name: true } }) : [];
   const repName = new Map(reps.map((r) => [r.id, r.name]));
-  return res.status(200).json(appts.map((a) => scrubAppointmentForContractor(a as unknown as Record<string, unknown>, repName.get(a.assignedRepId) ?? '')));
+  const ownership = await contractorOwnership(contractorId);
+  return res.status(200).json(
+    appts.map((a) =>
+      scrubAppointmentForContractor(
+        a as unknown as Record<string, unknown>,
+        repName.get(a.assignedRepId) ?? '',
+        isOwnAppointment(a, ownership)
+      )
+    )
+  );
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
