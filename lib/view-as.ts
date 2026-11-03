@@ -13,9 +13,10 @@
 //      an admin. For anyone else it is ignored completely — not an error, just
 //      ignored, so a rep who finds the header in devtools and sends it gains
 //      exactly nothing.
-//   2. The effective user it produces is a rep. An admin viewing as a rep is
-//      therefore refused by every admin-only endpoint, because those check the
-//      effective role.
+//   2. The effective user it produces is a rep or a contractor. Either way it
+//      is refused by every admin-only endpoint, because those check the
+//      effective role — and a contractor is refused by nearly everything else
+//      too (denyContractor).
 //   3. Writes are blocked outright while viewing (enforced in requireAuth). An
 //      audit tool must not be able to change anything on a rep's behalf, and a
 //      write attributed to someone who wasn't there is a lie in the activity
@@ -56,11 +57,14 @@ export function requestedViewAsId(
 /**
  * Is this a user an admin may view as?
  *
- * Reps only. Not another admin — viewing as an admin would be a sideways move
- * that grants nothing and invites the mistake of thinking it is a safe way to
- * act as someone else. Not a contractor either: contractor accounts are a
- * different, narrower thing and are refused at the door by denyContractor
- * anyway. Not an inactive account, and not yourself.
+ * Reps, and contractor accounts (PJ at Galaxy). Contractors were left out at
+ * first only because their portal is a different, narrower thing — but that
+ * narrowness is exactly why it is safe, and the admin edits that portal and
+ * needs to see what PJ sees. Rule 3 still makes it read-only.
+ *
+ * Not another admin — viewing as an admin would be a sideways move that grants
+ * nothing and invites the mistake of thinking it is a safe way to act as
+ * someone else. Not an inactive account, and not yourself.
  */
 export function canViewAs(
   realUser: { id: string; role: string },
@@ -70,7 +74,7 @@ export function canViewAs(
   if (!target) return false;
   if (!target.active) return false;
   if (target.id === realUser.id) return false;
-  return target.role === 'rep';
+  return target.role === 'rep' || target.role === 'contractor';
 }
 
 /** Methods that are allowed while viewing as someone else. Reads only. */

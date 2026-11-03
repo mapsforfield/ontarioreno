@@ -64,9 +64,13 @@ describe('canViewAs', () => {
     assert.equal(canViewAs(admin, otherAdmin), false);
   });
 
-  it('refuses a contractor account', () => {
+  it('allows an active contractor account — read-only, and narrower than a rep', () => {
     assert.equal(
       canViewAs(admin, { id: 'c', role: 'contractor', active: true }),
+      true
+    );
+    assert.equal(
+      canViewAs(admin, { id: 'c', role: 'contractor', active: false }),
       false
     );
   });
