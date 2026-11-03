@@ -138,6 +138,7 @@ const PortalDeals = lazy(() => import('./portal/pages/PortalDeals'));
 const PortalWorkspace = lazy(() => import('./portal/pages/PortalWorkspace'));
 const ContractorCalendar = lazy(() => import('./portal/pages/ContractorCalendar'));
 const ContractorClients = lazy(() => import('./portal/pages/ContractorClients'));
+const ContractorPayments = lazy(() => import('./portal/pages/ContractorPayments'));
 const PortalClients = lazy(() => import('./portal/pages/PortalClients'));
 const PortalSubmissions = lazy(() => import('./portal/pages/PortalSubmissions'));
 const PortalInvoices = lazy(() => import('./portal/pages/PortalInvoices'));
@@ -193,6 +194,7 @@ export default function App({ location }: { location?: string } = {}) {
               <Route path="dashboard" element={<PortalDashboard />} />
               <Route path="cx-calendar" element={<ContractorCalendar />} />
               <Route path="cx-clients" element={<ContractorClients />} />
+              <Route path="cx-payments" element={<ContractorPayments />} />
               <Route path="workspace" element={<PortalWorkspace />} />
               <Route path="contractors" element={<PortalContractors />} />
               <Route path="deals" element={<PortalDeals />} />

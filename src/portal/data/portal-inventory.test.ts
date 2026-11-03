@@ -59,6 +59,7 @@ const PORTAL_FEATURES: PortalFeature[] = [
   { navLabel: 'Consultations', route: 'appointments', page: 'src/portal/pages/PortalAppointments.tsx', component: 'PortalAppointments' },
   // The contractor accounts' entire portal: two read-only pages behind their
   // own sidebar (contractorNavItems in PortalLayout).
+  { navLabel: 'Payments', route: 'cx-payments', page: 'src/portal/pages/ContractorPayments.tsx', component: 'ContractorPayments' },
   { navLabel: 'Calendar', route: 'cx-calendar', page: 'src/portal/pages/ContractorCalendar.tsx', component: 'ContractorCalendar' },
   { navLabel: 'Clients', route: 'cx-clients', page: 'src/portal/pages/ContractorClients.tsx', component: 'ContractorClients' },
   // Grant Radar's admin review queue. Routed and admin-guarded, with no

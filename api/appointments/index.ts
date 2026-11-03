@@ -5,6 +5,8 @@ import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
+import { reconcileLedger } from '../../lib/commission-ledger.js';
+import { toContractorPayment } from '../../lib/contractor-payments.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
 import { drainOutbox } from '../../lib/notification-drain.js';
 import { maybeSendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
@@ -167,6 +169,42 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse, cont
   if (req.query['_resource'] === 'clients') {
     const clients = await withSchema(() => prisma.client.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } }));
     return res.status(200).json(clients.map((c) => scrubClientForContractor(c as unknown as Record<string, unknown>)));
+  }
+
+  // Payments: the 45-day balances this contractor owes on its OWN won deals —
+  // the total commission, paid and remaining, never the rep/house split.
+  // See lib/contractor-payments.ts for the shape and why.
+  //
+  // Only deals with a balance clock are listed. A deal whose payments were
+  // never recorded would otherwise show the contractor a debt that isn't real,
+  // and the one person this page must not mislead is the one paying.
+  if (req.query['_resource'] === 'payments') {
+    if (!contractorId) return res.status(200).json([]);
+    const rows = await withSchema(() =>
+      prisma.commission.findMany({
+        where: {
+          balanceClockStartedAt: { not: '' },
+          deal: { assignedContractorId: contractorId, status: 'won', isHistorical: false, deletedAt: null },
+        },
+        include: {
+          deal: {
+            select: { id: true, homeownerName: true, projectType: true, city: true, estimatedJobValue: true, financeFeePercent: true, parentDealId: true },
+          },
+        },
+      })
+    );
+    const payments = rows.map(({ deal, ...commission }) => {
+      // Re-derive the total from price × rate rather than trust the stored
+      // one: rows saved before the ledger fix can still hold a total at the
+      // old rate, and this figure is a bill.
+      const derived = reconcileLedger(
+        { ...commission, adminNetPaidCommission: commission.adminNetPaidCommission },
+        {},
+        deal
+      );
+      return toContractorPayment({ deal, commission: { ...commission, ...derived } });
+    });
+    return res.status(200).json(payments);
   }
 
   // Anything else the contractor asks for that isn't the calendar → not available.

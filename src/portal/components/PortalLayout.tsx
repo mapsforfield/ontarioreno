@@ -23,7 +23,7 @@ import {
   TableProperties,
   Trophy,
   UserRound,
-  X, Megaphone
+  X, Megaphone, Wallet
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import PullToRefresh from './PullToRefresh';
@@ -44,6 +44,7 @@ import { torontoToday } from '../lib/time';
 import AdminActivityCenter from './AdminActivityCenter';
 import GlobalSearch from './GlobalSearch';
 import Toaster from './Toaster';
+import ContractorPaymentAlert from './ContractorPaymentAlert';
 
 type NavItem = {
   label: string;
@@ -80,6 +81,7 @@ const navItems: NavItem[] = [
 
 // Contractor accounts get a tiny, read-only nav: just their scoped calendar + clients.
 const contractorNavItems: NavItem[] = [
+  { label: 'Payments', href: '/portal/cx-payments', icon: Wallet },
   { label: 'Calendar', href: '/portal/cx-calendar', icon: CalendarDays },
   { label: 'Clients', href: '/portal/cx-clients', icon: UserRound },
 ];
@@ -194,13 +196,12 @@ export default function PortalLayout() {
       navigate('/portal/dashboard', { replace: true });
     }
   }, [currentUser, isAdmin, isContractor, location.pathname, repAccess, navigate]);
-
-  // Contractors can only ever be on their two scoped pages — anything else
-  // (dashboard, deep links, etc.) bounces to their calendar.
+  // Contractors can only ever be on their scoped cx- pages — anything else
+  // (dashboard, deep links, etc.) bounces to Payments, their dashboard.
   useEffect(() => {
     if (!currentUser || !isContractor) return;
     if (!location.pathname.startsWith('/portal/cx-')) {
-      navigate('/portal/cx-calendar', { replace: true });
+      navigate('/portal/cx-payments', { replace: true });
     }
   }, [currentUser, isContractor, location.pathname, navigate]);
   const mobilePrimaryHrefs = [
@@ -499,6 +500,9 @@ export default function PortalLayout() {
               </button>
             </div>
           )}
+          {/* The contractor pays the 45-day balances; when one is due it is
+              said loudly, on every page of their portal. */}
+          {isContractor && <ContractorPaymentAlert />}
           <div className="mb-6 hidden items-center justify-between lg:flex">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
