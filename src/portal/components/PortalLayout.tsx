@@ -495,7 +495,7 @@ export default function PortalLayout() {
                 onClick={() => setViewAs(null)}
                 className="shrink-0 rounded-[0.4rem] bg-amber-700 px-3 py-1.5 text-xs font-black text-white transition hover:bg-amber-800"
               >
-                Exit rep view
+                {isContractor ? 'Exit contractor view' : 'Exit rep view'}
               </button>
             </div>
           )}
@@ -514,21 +514,34 @@ export default function PortalLayout() {
               {isAdmin && !viewingAsRepId && (
                 <label className="flex items-center gap-2 rounded-full border border-white bg-white px-3 py-2 shadow-sm">
                   <Eye className="h-4 w-4 text-[#1B3C6C]" />
-                  <span className="sr-only">View the portal as a rep</span>
+                  <span className="sr-only">View the portal as a rep or contractor</span>
                   <select
                     value=""
                     onChange={(event) => event.target.value && setViewAs(event.target.value)}
-                    title="See the portal exactly as one of your reps sees it — read-only"
+                    title="See the portal exactly as a rep or contractor sees it — read-only"
                     className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 focus:ring-0"
                   >
-                    <option value="">View as rep…</option>
-                    {users
-                      .filter((user) => user.role === 'rep' && user.active)
-                      .map((rep) => (
-                        <option key={rep.id} value={rep.id}>
-                          {rep.name}
-                        </option>
-                      ))}
+                    <option value="">View as…</option>
+                    <optgroup label="Reps">
+                      {users
+                        .filter((user) => user.role === 'rep' && user.active)
+                        .map((rep) => (
+                          <option key={rep.id} value={rep.id}>
+                            {rep.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                    {users.some((user) => user.role === 'contractor' && user.active) && (
+                      <optgroup label="Contractors">
+                        {users
+                          .filter((user) => user.role === 'contractor' && user.active)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
               )}
