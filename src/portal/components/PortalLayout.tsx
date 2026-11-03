@@ -23,7 +23,7 @@ import {
   TableProperties,
   Trophy,
   UserRound,
-  X, MessageSquare, Megaphone
+  X, Megaphone
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import PullToRefresh from './PullToRefresh';
@@ -73,7 +73,6 @@ const navItems: NavItem[] = [
   { label: 'Performance', href: '/portal/performance', icon: LineChart, feature: 'analytics' },
   { label: 'Advertising', mobileLabel: 'Ads', href: '/portal/advertising', icon: Megaphone },
   { label: 'Call Queue', href: '/portal/workspace', icon: PhoneCall, feature: 'workspace' },
-  { label: 'Conversations', mobileLabel: 'Texts', href: '/portal/conversations', icon: MessageSquare, adminOnly: true },
   { label: 'Submissions', href: '/portal/submissions', icon: Inbox, adminOnly: true },
   { label: 'Invoices', href: '/portal/invoices', icon: ReceiptText, adminOnly: true },
   { label: 'Admin', href: '/portal/admin', icon: ShieldCheck, adminOnly: true },

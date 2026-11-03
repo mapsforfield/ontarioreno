@@ -16,7 +16,28 @@
  */
 import { dealWonDate } from './deal-won-date.ts';
 
-export type BoardPeriod = 'all' | 'today' | 'month' | 'last_month' | 'quarter' | 'year';
+/** `day:YYYY-MM-DD` is one specific day, picked from the calendar — so
+ *  "yesterday" (or any day) doesn't need a button of its own. */
+export type BoardPeriod =
+  | 'all'
+  | 'today'
+  | 'month'
+  | 'last_month'
+  | 'quarter'
+  | 'year'
+  | `day:${string}`;
+
+const DAY_PERIOD = /^day:(\d{4})-(\d{2})-(\d{2})$/;
+
+/** The period for one calendar day. */
+export function dayPeriod(dateKey: string): BoardPeriod {
+  return `day:${dateKey}`;
+}
+
+/** YYYY-MM-DD of a day period, or null for any other period. */
+export function periodDay(period: BoardPeriod): string | null {
+  return DAY_PERIOD.test(period) ? period.slice(4) : null;
+}
 
 export type DealPeriodFields = {
   status: string;
@@ -34,6 +55,11 @@ export function dealPeriodDate(deal: DealPeriodFields): Date {
 
 /** [start, end) of the period in local time, or null for 'all'. */
 export function periodBounds(period: BoardPeriod, now = new Date()): [Date, Date] | null {
+  const day = DAY_PERIOD.exec(period);
+  if (day) {
+    const [, dy, dm, dd] = day.map(Number);
+    return [new Date(dy, dm - 1, dd), new Date(dy, dm - 1, dd + 1)];
+  }
   const y = now.getFullYear();
   const m = now.getMonth();
   switch (period) {
@@ -51,6 +77,8 @@ export function periodBounds(period: BoardPeriod, now = new Date()): [Date, Date
     }
     case 'year':
       return [new Date(y, 0, 1), new Date(y + 1, 0, 1)];
+    default:
+      return null;
   }
 }
 
@@ -69,6 +97,14 @@ export function periodLabel(period: BoardPeriod, now = new Date()): string {
   const [start] = bounds;
   if (period === 'today') {
     return `Today · ${new Intl.DateTimeFormat('en-CA', { month: 'long', day: 'numeric' }).format(start)}`;
+  }
+  if (periodDay(period)) {
+    const dayName = new Intl.DateTimeFormat('en-CA', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }).format(start);
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (start.getTime() === yesterday.getTime()) return `Yesterday · ${dayName}`;
+    if (start.getTime() === today.getTime()) return `Today · ${dayName}`;
+    return dayName;
   }
   if (period === 'month' || period === 'last_month') {
     return new Intl.DateTimeFormat('en-CA', { month: 'long', year: 'numeric' }).format(start);
