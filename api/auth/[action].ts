@@ -289,6 +289,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: user.id, name: user.name, email: user.email, role: user.role,
       avatarInitial: user.avatarInitial, avatarUrl: user.avatarUrl, active: user.active,
       contractorId: user.contractorId ?? null, contractorName,
+      // The real admin's id when "view as" is in effect. The portal treats
+      // its ABSENCE as "the view-as target was refused" and drops the header
+      // (src/portal/auth.tsx) — so leaving it out of this whitelist meant
+      // view-as switched itself off after the first load: the target's name
+      // and layout over the admin's data, with no banner.
+      ...('viewAsOf' in user && user.viewAsOf ? { viewAsOf: user.viewAsOf } : {}),
     });
   }
 
