@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CalendarDays, ArrowRightLeft, Check, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
+import { Archive, CalendarClock, CalendarDays, ArrowRightLeft, Check, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, MessageSquare, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -11,6 +11,8 @@ import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
 import BalanceClockControl from '../components/BalanceClockControl';
+import DealQuickSheet from '../components/DealQuickSheet';
+import MobilePipeline from '../components/MobilePipeline';
 import ChangeOrdersPanel, { InvoiceBadge } from '../components/ChangeOrdersPanel';
 import {
   changeOrdersOf,
@@ -20,6 +22,7 @@ import {
   sameHomeowner,
   type InvoiceLedgerRow,
 } from '../../../lib/change-orders';
+import { type DealSort, getDealAttention, sortDeals } from '../data/dealPriority';
 import { getRecommendedContractors } from '../data/recommendations';
 import {
   formatCurrency,
@@ -331,6 +334,7 @@ export default function PortalDeals() {
     addSalesAgreement,
     getAgreementLink,
     deleteSalesAgreement,
+    isLoading,
   } = usePortalData();
   const visibleDeals = currentUser ? getVisibleDealsForUser(currentUser) : [];
   // Contractor invoice ledger, for the "Not invoiced" check on won deals.
@@ -432,6 +436,22 @@ export default function PortalDeals() {
   // this sheet. It goes through moveDealToStatus like every other route.
   const compactBoard = useCompactBoard();
   const [moveSheetDeal, setMoveSheetDeal] = useState<Deal | null>(null);
+  // Won starts a commission, so it takes a second tap on a phone.
+  const [confirmWonMove, setConfirmWonMove] = useState(false);
+  // A tap on a card opens the quick sheet on phones. An id, not a Deal, so the
+  // sheet shows a saved follow-up or note the moment it lands.
+  const [quickDealId, setQuickDealId] = useState<string | null>(null);
+  const [mobileSort, setMobileSortChoice] = useState<DealSort>(() => {
+    try {
+      const saved = localStorage.getItem('deals.mobileSort');
+      if (saved === 'newest' || saved === 'value' || saved === 'name') return saved;
+    } catch { /* storage unavailable */ }
+    return 'attention';
+  });
+  const setMobileSort = (sort: DealSort) => {
+    setMobileSortChoice(sort);
+    try { localStorage.setItem('deals.mobileSort', sort); } catch { /* ignore */ }
+  };
 
   // ── Bulk "Select mode" (admin) — quarantined so normal click/drag is untouched ──
   const [selectMode, setSelectMode] = useState(false);
@@ -555,6 +575,14 @@ export default function PortalDeals() {
   const boardDeals = boardPeriodActive
     ? filteredDeals.filter((deal) => isDealInPeriod(deal, boardPeriod))
     : filteredDeals;
+  const today = todayIso();
+  const nowMs = Date.now();
+  const attentionDeals = sortDeals(
+    boardDeals.filter((deal) => getDealAttention(deal, today, nowMs)),
+    'attention',
+    today,
+    nowMs
+  );
   // What a stage actually lists. Won and Lost carry their own range toggle, so a
   // raw count would promise deals the list below it doesn't show.
   const stageListDeals = (status: DealStatus) => {
@@ -615,6 +643,23 @@ export default function PortalDeals() {
     }
     // Moving stages implies the pending follow-up was completed — clear it
     updateDeal(deal.id, { status, nextFollowUpDate: '' }, currentUser);
+  };
+
+  // Phones only. A move between open stages can be undone; Won and Lost can't
+  // here, because they have consequences a status flip wouldn't unwind.
+  const moveDealFromPhone = (deal: Deal, status: DealStatus) => {
+    if (deal.status === status || !currentUser) return;
+    const previous = { status: deal.status, nextFollowUpDate: deal.nextFollowUpDate };
+    moveDealToStatus(deal, status);
+    try { navigator.vibrate?.(10); } catch { /* unsupported */ }
+    if (openDealStatuses.includes(deal.status) && openDealStatuses.includes(status)) {
+      showToast({
+        message: `Moved to ${columns.find((col) => col.status === status)?.label ?? status}`,
+        description: deal.homeownerName,
+        duration: 6000,
+        action: { label: 'Undo', onClick: () => updateDeal(deal.id, previous, currentUser) },
+      });
+    }
   };
 
   const loadTrash = async () => {
@@ -694,6 +739,7 @@ export default function PortalDeals() {
   // deal links back to that client record.
   const prefillClientIdRef = useRef<string | null>(null);
   const selectedDeal = visibleDeals.find((deal) => deal.id === selectedDealId);
+  const quickDeal = visibleDeals.find((deal) => deal.id === quickDealId);
   // The commission row backing the drawer's balance clock. Won deals always
   // have one; anything earlier in the pipeline may not, and the panel simply
   // doesn't render rather than inventing a record.
@@ -1236,14 +1282,18 @@ OntarioReno Broker Portal`;
           }}
         />
       )}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
+      <header className="flex flex-col gap-3 max-sm:flex-row max-sm:items-center max-sm:justify-between sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] max-lg:hidden sm:text-sm">
             Deal CRM
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 sm:text-3xl">
-            Pipeline workspace
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] max-lg:mt-0 sm:mt-2 sm:text-3xl">
+            Pipeline<span className="max-sm:hidden"> workspace</span>
           </h1>
+          <p className="mt-0.5 text-sm font-bold text-slate-500 lg:hidden">
+            <span className="text-[#1B3C6C]">{formatCurrency(periodSummary.openValue)}</span>
+            {boardPeriodActive ? ' new' : ' open'} · {periodSummary.openCount} deal{periodSummary.openCount !== 1 ? 's' : ''}
+          </p>
         </div>
         {currentUser && (
           <div className="flex items-center gap-2">
@@ -1252,7 +1302,7 @@ OntarioReno Broker Portal`;
                 type="button"
                 onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
                 className={cn(
-                  'inline-flex items-center justify-center gap-2 rounded-[0.5rem] border px-3.5 py-3 text-sm font-bold shadow-sm transition',
+                  'inline-flex items-center justify-center gap-2 rounded-[0.5rem] border px-3.5 py-3 text-sm font-bold shadow-sm transition max-lg:min-h-11 max-lg:py-2',
                   selectMode
                     ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white hover:bg-[#153158]'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
@@ -1265,7 +1315,7 @@ OntarioReno Broker Portal`;
             <button
               type="button"
               onClick={() => { setTrashOpen(true); loadTrash(); }}
-              className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3.5 py-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              className="relative inline-flex items-center justify-center gap-2 rounded-[0.5rem] border border-slate-200 bg-white px-3.5 py-3 text-sm font-bold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 max-lg:min-h-11 max-lg:py-2"
               title="Trash bin"
             >
               <Trash2 className="h-4 w-4" />
@@ -1279,7 +1329,7 @@ OntarioReno Broker Portal`;
             <button
               type="button"
               onClick={openAddDeal}
-              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158]"
+              className="inline-flex items-center justify-center gap-2 rounded-[0.5rem] bg-[#1B3C6C] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#153158] max-lg:hidden"
             >
               <Plus className="h-4 w-4" />
               Add Deal
@@ -1296,24 +1346,24 @@ OntarioReno Broker Portal`;
         const histTotal = calculateHistoricalSalesTotal(repId);
         if (histCount === 0) return null;
         return (
-          <section className="rounded-[0.5rem] border border-[#c9d9eb] bg-gradient-to-r from-[#e8f1fb] to-[#f6faff] p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <section className="rounded-[0.5rem] border border-[#c9d9eb] bg-gradient-to-r from-[#e8f1fb] to-[#f6faff] p-4 max-lg:px-3 max-lg:py-2.5">
+            <div className="flex flex-col gap-3 max-sm:flex-row max-sm:items-center max-sm:justify-between sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B3C6C]/10">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B3C6C]/10 max-lg:hidden">
                   <Archive className="h-5 w-5 text-[#1B3C6C]" />
                 </div>
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#32639b]">
                     Pre-Portal Career Sales
                   </p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-600">
+                  <p className="mt-0.5 text-sm font-semibold text-slate-600 max-lg:hidden">
                     {histCount} historical deal{histCount !== 1 ? 's' : ''} imported from before the portal — not counted on the leaderboard.
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black text-[#1B3C6C]">{formatCurrency(histTotal)}</p>
-                <p className="text-xs font-semibold text-slate-500">total career sales volume</p>
+                <p className="text-2xl font-black text-[#1B3C6C] max-lg:text-lg">{formatCurrency(histTotal)}</p>
+                <p className="text-xs font-semibold text-slate-500 max-lg:hidden">total career sales volume</p>
               </div>
             </div>
           </section>
@@ -1577,7 +1627,7 @@ OntarioReno Broker Portal`;
           Every stage on screen at once, so nothing here scrolls sideways: the
           four open stages across the top, the outcomes underneath. Tap a stage
           to list it, tap it again (or All) to go back. */}
-      <section className="lg:hidden">
+      <section className={cn('space-y-2 lg:hidden', !selectMode && 'hidden')}>
         <div className="grid grid-cols-12 gap-1.5 rounded-[0.5rem] border border-white bg-white p-2 shadow-sm">
           {columns.filter((col) => openDealStatuses.includes(col.status)).map((col) => {
             const isActive = mobileStageFilter === col.status;
@@ -1628,24 +1678,87 @@ OntarioReno Broker Portal`;
           })}
         </div>
 
-        {/* Stage summary when a filter is active */}
-        {mobileStageFilter && (() => {
-          const stageDeals = stageListDeals(mobileStageFilter);
+        {/* What's listed, and in what order. */}
+        {(() => {
+          const stageDeals = mobileStageFilter ? stageListDeals(mobileStageFilter) : [];
           const stageValue = stageDeals.reduce((sum, d) => sum + d.estimatedJobValue, 0);
           const stageLabel = columns.find((c) => c.status === mobileStageFilter)?.label ?? '';
           return (
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[0.5rem] border border-slate-200 bg-white px-3 py-2">
-              <span className="text-xs font-black text-slate-900">{stageLabel}</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-xs font-bold text-slate-600">
-                {stageDeals.length} deal{stageDeals.length !== 1 ? 's' : ''}
-              </span>
-              <span className="text-slate-300">·</span>
-              <span className="text-xs font-bold text-[#1B3C6C]">{formatCurrency(stageValue)}</span>
+            <div className="flex items-center justify-between gap-2 px-1">
+              <p className="min-w-0 text-xs font-bold text-slate-600">
+                {mobileStageFilter ? (
+                  <>
+                    <span className="font-black text-slate-900">{stageLabel}</span>
+                    {' · '}{stageDeals.length} deal{stageDeals.length !== 1 ? 's' : ''}
+                    {' · '}<span className="text-[#1B3C6C]">{formatCurrency(stageValue)}</span>
+                  </>
+                ) : (
+                  <span className="font-black text-slate-900">All stages</span>
+                )}
+              </p>
+              <select
+                  value={mobileSort}
+                  onChange={(event) => setMobileSort(event.target.value as DealSort)}
+                  aria-label="Sort deals"
+                  className="!w-auto shrink-0 !rounded-full !border-0 !bg-transparent !py-1 !pl-2 !pr-1 text-right !text-base font-bold text-[#1B3C6C] !shadow-none"
+                >
+                  <option value="attention">Most urgent</option>
+                  <option value="newest">Newest</option>
+                  <option value="value">Highest value</option>
+                  <option value="name">Name</option>
+                </select>
             </div>
           );
         })()}
       </section>
+
+      {/* Phones: first load, and a search that finds nothing. Six empty stage
+          boxes say neither of those things. */}
+      {isLoading && visibleDeals.length === 0 && (
+        <div className="space-y-3 lg:hidden" aria-label="Loading deals">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="animate-pulse rounded-[0.5rem] bg-white p-3 shadow-sm">
+              <div className="h-4 w-1/2 rounded bg-slate-200" />
+              <div className="mt-2 h-3 w-3/4 rounded bg-slate-100" />
+              <div className="mt-4 h-4 w-1/4 rounded bg-slate-200" />
+            </div>
+          ))}
+        </div>
+      )}
+      {!isLoading && hasActiveFilters && boardDeals.length === 0 && (
+        <div className="rounded-[0.5rem] bg-white px-4 py-10 text-center shadow-sm lg:hidden">
+          <Search className="mx-auto h-7 w-7 text-slate-300" />
+          <p className="mt-3 text-sm font-bold text-slate-700">No deals match</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-3 min-h-11 rounded-full bg-[#1B3C6C] px-5 text-sm font-bold text-white"
+          >
+            Clear search and filters
+          </button>
+        </div>
+      )}
+
+      {/* ── Phones: the pipeline as one picture. Bulk Select needs every card
+          on the page, so it keeps the list below. ── */}
+      {!selectMode && !(isLoading && visibleDeals.length === 0) && !(!isLoading && hasActiveFilters && boardDeals.length === 0) && (
+        <div className="pb-16 lg:hidden">
+          <MobilePipeline
+            stages={columns.map((col) => ({
+              ...col,
+              deals: sortDeals(stageListDeals(col.status), 'attention', today, nowMs),
+            }))}
+            attentionDeals={attentionDeals}
+            attentionOf={(deal) => getDealAttention(deal, today, nowMs)}
+            searchResults={normalizedQuery ? sortDeals(boardDeals, 'attention', today, nowMs) : null}
+            ranges={boardPeriodActive ? null : {
+              won: { value: wonRange, onChange: setWonRange },
+              lost: { value: lostRange, onChange: setLostRange },
+            }}
+            onOpenDeal={(deal) => setQuickDealId(deal.id)}
+          />
+        </div>
+      )}
 
       {/* Top horizontal scrollbar — mirrors the board so you don't have to scroll
           to the bottom to reach the right-hand columns. */}
@@ -1664,7 +1777,8 @@ OntarioReno Broker Portal`;
         onMouseDown={onBoardMouseDown}
         className={cn(
           'w-full cursor-grab overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable] max-lg:cursor-auto max-lg:overflow-x-visible max-lg:pb-0 max-lg:[scrollbar-gutter:auto]',
-          selectMode && 'max-lg:pb-20'
+          selectMode ? 'max-lg:pb-20' : 'max-lg:pb-16',
+          (!selectMode || (isLoading && visibleDeals.length === 0) || (!isLoading && hasActiveFilters && boardDeals.length === 0)) && 'max-lg:hidden'
         )}
       >
         {/* Columns stretch to fill the width on wide screens (flush with the panels
@@ -1694,7 +1808,7 @@ OntarioReno Broker Portal`;
                 ? rangeFiltered.filter((deal) => getDaysSinceUpdate(deal) < 90)
                 : rangeFiltered;
             const hiddenOlderCount = rangeFiltered.length - recentDeals.length;
-            const columnDeals = recentDeals;
+            const columnDeals = compactBoard ? sortDeals(recentDeals, mobileSort, today, nowMs) : recentDeals;
             const columnTotal = rangeFiltered.reduce((sum, d) => sum + (d.estimatedJobValue || 0), 0);
             const columnTotalLabel = columnTotal > 0
               ? new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(columnTotal)
@@ -1820,11 +1934,17 @@ OntarioReno Broker Portal`;
                               deal,
                             });
                           }}
-                          onClick={() => (selectMode ? toggleSelect(deal.id) : openDeal(deal))}
+                          onClick={() => {
+                            if (selectMode) toggleSelect(deal.id);
+                            else if (compactBoard) setQuickDealId(deal.id);
+                            else openDeal(deal);
+                          }}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
-                              if (selectMode) toggleSelect(deal.id); else openDeal(deal);
+                              if (selectMode) toggleSelect(deal.id);
+                              else if (compactBoard) setQuickDealId(deal.id);
+                              else openDeal(deal);
                             }
                           }}
                           className={cn(
@@ -1871,6 +1991,16 @@ OntarioReno Broker Portal`;
                           <p className="mt-1 text-xs font-semibold text-slate-500 max-lg:break-words max-lg:text-[0.8rem]">
                             {deal.city} - {deal.projectType}
                           </p>
+                          {(() => {
+                            // Overdue and idle already show on the card; a waiting lead doesn't.
+                            const attention = compactBoard ? getDealAttention(deal, today, nowMs) : null;
+                            if (!attention?.reason.startsWith('New lead')) return null;
+                            return (
+                              <p className={cn('mt-1 text-xs font-bold lg:hidden', attention.level === 'urgent' ? 'text-red-600' : 'text-amber-700')}>
+                                {attention.reason}
+                              </p>
+                            );
+                          })()}
                           {(() => {
                             const addOns = changeOrdersOf(visibleDeals, deal.id);
                             if (addOns.length === 0) return null;
@@ -1958,6 +2088,18 @@ OntarioReno Broker Portal`;
                                 >
                                   <Phone className="h-4 w-4" />
                                   Call
+                                </a>
+                              )}
+                              {deal.phone && (
+                                <a
+                                  href={`sms:${deal.phone.replace(/[^+\d]/g, '')}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  draggable={false}
+                                  className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[0.4rem] text-[0.8rem] font-bold text-[#1B3C6C]"
+                                  aria-label={`Text ${deal.homeownerName}`}
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                  Text
                                 </a>
                               )}
                               {deal.email && (
@@ -2129,11 +2271,53 @@ OntarioReno Broker Portal`;
         </div>
       )}
 
+      {/* ── Phones: add a deal, within thumb reach ── */}
+      {currentUser && !selectMode && (
+        <button
+          type="button"
+          onClick={openAddDeal}
+          aria-label="Add Deal"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#1B3C6C] text-white shadow-[0_10px_28px_rgba(27,60,108,0.4)] lg:hidden"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }}
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* ── Phones: the quick view a tap on a card opens ── */}
+      {quickDeal && compactBoard && (
+        <DealQuickSheet
+          key={quickDeal.id}
+          deal={quickDeal}
+          stages={columns}
+          attention={getDealAttention(quickDeal, today, nowMs)}
+          contractorName={contractors.find((c) => c.id === quickDeal.assignedContractorId)?.companyName ?? null}
+          repName={isAdmin ? users.find((u) => u.id === quickDeal.assignedRepId)?.name ?? null : null}
+          appointment={getAppointmentsForDeal(quickDeal.id).find(
+            (appointment) => appointment.appointmentDate >= today && (appointment.status === 'scheduled' || appointment.status === 'confirmed')
+          )}
+          today={today}
+          onClose={() => setQuickDealId(null)}
+          onMove={(status) => {
+            if (status === 'won' || status === 'lost') setQuickDealId(null);
+            moveDealFromPhone(quickDeal, status);
+          }}
+          onSetFollowUp={(date) => {
+            if (currentUser) updateDeal(quickDeal.id, { nextFollowUpDate: date }, currentUser);
+          }}
+          onAddNote={(text) => addDealActivity(quickDeal.id, text, currentUser ?? undefined)}
+          onOpenFull={() => {
+            setQuickDealId(null);
+            openDeal(quickDeal);
+          }}
+        />
+      )}
+
       {/* ── Phones: move a deal between stages ── */}
       {moveSheetDeal && (
         <div
           className="fixed inset-0 z-[120] flex items-end bg-slate-950/45 backdrop-blur-sm lg:hidden"
-          onClick={() => setMoveSheetDeal(null)}
+          onClick={() => { setMoveSheetDeal(null); setConfirmWonMove(false); }}
         >
           <div
             role="dialog"
@@ -2150,7 +2334,7 @@ OntarioReno Broker Portal`;
               </div>
               <button
                 type="button"
-                onClick={() => setMoveSheetDeal(null)}
+                onClick={() => { setMoveSheetDeal(null); setConfirmWonMove(false); }}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500"
                 aria-label="Close"
               >
@@ -2166,9 +2350,11 @@ OntarioReno Broker Portal`;
                     type="button"
                     disabled={isCurrent}
                     onClick={() => {
+                      if (column.status === 'won' && !confirmWonMove) { setConfirmWonMove(true); return; }
                       const deal = moveSheetDeal;
                       setMoveSheetDeal(null);
-                      moveDealToStatus(deal, column.status);
+                      setConfirmWonMove(false);
+                      moveDealFromPhone(deal, column.status);
                     }}
                     className={cn(
                       'flex min-h-[3.25rem] w-full items-center justify-between gap-3 text-left text-base font-bold',
@@ -2181,7 +2367,7 @@ OntarioReno Broker Portal`;
                             : 'text-slate-800'
                     )}
                   >
-                    {column.label}
+                    {column.status === 'won' && confirmWonMove ? 'Tap again to confirm Won' : column.label}
                     {isCurrent && (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400">
                         <Check className="h-3.5 w-3.5" />
