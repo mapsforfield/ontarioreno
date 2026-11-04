@@ -1,5 +1,5 @@
-import { Archive, CalendarClock, CalendarDays, ChevronRight, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
-import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Archive, CalendarClock, CalendarDays, ArrowRightLeft, Check, CircleDollarSign, Clock, Download, FileSignature, FileText, Image as ImageIcon, Mail, Phone, Plus, RotateCcw, Search, Send, SlidersHorizontal, Trash2, Upload, X, XCircle } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
@@ -239,6 +239,23 @@ function todayIso() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+/** Under the lg breakpoint — the same line the portal's bottom nav and
+ *  pull-to-refresh use. Only for what CSS cannot do: a touch drag and a
+ *  long-press menu are behaviour, not layout. */
+function useCompactBoard() {
+  const [compact, setCompact] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+  );
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1023px)');
+    const onChange = () => setCompact(query.matches);
+    onChange();
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  return compact;
+}
+
 type ValueFilter = 'all' | 'under50' | '50to100' | 'over100';
 type RangeFilter = 'month' | 'quarter' | 'year' | 'all';
 
@@ -411,6 +428,10 @@ export default function PortalDeals() {
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<DealStatus | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; deal: Deal } | null>(null);
+  // Phones can't drag a card or right-click one, so "Move" on the card opens
+  // this sheet. It goes through moveDealToStatus like every other route.
+  const compactBoard = useCompactBoard();
+  const [moveSheetDeal, setMoveSheetDeal] = useState<Deal | null>(null);
 
   // ── Bulk "Select mode" (admin) — quarantined so normal click/drag is untouched ──
   const [selectMode, setSelectMode] = useState(false);
@@ -534,6 +555,14 @@ export default function PortalDeals() {
   const boardDeals = boardPeriodActive
     ? filteredDeals.filter((deal) => isDealInPeriod(deal, boardPeriod))
     : filteredDeals;
+  // What a stage actually lists. Won and Lost carry their own range toggle, so a
+  // raw count would promise deals the list below it doesn't show.
+  const stageListDeals = (status: DealStatus) => {
+    const inStage = boardDeals.filter((deal) => deal.status === status);
+    if ((status !== 'won' && status !== 'lost') || boardPeriodActive) return inStage;
+    const range = status === 'lost' ? lostRange : wonRange;
+    return inStage.filter((deal) => isDealInRange(deal, range));
+  };
   const periodSummary = (() => {
     const open = boardDeals.filter((d) => openDealStatuses.includes(d.status));
     const won = boardDeals.filter((d) => d.status === 'won');
@@ -1195,7 +1224,7 @@ OntarioReno Broker Portal`;
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 max-lg:space-y-4 max-lg:overflow-x-clip">
       {lostPrompt && (
         <LostReasonDialog
           dealName={lostPrompt.name}
@@ -1291,16 +1320,16 @@ OntarioReno Broker Portal`;
         );
       })()}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm">
+      <div className="grid gap-4 max-lg:grid-cols-1 max-lg:gap-3 xl:grid-cols-2">
+      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm max-lg:p-3">
         <div className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2.5 transition focus-within:border-[#1B3C6C] focus-within:bg-white">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by name, city, project type, address…"
-            className="w-full rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0 font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+            placeholder={compactBoard ? 'Search deals' : 'Search by name, city, project type, address…'}
+            className="w-full rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0 font-semibold text-slate-900 outline-none placeholder:text-slate-400 max-lg:text-base"
           />
           {searchQuery && (
             <button
@@ -1337,13 +1366,13 @@ OntarioReno Broker Portal`;
             );
           })()}
         </div>
-        <div className={cn('mt-3 flex-wrap items-center gap-2 lg:flex', mobileFiltersOpen ? 'flex' : 'hidden')}>
+        <div className={cn('mt-3 flex-wrap items-center gap-2 max-lg:grid-flow-dense max-lg:grid-cols-2 lg:flex', mobileFiltersOpen ? 'flex max-lg:grid' : 'hidden')}>
           {isAdmin && (
             <select
               value={repFilter}
               onChange={(event) => setRepFilter(event.target.value)}
               className={cn(
-                'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+                'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition max-lg:w-full max-lg:py-2.5 max-lg:text-base',
                 repFilter !== 'all'
                   ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                   : 'border-slate-200 bg-white text-slate-600'
@@ -1361,7 +1390,7 @@ OntarioReno Broker Portal`;
             value={contractorFilter}
             onChange={(event) => setContractorFilter(event.target.value)}
             className={cn(
-              'w-auto max-w-[11rem] rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              'w-auto max-w-[11rem] rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition max-lg:col-span-full max-lg:w-full max-lg:max-w-full max-lg:py-2.5 max-lg:text-base',
               contractorFilter !== 'all'
                 ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                 : 'border-slate-200 bg-white text-slate-600'
@@ -1379,7 +1408,7 @@ OntarioReno Broker Portal`;
             value={valueFilter}
             onChange={(event) => setValueFilter(event.target.value as ValueFilter)}
             className={cn(
-              'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition',
+              'w-auto rounded-full border px-3 py-1.5 text-xs font-bold outline-none transition max-lg:w-full max-lg:py-2.5 max-lg:text-base',
               valueFilter !== 'all'
                 ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C]'
                 : 'border-slate-200 bg-white text-slate-600'
@@ -1394,7 +1423,8 @@ OntarioReno Broker Portal`;
             type="button"
             onClick={() => setStaleOnly((current) => !current)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition max-lg:min-h-11 max-lg:justify-center max-lg:text-sm',
+              isAdmin && 'max-lg:col-span-full',
               staleOnly
                 ? 'border-amber-400 bg-amber-50 text-amber-700'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300'
@@ -1407,7 +1437,7 @@ OntarioReno Broker Portal`;
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-slate-400 transition hover:text-slate-600"
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-slate-400 transition hover:text-slate-600 max-lg:col-span-full max-lg:min-h-11 max-lg:justify-center"
             >
               <X className="h-3 w-3" />
               Clear ({boardDeals.length} of {visibleDeals.length} shown)
@@ -1427,7 +1457,7 @@ OntarioReno Broker Portal`;
               </p>
               <span className="text-sm font-black text-slate-900">{periodLabel(boardPeriod)}</span>
             </div>
-            <div className="flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex rounded-full border border-slate-200 bg-slate-50 p-0.5 max-lg:grid max-lg:w-full max-lg:grid-cols-4 max-lg:gap-0.5 max-lg:rounded-[0.75rem]">
               {([
                 { label: 'All time', value: 'all' },
                 { label: 'Today', value: 'today' },
@@ -1441,7 +1471,7 @@ OntarioReno Broker Portal`;
                   type="button"
                   onClick={() => setBoardPeriod(option.value)}
                   className={cn(
-                    'whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition',
+                    'whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition max-lg:min-h-10 max-lg:rounded-[0.6rem] max-lg:px-1',
                     boardPeriod === option.value
                       ? 'bg-[#1B3C6C] text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800'
@@ -1453,7 +1483,7 @@ OntarioReno Broker Portal`;
               {/* Any single day — yesterday, last Friday — without a button each. */}
               <label
                 className={cn(
-                  'relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition',
+                  'relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-black transition max-lg:col-span-2 max-lg:min-h-10 max-lg:justify-center max-lg:rounded-[0.6rem]',
                   pickedDay ? 'bg-[#1B3C6C] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 )}
                 title="Pick a day"
@@ -1543,84 +1573,64 @@ OntarioReno Broker Portal`;
       )}
       </div>
 
-      {/* ── Mobile pipeline strip ──────────────────────────────── */}
+      {/* ── Mobile pipeline stages ─────────────────────────────────
+          Every stage on screen at once, so nothing here scrolls sideways: the
+          four open stages across the top, the outcomes underneath. Tap a stage
+          to list it, tap it again (or All) to go back. */}
       <section className="lg:hidden">
-        <div className="-mx-4 overflow-x-auto overscroll-x-contain px-4">
-          <div className="flex w-max items-center gap-1 py-1">
-            {/* All pill */}
-            <button
-              type="button"
-              onClick={() => setMobileStageFilter(null)}
-              className={cn(
-                'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[0.68rem] font-bold transition',
-                mobileStageFilter === null
-                  ? 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              )}
-            >
-              All
-              <span
+        <div className="grid grid-cols-12 gap-1.5 rounded-[0.5rem] border border-white bg-white p-2 shadow-sm">
+          {columns.filter((col) => openDealStatuses.includes(col.status)).map((col) => {
+            const isActive = mobileStageFilter === col.status;
+            return (
+              <button
+                key={col.status}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setMobileStageFilter(isActive ? null : col.status)}
                 className={cn(
-                  'flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[0.58rem] font-black',
-                  mobileStageFilter === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  'col-span-3 flex min-h-[3.5rem] min-w-0 flex-col items-center justify-center rounded-[0.4rem] px-0.5 py-1.5 transition',
+                  isActive ? 'bg-[#1B3C6C] text-white' : 'bg-slate-50 text-slate-600'
                 )}
               >
-                {boardDeals.length}
-              </span>
-            </button>
-
-            {columns.map((col, colIndex) => {
-              const stageCount = boardDeals.filter((d) => d.status === col.status).length;
-              const isActive = mobileStageFilter === col.status;
-              const isWon = col.status === 'won';
-              const isLost = col.status === 'lost';
-              const shortLabel = col.label.replace('Appointment ', '');
-
-              return (
-                <Fragment key={col.status}>
-                  {/* Vertical separator before Lost — it's an off-ramp, not a funnel step */}
-                  {isLost ? (
-                    <span className="mx-1 h-5 w-px shrink-0 bg-slate-300" />
-                  ) : colIndex > 0 ? (
-                    <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setMobileStageFilter(isActive ? null : col.status)}
-                    className={cn(
-                      'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[0.68rem] font-bold transition',
-                      isActive
-                        ? isWon
-                          ? 'border-emerald-600 bg-emerald-600 text-white'
-                          : isLost
-                          ? 'border-slate-600 bg-slate-600 text-white'
-                          : 'border-[#1B3C6C] bg-[#1B3C6C] text-white'
-                        : isWon
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                        : isLost
-                        ? 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    )}
-                  >
-                    {shortLabel}
-                    <span
-                      className={cn(
-                        'flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[0.58rem] font-black',
-                        isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
-                      )}
-                    >
-                      {stageCount}
-                    </span>
-                  </button>
-                </Fragment>
-              );
-            })}
-          </div>
+                <span className={cn('text-lg font-black leading-none tabular-nums', !isActive && 'text-slate-900')}>
+                  {stageListDeals(col.status).length}
+                </span>
+                <span className="mt-0.5 max-w-full truncate text-[0.68rem] font-bold leading-tight max-[350px]:text-[0.62rem]">
+                  {col.label.replace('Appointment ', '')}
+                </span>
+              </button>
+            );
+          })}
+          {([
+            { label: 'All', status: null, activeTone: 'bg-[#1B3C6C] text-white', tone: 'bg-slate-50 text-slate-600' },
+            { label: 'Won', status: 'won', activeTone: 'bg-emerald-600 text-white', tone: 'bg-emerald-50 text-emerald-700' },
+            { label: 'Lost', status: 'lost', activeTone: 'bg-slate-600 text-white', tone: 'bg-slate-100 text-slate-500' },
+          ] as Array<{ label: string; status: DealStatus | null; activeTone: string; tone: string }>).map((tile) => {
+            const isActive = mobileStageFilter === tile.status;
+            const count = tile.status
+              ? stageListDeals(tile.status).length
+              : columns.reduce((total, col) => total + stageListDeals(col.status).length, 0);
+            return (
+              <button
+                key={tile.label}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setMobileStageFilter(isActive ? null : tile.status)}
+                className={cn(
+                  'col-span-4 flex min-h-11 items-center justify-center gap-1.5 rounded-[0.4rem] px-1 text-xs font-bold transition',
+                  isActive ? tile.activeTone : tile.tone
+                )}
+              >
+                {tile.label}
+                <span className="font-black tabular-nums">{count}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Stage summary when a filter is active */}
         {mobileStageFilter && (() => {
-          const stageDeals = boardDeals.filter((d) => d.status === mobileStageFilter);
+          const stageDeals = stageListDeals(mobileStageFilter);
           const stageValue = stageDeals.reduce((sum, d) => sum + d.estimatedJobValue, 0);
           const stageLabel = columns.find((c) => c.status === mobileStageFilter)?.label ?? '';
           return (
@@ -1642,7 +1652,7 @@ OntarioReno Broker Portal`;
       <div
         ref={topScrollRef}
         onScroll={syncFromTop}
-        className="hidden w-full overflow-x-auto overscroll-x-contain md:block"
+        className="hidden w-full overflow-x-auto overscroll-x-contain lg:block"
         aria-hidden="true"
       >
         <div style={{ width: boardScrollW, height: 1 }} />
@@ -1652,14 +1662,17 @@ OntarioReno Broker Portal`;
         ref={boardRef}
         onScroll={syncFromBoard}
         onMouseDown={onBoardMouseDown}
-        className="w-full cursor-grab overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable]"
+        className={cn(
+          'w-full cursor-grab overflow-x-auto overscroll-x-contain pb-3 [scrollbar-gutter:stable] max-lg:cursor-auto max-lg:overflow-x-visible max-lg:pb-0 max-lg:[scrollbar-gutter:auto]',
+          selectMode && 'max-lg:pb-20'
+        )}
       >
         {/* Columns stretch to fill the width on wide screens (flush with the panels
             above); below 300px each, the board scrolls sideways instead. */}
         <div
           ref={boardInnerRef}
           style={{ '--deal-cols': columnsToRender.length } as React.CSSProperties}
-          className="grid min-w-full gap-4 md:min-w-[calc(var(--deal-cols)*300px+(var(--deal-cols)-1)*1rem)] md:grid-flow-col md:auto-cols-[minmax(300px,1fr)] md:grid-cols-none"
+          className="grid min-w-full gap-4 max-lg:grid-cols-1 max-lg:gap-5 lg:min-w-[calc(var(--deal-cols)*300px+(var(--deal-cols)-1)*1rem)] lg:grid-flow-col lg:auto-cols-[minmax(300px,1fr)] lg:grid-cols-none"
         >
           {columnsToRender.map((column) => {
             const isWonColumn = column.status === 'won';
@@ -1710,13 +1723,23 @@ OntarioReno Broker Portal`;
                   if (deal) moveDealToStatus(deal, column.status);
                 }}
                 className={cn(
-                  'min-h-[16rem] rounded-[0.5rem] border bg-white p-4 shadow-sm transition',
+                  'min-h-[16rem] rounded-[0.5rem] border bg-white p-4 shadow-sm transition max-lg:min-h-0 max-lg:border-0 max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none',
+                  // "All" on a phone is a list of what exists, not six empty boxes.
+                  !mobileStageFilter && boardDeals.length > 0 && rangeFiltered.length === 0 && 'max-lg:hidden',
                   isDropTarget
                     ? 'border-[#1B3C6C] ring-2 ring-[#1B3C6C]/25'
                     : 'border-white'
                 )}
               >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div
+                  className={cn(
+                    'flex items-center justify-between gap-3 border-b border-slate-200 pb-3',
+                    // The sticky header keeps "which stage am I in" on screen
+                    // through a long list; a picked stage is already named above.
+                    'max-lg:sticky max-lg:top-[calc(env(safe-area-inset-top,0px)+3.3rem)] max-lg:z-10 max-lg:rounded-[0.4rem] max-lg:border-b-0 max-lg:bg-[#eef3f8]/95 max-lg:py-2 max-lg:backdrop-blur',
+                    mobileStageFilter && 'max-lg:hidden'
+                  )}
+                >
                   <div className="min-w-0">
                     <h2 className="whitespace-nowrap text-sm font-black uppercase leading-snug tracking-[0.12em] text-slate-700">
                       {column.label}
@@ -1730,7 +1753,7 @@ OntarioReno Broker Portal`;
                   </span>
                 </div>
                 {isRangeColumn && !boardPeriodActive && allColumnDeals.length > 0 && (
-                  <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                  <div className="mt-3 flex rounded-full border border-slate-200 bg-slate-50 p-0.5 max-lg:bg-white">
                     {([
                       { label: 'Month', value: 'month' },
                       { label: 'Quarter', value: 'quarter' },
@@ -1742,7 +1765,7 @@ OntarioReno Broker Portal`;
                         type="button"
                         onClick={() => setColumnRange(option.value)}
                         className={cn(
-                          'flex-1 rounded-full px-2 py-1 text-[0.65rem] font-black transition',
+                          'flex-1 rounded-full px-2 py-1 text-[0.65rem] font-black transition max-lg:min-h-9 max-lg:text-xs',
                           columnRange === option.value
                             ? 'bg-emerald-600 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-700'
@@ -1754,7 +1777,7 @@ OntarioReno Broker Portal`;
                   </div>
                 )}
                 {columnDeals.length > 0 ? (
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 space-y-3 max-lg:mt-2 md:max-lg:grid md:max-lg:grid-cols-2 md:max-lg:gap-3 md:max-lg:space-y-0">
                     {columnDeals.map((deal) => {
                       const contractor = contractors.find(
                         (candidate) =>
@@ -1775,7 +1798,7 @@ OntarioReno Broker Portal`;
                           key={deal.id}
                           role="button"
                           tabIndex={0}
-                          draggable={!selectMode}
+                          draggable={!selectMode && !compactBoard}
                           onDragStart={(event) => {
                             if (selectMode) { event.preventDefault(); return; }
                             event.dataTransfer.setData('text/deal-id', deal.id);
@@ -1790,6 +1813,7 @@ OntarioReno Broker Portal`;
                             if (selectMode) return;
                             event.preventDefault();
                             event.stopPropagation();
+                            if (compactBoard) { setMoveSheetDeal(deal); return; }
                             setContextMenu({
                               x: Math.min(event.clientX, window.innerWidth - 230),
                               y: Math.min(event.clientY, window.innerHeight - 300),
@@ -1804,8 +1828,8 @@ OntarioReno Broker Portal`;
                             }
                           }}
                           className={cn(
-                            'w-full rounded-[0.5rem] border p-3 text-left transition',
-                            selectMode ? 'cursor-pointer' : 'cursor-grab hover:bg-white active:cursor-grabbing',
+                            'w-full rounded-[0.5rem] border p-3 text-left transition max-lg:min-w-0 max-lg:select-none max-lg:shadow-sm',
+                            selectMode ? 'cursor-pointer' : 'cursor-grab hover:bg-white active:cursor-grabbing max-lg:cursor-pointer',
                             draggingDealId === deal.id && 'opacity-40',
                             selectMode && selectedDealIds.has(deal.id)
                               ? 'border-[#1B3C6C] bg-[#e8f1fb] ring-2 ring-[#1B3C6C]'
@@ -1813,14 +1837,14 @@ OntarioReno Broker Portal`;
                                 ? 'border-red-200 bg-red-50 hover:border-red-300'
                                 : rot?.level === 'warn'
                                   ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
-                                  : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd]'
+                                  : 'border-slate-200 bg-[#fbfdff] hover:border-[#b8c9dd] max-lg:border-white max-lg:bg-white'
                           )}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-black text-slate-950">
+                          <div className="flex items-start justify-between gap-2 max-lg:flex-wrap">
+                            <p className="text-sm font-black text-slate-950 max-lg:min-w-0 max-lg:break-words max-lg:text-base max-lg:leading-snug">
                               {deal.homeownerName}
                             </p>
-                            <div className="flex shrink-0 items-center gap-1.5">
+                            <div className="flex shrink-0 items-center gap-1.5 max-lg:max-w-full max-lg:shrink max-lg:flex-wrap">
                               {rot && (
                                 <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-black ${
                                   rot.level === 'danger'
@@ -1844,7 +1868,7 @@ OntarioReno Broker Portal`;
                               {isAdmin && <InvoiceBadge deal={deal} invoices={invoiceLedger} />}
                             </div>
                           </div>
-                          <p className="mt-1 text-xs font-semibold text-slate-500">
+                          <p className="mt-1 text-xs font-semibold text-slate-500 max-lg:break-words max-lg:text-[0.8rem]">
                             {deal.city} - {deal.projectType}
                           </p>
                           {(() => {
@@ -1857,7 +1881,7 @@ OntarioReno Broker Portal`;
                               </p>
                             );
                           })()}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] font-bold text-slate-400">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.65rem] font-bold text-slate-400 max-lg:text-xs max-lg:text-slate-500">
                             <span className="inline-flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5" />
                               {daysInStage === 0 ? 'Updated today' : `${daysInStage}d in stage`}
@@ -1883,7 +1907,7 @@ OntarioReno Broker Portal`;
                           </div>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-black text-[#1B3C6C]">
+                              <span className="text-sm font-black text-[#1B3C6C] max-lg:text-base">
                                 {formatCurrency(deal.estimatedJobValue)}
                               </span>
                               {deal.phone && (
@@ -1891,7 +1915,7 @@ OntarioReno Broker Portal`;
                                   href={`tel:${deal.phone.replace(/[^+\d]/g, '')}`}
                                   onClick={(event) => event.stopPropagation()}
                                   draggable={false}
-                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] sm:h-7 sm:w-7"
+                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] max-lg:hidden sm:h-7 sm:w-7"
                                   aria-label={`Call ${deal.homeownerName}`}
                                 >
                                   <Phone className="h-3.5 w-3.5" />
@@ -1902,24 +1926,66 @@ OntarioReno Broker Portal`;
                                   href={`mailto:${deal.email}`}
                                   onClick={(event) => event.stopPropagation()}
                                   draggable={false}
-                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] sm:h-7 sm:w-7"
+                                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-[#e8f1fb] hover:text-[#1B3C6C] max-lg:hidden sm:h-7 sm:w-7"
                                   aria-label={`Email ${deal.homeownerName}`}
                                 >
                                   <Mail className="h-3.5 w-3.5" />
                                 </a>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5 max-lg:min-w-0">
                               {isAdmin && rep && (
                                 <span className="rounded-full bg-[#e8f1fb] px-2 py-1 text-[0.65rem] font-bold text-[#1B3C6C]">
                                   {rep.name.split(' ')[0]}
                                 </span>
                               )}
-                              <span className="max-w-full rounded-full bg-slate-100 px-2 py-1 text-[0.65rem] font-bold text-slate-500">
+                              <span className="max-w-full rounded-full bg-slate-100 px-2 py-1 text-[0.65rem] font-bold text-slate-500 max-lg:truncate">
                                 {contractor?.companyName ?? 'Unassigned'}
                               </span>
                             </div>
                           </div>
+                          {/* Phones: thumb-sized actions. Hidden while selecting,
+                              where a tap anywhere on the card must only select. */}
+                          {!selectMode && (
+                            <div className="-mx-1 -mb-1 mt-2.5 flex gap-1 border-t border-slate-200/70 pt-1.5 lg:hidden">
+                              {deal.phone && (
+                                <a
+                                  href={`tel:${deal.phone.replace(/[^+\d]/g, '')}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  draggable={false}
+                                  className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[0.4rem] text-[0.8rem] font-bold text-[#1B3C6C]"
+                                  aria-label={`Call ${deal.homeownerName}`}
+                                >
+                                  <Phone className="h-4 w-4" />
+                                  Call
+                                </a>
+                              )}
+                              {deal.email && (
+                                <a
+                                  href={`mailto:${deal.email}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  draggable={false}
+                                  className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[0.4rem] text-[0.8rem] font-bold text-[#1B3C6C]"
+                                  aria-label={`Email ${deal.homeownerName}`}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                  Email
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMoveSheetDeal(deal);
+                                }}
+                                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[0.4rem] text-[0.8rem] font-bold text-[#1B3C6C]"
+                                aria-label={`Move ${deal.homeownerName} to another stage`}
+                              >
+                                <ArrowRightLeft className="h-4 w-4" />
+                                Move
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1927,7 +1993,7 @@ OntarioReno Broker Portal`;
                       <button
                         type="button"
                         onClick={() => setShowOlderWon(true)}
-                        className="w-full rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                        className="w-full rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 max-lg:col-span-full"
                       >
                         Show {hiddenOlderCount} older deal{hiddenOlderCount !== 1 ? 's' : ''} (90+ days)
                       </button>
@@ -1936,14 +2002,14 @@ OntarioReno Broker Portal`;
                       <button
                         type="button"
                         onClick={() => setShowOlderWon(false)}
-                        className="w-full rounded-[0.5rem] px-3 py-2 text-xs font-bold text-slate-400 transition hover:text-slate-600"
+                        className="w-full rounded-[0.5rem] px-3 py-2 text-xs font-bold text-slate-400 transition hover:text-slate-600 max-lg:col-span-full"
                       >
                         Hide older deals
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div className="mt-6 flex min-h-36 flex-col items-center justify-center rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 text-center">
+                  <div className="mt-6 flex min-h-36 flex-col items-center justify-center rounded-[0.5rem] border border-dashed border-slate-300 bg-slate-50 px-3 text-center max-lg:mt-2 max-lg:bg-white/60">
                     {column.status === 'new_lead' ? (
                       <>
                         <CalendarDays className="h-7 w-7 text-slate-300" />
@@ -1988,7 +2054,7 @@ OntarioReno Broker Portal`;
               value=""
               onChange={(e) => { if (e.target.value) bulkReassign(e.target.value); }}
               disabled={selectedDealIds.size === 0}
-              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50 max-lg:w-auto max-lg:flex-1 max-lg:text-base"
             >
               <option value="">Reassign rep…</option>
               {users.filter((u) => u.role === 'rep').map((r) => (
@@ -1999,7 +2065,7 @@ OntarioReno Broker Portal`;
               value=""
               onChange={(e) => { if (e.target.value) bulkSetStatus(e.target.value as DealStatus); }}
               disabled={selectedDealIds.size === 0}
-              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+              className="rounded-[0.5rem] border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50 max-lg:w-auto max-lg:flex-1 max-lg:text-base"
             >
               <option value="">Set status…</option>
               {columns.map((c) => (
@@ -2060,6 +2126,73 @@ OntarioReno Broker Portal`;
                 {column.label}
               </button>
             ))}
+        </div>
+      )}
+
+      {/* ── Phones: move a deal between stages ── */}
+      {moveSheetDeal && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end bg-slate-950/45 backdrop-blur-sm lg:hidden"
+          onClick={() => setMoveSheetDeal(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Move ${moveSheetDeal.homeownerName}`}
+            className="portal-sheet max-h-[85dvh] w-full overflow-y-auto rounded-t-[1rem] bg-white px-4 pt-4 shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">Move to</p>
+                <p className="mt-1 break-words text-lg font-black text-slate-950">{moveSheetDeal.homeownerName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMoveSheetDeal(null)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 divide-y divide-slate-100">
+              {columns.map((column) => {
+                const isCurrent = column.status === moveSheetDeal.status;
+                return (
+                  <button
+                    key={column.status}
+                    type="button"
+                    disabled={isCurrent}
+                    onClick={() => {
+                      const deal = moveSheetDeal;
+                      setMoveSheetDeal(null);
+                      moveDealToStatus(deal, column.status);
+                    }}
+                    className={cn(
+                      'flex min-h-[3.25rem] w-full items-center justify-between gap-3 text-left text-base font-bold',
+                      isCurrent
+                        ? 'text-slate-400'
+                        : column.status === 'won'
+                          ? 'text-emerald-700'
+                          : column.status === 'lost'
+                            ? 'text-red-600'
+                            : 'text-slate-800'
+                    )}
+                  >
+                    {column.label}
+                    {isCurrent && (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400">
+                        <Check className="h-3.5 w-3.5" />
+                        Current
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -3209,7 +3342,7 @@ OntarioReno Broker Portal`;
                 };
                 return (
                   <section className="mt-6 rounded-[0.5rem] border border-emerald-200 bg-emerald-50/60 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3 max-lg:flex-wrap">
                       <div>
                         <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Sales Agreement</p>
                         <h3 className="mt-1 text-lg font-black text-slate-950">Signed Agreement</h3>
