@@ -107,6 +107,11 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
                 </Link>
               </li>
               <li>
+                <Link to="/commercial" className="transition-colors hover:text-[#5694CF]">
+                  Commercial
+                </Link>
+              </li>
+              <li>
                 <Link to="/costs" className="transition-colors hover:text-[#5694CF]">
                   2026 Cost Guides
                 </Link>

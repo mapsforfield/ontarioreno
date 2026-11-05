@@ -2,6 +2,16 @@
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, requireAdmin, denyContractor, getTokenFromRequest } from '../../lib/auth.js';
 import { randomUUID } from 'node:crypto';
+import {
+  COMMERCIAL_FILE_RULES,
+  commercialAlert,
+  commercialFileKey,
+  commercialNotes,
+  commercialSourceDetail,
+  isAllowedCommercialFile,
+  parseCommercialInquiry,
+  type CommercialFile,
+} from '../../lib/commercial-inquiry.js';
 import { deleteObject, isR2Configured, objectSize, presignGetUrl, presignPutUrl } from '../../lib/r2.js';
 import {
   isAllowedQuoteFile,
@@ -2357,6 +2367,9 @@ const PUBLIC_RATE_RULES: Record<string, RateLimitRule> = {
   // /match documents: the same presign, and one attach per submission.
   project_presign: { limit: 30, windowMs: 60 * 60_000 },
   project_files: { limit: 10, windowMs: 60 * 60_000 },
+  // /commercial: up to ten drawing files a submission, plus retries.
+  commercial_presign: { limit: 40, windowMs: 60 * 60_000 },
+  commercial_inquiry: { limit: 10, windowMs: 60 * 60_000 },
 };
 
 const publicLimiter = createRateLimiter();
@@ -2657,6 +2670,115 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
         },
       });
     }
+
+    await drainOutbox().catch(() => null);
+    await ringDoorbell();
+    return res.status(201).json({ ok: true, leadRef: lead.id });
+  }
+
+  // ── /commercial: presigned upload for a drawing set ──
+  //
+  // Same private bucket and same login-gated `?quote_file=` route as /windows,
+  // under its own prefix and with room for a real drawing set. A presigned PUT
+  // cannot cap size, so `commercial_inquiry` re-checks what actually landed.
+  if (flow === 'commercial_presign' && req.method === 'POST') {
+    if (!isR2Configured()) {
+      return res.status(503).json({ error: 'Uploads are not available right now. Paste a link to your drawings instead.' });
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const type = clean(body.type);
+    const size = Number(body.size ?? 0);
+    if (!isAllowedCommercialFile(type, size)) {
+      return res.status(400).json({ error: `Files must be PDF, DWG, DXF, PLN, JPG, PNG or ZIP, up to ${COMMERCIAL_FILE_RULES.maxBytes / 1024 / 1024} MB each.` });
+    }
+    const key = commercialFileKey(randomUUID(), clean(body.name));
+    return res.status(200).json({ uploadUrl: presignPutUrl(key), key });
+  }
+
+  // ── /commercial: the inquiry form, both paths → create or enrich a Lead ──
+  //
+  // Mirrors `windows_quote`: unassigned, admin alert only, nothing texted to
+  // the sender. Deliberately sends NO Meta Lead event, server or browser: the
+  // homeowner ad campaigns optimise on that event, and a general contractor is
+  // not the audience they should learn from.
+  if (flow === 'commercial_inquiry' && req.method === 'POST') {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const parsed = parseCommercialInquiry(body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const q = parsed.value;
+
+    const files: CommercialFile[] = [];
+    for (const f of q.files) {
+      const stored = await objectSize(f.key).catch(() => null);
+      if (stored == null) {
+        return res.status(400).json({ error: `"${f.name || 'A file'}" did not finish uploading. Please add it again.` });
+      }
+      if (stored > COMMERCIAL_FILE_RULES.maxBytes) {
+        await deleteObject(f.key).catch(() => null);
+        return res.status(400).json({ error: `"${f.name || 'A file'}" is over ${COMMERCIAL_FILE_RULES.maxBytes / 1024 / 1024} MB.` });
+      }
+      files.push({ ...f, size: stored });
+    }
+
+    const submittedAt = new Date().toISOString();
+    const incoming = importLeadData({
+      name: q.name,
+      phone: q.phone,
+      email: q.email,
+      city: q.city,
+      projectType: 'Commercial',
+      source: 'website_intake',
+      sourceDetail: commercialSourceDetail(q),
+      notes: commercialNotes(q, submittedAt),
+    });
+
+    const lead = await withTables(async () => {
+      const existing = await findExistingLead(incoming);
+      if (existing) {
+        const { patch } = mergeLeadPatch(existing as unknown as Record<string, unknown>, incoming, false, false);
+        // Appended, never replaced, so links in an earlier alert stay correct.
+        const prior = Array.isArray(existing.quoteFiles) ? (existing.quoteFiles as unknown as CommercialFile[]) : [];
+        if (files.length > 0) patch.quoteFiles = [...prior, ...files];
+        if (Object.keys(patch).length > 0) {
+          await prisma.lead.update({ where: { id: existing.id }, data: patch as never });
+        }
+        return { id: existing.id, fileOffset: prior.length };
+      }
+      const created = await prisma.lead.create({
+        data: {
+          ...incoming,
+          ...(files.length > 0 ? { quoteFiles: files } : {}),
+          ...attributionFields(body.attribution, incoming.sourceDetail),
+        } as never,
+      });
+      return { id: created.id, fileOffset: 0 };
+    });
+
+    const alert = commercialAlert(
+      { ...q, files },
+      lead.id,
+      (i) => `https://ontarioreno.ca/api/leads?quote_file=1&lead=${encodeURIComponent(lead.id)}&i=${lead.fileOffset + i}`,
+    );
+    const recipients = [teamInbox(), archiveInbox()].filter((a, i, all) => a && all.indexOf(a) === i);
+    await prisma.notificationOutbox
+      .createMany({
+        data: recipients.map((recipient) => ({
+          leadId: lead.id,
+          channel: 'email',
+          kind: 'lead_alert',
+          recipient,
+          subject: alert.subject,
+          body: alert.body,
+          html: '',
+          sendAfter: submittedAt,
+          expiresAt: '',
+          idempotencyKey: `${lead.id}:email:commercial_inquiry:${clean(body.eventId) || submittedAt}:${recipient}`,
+        })),
+        skipDuplicates: true,
+      })
+      .catch((err) => {
+        console.error('[flow/commercial_inquiry] could not queue alert:', err);
+      });
 
     await drainOutbox().catch(() => null);
     await ringDoorbell();
