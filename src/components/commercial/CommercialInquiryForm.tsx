@@ -205,13 +205,13 @@ export function CommercialInquiryForm({
   );
 
   return (
-    <form onSubmit={onSubmit} noValidate className="rounded-[1.1rem] bg-white p-5 shadow-xl sm:p-8" aria-label="Commercial inquiry form">
+    <form onSubmit={onSubmit} noValidate className="rounded-[1.1rem] bg-white p-4 shadow-xl sm:p-8" aria-label="Commercial inquiry form">
       <div role="tablist" aria-label="Who is this for?" className="flex gap-1 rounded-[0.85rem] bg-slate-100 p-1">
-        {tab('tender', "I'm a general contractor")}
+        {tab('tender', 'General contractor')}
         {tab('project', 'I need a quote')}
       </div>
 
-      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+      <div className="mt-5 grid gap-4 sm:mt-6 sm:grid-cols-2 sm:gap-5">
         <Field label="Company" htmlFor="cm-company">
           <input id="cm-company" value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" required className={formStyles.field} />
         </Field>
@@ -267,7 +267,7 @@ export function CommercialInquiryForm({
           inputMode="url"
           value={drawingsLink}
           onChange={(e) => setDrawingsLink(e.target.value)}
-          placeholder="Paste the link to your drawing package"
+          placeholder="Paste your link here"
           className={`${formStyles.field} mt-2`}
         />
         <p className="mt-1.5 text-xs text-slate-600">The fastest way to send a large package. Make sure the link is shared so we can open it.</p>
@@ -299,7 +299,10 @@ export function CommercialInquiryForm({
           }`}
         >
           <Upload className="h-6 w-6 text-[#1B3C6C]" aria-hidden="true" />
-          <span className="mt-2 text-sm font-bold text-slate-800">Drop files here or choose from your computer</span>
+          <span className="mt-2 text-sm font-bold text-slate-800">
+            <span className="sm:hidden">Tap to choose files</span>
+            <span className="hidden sm:inline">Drop files here or choose from your computer</span>
+          </span>
           <span className="mt-3 flex flex-wrap justify-center gap-1.5">
             {['DWG', 'DXF', 'PLN', 'PDF', 'ZIP'].map((format) => (
               <span key={format} className="rounded border border-[#2b5a96]/30 bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1B3C6C]">
