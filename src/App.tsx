@@ -40,6 +40,8 @@ const BathroomRenovations = lazy(() => import('./pages/BathroomRenovations'));
 const BathroomRenovationsNext = lazy(() => import('./pages/BathroomRenovationsNext'));
 // Windows & doors: the beat-your-quote landing page (Meta ads + partner links).
 const WindowsDoors = lazy(() => import('./pages/WindowsDoors'));
+// Commercial millwork and fit-outs: tenders from GCs, quotes from businesses.
+const Commercial = lazy(() => import('./pages/Commercial'));
 const Costs = lazy(() => import('./pages/Costs'));
 const Match = lazy(() => import('./pages/Match'));
 const BookConsultation = lazy(() => import('./pages/BookConsultation'));
@@ -258,6 +260,7 @@ export default function App({ location }: { location?: string } = {}) {
           <Route path="kitchen-renovations" element={<KitchenRenovationsNext />} />
           <Route path="bathroom-renovations" element={<BathroomRenovationsNext />} />
           <Route path="windows" element={<WindowsDoors />} />
+          <Route path="commercial" element={<Commercial />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
           <Route path="book" element={<BookConsultation />} />

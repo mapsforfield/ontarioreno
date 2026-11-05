@@ -46,7 +46,7 @@ type UploadState = {
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
 
 /** utm_source / utm_campaign / ref: from this URL, else from the visit's first page. */
-function readTracking() {
+export function readTracking() {
   const pick = (search: string) => {
     const q = new URLSearchParams(search);
     return { utmSource: q.get('utm_source') ?? '', utmCampaign: q.get('utm_campaign') ?? '', ref: q.get('ref') ?? '' };
@@ -61,7 +61,7 @@ function readTracking() {
   };
 }
 
-function putFile(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+export function putFile(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
@@ -75,11 +75,11 @@ function putFile(url: string, file: File, onProgress: (pct: number) => void): Pr
   });
 }
 
-function formatSize(bytes: number) {
+export function formatSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function ChoiceGroup({
+export function ChoiceGroup({
   label,
   name,
   options,
@@ -124,7 +124,7 @@ function ChoiceGroup({
   );
 }
 
-function Field({ label, children, htmlFor }: { label: string; htmlFor: string; children: ReactNode }) {
+export function Field({ label, children, htmlFor }: { label: string; htmlFor: string; children: ReactNode }) {
   return (
     <div>
       <label htmlFor={htmlFor} className={formStyles.label}>

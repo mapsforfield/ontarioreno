@@ -76,6 +76,10 @@ export default function Navbar() {
       items: [{ name: 'Windows & Doors', href: '/windows' }],
     },
     {
+      label: 'Commercial',
+      items: [{ name: 'Commercial Millwork & Fit-Outs', href: '/commercial' }],
+    },
+    {
       label: 'Planning',
       items: [{ name: 'Cost Guides', href: '/costs' }],
     },
