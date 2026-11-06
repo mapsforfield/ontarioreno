@@ -28,8 +28,8 @@ import type { CommercialPath } from '../../lib/commercial-inquiry';
  * show the contractor headline until the JavaScript arrived. Kept out of Google
  * (noindex, canonical to /commercial, left out of the sitemap).
  *
- * Photos: everything under "Recent commercial work" is a real job. The hero is
- * a design RENDER, so it must never be captioned or moved there as past work.
+ * Photos: everything under "Recent commercial work" is a real job. Both heroes
+ * are design illustrations, so never caption them or move them there as past work.
  * Captions name no client and no contractor.
  */
 
@@ -147,6 +147,9 @@ const OWNER_PROOF = PROOF.map((item) => (item.label === 'Project size' ? { ...it
 /** The next step for an owner. Used by the hero and the phone bar. */
 const OWNER_CTA = 'Get a free consultation';
 
+/** Shown on the owner version only. */
+const OWNER_PHONE = { label: '647-988-5484', href: 'tel:+16479885484' };
+
 const BUILDS = [
   'Reception desks',
   'Feature walls',
@@ -167,6 +170,8 @@ const STEPS = [
 
 export default function Commercial({ audience }: { audience?: 'owner' }) {
   const owner = audience === 'owner';
+  // Both heroes are illustrations, never past work: no caption, keep them out of Recent work.
+  const hero = owner ? 'owner-hero' : 'hero';
   const [path, setPath] = useState<CommercialPath>(owner ? 'project' : 'tender');
   const [workFilter, setWorkFilter] = useState<WorkFilter>('All');
   const cases = CASES.filter((job) => workFilter === 'All' || job.category === workFilter);
@@ -221,12 +226,18 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
       {/* ---- Hero ---- */}
       <section className="relative overflow-hidden">
         <img
-          src={`${IMG}/hero-1800w.webp`}
-          srcSet={`${IMG}/hero-900w.webp 900w, ${IMG}/hero-1800w.webp 1800w`}
+          src={`${IMG}/${hero}-1800w.webp`}
+          srcSet={`${IMG}/${hero}-900w.webp 900w, ${IMG}/${hero}-1800w.webp 1800w`}
           sizes="100vw"
-          alt="Curved reception desk with a fluted wood front against a slatted wood wall"
+          alt={
+            owner
+              ? 'Design illustration of a restaurant interior'
+              : 'Curved reception desk with a fluted wood front against a slatted wood wall'
+          }
           fetchPriority="high"
-          className="h-44 w-full object-cover object-right sm:h-72 lg:absolute lg:right-0 lg:top-0 lg:h-full lg:w-[60%]"
+          className={`h-44 w-full object-cover sm:h-72 lg:absolute lg:right-0 lg:top-0 lg:h-full lg:w-[60%] ${
+            owner ? 'object-center' : 'object-right'
+          }`}
         />
         <div
           className="absolute inset-0 hidden bg-[linear-gradient(90deg,#0B1424_40%,rgba(11,20,36,0.75)_47%,rgba(11,20,36,0)_60%)] lg:block"
@@ -275,6 +286,14 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
                 </>
               )}
             </div>
+            {owner ? (
+              <p className="mt-3 text-sm text-slate-300 sm:text-base">
+                Or call{' '}
+                <a href={OWNER_PHONE.href} className="font-bold text-white underline underline-offset-4">
+                  {OWNER_PHONE.label}
+                </a>
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -416,6 +435,14 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
                 ? "Send what you have and you'll hear back within one business day."
                 : 'Your drawings stay private. They are shared only with the trades pricing your project.'}
             </p>
+            {owner ? (
+              <p className="mt-3 text-base text-slate-300">
+                Rather talk? Call{' '}
+                <a href={OWNER_PHONE.href} className="font-bold text-white underline underline-offset-4">
+                  {OWNER_PHONE.label}
+                </a>
+              </p>
+            ) : null}
           </div>
           <CommercialInquiryForm path={path} onPathChange={setPath} audience={audience} />
         </div>
@@ -424,19 +451,29 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
       {/* ---- Phone action bar ---- */}
       <div
         aria-hidden={!showPhoneBar}
-        className={`fixed inset-x-0 bottom-0 z-40 grid gap-2 border-t ${owner ? 'grid-cols-1' : 'grid-cols-2'} border-white/10 bg-[#0B1424]/95 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur transition-transform duration-200 sm:hidden ${
+        className={`fixed inset-x-0 bottom-0 z-40 grid gap-2 border-t ${owner ? 'grid-cols-[1fr_auto]' : 'grid-cols-2'} border-white/10 bg-[#0B1424]/95 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur transition-transform duration-200 sm:hidden ${
           showPhoneBar ? 'translate-y-0' : 'pointer-events-none translate-y-full'
         }`}
       >
         {owner ? (
-          <button
-            type="button"
-            tabIndex={showPhoneBar ? 0 : -1}
-            onClick={() => goToForm('project')}
-            className="min-h-[3rem] rounded-[0.7rem] bg-white text-sm font-bold text-[#0B1424]"
-          >
-            {OWNER_CTA}
-          </button>
+          <>
+            <button
+              type="button"
+              tabIndex={showPhoneBar ? 0 : -1}
+              onClick={() => goToForm('project')}
+              className="min-h-[3rem] rounded-[0.7rem] bg-white text-sm font-bold text-[#0B1424]"
+            >
+              {OWNER_CTA}
+            </button>
+            <a
+              href={OWNER_PHONE.href}
+              tabIndex={showPhoneBar ? 0 : -1}
+              aria-label={`Call ${OWNER_PHONE.label}`}
+              className="inline-flex min-h-[3rem] items-center justify-center rounded-[0.7rem] border border-white/30 px-5 text-sm font-bold text-white"
+            >
+              Call
+            </a>
+          </>
         ) : (
           <>
             <button
