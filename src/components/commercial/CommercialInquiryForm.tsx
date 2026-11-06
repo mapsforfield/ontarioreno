@@ -325,7 +325,7 @@ export function CommercialInquiryForm({
   return (
     <form onSubmit={onSubmit} noValidate className="rounded-[1.1rem] bg-white p-4 shadow-xl sm:p-8" aria-label="Commercial inquiry form">
       <div role="tablist" aria-label="Who is this for?" className="flex gap-1 rounded-[0.85rem] bg-slate-100 p-1">
-        {audience === 'owner' ? tab('project', 'Free consultation') : tab('tender', 'General contractor')}
+        {audience === 'owner' ? tab('project', 'I need a quote') : tab('tender', 'General contractor')}
         {audience === 'owner' ? tab('tender', 'General contractor') : tab('project', 'I need a quote')}
       </div>
 
