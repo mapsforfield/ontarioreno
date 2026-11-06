@@ -7,10 +7,12 @@ import {
   commercialFileKey,
   commercialFileType,
   commercialNotes,
+  canOpenLeadFile,
   commercialSourceDetail,
   isAllowedCommercialFile,
   isCommercialFileKey,
   isIsoDate,
+  leadFilesFor,
   normalizeDrawingsLink,
   parseCommercialInquiry,
 } from './commercial-inquiry';
@@ -127,6 +129,28 @@ test('every owner business type is a stored project type', () => {
   for (const { value } of COMMERCIAL_OWNER_BUSINESS_TYPES) {
     assert.equal(parsed({ ...project, projectType: value }).projectType, value);
   }
+});
+
+test('a rep opens commercial files on their own leads and nothing else', () => {
+  const steven = { id: 'steven', role: 'rep' };
+  const commercial = commercialFileKey(uuid, 'plan.pdf');
+  const quote = `window-quotes/${uuid}/quote.pdf`;
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, commercial), true);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, quote), false);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'keven' }, commercial), false);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: null }, commercial), false);
+  assert.equal(canOpenLeadFile({ id: 'pj', role: 'contractor' }, { assignedRepId: 'pj' }, commercial), false);
+  assert.equal(canOpenLeadFile({ id: 'me', role: 'admin' }, { assignedRepId: null }, quote), true);
+});
+
+test('the listed files keep their real position, and reps only see commercial ones', () => {
+  const files = [
+    { key: `window-quotes/${uuid}/quote.pdf`, name: 'quote.pdf' },
+    { key: commercialFileKey(uuid, 'plan.pdf'), name: 'plan.pdf' },
+  ];
+  assert.deepEqual(leadFilesFor(files, false), [{ index: 1, name: 'plan.pdf' }]);
+  assert.equal(leadFilesFor(files, true).length, 2);
+  assert.deepEqual(leadFilesFor(null, true), []);
 });
 
 test('isIsoDate accepts real dates only', () => {

@@ -135,6 +135,39 @@ export function isCommercialFileKey(key: string): boolean {
   return KEY_PATTERN.test(key) && !key.includes('..');
 }
 
+/**
+ * Who may open a file stored on a lead. Admins may open any. A rep may open a
+ * COMMERCIAL file on a lead assigned to them, and nothing else: window quotes
+ * and /match documents stay admin-only, and contractor accounts get none.
+ * Reassigning the lead ends the access.
+ */
+export function canOpenLeadFile(
+  user: { id: string; role: string },
+  lead: { assignedRepId?: string | null },
+  fileKey: string,
+): boolean {
+  if (user.role === 'admin') return true;
+  return (
+    user.role === 'rep' &&
+    Boolean(lead.assignedRepId) &&
+    lead.assignedRepId === user.id &&
+    fileKey.startsWith(COMMERCIAL_FILE_PREFIX)
+  );
+}
+
+/**
+ * The files to list on a lead, keeping each one's position in Lead.quoteFiles,
+ * because that position is what the file link addresses.
+ */
+export function leadFilesFor(files: unknown, isAdmin: boolean): { index: number; name: string }[] {
+  if (!Array.isArray(files)) return [];
+  return files.flatMap((file, index) => {
+    const key = String((file as { key?: unknown } | null)?.key ?? '');
+    if (!key || (!isAdmin && !key.startsWith(COMMERCIAL_FILE_PREFIX))) return [];
+    return [{ index, name: String((file as { name?: unknown }).name ?? '') || `File ${index + 1}` }];
+  });
+}
+
 /** A real calendar date as YYYY-MM-DD. Rejects 2026-02-31. */
 export function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

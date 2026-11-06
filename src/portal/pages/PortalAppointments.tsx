@@ -31,7 +31,8 @@ import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import FinanceTab from '../components/FinanceTab';
 import HomeownerAnswers from '../components/HomeownerAnswers';
-import { sameHomeowner } from '../data/clientLinks';
+import LeadFiles from '../components/LeadFiles';
+import { phoneKey, sameHomeowner } from '../data/clientLinks';
 import { visibilityPartnerIds } from '../data/repVisibility';
 import { showToast } from '../lib/toast';
 import { torontoToday, localDateKey } from '../lib/time';
@@ -770,6 +771,7 @@ export default function PortalAppointments() {
     contractors,
     daysOff,
     deals,
+    leads,
     deleteAppointment,
     restoreAppointment,
     purgeAppointment,
@@ -1034,6 +1036,16 @@ export default function PortalAppointments() {
   // them so a repeat customer's application doesn't have to be retyped — the
   // application is stored per consultation, so a second booking used to open
   // an empty form.
+  // Commercial consultations are booked by hand, so the lead is matched by id,
+  // then by phone. This is where a rep sees that lead's uploaded files.
+  const selectedLead = selectedAppointment
+    ? leads.find((lead) => lead.id === selectedAppointment.leadId) ??
+      leads.find((lead) => {
+        const phone = phoneKey(selectedAppointment.phone);
+        return Boolean(phone) && phoneKey(lead.phone) === phone && Boolean(lead.quoteFiles);
+      })
+    : undefined;
+
   const relatedFinanceAppointments = selectedAppointment
     ? visibleAppointments
         .filter((a) => a.id !== selectedAppointment.id && sameHomeowner(a, selectedAppointment))
@@ -4110,6 +4122,7 @@ export default function PortalAppointments() {
                   </div>
                 </div>
                 {selectedAppointment && <HomeownerAnswers appointmentId={selectedAppointment.id} />}
+                {selectedLead && <LeadFiles lead={selectedLead} isAdmin={isAdmin} />}
                 <div
                   className={`mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 ${form.internalNotes?.trim() ? 'cursor-pointer hover:bg-amber-100 transition-colors' : ''}`}
                   onClick={() => form.internalNotes?.trim() && setNotesModal(form.internalNotes)}
