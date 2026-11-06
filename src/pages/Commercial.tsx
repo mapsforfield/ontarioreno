@@ -148,7 +148,7 @@ const OWNER_PROOF = PROOF.map((item) => (item.label === 'Project size' ? { ...it
 const OWNER_CTA = 'Get a free consultation';
 
 /** Shown on the owner version only. */
-const OWNER_PHONE = { label: '647-988-5484', href: 'tel:+16479885484' };
+const OWNER_PHONE = { label: '647-558-5900', href: 'tel:+16475585900' };
 
 const BUILDS = [
   'Reception desks',
