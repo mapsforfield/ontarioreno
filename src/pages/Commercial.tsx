@@ -307,7 +307,7 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
 
       {/* ---- Whose date ---- */}
       <section className="mx-auto max-w-[76rem] px-5 py-12 sm:px-8 sm:py-16">
-        <h2 className="max-w-[34rem] text-3xl font-bold tracking-[-0.02em] [text-wrap:balance] sm:text-4xl">Whose date are you working to?</h2>
+        <h2 className="max-w-[34rem] text-3xl font-bold tracking-[-0.02em] [text-wrap:balance] sm:text-4xl">{owner ? 'Who we work with' : 'Whose date are you working to?'}</h2>
         <div className={`-mx-5 mt-6 flex snap-x snap-mandatory scroll-px-5 gap-3 px-5 sm:mx-0 sm:mt-8 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-4 ${SWIPE}`}>
           {(owner ? OWNER_BUYERS : BUYERS).map(({ image, alt, date, title, body }) => (
             <article key={title} className="w-[84%] shrink-0 snap-start overflow-hidden rounded-[1rem] border border-white/10 bg-[#101C31] sm:w-auto">
