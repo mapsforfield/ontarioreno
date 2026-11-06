@@ -7,6 +7,7 @@ import { ChoiceGroup, Field, formatSize, putFile, readTracking } from '../window
 import {
   COMMERCIAL_CONSENT_TEXT,
   COMMERCIAL_FILE_RULES,
+  COMMERCIAL_OWNER_BUSINESS_TYPES,
   COMMERCIAL_PROJECT_TYPES,
   COMMERCIAL_ROLES,
   commercialFileType,
@@ -23,6 +24,10 @@ import {
  * packages actually travel. Files go straight from the browser to
  * private storage (see `commercial_presign` in api/leads/index.ts), and the
  * admin opens them through a login-gated link.
+ *
+ * /commercial/owners passes `audience="owner"`: the quote tab comes first and
+ * drops to the short form (name, email, phone, city, business type, opening
+ * day), with plans and notes folded away. The contractor tab stays whole.
  *
  * Validation lives in lib/commercial-inquiry.ts and the server re-runs it.
  */
@@ -44,10 +49,13 @@ const MAX_MB = COMMERCIAL_FILE_RULES.maxBytes / 1024 / 1024;
 export function CommercialInquiryForm({
   path,
   onPathChange,
+  audience,
 }: {
   path: CommercialPath;
   onPathChange: (p: CommercialPath) => void;
+  audience?: 'owner';
 }) {
+  const short = audience === 'owner' && path === 'project';
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [company, setCompany] = useState('');
   const [name, setName] = useState('');
@@ -85,7 +93,7 @@ export function CommercialInquiryForm({
     setError('');
     const room = COMMERCIAL_FILE_RULES.maxFiles - uploads.length;
     const picked = Array.from(fileList).slice(0, Math.max(0, room));
-    if (fileList.length > room) setError(`Up to ${COMMERCIAL_FILE_RULES.maxFiles} files. For a larger set, paste a link above.`);
+    if (fileList.length > room) setError(`Up to ${COMMERCIAL_FILE_RULES.maxFiles} files.${short ? '' : ' For a larger set, paste a link above.'}`);
 
     await Promise.all(
       picked.map(async (file) => {
@@ -96,7 +104,7 @@ export function CommercialInquiryForm({
         const entry: UploadState = { id, name: file.name, size: file.size, type, status: 'uploading', progress: 0 };
         if (tooBig || wrongType) {
           entry.status = 'error';
-          entry.error = wrongType ? 'PDF, DWG, DXF, PLN, JPG, PNG or ZIP only' : `Over ${MAX_MB} MB. Paste a link above instead`;
+          entry.error = wrongType ? 'PDF, DWG, DXF, PLN, JPG, PNG or ZIP only' : `Over ${MAX_MB} MB.${short ? '' : ' Paste a link above instead'}`;
           setUploads((list) => [...list, entry]);
           return;
         }
@@ -132,9 +140,9 @@ export function CommercialInquiryForm({
     e.preventDefault();
     setError('');
     if (uploading) return setError('Hang on, your files are still uploading.');
-    if (!projectType) return setError('Please choose a project type.');
+    if (!projectType) return setError(short ? 'Please choose your type of business.' : 'Please choose a project type.');
     if (path === 'tender' && !keyDate) return setError('Please enter the bid closing date.');
-    if (path === 'project' && !role) return setError('Please choose your role.');
+    if (path === 'project' && !short && !role) return setError('Please choose your role.');
     if (!consent) return setError('Please tick the box so we can contact you.');
 
     setSubmitting(true);
@@ -144,6 +152,7 @@ export function CommercialInquiryForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           path,
+          audience: short ? 'owner' : '',
           company,
           name,
           phone,
@@ -165,7 +174,7 @@ export function CommercialInquiryForm({
       const data = (await r.json().catch(() => ({}))) as { error?: string };
       if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
       // A custom event only. See the note on `commercial_inquiry` in the API.
-      trackCustom('CommercialInquiry', { content_category: 'commercial' });
+      trackCustom('CommercialInquiry', { content_category: 'commercial', audience: short ? 'owner' : 'all' });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -178,9 +187,13 @@ export function CommercialInquiryForm({
     return (
       <div ref={thanks} className="rounded-[1.1rem] bg-white p-6 text-center shadow-xl sm:p-10" role="status">
         <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" aria-hidden="true" />
-        <h3 className="mt-4 text-2xl font-bold tracking-[-0.02em] text-slate-900">Received. Thank you, {name.split(' ')[0]}.</h3>
+        <h3 className="mt-4 text-2xl font-bold tracking-[-0.02em] text-slate-900 [text-wrap:balance]">
+          {short ? `Thanks, ${name.split(' ')[0]}. We've got it.` : `Received. Thank you, ${name.split(' ')[0]}.`}
+        </h3>
         <p className="mx-auto mt-3 max-w-[42ch] text-base leading-7 text-slate-600">
-          We'll review what you sent and reply within one business day.
+          {short
+            ? "We'll call you within one business day to set up your free consultation."
+            : "We'll review what you sent and reply within one business day."}
         </p>
         <p className="mx-auto mt-3 max-w-[44ch] text-sm leading-6 text-slate-500">We'll reach you at {phone} or {email}.</p>
       </div>
@@ -204,58 +217,7 @@ export function CommercialInquiryForm({
     </button>
   );
 
-  return (
-    <form onSubmit={onSubmit} noValidate className="rounded-[1.1rem] bg-white p-4 shadow-xl sm:p-8" aria-label="Commercial inquiry form">
-      <div role="tablist" aria-label="Who is this for?" className="flex gap-1 rounded-[0.85rem] bg-slate-100 p-1">
-        {tab('tender', 'General contractor')}
-        {tab('project', 'I need a quote')}
-      </div>
-
-      <div className="mt-5 grid gap-4 sm:mt-6 sm:grid-cols-2 sm:gap-5">
-        <Field label="Company" htmlFor="cm-company">
-          <input id="cm-company" value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" required className={formStyles.field} />
-        </Field>
-        <Field label="Your name" htmlFor="cm-name">
-          <input id="cm-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required className={formStyles.field} />
-        </Field>
-        <Field label="Work email" htmlFor="cm-email">
-          <input id="cm-email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={formStyles.field} />
-        </Field>
-        <Field label="Phone" htmlFor="cm-phone">
-          <input id="cm-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" required className={formStyles.field} />
-        </Field>
-        <Field label="Project city" htmlFor="cm-city">
-          <input id="cm-city" value={city} onChange={(e) => setCity(e.target.value)} required className={formStyles.field} />
-        </Field>
-        <Field label="Project type" htmlFor="cm-type">
-          <select id="cm-type" value={projectType} onChange={(e) => setProjectType(e.target.value)} required className={formStyles.field}>
-            <option value="">Choose one</option>
-            {COMMERCIAL_PROJECT_TYPES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={path === 'tender' ? 'Bid closing date' : 'Target completion / opening date'} htmlFor="cm-date">
-          <input
-            id="cm-date"
-            type="date"
-            value={keyDate}
-            onChange={(e) => setKeyDate(e.target.value)}
-            required={path === 'tender'}
-            className={formStyles.field}
-          />
-          {path === 'project' ? <p className="mt-1.5 text-xs text-slate-500">No date yet? Leave it blank.</p> : null}
-        </Field>
-      </div>
-
-      {path === 'project' ? (
-        <div className="mt-5">
-          <ChoiceGroup label="Your role" name="cm-role" options={COMMERCIAL_ROLES} value={role} onChange={setRole} />
-        </div>
-      ) : null}
-
+  const linkBlock = (
       <div className="mt-5 rounded-[0.85rem] border border-[#2b5a96]/30 bg-blue-50 p-4">
         <label htmlFor="cm-link" className="flex items-center gap-2 text-sm font-bold text-[#1B3C6C]">
           <Link2 className="h-4 w-4" aria-hidden="true" />
@@ -272,9 +234,11 @@ export function CommercialInquiryForm({
         />
         <p className="mt-1.5 text-xs text-slate-600">The fastest way to send a large package. Make sure the link is shared so we can open it.</p>
       </div>
+  );
 
+  const uploadBlock = (
       <div className="mt-5">
-        <p className={formStyles.label}>Or upload files</p>
+        {short ? null : <p className={formStyles.label}>Or upload files</p>}
         <input
           ref={fileInput}
           type="file"
@@ -303,16 +267,22 @@ export function CommercialInquiryForm({
             <span className="sm:hidden">Tap to choose files</span>
             <span className="hidden sm:inline">Drop files here or choose from your computer</span>
           </span>
-          <span className="mt-3 flex flex-wrap justify-center gap-1.5">
-            {['DWG', 'DXF', 'PLN', 'PDF', 'ZIP'].map((format) => (
-              <span key={format} className="rounded border border-[#2b5a96]/30 bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1B3C6C]">
-                {format}
+          {short ? (
+            <span className="mt-2 text-xs text-slate-500">PDF, photos or a ZIP. Up to {COMMERCIAL_FILE_RULES.maxFiles} files.</span>
+          ) : (
+            <>
+              <span className="mt-3 flex flex-wrap justify-center gap-1.5">
+                {['DWG', 'DXF', 'PLN', 'PDF', 'ZIP'].map((format) => (
+                  <span key={format} className="rounded border border-[#2b5a96]/30 bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1B3C6C]">
+                    {format}
+                  </span>
+                ))}
               </span>
-            ))}
-          </span>
-          <span className="mt-2 text-xs text-slate-500">
-            CAD files welcome, loose or zipped. JPG and PNG too. Up to {COMMERCIAL_FILE_RULES.maxFiles} files, {MAX_MB} MB each.
-          </span>
+              <span className="mt-2 text-xs text-slate-500">
+                CAD files welcome, loose or zipped. JPG and PNG too. Up to {COMMERCIAL_FILE_RULES.maxFiles} files, {MAX_MB} MB each.
+              </span>
+            </>
+          )}
         </button>
         {uploads.length > 0 ? (
           <ul className="mt-3 space-y-2">
@@ -342,12 +312,89 @@ export function CommercialInquiryForm({
           </ul>
         ) : null}
       </div>
+  );
 
+  const notesBlock = (
       <div className="mt-5">
-        <Field label="Scope notes (optional)" htmlFor="cm-scope">
+        <Field label={short ? 'Anything else we should know?' : 'Scope notes (optional)'} htmlFor="cm-scope">
           <textarea id="cm-scope" rows={3} value={scope} onChange={(e) => setScope(e.target.value)} className={formStyles.field} />
         </Field>
       </div>
+  );
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="rounded-[1.1rem] bg-white p-4 shadow-xl sm:p-8" aria-label="Commercial inquiry form">
+      <div role="tablist" aria-label="Who is this for?" className="flex gap-1 rounded-[0.85rem] bg-slate-100 p-1">
+        {audience === 'owner' ? tab('project', 'I need a quote') : tab('tender', 'General contractor')}
+        {audience === 'owner' ? tab('tender', 'General contractor') : tab('project', 'I need a quote')}
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:mt-6 sm:grid-cols-2 sm:gap-5">
+        {short ? null : (
+          <Field label="Company" htmlFor="cm-company">
+            <input id="cm-company" value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" required className={formStyles.field} />
+          </Field>
+        )}
+        <Field label="Your name" htmlFor="cm-name">
+          <input id="cm-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required className={formStyles.field} />
+        </Field>
+        <Field label={short ? 'Email' : 'Work email'} htmlFor="cm-email">
+          <input id="cm-email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={formStyles.field} />
+        </Field>
+        <Field label="Phone" htmlFor="cm-phone">
+          <input id="cm-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" required className={formStyles.field} />
+        </Field>
+        <Field label={short ? 'City' : 'Project city'} htmlFor="cm-city">
+          <input id="cm-city" value={city} onChange={(e) => setCity(e.target.value)} required className={formStyles.field} />
+        </Field>
+        <Field label={short ? 'Type of business' : 'Project type'} htmlFor="cm-type">
+          <select id="cm-type" value={projectType} onChange={(e) => setProjectType(e.target.value)} required className={formStyles.field}>
+            <option value="">Choose one</option>
+            {short
+              ? COMMERCIAL_OWNER_BUSINESS_TYPES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))
+              : COMMERCIAL_PROJECT_TYPES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+          </select>
+        </Field>
+        <Field label={path === 'tender' ? 'Bid closing date' : short ? 'Opening day' : 'Target completion / opening date'} htmlFor="cm-date">
+          <input
+            id="cm-date"
+            type="date"
+            value={keyDate}
+            onChange={(e) => setKeyDate(e.target.value)}
+            required={path === 'tender'}
+            className={formStyles.field}
+          />
+          {path === 'project' ? <p className="mt-1.5 text-xs text-slate-500">No date yet? Leave it blank.</p> : null}
+        </Field>
+      </div>
+
+      {path === 'project' && !short ? (
+        <div className="mt-5">
+          <ChoiceGroup label="Your role" name="cm-role" options={COMMERCIAL_ROLES} value={role} onChange={setRole} />
+        </div>
+      ) : null}
+
+      {short ? (
+        <details className="mt-5 rounded-[0.85rem] border border-slate-200 bg-slate-50 p-4">
+          <summary className="flex min-h-[1.75rem] cursor-pointer items-center text-sm font-bold text-[#1B3C6C]">Have plans or photos? Add them (optional)</summary>
+          {uploadBlock}
+          {notesBlock}
+        </details>
+      ) : (
+        <>
+          {linkBlock}
+          {uploadBlock}
+          {notesBlock}
+        </>
+      )}
 
       <label className="mt-5 flex cursor-pointer items-start gap-3 text-sm leading-6 text-slate-600">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-4 w-4 shrink-0" />
@@ -366,7 +413,7 @@ export function CommercialInquiryForm({
         className="mt-5 inline-flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-[0.78rem] bg-[#1B3C6C] px-6 text-base font-bold text-white transition hover:bg-[#2b5a96] disabled:opacity-60"
       >
         {submitting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : null}
-        {path === 'tender' ? 'Send for pricing' : 'Request a quote'}
+        {path === 'tender' ? 'Send for pricing' : short ? 'Request my free consultation' : 'Request a quote'}
       </button>
     </form>
   );

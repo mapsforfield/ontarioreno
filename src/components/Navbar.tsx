@@ -18,11 +18,19 @@ export default function Navbar() {
   const location = useLocation();
   // The header CTA opens the calendar for the service this page is about;
   // see src/lib/bookingRoutes.ts.
-  const bookingHref = bookingHrefFor(location.pathname);
+  // The commercial pages have their own form, so the button goes there rather
+  // than into the homeowner funnel.
+  const isCommercialPage = location.pathname === '/commercial' || location.pathname.startsWith('/commercial/');
+  const bookingHref = isCommercialPage ? `${location.pathname}#inquiry` : bookingHrefFor(location.pathname);
   // Where the button opens the service picker (the homepage), it says what
   // the homepage's other booking buttons say. Elsewhere it keeps its label.
-  const bookingLabel =
-    bookingHref === SERVICE_PICKER_HREF ? 'Book a Free Consultation' : 'Start Project Review';
+  const bookingLabel = isCommercialPage
+    ? location.pathname === '/commercial/owners'
+      ? 'Get a Free Consultation'
+      : 'Request a Quote'
+    : bookingHref === SERVICE_PICKER_HREF
+      ? 'Book a Free Consultation'
+      : 'Start Project Review';
 
   useEffect(() => {
     if (!isOpen) {

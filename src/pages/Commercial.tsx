@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ArrowRight } from 'lucide-react';
 import { PageMeta } from '../components/PageMeta';
 import { NeedsMarker } from '../components/project/NeedsMarker';
@@ -20,6 +21,12 @@ import type { CommercialPath } from '../../lib/commercial-inquiry';
  *
  * No invented credentials, capacity or project history. Anything we have not
  * confirmed is a loud NeedsMarker, so it cannot go live looking finished.
+ *
+ * /commercial/owners is the same page for the Meta ad aimed at business owners:
+ * owner headline and form, no tender section, no "millwork". It is a real path
+ * rather than a query string because the HTML is pre-rendered, so a query would
+ * show the contractor headline until the JavaScript arrived. Kept out of Google
+ * (noindex, canonical to /commercial, left out of the sitemap).
  *
  * Photos: everything under "Recent commercial work" is a real job. The hero is
  * a design RENDER, so it must never be captioned or moved there as past work.
@@ -117,6 +124,29 @@ const BUYERS: { image: string; alt: string; date: string; title: string; body: s
   },
 ];
 
+/** Owner version: their card first, and contractors told where to go, in plain words. */
+const OWNER_BUYERS = [
+  ...BUYERS.slice(1),
+  { ...BUYERS[0], date: 'Working for a client?', body: 'Choose General contractor in the form below and we will take it from there.' },
+];
+
+const OWNER_BUILDS = [
+  'Custom counters',
+  'Seating and banquettes',
+  'Feature walls',
+  'Reception desks',
+  'Retail displays',
+  'Wall panelling',
+  'Custom cabinetry',
+  'Interior renovations',
+];
+
+/** Same figure as PROOF, without the trade words. Change the amount in both. */
+const OWNER_PROOF = PROOF.map((item) => (item.label === 'Project size' ? { ...item, value: '$10K – $500K+ projects' } : item));
+
+/** The next step for an owner. Used by the hero and the phone bar. */
+const OWNER_CTA = 'Get a free consultation';
+
 const BUILDS = [
   'Reception desks',
   'Feature walls',
@@ -135,8 +165,9 @@ const STEPS = [
   { title: 'Built around your site', body: 'A vetted trade fabricates and installs under a written contract, on your schedule.' },
 ];
 
-export default function Commercial() {
-  const [path, setPath] = useState<CommercialPath>('tender');
+export default function Commercial({ audience }: { audience?: 'owner' }) {
+  const owner = audience === 'owner';
+  const [path, setPath] = useState<CommercialPath>(owner ? 'project' : 'tender');
   const [workFilter, setWorkFilter] = useState<WorkFilter>('All');
   const cases = CASES.filter((job) => workFilter === 'All' || job.category === workFilter);
   const gallery = GALLERY.filter((item) => workFilter === 'All' || item.category === workFilter);
@@ -168,11 +199,24 @@ export default function Commercial() {
 
   return (
     <div className="bg-[#0B1424] text-white">
-      <PageMeta
-        path="/commercial"
-        title="Commercial Millwork & Renovations Ontario | Tenders & Fit-Outs | OntarioReno"
-        description="Commercial millwork and interior renovations across Ontario. General contractors can send drawings for pricing. Businesses can request a quote for retail, restaurant, office and institutional projects."
-      />
+      {owner ? (
+        <>
+          <PageMeta
+            path="/commercial"
+            title="Restaurant, Shop & Office Renovations | OntarioReno"
+            description="We build the whole inside of your restaurant, shop or office, planned back from your opening day. Send what you have and hear back within one business day."
+          />
+          <Helmet>
+            <meta name="robots" content="noindex" />
+          </Helmet>
+        </>
+      ) : (
+        <PageMeta
+          path="/commercial"
+          title="Commercial Millwork & Renovations Ontario | Tenders & Fit-Outs | OntarioReno"
+          description="Commercial millwork and interior renovations across Ontario. General contractors can send drawings for pricing. Businesses can request a quote for retail, restaurant, office and institutional projects."
+        />
+      )}
 
       {/* ---- Hero ---- */}
       <section className="relative overflow-hidden">
@@ -190,30 +234,46 @@ export default function Commercial() {
         />
         <div className="relative mx-auto max-w-[76rem] px-5 py-7 sm:px-8 sm:py-12 lg:py-28">
           <div className="max-w-[35rem]">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8FB6DD]">Commercial millwork and interiors</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8FB6DD]">
+              {owner ? 'Restaurants, shops and offices' : 'Commercial millwork and interiors'}
+            </p>
             <h1 className="mt-3 text-[2.15rem] font-bold leading-[1.08] tracking-[-0.03em] [text-wrap:balance] sm:mt-4 sm:text-5xl lg:text-[3.5rem]">
-              Every commercial job has a date that can't move.
+              {owner ? "The rent starts whether you're open or not." : "Every commercial job has a date that can't move."}
             </h1>
             <p className="mt-3 text-base leading-7 text-slate-300 sm:mt-5 sm:text-lg sm:leading-8">
-              A bid closing, a store opening, a first day of school. OntarioReno prices and delivers commercial interiors by
-              working back from that date. Send what you have and you'll hear back within one business day.
+              {owner
+                ? "We build the whole inside of your restaurant, shop or office, planned back from your opening day. Send what you have and you'll hear back within one business day."
+                : "A bid closing, a store opening, a first day of school. OntarioReno prices and delivers commercial interiors by working back from that date. Send what you have and you'll hear back within one business day."}
             </p>
             <div ref={heroButtons} className="mt-5 flex flex-col gap-2.5 sm:mt-8 sm:flex-row sm:gap-3">
-              <button
-                type="button"
-                onClick={() => goToForm('tender')}
-                className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-[0.78rem] bg-white px-6 font-bold text-[#0B1424] transition hover:bg-slate-200"
-              >
-                I have a tender to price
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => goToForm('project')}
-                className="inline-flex min-h-[3.25rem] items-center justify-center rounded-[0.78rem] border border-white/30 bg-[#0B1424]/40 px-6 font-bold text-white transition hover:bg-white/10"
-              >
-                I'm planning a project
-              </button>
+              {owner ? (
+                <button
+                  type="button"
+                  onClick={() => goToForm('project')}
+                  className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-[0.78rem] bg-white px-6 font-bold text-[#0B1424] transition hover:bg-slate-200"
+                >
+                  {OWNER_CTA}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => goToForm('tender')}
+                    className="inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-[0.78rem] bg-white px-6 font-bold text-[#0B1424] transition hover:bg-slate-200"
+                  >
+                    I have a tender to price
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToForm('project')}
+                    className="inline-flex min-h-[3.25rem] items-center justify-center rounded-[0.78rem] border border-white/30 bg-[#0B1424]/40 px-6 font-bold text-white transition hover:bg-white/10"
+                  >
+                    I'm planning a project
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -222,7 +282,7 @@ export default function Commercial() {
       {/* ---- Proof bar ---- */}
       <section className="border-y border-white/10 bg-[#101C31]" aria-label="Credentials">
         <dl className="mx-auto grid max-w-[76rem] grid-cols-2 gap-x-4 gap-y-5 px-5 py-6 sm:gap-6 sm:px-8 sm:py-7 lg:grid-cols-4">
-          {PROOF.map((item) => (
+          {(owner ? OWNER_PROOF : PROOF).map((item) => (
             <div key={item.label}>
               <dt className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[#8FB6DD] sm:text-xs sm:tracking-[0.14em]">{item.label}</dt>
               <dd className="mt-1 text-[0.95rem] font-bold leading-snug sm:mt-2 sm:text-lg">{item.value ?? <NeedsMarker label={item.needs} />}</dd>
@@ -235,7 +295,7 @@ export default function Commercial() {
       <section className="mx-auto max-w-[76rem] px-5 py-12 sm:px-8 sm:py-16">
         <h2 className="max-w-[34rem] text-3xl font-bold tracking-[-0.02em] [text-wrap:balance] sm:text-4xl">Whose date are you working to?</h2>
         <div className={`-mx-5 mt-6 flex snap-x snap-mandatory scroll-px-5 gap-3 px-5 sm:mx-0 sm:mt-8 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-4 ${SWIPE}`}>
-          {BUYERS.map(({ image, alt, date, title, body }) => (
+          {(owner ? OWNER_BUYERS : BUYERS).map(({ image, alt, date, title, body }) => (
             <article key={title} className="w-[84%] shrink-0 snap-start overflow-hidden rounded-[1rem] border border-white/10 bg-[#101C31] sm:w-auto">
               <img src={image} alt={alt} loading="lazy" className="aspect-[3/2] w-full object-cover" />
               <div className="p-5 sm:p-6">
@@ -248,7 +308,7 @@ export default function Commercial() {
         </div>
         <h3 className="mt-12 text-lg font-bold">What we build</h3>
         <ul className="mt-4 flex flex-wrap gap-2">
-          {BUILDS.map((item) => (
+          {(owner ? OWNER_BUILDS : BUILDS).map((item) => (
             <li key={item} className="rounded-full border border-white/15 px-4 py-2 text-sm text-slate-200">
               {item}
             </li>
@@ -257,31 +317,33 @@ export default function Commercial() {
       </section>
 
       {/* ---- For general contractors ---- */}
-      <section className="border-t border-white/10 bg-[#101C31]">
-        <div className="mx-auto max-w-[76rem] px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8FB6DD]">For general contractors and estimators</p>
-          <h2 className="mt-3 max-w-[36rem] text-3xl font-bold tracking-[-0.02em] [text-wrap:balance] sm:text-4xl">How a tender works with us</h2>
-          <ol className="mt-6 grid gap-5 sm:mt-8 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
-            {STEPS.map((step, i) => (
-              <li key={step.title} className="grid grid-cols-[2rem_1fr] sm:block sm:border-t-2 sm:border-[#5694CF] sm:pt-4">
-                <span className="pt-1 font-mono text-sm text-[#8FB6DD]">0{i + 1}</span>
-                <div>
-                  <h3 className="text-lg font-bold sm:mt-2">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-300 sm:mt-2">{step.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <figure className="mt-8 overflow-hidden rounded-[1rem] border border-white/10 sm:mt-10">
-            <img
-              src={`${IMG}/shop-edgebander.webp`}
-              alt="Edgebanding machine running in a millwork shop"
-              loading="lazy"
-              className="aspect-[16/9] w-full object-cover sm:aspect-[3/1]"
-            />
-          </figure>
-        </div>
-      </section>
+      {owner ? null : (
+        <section className="border-t border-white/10 bg-[#101C31]">
+          <div className="mx-auto max-w-[76rem] px-5 py-12 sm:px-8 sm:py-16">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8FB6DD]">For general contractors and estimators</p>
+            <h2 className="mt-3 max-w-[36rem] text-3xl font-bold tracking-[-0.02em] [text-wrap:balance] sm:text-4xl">How a tender works with us</h2>
+            <ol className="mt-6 grid gap-5 sm:mt-8 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="grid grid-cols-[2rem_1fr] sm:block sm:border-t-2 sm:border-[#5694CF] sm:pt-4">
+                  <span className="pt-1 font-mono text-sm text-[#8FB6DD]">0{i + 1}</span>
+                  <div>
+                    <h3 className="text-lg font-bold sm:mt-2">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-300 sm:mt-2">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <figure className="mt-8 overflow-hidden rounded-[1rem] border border-white/10 sm:mt-10">
+              <img
+                src={`${IMG}/shop-edgebander.webp`}
+                alt="Edgebanding machine running in a millwork shop"
+                loading="lazy"
+                className="aspect-[16/9] w-full object-cover sm:aspect-[3/1]"
+              />
+            </figure>
+          </div>
+        </section>
+      )}
 
       {/* ---- Recent work ---- */}
       <section className="mx-auto max-w-[76rem] px-5 py-12 sm:px-8 sm:py-16">
@@ -346,38 +408,55 @@ export default function Commercial() {
       <section id="inquiry" className="scroll-mt-24 border-t border-white/10 bg-[#101C31]">
         <div className="mx-auto grid max-w-[76rem] gap-6 px-4 py-12 sm:gap-10 sm:px-8 sm:py-16 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
-            <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">Give us the date. We'll work back from there.</h2>
+            <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+              {owner ? "Tell us your opening day. We'll plan back from there." : "Give us the date. We'll work back from there."}
+            </h2>
             <p className="mt-4 text-base leading-7 text-slate-300">
-              Your drawings stay private. They are shared only with the trades pricing your project.
+              {owner
+                ? "Send what you have and you'll hear back within one business day."
+                : 'Your drawings stay private. They are shared only with the trades pricing your project.'}
             </p>
           </div>
-          <CommercialInquiryForm path={path} onPathChange={setPath} />
+          <CommercialInquiryForm path={path} onPathChange={setPath} audience={audience} />
         </div>
       </section>
 
       {/* ---- Phone action bar ---- */}
       <div
         aria-hidden={!showPhoneBar}
-        className={`fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 gap-2 border-t border-white/10 bg-[#0B1424]/95 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur transition-transform duration-200 sm:hidden ${
+        className={`fixed inset-x-0 bottom-0 z-40 grid gap-2 border-t ${owner ? 'grid-cols-1' : 'grid-cols-2'} border-white/10 bg-[#0B1424]/95 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur transition-transform duration-200 sm:hidden ${
           showPhoneBar ? 'translate-y-0' : 'pointer-events-none translate-y-full'
         }`}
       >
-        <button
-          type="button"
-          tabIndex={showPhoneBar ? 0 : -1}
-          onClick={() => goToForm('tender')}
-          className="min-h-[3rem] rounded-[0.7rem] bg-white text-sm font-bold text-[#0B1424]"
-        >
-          Price a tender
-        </button>
-        <button
-          type="button"
-          tabIndex={showPhoneBar ? 0 : -1}
-          onClick={() => goToForm('project')}
-          className="min-h-[3rem] rounded-[0.7rem] border border-white/30 text-sm font-bold text-white"
-        >
-          Plan a project
-        </button>
+        {owner ? (
+          <button
+            type="button"
+            tabIndex={showPhoneBar ? 0 : -1}
+            onClick={() => goToForm('project')}
+            className="min-h-[3rem] rounded-[0.7rem] bg-white text-sm font-bold text-[#0B1424]"
+          >
+            {OWNER_CTA}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              tabIndex={showPhoneBar ? 0 : -1}
+              onClick={() => goToForm('tender')}
+              className="min-h-[3rem] rounded-[0.7rem] bg-white text-sm font-bold text-[#0B1424]"
+            >
+              Price a tender
+            </button>
+            <button
+              type="button"
+              tabIndex={showPhoneBar ? 0 : -1}
+              onClick={() => goToForm('project')}
+              className="min-h-[3rem] rounded-[0.7rem] border border-white/30 text-sm font-bold text-white"
+            >
+              Plan a project
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

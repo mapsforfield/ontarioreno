@@ -12,6 +12,10 @@
  *                  Target completion or opening date, optional: an owner still
  *                  budgeting may not have one, and should still reach us.
  *
+ * /commercial/owners (the Meta ad for business owners) uses the 'project' path
+ * with a shorter form: `audience: 'owner'` makes company optional and sets the
+ * role, because neither is worth a field to someone on a phone.
+ *
  * Who hears about it: the ADMIN only. The lead is unassigned, the alert goes to
  * the team inbox, and the sender is not texted. Commercial work has no booking
  * flow, and none of the homeowner messages are true for it.
@@ -26,6 +30,13 @@ export const COMMERCIAL_PROJECT_TYPES = [
   'Office',
   'School, library or institution',
   'Other',
+] as const;
+/** The owner form's plain labels for the same stored project types. */
+export const COMMERCIAL_OWNER_BUSINESS_TYPES = [
+  { value: 'Restaurant or hospitality', label: 'Restaurant or café' },
+  { value: 'Retail', label: 'Shop or salon' },
+  { value: 'Office', label: 'Office' },
+  { value: 'Other', label: 'Something else' },
 ] as const;
 export const COMMERCIAL_ROLES = ['Business owner', 'Property manager', 'Designer or architect', 'Other'] as const;
 
@@ -78,6 +89,8 @@ export type CommercialFile = { key: string; name: string; size: number; type: st
 
 export type CommercialInquiry = {
   path: CommercialPath;
+  /** 'owner' when it came through the short form on /commercial/owners. */
+  audience: '' | 'owner';
   company: string;
   name: string;
   phone: string;
@@ -147,13 +160,14 @@ export function parseCommercialInquiry(body: Record<string, unknown>): Commercia
   const path = body.path === 'tender' || body.path === 'project' ? body.path : null;
   if (!path) return { ok: false, error: 'Choose how we can help.' };
 
+  const audience = path === 'project' && body.audience === 'owner' ? 'owner' : '';
   const company = s(body.company, 160);
   const name = s(body.name, 120);
   const phone = s(body.phone, 40);
   const email = s(body.email, 160).toLowerCase();
   const city = s(body.city, 80);
   const projectType = s(body.projectType, 60);
-  if (!company) return { ok: false, error: 'Please enter your company name.' };
+  if (!company && !audience) return { ok: false, error: 'Please enter your company name.' };
   if (!name) return { ok: false, error: 'Please enter your name.' };
   if (phone.replace(/\D/g, '').length < 10) return { ok: false, error: 'Please enter a 10-digit phone number.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'Please enter a valid email.' };
@@ -167,7 +181,7 @@ export function parseCommercialInquiry(body: Record<string, unknown>): Commercia
   if (path === 'tender') {
     if (!isIsoDate(keyDate)) return { ok: false, error: 'Please enter the bid closing date.' };
   } else {
-    role = s(body.role, 40);
+    role = audience ? 'Business owner' : s(body.role, 40);
     if (!(COMMERCIAL_ROLES as readonly string[]).includes(role)) return { ok: false, error: 'Please choose your role.' };
     if (keyDate && !isIsoDate(keyDate)) return { ok: false, error: 'Please enter a valid target date.' };
   }
@@ -191,7 +205,7 @@ export function parseCommercialInquiry(body: Record<string, unknown>): Commercia
   return {
     ok: true,
     value: {
-      path, company, name, phone, email, city, projectType, role, keyDate,
+      path, audience, company, name, phone, email, city, projectType, role, keyDate,
       scope: s(body.scope, 2000),
       drawingsLink,
       files,
@@ -214,12 +228,13 @@ export function commercialSourceDetail(q: CommercialInquiry): string {
     q.utmCampaign && `utm_campaign=${q.utmCampaign}`,
     q.ref && `ref=${q.ref}`,
   ].filter(Boolean);
-  return [`Commercial (/commercial) · ${PATH_LABEL[q.path]} · ${q.company}`, ...tags].join(' · ').slice(0, 300);
+  const page = q.audience ? '/commercial/owners' : '/commercial';
+  return [`Commercial (${page}) · ${PATH_LABEL[q.path]} · ${q.company || q.name}`, ...tags].join(' · ').slice(0, 300);
 }
 
 function detailLines(q: CommercialInquiry): string[] {
   const lines = [
-    `Company: ${q.company}`,
+    `Company: ${q.company || 'Not asked'}`,
     `Role: ${q.role}`,
     `Project type: ${q.projectType}`,
     `City: ${q.city}`,
@@ -252,9 +267,13 @@ export function commercialAlert(
   const subject =
     q.path === 'tender'
       ? `Commercial tender: ${q.company}, bid closes ${q.keyDate} (${q.city})`
-      : `Commercial quote request: ${q.company} (${q.city})`;
+      : `Commercial quote request: ${q.company || q.name} (${q.city})`;
   const lines = [
-    q.path === 'tender' ? 'A general contractor sent a project to price.' : 'A business asked for a commercial quote.',
+    q.path === 'tender'
+      ? 'A general contractor sent a project to price.'
+      : q.audience
+        ? 'A business owner came through the owner ad page.'
+        : 'A business asked for a commercial quote.',
     '',
     `Name: ${q.name}`,
     `Phone: ${q.phone}`,

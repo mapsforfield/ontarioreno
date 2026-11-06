@@ -116,9 +116,12 @@ console.log(`prerender: ${written}/${routes.length} public pages written${failed
 // replaces the copy in dist/; public/sitemap.xml is left as it is.
 // No <lastmod>: stamping every URL with the build date on every deploy is a
 // signal Google learns to ignore.
+// Ad landing pages that are noindexed: a sitemap must not list them.
+const NOT_IN_SITEMAP = new Set(['/commercial/owners']);
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${[...routes]
+  .filter((r) => !NOT_IN_SITEMAP.has(r))
   .sort((a, b) => (a === '/' ? -1 : b === '/' ? 1 : a.localeCompare(b)))
   .map((r) => `  <url>\n    <loc>https://ontarioreno.ca${r === '/' ? '/' : r}</loc>\n  </url>`)
   .join('\n')}
