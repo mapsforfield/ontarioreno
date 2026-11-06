@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Mail, MapPin, ArrowRight } from 'lucide-react';
 
 type FooterProps = {
@@ -6,6 +6,17 @@ type FooterProps = {
 };
 
 export default function Footer({ compactOnMobile = false }: FooterProps) {
+  // The commercial pages sell to businesses, so their footer must not send
+  // anyone into the homeowner funnel or describe the company as homeowners-only.
+  const { pathname } = useLocation();
+  const commercial = pathname === '/commercial' || pathname.startsWith('/commercial/');
+  const nextStepHref = commercial ? `${pathname}#inquiry` : '/match';
+  const nextStepLabel = !commercial
+    ? 'Start Project Review'
+    : pathname === '/commercial/owners'
+      ? 'Get a Free Consultation'
+      : 'Request a Quote';
+
   return (
     <>
       {compactOnMobile && (
@@ -133,8 +144,8 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
                 </Link>
               </li>
               <li>
-                <Link to="/match" className="transition-colors hover:text-[#5694CF]">
-                  Start Project Review
+                <Link to={nextStepHref} className="transition-colors hover:text-[#5694CF]">
+                  {nextStepLabel}
                 </Link>
               </li>
               <li>
@@ -161,16 +172,16 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
 
               <li className="flex items-start gap-3">
                 <MapPin className="mt-0.5 h-4 w-4 text-slate-500" />
-                <span>Serving homeowners across Ontario, Canada.</span>
+                <span>{commercial ? 'Serving businesses across Ontario, Canada.' : 'Serving homeowners across Ontario, Canada.'}</span>
               </li>
             </ul>
 
             <div className="mt-6">
               <Link
-                to="/match"
+                to={nextStepHref}
                 className="inline-flex items-center gap-2 font-medium text-white transition-colors hover:text-[#5694CF]"
               >
-                Start Project Review <ArrowRight className="h-4 w-4" />
+                {nextStepLabel} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -179,7 +190,7 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-slate-800 pt-8 text-sm text-slate-500 md:flex-row">
           <p>
             &copy; {new Date().getFullYear()} OntarioReno. All rights reserved.
-            Renovation planning and project guidance for homeowners across Ontario.
+            {commercial ? 'Renovation planning and project guidance across Ontario.' : 'Renovation planning and project guidance for homeowners across Ontario.'}
           </p>
 
           <div className="flex space-x-6">

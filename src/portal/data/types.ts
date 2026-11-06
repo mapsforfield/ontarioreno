@@ -604,6 +604,8 @@ export type Lead = {
   programVersion?: number | null;
   schedulingArea?: string | null;
   addressState?: AddressState | null;
+  /** Uploaded files; shown through LeadFiles. */
+  quoteFiles?: unknown;
   resolvedMunicipality?: string | null;
   answersJson?: Record<string, string> | null;
   routingOutcome?: RoutingOutcome | null;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LeadFiles from '../components/LeadFiles';
 import {
   CalendarDays,
   CalendarPlus,
@@ -309,6 +310,7 @@ function CustomerCard({
   onNext: () => void;
   onSkip: () => void;
 }) {
+  const { isAdmin } = usePortalAuth();
   const navigate = useNavigate();
   const { logInteraction, scheduleCallback } = usePortalData();
 
@@ -626,6 +628,8 @@ function CustomerCard({
             <p className="text-sm text-slate-700 whitespace-pre-wrap">{lead.notes}</p>
           </div>
         )}
+
+        <LeadFiles lead={lead} isAdmin={isAdmin} />
 
         <div className="mt-5 rounded-[0.85rem] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -261,6 +261,7 @@ export default function App({ location }: { location?: string } = {}) {
           <Route path="bathroom-renovations" element={<BathroomRenovationsNext />} />
           <Route path="windows" element={<WindowsDoors />} />
           <Route path="commercial" element={<Commercial />} />
+          <Route path="commercial/owners" element={<Commercial audience="owner" />} />
           <Route path="costs" element={<Costs />} />
           <Route path="match" element={<Match />} />
           <Route path="book" element={<BookConsultation />} />

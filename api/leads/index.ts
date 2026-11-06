@@ -1,9 +1,10 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
-import { requireAuth, requireAdmin, denyContractor, getTokenFromRequest } from '../../lib/auth.js';
+import { requireAuth, denyContractor, getTokenFromRequest } from '../../lib/auth.js';
 import { randomUUID } from 'node:crypto';
 import {
   COMMERCIAL_FILE_RULES,
+  canOpenLeadFile,
   commercialAlert,
   commercialFileKey,
   commercialNotes,
@@ -3399,7 +3400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return handleCollection(req, res, user);
 }
 
-// ─── ?quote_file=1 — open one uploaded /windows quote (admin only) ────────────
+// ─── ?quote_file=1 — open one uploaded file (see canOpenLeadFile) ─────────────
 //
 // The admin alert links here rather than to the bucket, so the email never
 // carries a working copy of a homeowner's document on its own. Each open mints
@@ -3421,15 +3422,20 @@ async function handleQuoteFile(req: VercelRequest, res: VercelResponse) {
       .status(200)
       .send(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="0;url=${again}"><p>Opening file...</p>`);
   }
-  const admin = await requireAdmin(req, res);
-  if (!admin) return;
+  const user = await requireAuth(req, res);
+  if (!user) return;
   const lead = await prisma.lead.findUnique({
     where: { id: String(req.query['lead'] ?? '') },
-    select: { quoteFiles: true },
+    select: { quoteFiles: true, assignedRepId: true },
   });
   const all = Array.isArray(lead?.quoteFiles) ? (lead.quoteFiles as unknown as QuoteFile[]) : [];
   const file = all[Number(req.query['i'] ?? -1)];
-  if (!file?.key) return res.status(404).json({ error: 'File not found.' });
+  // One answer for "not yours" and "not there", so a rep cannot probe for files.
+  if (!lead || !file?.key || !canOpenLeadFile(user, lead, file.key)) {
+    return user.role === 'admin'
+      ? res.status(404).json({ error: 'File not found.' })
+      : res.status(403).json({ error: 'You do not have access to this file.' });
+  }
   res.setHeader('Location', presignGetUrl(file.key, 300));
   return res.status(302).end();
 }

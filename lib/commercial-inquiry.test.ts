@@ -2,14 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   COMMERCIAL_FILE_RULES,
+  COMMERCIAL_OWNER_BUSINESS_TYPES,
   commercialAlert,
   commercialFileKey,
   commercialFileType,
   commercialNotes,
+  canOpenLeadFile,
   commercialSourceDetail,
   isAllowedCommercialFile,
   isCommercialFileKey,
   isIsoDate,
+  leadFilesFor,
   normalizeDrawingsLink,
   parseCommercialInquiry,
 } from './commercial-inquiry';
@@ -96,6 +99,58 @@ test('CAD files are accepted by extension, whatever the browser reports', () => 
   }
   assert.equal(isAllowedCommercialFile(commercialFileType('tool.exe', 'application/x-msdownload'), 1000), false);
   assert.equal(isAllowedCommercialFile(commercialFileType('noextension', ''), 1000), false);
+});
+
+test('the owner form needs no company or role, and nothing else is relaxed', () => {
+  const { company: _company, ...noCompany } = base;
+  const owner = { ...noCompany, path: 'project', audience: 'owner' };
+  const q = parsed(owner);
+  assert.equal(q.audience, 'owner');
+  assert.equal(q.role, 'Business owner');
+  assert.match(commercialSourceDetail(q), /\/commercial\/owners\) · Quote request · Sam Lee/);
+  const alert = commercialAlert(q, 'lead-1', () => '');
+  assert.match(alert.subject, /Commercial quote request: Sam Lee \(Toronto\)/);
+  assert.match(alert.body, /owner ad page/);
+  assert.match(alert.body, /Company: Not asked/);
+  assert.match(error({ ...owner, phone: '123' }), /phone/);
+  assert.match(error({ ...owner, city: '' }), /city/);
+  assert.match(error({ ...owner, projectType: '' }), /project type/);
+  assert.match(error({ ...owner, consent: false }), /tick the box/);
+});
+
+test('audience cannot relax the other two forms', () => {
+  const { company: _company, ...noCompany } = base;
+  assert.match(error({ ...noCompany, path: 'tender', keyDate: '2026-12-01', audience: 'owner' }), /company/);
+  assert.match(error({ ...noCompany, path: 'project', role: 'Business owner' }), /company/);
+  assert.equal(parsed({ ...tender, audience: 'owner' }).audience, '');
+});
+
+test('every owner business type is a stored project type', () => {
+  for (const { value } of COMMERCIAL_OWNER_BUSINESS_TYPES) {
+    assert.equal(parsed({ ...project, projectType: value }).projectType, value);
+  }
+});
+
+test('a rep opens commercial files on their own leads and nothing else', () => {
+  const steven = { id: 'steven', role: 'rep' };
+  const commercial = commercialFileKey(uuid, 'plan.pdf');
+  const quote = `window-quotes/${uuid}/quote.pdf`;
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, commercial), true);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, quote), false);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'keven' }, commercial), false);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: null }, commercial), false);
+  assert.equal(canOpenLeadFile({ id: 'pj', role: 'contractor' }, { assignedRepId: 'pj' }, commercial), false);
+  assert.equal(canOpenLeadFile({ id: 'me', role: 'admin' }, { assignedRepId: null }, quote), true);
+});
+
+test('the listed files keep their real position, and reps only see commercial ones', () => {
+  const files = [
+    { key: `window-quotes/${uuid}/quote.pdf`, name: 'quote.pdf' },
+    { key: commercialFileKey(uuid, 'plan.pdf'), name: 'plan.pdf' },
+  ];
+  assert.deepEqual(leadFilesFor(files, false), [{ index: 1, name: 'plan.pdf' }]);
+  assert.equal(leadFilesFor(files, true).length, 2);
+  assert.deepEqual(leadFilesFor(null, true), []);
 });
 
 test('isIsoDate accepts real dates only', () => {
