@@ -107,7 +107,7 @@ test('the owner form needs no company or role, and nothing else is relaxed', () 
   const q = parsed(owner);
   assert.equal(q.audience, 'owner');
   assert.equal(q.role, 'Business owner');
-  assert.match(commercialSourceDetail(q), /\/commercial\/owners\) · Quote request · Sam Lee/);
+  assert.match(commercialSourceDetail(q), /Commercial \(\/commercial\) · Owner quote request · Sam Lee/);
   const alert = commercialAlert(q, 'lead-1', () => '');
   assert.match(alert.subject, /Commercial quote request: Sam Lee \(Toronto\)/);
   assert.match(alert.body, /owner ad page/);

@@ -25,7 +25,7 @@ import {
  * private storage (see `commercial_presign` in api/leads/index.ts), and the
  * admin opens them through a login-gated link.
  *
- * /commercial/owners passes `audience="owner"`: the quote tab comes first and
+ * /commercial passes `audience="owner"`: the quote tab comes first and
  * drops to the short form (name, email, phone, city, business type, opening
  * day), with plans and notes folded away. The contractor tab stays whole.
  *

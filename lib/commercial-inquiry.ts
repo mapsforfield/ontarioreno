@@ -12,7 +12,7 @@
  *                  Target completion or opening date, optional: an owner still
  *                  budgeting may not have one, and should still reach us.
  *
- * /commercial/owners (the Meta ad for business owners) uses the 'project' path
+ * /commercial (the Meta ad's page for business owners) uses the 'project' path
  * with a shorter form: `audience: 'owner'` makes company optional and sets the
  * role, because neither is worth a field to someone on a phone.
  *
@@ -89,7 +89,7 @@ export type CommercialFile = { key: string; name: string; size: number; type: st
 
 export type CommercialInquiry = {
   path: CommercialPath;
-  /** 'owner' when it came through the short form on /commercial/owners. */
+  /** 'owner' when it came through the short owner form on /commercial. */
   audience: '' | 'owner';
   company: string;
   name: string;
@@ -261,8 +261,8 @@ export function commercialSourceDetail(q: CommercialInquiry): string {
     q.utmCampaign && `utm_campaign=${q.utmCampaign}`,
     q.ref && `ref=${q.ref}`,
   ].filter(Boolean);
-  const page = q.audience ? '/commercial/owners' : '/commercial';
-  return [`Commercial (${page}) · ${PATH_LABEL[q.path]} · ${q.company || q.name}`, ...tags].join(' · ').slice(0, 300);
+  const label = q.audience ? 'Owner quote request' : PATH_LABEL[q.path];
+  return [`Commercial (/commercial) · ${label} · ${q.company || q.name}`, ...tags].join(' · ').slice(0, 300);
 }
 
 function detailLines(q: CommercialInquiry): string[] {

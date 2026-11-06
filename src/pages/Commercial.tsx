@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { ArrowRight } from 'lucide-react';
 import { PageMeta } from '../components/PageMeta';
 import { NeedsMarker } from '../components/project/NeedsMarker';
@@ -22,11 +21,12 @@ import type { CommercialPath } from '../../lib/commercial-inquiry';
  * No invented credentials, capacity or project history. Anything we have not
  * confirmed is a loud NeedsMarker, so it cannot go live looking finished.
  *
- * /commercial/owners is the same page for the Meta ad aimed at business owners:
- * owner headline and form, no tender section, no "millwork". It is a real path
- * rather than a query string because the HTML is pre-rendered, so a query would
- * show the contractor headline until the JavaScript arrived. Kept out of Google
- * (noindex, canonical to /commercial, left out of the sitemap).
+ * /commercial is the OWNER version: the page the Meta ad lands on, with the owner
+ * headline and form, no tender section and no "millwork".
+ * /commercial/contractors is the full contractor version. Each is its own
+ * route rather than a query string because the HTML is pre-rendered, so a query
+ * would show the wrong headline until the JavaScript arrived. The old
+ * /commercial/owners link redirects to /commercial (vercel.json).
  *
  * Photos: everything under "Recent commercial work" is a real job. Both heroes
  * are design illustrations, so never caption them or move them there as past work.
@@ -205,19 +205,14 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
   return (
     <div className="bg-[#0B1424] text-white">
       {owner ? (
-        <>
-          <PageMeta
-            path="/commercial"
-            title="Restaurant, Shop & Office Renovations | OntarioReno"
-            description="We build the whole inside of your restaurant, shop or office, planned back from your opening day. Send what you have and hear back within one business day."
-          />
-          <Helmet>
-            <meta name="robots" content="noindex" />
-          </Helmet>
-        </>
-      ) : (
         <PageMeta
           path="/commercial"
+          title="Restaurant, Shop & Office Renovations | OntarioReno"
+          description="We build the whole inside of your restaurant, shop or office, planned back from your opening day. Send what you have and hear back within one business day."
+        />
+      ) : (
+        <PageMeta
+          path="/commercial/contractors"
           title="Commercial Millwork & Renovations Ontario | Tenders & Fit-Outs | OntarioReno"
           description="Commercial millwork and interior renovations across Ontario. General contractors can send drawings for pricing. Businesses can request a quote for retail, restaurant, office and institutional projects."
         />
