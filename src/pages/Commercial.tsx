@@ -230,15 +230,22 @@ export default function Commercial({ audience }: { audience?: 'owner' }) {
               : 'Curved reception desk with a fluted wood front against a slatted wood wall'
           }
           fetchPriority="high"
-          className={`h-44 w-full object-cover sm:h-72 lg:absolute lg:right-0 lg:top-0 lg:h-full lg:w-[60%] ${
-            owner ? 'object-center' : 'object-right'
+          className={`w-full object-cover lg:absolute lg:right-0 lg:top-0 lg:h-full lg:w-[60%] ${
+            owner ? 'aspect-[1800/975] object-center lg:aspect-auto' : 'h-44 object-right sm:h-72'
           }`}
         />
+        {owner && (
+          // Below desktop the room sits above the text: melt its cut-off floor into the page.
+          <div
+            className="absolute inset-x-0 top-0 aspect-[1800/975] bg-[linear-gradient(180deg,rgba(11,20,36,0)_55%,rgba(11,20,36,0.7)_80%,#0B1424_100%)] lg:hidden"
+            aria-hidden="true"
+          />
+        )}
         <div
           className="absolute inset-0 hidden bg-[linear-gradient(90deg,#0B1424_40%,rgba(11,20,36,0.75)_47%,rgba(11,20,36,0)_60%)] lg:block"
           aria-hidden="true"
         />
-        <div className="relative mx-auto max-w-[76rem] px-5 py-7 sm:px-8 sm:py-12 lg:py-28">
+        <div className={`relative mx-auto max-w-[76rem] px-5 py-7 sm:px-8 sm:py-12 lg:py-28 ${owner ? '-mt-6 sm:-mt-10 lg:mt-0' : ''}`}>
           <div className="max-w-[35rem]">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8FB6DD]">
               {owner ? 'Restaurants, shops and offices' : 'Commercial millwork and interiors'}
