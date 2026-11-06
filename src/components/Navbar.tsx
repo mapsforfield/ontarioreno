@@ -25,7 +25,7 @@ export default function Navbar() {
   // Where the button opens the service picker (the homepage), it says what
   // the homepage's other booking buttons say. Elsewhere it keeps its label.
   const bookingLabel = isCommercialPage
-    ? location.pathname === '/commercial/owners'
+    ? location.pathname === '/commercial'
       ? 'Get a Free Consultation'
       : 'Request a Quote'
     : bookingHref === SERVICE_PICKER_HREF
@@ -85,7 +85,7 @@ export default function Navbar() {
     },
     {
       label: 'Commercial',
-      items: [{ name: 'Commercial Millwork & Fit-Outs', href: '/commercial' }],
+      items: [{ name: 'Commercial Renovations', href: '/commercial' }],
     },
     {
       label: 'Planning',

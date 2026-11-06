@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/commercial/owners", "destination": "/commercial", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.png" },
     { "source": "/api/sms/inbound", "destination": "/api/appointments?resource=sms-inbound" },

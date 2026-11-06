@@ -13,7 +13,7 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
   const nextStepHref = commercial ? `${pathname}#inquiry` : '/match';
   const nextStepLabel = !commercial
     ? 'Start Project Review'
-    : pathname === '/commercial/owners'
+    : pathname === '/commercial'
       ? 'Get a Free Consultation'
       : 'Request a Quote';
 
