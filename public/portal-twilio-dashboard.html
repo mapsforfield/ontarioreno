@@ -105,6 +105,24 @@
       margin: 0 0 14px;
     }
 
+    /* Title and the New message button share a line; the row carries the
+       spacing the title used to carry on its own. */
+    .sidebar-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 14px;
+    }
+
+    .sidebar-title-row .sidebar-title {
+      margin: 0;
+    }
+
+    .new-message-btn {
+      padding: 8px 12px;
+    }
+
     .from-select,
     .search-input,
     .composer-input,
@@ -1017,6 +1035,10 @@
         margin: 0 0 8px;
       }
 
+      .sidebar-title-row {
+        margin: 0 0 8px;
+      }
+
       .search-wrap {
         padding: 8px 12px;
       }
@@ -1299,7 +1321,10 @@
   <div class="app">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-title">Messages</div>
+        <div class="sidebar-title-row">
+          <div class="sidebar-title">Messages</div>
+          <button id="newMessageBtn" class="sync-btn new-message-btn" type="button">+ New message</button>
+        </div>
         <select id="fromNumber" class="from-select">
           <option value="">Loading Twilio numbers...</option>
         </select>
@@ -1414,6 +1439,33 @@
     const MAX_CACHED_MESSAGES = 3000;
     const THREAD_RENDER_LIMIT = 150;
     // ============================================
+
+    // ─── New message (a number with no thread yet) ───────────────────────
+    //
+    // The To field was always editable, but nothing made room for a number
+    // that isn't in the list: on a desktop the ten-second poll re-opens the
+    // newest thread whenever none is open, and that overwrote whatever had
+    // been typed into To. While composingNew is set, the poll leaves the
+    // thread closed and the To field alone. pendingNewContact is the number a
+    // new message just went to, so the thread opens itself once Twilio's log
+    // has it.
+    const newMessageBtn = document.getElementById("newMessageBtn");
+    let composingNew = false;
+    let pendingNewContact = null;
+
+    // Twilio wants E.164. Reps type numbers the way they read them off a
+    // form: "416-555-0123", "(905) 555 0123", "1 647 555 0123". Ten digits
+    // is a Canada/US number; anything else must already carry its own +code.
+    function normalizeRecipient(raw) {
+      const trimmed = String(raw || "").trim();
+      const digits = trimmed.replace(/\D/g, "");
+      if (trimmed.startsWith("+")) {
+        return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+      }
+      if (digits.length === 10) return `+1${digits}`;
+      if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+      return null;
+    }
 
     // ─── Repaint only when the markup actually changed ───────────────────
     //
@@ -1978,6 +2030,8 @@
           const contact = el.getAttribute("data-contact");
           const found = conversations.find((c) => c.contact === contact);
           if (found) {
+            composingNew = false;
+            pendingNewContact = null;
             activeConversation = withHydratedMessages(found);
             toNumberEl.value = found.contact;
 
@@ -2149,6 +2203,16 @@
     }
 
     function renderActiveConversation() {
+      if (!activeConversation && composingNew) {
+        threadTitleEl.textContent = "New message";
+        threadSubtitleEl.textContent = `Sending from ${formatPhoneNumber(fromNumberEl.value) || "the selected number"}`;
+        threadAvatarEl.textContent = "+";
+        threadBadgeEl.classList.add("hidden");
+        paint(threadBodyEl, `<div class="thread-empty">Type the recipient's number in the <strong>To</strong> field below, then your message, and press <strong>Send</strong>.<br /><br />A 10-digit number is sent as Canada/US (+1). If that number already has a thread, the message joins it.</div>`);
+        paintedThreadContact = null;
+        return;
+      }
+
       if (!activeConversation) {
         threadTitleEl.textContent = "No conversation selected";
         threadSubtitleEl.textContent = "Choose a thread from the left";
@@ -2507,6 +2571,17 @@
         if (activeConversation) {
           const refreshed = conversations.find((c) => c.contact === activeConversation.contact);
           activeConversation = withHydratedMessages(refreshed) || fallback;
+        } else if (composingNew) {
+          // Leave the compose screen alone - unless the message it just sent
+          // is now in the log, in which case open that thread.
+          const sent = pendingNewContact
+            ? conversations.find((c) => c.contact === pendingNewContact)
+            : null;
+          if (sent) {
+            composingNew = false;
+            pendingNewContact = null;
+            activeConversation = withHydratedMessages(sent);
+          }
         } else {
           activeConversation = fallback;
         }
@@ -2547,12 +2622,26 @@
 
     sendBtn.addEventListener("click", async () => {
       const from = fromNumberEl.value.trim();
-      const to = toNumberEl.value.trim();
+      const rawTo = toNumberEl.value.trim();
       const body = messageBodyEl.value.trim();
 
-      if (!from || !to || !body) {
+      if (!from || !rawTo || !body) {
         setStatus("Fill in sender, recipient, and message.", true);
         return;
+      }
+
+      // Only a hand-typed new number is reformatted. An existing thread's
+      // contact is already what Twilio gave us (including short codes, which
+      // the formatter would reject).
+      const to = composingNew ? normalizeRecipient(rawTo) : rawTo;
+      if (!to) {
+        setStatus("Enter a 10-digit phone number, e.g. 416 555 0123 (or +country code for outside Canada/US).", true);
+        toNumberEl.focus();
+        return;
+      }
+      if (composingNew) {
+        toNumberEl.value = to;
+        pendingNewContact = to;
       }
 
       try {
@@ -2585,7 +2674,21 @@
 
     refreshBtn.addEventListener("click", () => loadMessages(false));
 
+    newMessageBtn.addEventListener("click", () => {
+      composingNew = true;
+      pendingNewContact = null;
+      activeConversation = null;
+      toNumberEl.value = "";
+      renderConversationList();
+      renderActiveConversation();
+      clearStatus();
+      closeSidebar();
+      toNumberEl.focus();
+    });
+
     fromNumberEl.addEventListener("change", () => {
+      composingNew = false;
+      pendingNewContact = null;
       activeConversation = null;
       previousLastMessageSidByContact = {};
       isInitialLoad = true;
@@ -2709,7 +2812,9 @@
       if (window.innerWidth > 900) closeSidebar();
       // Shrunk into the phone layout with nothing open: show the list, not
       // an empty thread screen.
-      else if (!activeConversation) setSidebarOpen(true);
+      // Not while composing: Android fires resize when the keyboard opens for
+      // the To field, and that would snap the rep back to the list.
+      else if (!activeConversation && !composingNew) setSidebarOpen(true);
     });
 
     // Switching lines clears the open thread; on a phone, go back to the
