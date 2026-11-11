@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto';
 import {
   COMMERCIAL_FILE_RULES,
   canOpenLeadFile,
+  leadFilesFor,
+  leadPhoneKey,
   commercialAlert,
   commercialFileKey,
   commercialNotes,
@@ -3391,6 +3393,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleQuoteFile(req, res);
   }
 
+  // Files behind one consultation, for the rep it is assigned to.
+  if (req.query['appointment_files'] !== undefined) {
+    return handleAppointmentFiles(req, res);
+  }
+
   const user = await requireAuth(req, res);
   if (!user) return;
   if (denyContractor(user, res)) return;
@@ -3398,6 +3405,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query['id'] as string | undefined;
   if (id) return handleById(req, res, user, id);
   return handleCollection(req, res, user);
+}
+
+// ─── Lead files behind a consultation ───────────────────────────────────────
+//
+// A consultation points at its lead by leadId, or — for bookings made before
+// that link existed — only by the homeowner's phone number. The portal's own
+// lookup (PortalAppointments `selectedLead`) uses the same two rules, so the
+// rep is shown and allowed exactly the lead the admin sees on that visit.
+
+/** Does this rep hold a consultation booked from this lead? */
+async function repHasConsultationFor(repId: string, lead: { id: string; phone: string | null }): Promise<boolean> {
+  const key = leadPhoneKey(lead.phone);
+  const mine = await prisma.appointment.findMany({
+    where: {
+      assignedRepId: repId,
+      OR: [{ leadId: lead.id }, ...(key ? [{ phone: { contains: key.slice(-4) } }] : [])],
+    },
+    select: { leadId: true, phone: true },
+  });
+  return mine.some((a) => a.leadId === lead.id || (key !== '' && leadPhoneKey(a.phone) === key));
+}
+
+/** The lead a consultation was booked from: by leadId, else by phone with files. */
+async function leadForAppointment(appt: { leadId: string | null; phone: string | null }) {
+  const select = { id: true, phone: true, quoteFiles: true, assignedRepId: true } as const;
+  if (appt.leadId) {
+    const byId = await prisma.lead.findUnique({ where: { id: appt.leadId }, select });
+    if (byId) return byId;
+  }
+  const key = leadPhoneKey(appt.phone);
+  if (!key) return null;
+  const candidates = await prisma.lead.findMany({ where: { phone: { contains: key.slice(-4) } }, select });
+  return (
+    candidates.find(
+      (l) => leadPhoneKey(l.phone) === key && Array.isArray(l.quoteFiles) && l.quoteFiles.length > 0,
+    ) ?? null
+  );
+}
+
+// ?appointment_files=<appointmentId> — the file list for one consultation.
+// Admins: any consultation. Reps: only their own. Contractors: none.
+async function handleAppointmentFiles(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (user.role !== 'admin' && user.role !== 'rep') {
+    return res.status(403).json({ error: 'You do not have access to these files.' });
+  }
+  const appt = await prisma.appointment.findUnique({
+    where: { id: String(req.query['appointment_files'] ?? '') },
+    select: { assignedRepId: true, leadId: true, phone: true },
+  });
+  if (!appt || (user.role === 'rep' && appt.assignedRepId !== user.id)) {
+    return res.status(200).json({ leadId: null, files: [] });
+  }
+  const lead = await leadForAppointment(appt);
+  if (!lead) return res.status(200).json({ leadId: null, files: [] });
+  return res.status(200).json({ leadId: lead.id, files: leadFilesFor(lead.quoteFiles) });
 }
 
 // ─── ?quote_file=1 — open one uploaded file (see canOpenLeadFile) ─────────────
@@ -3426,12 +3492,16 @@ async function handleQuoteFile(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
   const lead = await prisma.lead.findUnique({
     where: { id: String(req.query['lead'] ?? '') },
-    select: { quoteFiles: true, assignedRepId: true },
+    select: { id: true, phone: true, quoteFiles: true, assignedRepId: true },
   });
   const all = Array.isArray(lead?.quoteFiles) ? (lead.quoteFiles as unknown as QuoteFile[]) : [];
   const file = all[Number(req.query['i'] ?? -1)];
+  const repHasConsultation =
+    lead && user.role === 'rep' && lead.assignedRepId !== user.id
+      ? await repHasConsultationFor(user.id, lead)
+      : false;
   // One answer for "not yours" and "not there", so a rep cannot probe for files.
-  if (!lead || !file?.key || !canOpenLeadFile(user, lead, file.key)) {
+  if (!lead || !file?.key || !canOpenLeadFile(user, lead, file.key, repHasConsultation)) {
     return user.role === 'admin'
       ? res.status(404).json({ error: 'File not found.' })
       : res.status(403).json({ error: 'You do not have access to this file.' });
