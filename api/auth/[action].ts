@@ -25,6 +25,7 @@ import {
   requireAdmin,
   denyContractor,
 } from '../../lib/auth.js';
+import { serveBundle, AUTH_BUNDLE } from '../../lib/bundle.js';
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
 const MAX_FIELD_LENGTH = 2_000;
@@ -59,6 +60,10 @@ function fmtDate(d: string): string {
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query['action'] as string;
+
+  // /api/auth/bundle — the portal's five small auth-side datasets in one
+  // invocation. See lib/bundle.ts.
+  if (action === 'bundle') return serveBundle(req, res, handler, AUTH_BUNDLE, ['action']);
 
   // ── /api/auth/login ──────────────────────────────────────────────────────────
   if (action === 'login') {
@@ -100,7 +105,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const { Rest } = await import('ably');
       const client = new Rest(apiKey);
-      const tokenRequest = await client.auth.createTokenRequest({ clientId: user.id });
+      // 24h (Ably's maximum) rather than the 1h default: every open portal tab
+      // renewed hourly around the clock, each renewal a function invocation.
+      // The token only lets the tab listen for "something changed" pings — no
+      // data rides on it — and the session cookie still guards every fetch.
+      const tokenRequest = await client.auth.createTokenRequest({
+        clientId: user.id,
+        ttl: 24 * 60 * 60 * 1000,
+      });
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json(tokenRequest);
     } catch (err) {

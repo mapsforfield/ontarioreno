@@ -176,6 +176,22 @@ const REPLY_STATUS: Record<Exclude<ReplyIntent, 'unknown'>, string> = {
   reschedule: 'reschedule_requested',
 };
 
+/** Best-effort realtime ping on the 'sms-inbound' channel (see the portal's
+ *  onSmsInbound). Capped at 1.5s so a slow Ably can never delay Twilio's reply. */
+async function signalInboundText(env: NodeJS.ProcessEnv): Promise<void> {
+  const apiKey = env.ABLY_API_KEY;
+  if (!apiKey) return;
+  try {
+    const { Rest } = await import('ably');
+    await Promise.race([
+      new Rest(apiKey).channels.get('sms-inbound').publish('inbound', { at: Date.now() }),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch (err) {
+    console.error('[sms-inbound] realtime signal failed (continuing):', err);
+  }
+}
+
 export async function handleInboundSms(
   req: VercelRequest,
   res: VercelResponse,
@@ -215,6 +231,12 @@ export async function handleInboundSms(
   const from = params.From || '';
   const body = params.Body || '';
   if (!messageSid || !from) return twiml(res, downstreamTwiml ?? EMPTY_TWIML);
+
+  // Tell an open Messages page a text just arrived, so it refreshes now
+  // instead of asking Twilio every ten seconds. Signal only — nothing about the
+  // message rides on it — and only after the signature check, so a stranger
+  // cannot make every Messages page refetch. Never blocks or fails the reply.
+  await signalInboundText(env);
 
   // Twilio retries a webhook it believes failed. Without this guard a slow
   // response would alert the rep twice and text the homeowner twice.

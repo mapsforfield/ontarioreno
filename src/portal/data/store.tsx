@@ -783,6 +783,29 @@ export function setChangePublisher(fn: (() => void) | null) {
   changePublisher = fn;
 }
 
+// ── Incoming-text signal (for the Messages page) ────────────────────────────
+// Published by the inbound-SMS webhook (lib/sms-inbound.ts) on its own channel.
+// `realtimeReady` tells a listener whether it can rely on the signal or must
+// keep polling as before — realtime is optional and can be unconfigured.
+export const SMS_INBOUND_CHANNEL = 'sms-inbound';
+const smsInboundListeners = new Set<() => void>();
+const realtimeReadyListeners = new Set<(ready: boolean) => void>();
+let realtimeReady = false;
+function setRealtimeReady(ready: boolean) {
+  realtimeReady = ready;
+  realtimeReadyListeners.forEach((fn) => fn(ready));
+}
+/** Subscribe to incoming texts and realtime availability. Returns an unsubscribe. */
+export function onSmsInbound(onText: () => void, onReady: (ready: boolean) => void): () => void {
+  smsInboundListeners.add(onText);
+  realtimeReadyListeners.add(onReady);
+  onReady(realtimeReady);
+  return () => {
+    smsInboundListeners.delete(onText);
+    realtimeReadyListeners.delete(onReady);
+  };
+}
+
 async function apiCall<T>(
   url: string,
   options?: RequestInit
@@ -812,6 +835,31 @@ async function apiCall<T>(
   }
 }
 
+/**
+ * Fetch several datasets from one bundled GET (lib/bundle.ts). Each key comes
+ * back as its body on a 2xx, or null — exactly what apiCall gives for a
+ * standalone fetch. If the bundle request itself fails (e.g. an older server
+ * without the bundle branch), or a part is missing, that dataset falls back to
+ * its own standalone URL, so the portal can never load LESS than it used to.
+ */
+async function fetchBundle<K extends string>(
+  bundleUrl: string,
+  fallbacks: Record<K, string>,
+): Promise<Record<K, unknown>> {
+  const keys = Object.keys(fallbacks) as K[];
+  const bundle = await apiCall<{ parts?: Record<string, { status: number; body: unknown }> }>(bundleUrl);
+  const values = await Promise.all(
+    keys.map(async (key) => {
+      const part = bundle?.parts?.[key];
+      if (!part) return apiCall<unknown>(fallbacks[key]);
+      if (part.status >= 200 && part.status < 300) return part.body;
+      console.error(`[store] bundle part ${key} → ${part.status}`, part.body);
+      return null;
+    }),
+  );
+  return Object.fromEntries(keys.map((k, i) => [k, values[i]])) as Record<K, unknown>;
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
@@ -822,6 +870,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefetchAt = useRef(0);
   const hiddenAt = useRef<number | null>(null);
+  const missedChangeWhileHidden = useRef(false);
 
   // Realtime is the primary freshness mechanism. The visibility fallback is
   // only needed after a meaningful absence; reloading all 15 portal datasets on
@@ -850,27 +899,58 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }).catch(() => setIsLoading(false));
     }
 
+    // 19 datasets in 7 requests: four routes answer several datasets in one
+    // invocation (see lib/bundle.ts and fetchBundle below). Same data, same
+    // auth, same order — each dataset still lands as its own value or null.
     return Promise.all([
       apiCall<User[]>('/api/users'),
-      apiCall<Contractor[]>('/api/contractors'),
-      apiCall<Deal[]>('/api/deals'),
-      apiCall<Appointment[]>('/api/appointments'),
+      fetchBundle('/api/contractors?_bundle=1', {
+        contractors: '/api/contractors',
+        finance_partners: '/api/contractors?_resource=finance_partners',
+      }),
+      fetchBundle('/api/deals?_bundle=1', {
+        deals: '/api/deals',
+        tracker: '/api/deals?_resource=tracker',
+        agreements: '/api/deals?_resource=agreements',
+        deal_documents: '/api/deals?_resource=deal_documents',
+        contract_presets: '/api/deals?_resource=contract_presets',
+      }),
+      fetchBundle('/api/appointments?_bundle=1', {
+        appointments: '/api/appointments',
+        clients: '/api/appointments?_resource=clients',
+        households: '/api/appointments?_resource=households',
+        days_off: '/api/appointments?_resource=days_off',
+      }),
       apiCall<Commission[]>('/api/commissions'),
-      apiCall<Activity[]>('/api/auth/activities'),
-      apiCall<Client[]>('/api/appointments?_resource=clients'),
-      apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker'),
-      apiCall<Household[]>('/api/appointments?_resource=households'),
-      apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
-      apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
-      apiCall<DealDocument[]>('/api/deals?_resource=deal_documents'),
-      apiCall<Task[]>('/api/auth/tasks'),
+      fetchBundle('/api/auth/bundle', {
+        activities: '/api/auth/activities',
+        tasks: '/api/auth/tasks',
+        rep_access: '/api/auth/rep-access',
+        note_templates: '/api/auth/note-templates',
+        scheduling_settings: '/api/auth/scheduling-settings',
+      }),
       apiCall<Lead[]>('/api/leads'),
-      apiCall<Record<string, boolean>>('/api/auth/rep-access'),
-      apiCall<NoteTemplate[]>('/api/auth/note-templates'),
-      apiCall<SchedulingSettings>('/api/auth/scheduling-settings'),
-      apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
-      apiCall<FinancePartner[]>('/api/contractors?_resource=finance_partners'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
+    ]).then(([users, contractorParts, dealParts, appointmentParts, commissions, authParts, leads]) => [
+      users,
+      contractorParts.contractors as Contractor[] | null,
+      dealParts.deals as Deal[] | null,
+      appointmentParts.appointments as Appointment[] | null,
+      commissions,
+      authParts.activities as Activity[] | null,
+      appointmentParts.clients as Client[] | null,
+      dealParts.tracker as SaleTrackerRow[] | null,
+      appointmentParts.households as Household[] | null,
+      appointmentParts.days_off as RepDayOff[] | null,
+      dealParts.agreements as SalesAgreement[] | null,
+      dealParts.deal_documents as DealDocument[] | null,
+      authParts.tasks as Task[] | null,
+      leads,
+      authParts.rep_access as Record<string, boolean> | null,
+      authParts.note_templates as NoteTemplate[] | null,
+      authParts.scheduling_settings as SchedulingSettings | null,
+      dealParts.contract_presets as ContractPreset[] | null,
+      contractorParts.finance_partners as FinancePartner[] | null,
+    ] as const).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -981,11 +1061,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }
       if (
         document.visibilityState === 'visible' &&
-        hiddenAt.current !== null &&
-        Date.now() - hiddenAt.current >= MIN_HIDDEN_REFRESH_MS
+        (missedChangeWhileHidden.current ||
+          (hiddenAt.current !== null && Date.now() - hiddenAt.current >= MIN_HIDDEN_REFRESH_MS))
       ) {
         scheduleRefetch();
       }
+      missedChangeWhileHidden.current = false;
       hiddenAt.current = null;
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -1007,10 +1088,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       const probe = await fetch('/api/auth/ably-token', { credentials: 'include' })
         .catch(() => null);
       if (cancelled || !probe || !probe.ok) return;
+      // The probe already IS a token request — hand it to the first connect
+      // instead of fetching a second one straight away.
+      let probeToken: unknown = await probe.json().catch(() => null);
 
       const { Realtime } = await import('ably');
       const client = new Realtime({
         authCallback: async (_params, callback) => {
+          if (probeToken) {
+            const token = probeToken;
+            probeToken = null;
+            callback(null, token as never);
+            return;
+          }
           try {
             const r = await fetch('/api/auth/ably-token', { credentials: 'include' });
             if (!r.ok) throw new Error(`token ${r.status}`);
@@ -1027,8 +1117,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       channel.subscribe('change', (msg) => {
         // Ignore our own pings — we already applied the change optimistically.
         if (msg.connectionId && msg.connectionId === client.connection.id) return;
+        // A tab nobody is looking at doesn't need the data yet. Reloading all
+        // of it on every ping, in every background tab left open all day, was
+        // the largest single use of server CPU when Vercel paused the site
+        // (Nov 11, 2026). Note it instead; the visibility handler above
+        // reloads the moment the tab is looked at again, so what a rep sees is
+        // exactly as current as before.
+        if (document.visibilityState === 'hidden') {
+          missedChangeWhileHidden.current = true;
+          return;
+        }
         scheduleRefetch();
       });
+
+      // Incoming texts: the Messages page listens for these instead of asking
+      // Twilio every ten seconds (see PortalMessages). Its own channel, so a
+      // text never triggers the full portal reload above.
+      client.channels.get(SMS_INBOUND_CHANNEL).subscribe('inbound', () => {
+        smsInboundListeners.forEach((fn) => { try { fn(); } catch { /* listener's problem */ } });
+      });
+      setRealtimeReady(true);
 
       // Register the publisher so every write rings the doorbell.
       setChangePublisher(() => {
@@ -1039,6 +1147,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       setChangePublisher(null);
+      setRealtimeReady(false);
       if (realtime) realtime.close();
     };
   }, [currentUser?.id, scheduleRefetch]);

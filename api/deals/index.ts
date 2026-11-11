@@ -6,6 +6,7 @@ import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
 import { linkProblem } from '../../lib/change-orders.js';
 import { stripAdminLedger } from '../../lib/commission-scope.js';
 import { randomUUID } from 'node:crypto';
+import { serveBundle, DEALS_BUNDLE } from '../../lib/bundle.js';
 
 // Self-healing ledger of commission invoices that were generated / sent.
 const CREATE_INVOICE_LEDGER =
@@ -79,6 +80,8 @@ async function readBillTo(contractorId: string): Promise<BillTo | null> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // One invocation for the portal's five deal datasets — see lib/bundle.ts.
+  if (req.query['_bundle']) return serveBundle(req, res, handler, DEALS_BUNDLE, ['_bundle']);
   const user = await requireAuth(req, res);
   if (!user) return;
   if (denyContractor(user, res)) return;

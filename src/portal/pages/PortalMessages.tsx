@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { onSmsInbound } from '../data/store';
 
 /**
  * Twilio Messages — the SMS dashboard, reachable from anywhere.
@@ -23,6 +24,32 @@ export default function PortalMessages() {
   // the portal page to get back in; a button that reloads just the frame does
   // the same thing without losing the portal session around it.
   const [frameKey, setFrameKey] = useState(0);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  // Relay the portal's realtime signal into the frame. While realtime is up the
+  // dashboard refreshes the moment a text arrives and drops its ten-second
+  // Twilio poll to a one-minute safety net; if realtime is down it keeps the
+  // ten-second poll exactly as before. (Server CPU — see lib/bundle.ts.)
+  const readyRef = useRef(false);
+  useEffect(() => {
+    const send = (data: Record<string, unknown>) => {
+      frameRef.current?.contentWindow?.postMessage(data, window.location.origin);
+    };
+    return onSmsInbound(
+      () => send({ type: 'sms-inbound' }),
+      (ready) => {
+        readyRef.current = ready;
+        send({ type: 'realtime', ready });
+      },
+    );
+  }, []);
+  // A reloaded frame starts from scratch — tell it again once it has loaded.
+  const onFrameLoad = () => {
+    frameRef.current?.contentWindow?.postMessage(
+      { type: 'realtime', ready: readyRef.current },
+      window.location.origin,
+    );
+  };
 
   return (
     // 100dvh, not 100vh: on mobile Safari 100vh is the height WITHOUT the
@@ -55,6 +82,8 @@ export default function PortalMessages() {
           second rounded border inside them costs line length in every bubble. */}
       <iframe
         key={frameKey}
+        ref={frameRef}
+        onLoad={onFrameLoad}
         src="/portal-twilio-dashboard.html"
         title="Twilio Messages"
         className="-mx-4 min-h-0 w-[calc(100%+2rem)] flex-1 border-y border-slate-200 bg-white sm:mx-0 sm:w-full sm:rounded-xl sm:border sm:shadow-sm"

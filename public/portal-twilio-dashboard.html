@@ -2755,11 +2755,32 @@
     // thread nobody is reading. Pausing on `hidden` makes an idle tab cost
     // nothing, and the refresh on `visible` means the first thing a rep sees
     // when they come back is current rather than however stale the tab went.
+    //
+    // When the portal around this frame has realtime, it posts "sms-inbound" the
+    // moment Twilio delivers a text to our webhook, so we refresh then and only
+    // keep a one-minute safety net (for texts SENT outside this page, and
+    // delivery statuses). Without realtime — or opened outside the portal —
+    // nothing is posted and the ten-second poll runs exactly as it always has.
+    const SAFETY_REFRESH_MS = 60000; // 1 minute, only while realtime is up
+    let realtimeUp = false;
+    let lastPollAt = Date.now();
     setInterval(() => {
-      if (fromNumberEl.value && document.visibilityState === "visible") {
+      if (!fromNumberEl.value || document.visibilityState !== "visible") return;
+      if (realtimeUp && Date.now() - lastPollAt < SAFETY_REFRESH_MS) return;
+      lastPollAt = Date.now();
+      loadMessages(true);
+    }, AUTO_REFRESH_MS);
+
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data || {};
+      if (data.type === "realtime") {
+        realtimeUp = data.ready === true;
+      } else if (data.type === "sms-inbound" && fromNumberEl.value && document.visibilityState === "visible") {
+        lastPollAt = Date.now();
         loadMessages(true);
       }
-    }, AUTO_REFRESH_MS);
+    });
 
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible" && fromNumberEl.value) {

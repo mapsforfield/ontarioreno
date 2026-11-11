@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { prisma } from '../../lib/prisma.js';
 import { requireAuth, denyContractor } from '../../lib/auth.js';
 import { withSchema } from '../../lib/schema.js';
+import { serveBundle, CONTRACTORS_BUNDLE } from '../../lib/bundle.js';
 
 /** commissionRate is confidential — only admins ever receive it. */
 function stripRate<T extends { commissionRate?: number }>(
@@ -15,6 +16,8 @@ function stripRate<T extends { commissionRate?: number }>(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Contractors + finance partners in one invocation — see lib/bundle.ts.
+  if (req.query['_bundle']) return serveBundle(req, res, handler, CONTRACTORS_BUNDLE, ['_bundle']);
   const user = await requireAuth(req, res);
   if (!user) return;
   if (denyContractor(user, res)) return;

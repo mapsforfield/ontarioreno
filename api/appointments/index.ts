@@ -32,6 +32,7 @@ import {
 } from '../../lib/reminder-resync.js';
 import { payDayMessage } from '../../lib/payday.js';
 import { balanceClock } from '../../src/portal/data/balanceClock.js';
+import { serveBundle, APPOINTMENTS_BUNDLE } from '../../lib/bundle.js';
 
 // Self-healing creation for the client-video metadata table (R2 holds the bytes).
 const CREATE_CLIENT_VIDEO_TABLE =
@@ -276,6 +277,8 @@ async function handleContractorGet(req: VercelRequest, res: VercelResponse, cont
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // One invocation for the portal's four calendar datasets — see lib/bundle.ts.
+  if (req.query['_bundle']) return serveBundle(req, res, handler, APPOINTMENTS_BUNDLE, ['_bundle']);
   // ── Grant Radar (folded into this function to stay under the 12-function cap) ──
   // Daily cron scans government sources for new/changed renovation-grant programs;
   // the admin API powers the /portal/grants review queue. Both fully self-contained
