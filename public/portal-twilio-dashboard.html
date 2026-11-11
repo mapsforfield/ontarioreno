@@ -1420,6 +1420,12 @@
 
     let previousLastMessageSidByContact = {};
     let isInitialLoad = true;
+    // Newest message time already seen, per company number. A reply only
+    // counts as new-unread if it is newer than this. Comparing against the
+    // previous list alone was not enough: the full reload after Send can
+    // return an older copy of the log, and the next poll then made every
+    // reply since that copy look new again - undoing "Mark all read".
+    const newestSeenAtByNumber = {};
 
     const AUTO_REFRESH_MS = 10000; // 10 seconds
 
@@ -2527,6 +2533,7 @@
           : sortMessagesNewestFirst(data.messages).slice(0, MAX_CACHED_MESSAGES);
         const newConversations = buildConversations(allMessages, activeNumber);
         let shouldPlayDing = false;
+        const newestSeenAt = newestSeenAtByNumber[activeNumber] || 0;
 
         // detect new inbound replies
         if (!isInitialLoad) {
@@ -2534,7 +2541,10 @@
             const prevSid = previousLastMessageSidByContact[conv.contact];
             const currentLast = conv.messages[conv.messages.length - 1];
 
-            const isNewLastMessage = currentLast && currentLast.sid !== prevSid;
+            const isNewLastMessage =
+              currentLast &&
+              currentLast.sid !== prevSid &&
+              new Date(currentLast.dateSent).getTime() > newestSeenAt;
             const isInbound = currentLast && currentLast.from !== activeNumber;
             const isCurrentlyOpen =
               activeConversation && activeConversation.contact === conv.contact;
@@ -2552,9 +2562,14 @@
 
         // refresh previous last sid map
         previousLastMessageSidByContact = {};
+        let newestInLoad = newestSeenAt;
         newConversations.forEach((conv) => {
           previousLastMessageSidByContact[conv.contact] = conv.lastSid;
+          const t = new Date(conv.lastDate).getTime();
+          if (t > newestInLoad) newestInLoad = t;
         });
+        // Only ever moves forward, so an older copy of the log cannot lower it.
+        newestSeenAtByNumber[activeNumber] = newestInLoad;
 
         // Built once. This used to call buildConversations a second time on
         // the same array, which on every ten-second poll re-sorted every
