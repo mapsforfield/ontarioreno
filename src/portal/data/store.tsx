@@ -783,6 +783,29 @@ export function setChangePublisher(fn: (() => void) | null) {
   changePublisher = fn;
 }
 
+// ── Incoming-text signal (for the Messages page) ────────────────────────────
+// Published by the inbound-SMS webhook (lib/sms-inbound.ts) on its own channel.
+// `realtimeReady` tells a listener whether it can rely on the signal or must
+// keep polling as before — realtime is optional and can be unconfigured.
+export const SMS_INBOUND_CHANNEL = 'sms-inbound';
+const smsInboundListeners = new Set<() => void>();
+const realtimeReadyListeners = new Set<(ready: boolean) => void>();
+let realtimeReady = false;
+function setRealtimeReady(ready: boolean) {
+  realtimeReady = ready;
+  realtimeReadyListeners.forEach((fn) => fn(ready));
+}
+/** Subscribe to incoming texts and realtime availability. Returns an unsubscribe. */
+export function onSmsInbound(onText: () => void, onReady: (ready: boolean) => void): () => void {
+  smsInboundListeners.add(onText);
+  realtimeReadyListeners.add(onReady);
+  onReady(realtimeReady);
+  return () => {
+    smsInboundListeners.delete(onText);
+    realtimeReadyListeners.delete(onReady);
+  };
+}
+
 async function apiCall<T>(
   url: string,
   options?: RequestInit
@@ -847,6 +870,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefetchAt = useRef(0);
   const hiddenAt = useRef<number | null>(null);
+  const missedChangeWhileHidden = useRef(false);
 
   // Realtime is the primary freshness mechanism. The visibility fallback is
   // only needed after a meaningful absence; reloading all 15 portal datasets on
@@ -1037,11 +1061,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }
       if (
         document.visibilityState === 'visible' &&
-        hiddenAt.current !== null &&
-        Date.now() - hiddenAt.current >= MIN_HIDDEN_REFRESH_MS
+        (missedChangeWhileHidden.current ||
+          (hiddenAt.current !== null && Date.now() - hiddenAt.current >= MIN_HIDDEN_REFRESH_MS))
       ) {
         scheduleRefetch();
       }
+      missedChangeWhileHidden.current = false;
       hiddenAt.current = null;
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -1063,10 +1088,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       const probe = await fetch('/api/auth/ably-token', { credentials: 'include' })
         .catch(() => null);
       if (cancelled || !probe || !probe.ok) return;
+      // The probe already IS a token request — hand it to the first connect
+      // instead of fetching a second one straight away.
+      let probeToken: unknown = await probe.json().catch(() => null);
 
       const { Realtime } = await import('ably');
       const client = new Realtime({
         authCallback: async (_params, callback) => {
+          if (probeToken) {
+            const token = probeToken;
+            probeToken = null;
+            callback(null, token as never);
+            return;
+          }
           try {
             const r = await fetch('/api/auth/ably-token', { credentials: 'include' });
             if (!r.ok) throw new Error(`token ${r.status}`);
@@ -1083,8 +1117,26 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       channel.subscribe('change', (msg) => {
         // Ignore our own pings — we already applied the change optimistically.
         if (msg.connectionId && msg.connectionId === client.connection.id) return;
+        // A tab nobody is looking at doesn't need the data yet. Reloading all
+        // of it on every ping, in every background tab left open all day, was
+        // the largest single use of server CPU when Vercel paused the site
+        // (Nov 11, 2026). Note it instead; the visibility handler above
+        // reloads the moment the tab is looked at again, so what a rep sees is
+        // exactly as current as before.
+        if (document.visibilityState === 'hidden') {
+          missedChangeWhileHidden.current = true;
+          return;
+        }
         scheduleRefetch();
       });
+
+      // Incoming texts: the Messages page listens for these instead of asking
+      // Twilio every ten seconds (see PortalMessages). Its own channel, so a
+      // text never triggers the full portal reload above.
+      client.channels.get(SMS_INBOUND_CHANNEL).subscribe('inbound', () => {
+        smsInboundListeners.forEach((fn) => { try { fn(); } catch { /* listener's problem */ } });
+      });
+      setRealtimeReady(true);
 
       // Register the publisher so every write rings the doorbell.
       setChangePublisher(() => {
@@ -1095,6 +1147,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       setChangePublisher(null);
+      setRealtimeReady(false);
       if (realtime) realtime.close();
     };
   }, [currentUser?.id, scheduleRefetch]);
