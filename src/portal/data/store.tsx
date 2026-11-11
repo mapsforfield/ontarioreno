@@ -812,6 +812,31 @@ async function apiCall<T>(
   }
 }
 
+/**
+ * Fetch several datasets from one bundled GET (lib/bundle.ts). Each key comes
+ * back as its body on a 2xx, or null — exactly what apiCall gives for a
+ * standalone fetch. If the bundle request itself fails (e.g. an older server
+ * without the bundle branch), or a part is missing, that dataset falls back to
+ * its own standalone URL, so the portal can never load LESS than it used to.
+ */
+async function fetchBundle<K extends string>(
+  bundleUrl: string,
+  fallbacks: Record<K, string>,
+): Promise<Record<K, unknown>> {
+  const keys = Object.keys(fallbacks) as K[];
+  const bundle = await apiCall<{ parts?: Record<string, { status: number; body: unknown }> }>(bundleUrl);
+  const values = await Promise.all(
+    keys.map(async (key) => {
+      const part = bundle?.parts?.[key];
+      if (!part) return apiCall<unknown>(fallbacks[key]);
+      if (part.status >= 200 && part.status < 300) return part.body;
+      console.error(`[store] bundle part ${key} → ${part.status}`, part.body);
+      return null;
+    }),
+  );
+  return Object.fromEntries(keys.map((k, i) => [k, values[i]])) as Record<K, unknown>;
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
@@ -850,27 +875,58 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }).catch(() => setIsLoading(false));
     }
 
+    // 19 datasets in 7 requests: four routes answer several datasets in one
+    // invocation (see lib/bundle.ts and fetchBundle below). Same data, same
+    // auth, same order — each dataset still lands as its own value or null.
     return Promise.all([
       apiCall<User[]>('/api/users'),
-      apiCall<Contractor[]>('/api/contractors'),
-      apiCall<Deal[]>('/api/deals'),
-      apiCall<Appointment[]>('/api/appointments'),
+      fetchBundle('/api/contractors?_bundle=1', {
+        contractors: '/api/contractors',
+        finance_partners: '/api/contractors?_resource=finance_partners',
+      }),
+      fetchBundle('/api/deals?_bundle=1', {
+        deals: '/api/deals',
+        tracker: '/api/deals?_resource=tracker',
+        agreements: '/api/deals?_resource=agreements',
+        deal_documents: '/api/deals?_resource=deal_documents',
+        contract_presets: '/api/deals?_resource=contract_presets',
+      }),
+      fetchBundle('/api/appointments?_bundle=1', {
+        appointments: '/api/appointments',
+        clients: '/api/appointments?_resource=clients',
+        households: '/api/appointments?_resource=households',
+        days_off: '/api/appointments?_resource=days_off',
+      }),
       apiCall<Commission[]>('/api/commissions'),
-      apiCall<Activity[]>('/api/auth/activities'),
-      apiCall<Client[]>('/api/appointments?_resource=clients'),
-      apiCall<SaleTrackerRow[]>('/api/deals?_resource=tracker'),
-      apiCall<Household[]>('/api/appointments?_resource=households'),
-      apiCall<RepDayOff[]>('/api/appointments?_resource=days_off'),
-      apiCall<SalesAgreement[]>('/api/deals?_resource=agreements'),
-      apiCall<DealDocument[]>('/api/deals?_resource=deal_documents'),
-      apiCall<Task[]>('/api/auth/tasks'),
+      fetchBundle('/api/auth/bundle', {
+        activities: '/api/auth/activities',
+        tasks: '/api/auth/tasks',
+        rep_access: '/api/auth/rep-access',
+        note_templates: '/api/auth/note-templates',
+        scheduling_settings: '/api/auth/scheduling-settings',
+      }),
       apiCall<Lead[]>('/api/leads'),
-      apiCall<Record<string, boolean>>('/api/auth/rep-access'),
-      apiCall<NoteTemplate[]>('/api/auth/note-templates'),
-      apiCall<SchedulingSettings>('/api/auth/scheduling-settings'),
-      apiCall<ContractPreset[]>('/api/deals?_resource=contract_presets'),
-      apiCall<FinancePartner[]>('/api/contractors?_resource=finance_partners'),
-    ]).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
+    ]).then(([users, contractorParts, dealParts, appointmentParts, commissions, authParts, leads]) => [
+      users,
+      contractorParts.contractors as Contractor[] | null,
+      dealParts.deals as Deal[] | null,
+      appointmentParts.appointments as Appointment[] | null,
+      commissions,
+      authParts.activities as Activity[] | null,
+      appointmentParts.clients as Client[] | null,
+      dealParts.tracker as SaleTrackerRow[] | null,
+      appointmentParts.households as Household[] | null,
+      appointmentParts.days_off as RepDayOff[] | null,
+      dealParts.agreements as SalesAgreement[] | null,
+      dealParts.deal_documents as DealDocument[] | null,
+      authParts.tasks as Task[] | null,
+      leads,
+      authParts.rep_access as Record<string, boolean> | null,
+      authParts.note_templates as NoteTemplate[] | null,
+      authParts.scheduling_settings as SchedulingSettings | null,
+      dealParts.contract_presets as ContractPreset[] | null,
+      contractorParts.finance_partners as FinancePartner[] | null,
+    ] as const).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
