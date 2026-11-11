@@ -4122,7 +4122,11 @@ export default function PortalAppointments() {
                   </div>
                 </div>
                 {selectedAppointment && <HomeownerAnswers appointmentId={selectedAppointment.id} />}
-                {selectedLead && <LeadFiles lead={selectedLead} isAdmin={isAdmin} />}
+                {/* Admins have every lead loaded; a rep's consultation may come
+                    from a lead they don't hold, so the server finds it for them. */}
+                {isAdmin
+                  ? selectedLead && <LeadFiles lead={selectedLead} isAdmin={isAdmin} />
+                  : selectedAppointment && <LeadFiles appointmentId={selectedAppointment.id} />}
                 <div
                   className={`mt-3 rounded-[0.5rem] border border-amber-200 bg-amber-50 p-3 ${form.internalNotes?.trim() ? 'cursor-pointer hover:bg-amber-100 transition-colors' : ''}`}
                   onClick={() => form.internalNotes?.trim() && setNotesModal(form.internalNotes)}

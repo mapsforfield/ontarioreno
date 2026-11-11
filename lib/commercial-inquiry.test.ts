@@ -131,25 +131,30 @@ test('every owner business type is a stored project type', () => {
   }
 });
 
-test('a rep opens commercial files on their own leads and nothing else', () => {
+test('a rep opens every file on their own leads and on leads behind their consultations, nothing else', () => {
   const steven = { id: 'steven', role: 'rep' };
   const commercial = commercialFileKey(uuid, 'plan.pdf');
   const quote = `window-quotes/${uuid}/quote.pdf`;
   assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, commercial), true);
-  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, quote), false);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'steven' }, quote), true);
+  // Not his lead, but his consultation was booked from it.
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: null }, quote, true), true);
+  assert.equal(canOpenLeadFile(steven, { assignedRepId: 'keven' }, quote, true), true);
+  // Neither his lead nor his consultation.
   assert.equal(canOpenLeadFile(steven, { assignedRepId: 'keven' }, commercial), false);
   assert.equal(canOpenLeadFile(steven, { assignedRepId: null }, commercial), false);
-  assert.equal(canOpenLeadFile({ id: 'pj', role: 'contractor' }, { assignedRepId: 'pj' }, commercial), false);
+  // Contractors never, even with a consultation flag.
+  assert.equal(canOpenLeadFile({ id: 'pj', role: 'contractor' }, { assignedRepId: 'pj' }, commercial, true), false);
   assert.equal(canOpenLeadFile({ id: 'me', role: 'admin' }, { assignedRepId: null }, quote), true);
 });
 
-test('the listed files keep their real position, and reps only see commercial ones', () => {
+test('the listed files keep their real position, and everyone shown the lead sees all of them', () => {
   const files = [
     { key: `window-quotes/${uuid}/quote.pdf`, name: 'quote.pdf' },
     { key: commercialFileKey(uuid, 'plan.pdf'), name: 'plan.pdf' },
   ];
-  assert.deepEqual(leadFilesFor(files, false), [{ index: 1, name: 'plan.pdf' }]);
-  assert.equal(leadFilesFor(files, true).length, 2);
+  assert.equal(leadFilesFor(files, false).length, 2);
+  assert.deepEqual(leadFilesFor(files, true)[1], { index: 1, name: 'plan.pdf' });
   assert.deepEqual(leadFilesFor(null, true), []);
 });
 

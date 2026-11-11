@@ -136,36 +136,44 @@ export function isCommercialFileKey(key: string): boolean {
 }
 
 /**
- * Who may open a file stored on a lead. Admins may open any. A rep may open a
- * COMMERCIAL file on a lead assigned to them, and nothing else: window quotes
- * and /match documents stay admin-only, and contractor accounts get none.
- * Reassigning the lead ends the access.
+ * Who may open a file stored on a lead. Admins may open any. A rep may open
+ * ANY file on a lead that is theirs — assigned to them, or one their own
+ * consultation was booked from (`repHasConsultation`, worked out by the caller
+ * from the appointments table). Contractor accounts get none. Reassigning the
+ * lead or the consultation ends the access.
+ *
+ * Until November 2026 reps saw only COMMERCIAL files; the owner widened it so
+ * the rep walking into the visit has the homeowner's placard, plans and quotes.
  */
 export function canOpenLeadFile(
   user: { id: string; role: string },
   lead: { assignedRepId?: string | null },
   fileKey: string,
+  repHasConsultation = false,
 ): boolean {
   if (user.role === 'admin') return true;
-  return (
-    user.role === 'rep' &&
-    Boolean(lead.assignedRepId) &&
-    lead.assignedRepId === user.id &&
-    fileKey.startsWith(COMMERCIAL_FILE_PREFIX)
-  );
+  if (user.role !== 'rep' || !fileKey) return false;
+  return (Boolean(lead.assignedRepId) && lead.assignedRepId === user.id) || repHasConsultation;
 }
 
 /**
  * The files to list on a lead, keeping each one's position in Lead.quoteFiles,
- * because that position is what the file link addresses.
+ * because that position is what the file link addresses. Every file is listed:
+ * whoever is shown the lead may open all of it (see canOpenLeadFile).
  */
-export function leadFilesFor(files: unknown, isAdmin: boolean): { index: number; name: string }[] {
+export function leadFilesFor(files: unknown, _isAdmin?: boolean): { index: number; name: string }[] {
   if (!Array.isArray(files)) return [];
   return files.flatMap((file, index) => {
     const key = String((file as { key?: unknown } | null)?.key ?? '');
-    if (!key || (!isAdmin && !key.startsWith(COMMERCIAL_FILE_PREFIX))) return [];
+    if (!key) return [];
     return [{ index, name: String((file as { name?: unknown }).name ?? '') || `File ${index + 1}` }];
   });
+}
+
+/** Last ten digits — the only part of a phone number stored consistently. */
+export function leadPhoneKey(value: string | null | undefined): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
 }
 
 /** A real calendar date as YYYY-MM-DD. Rejects 2026-02-31. */
