@@ -23,6 +23,9 @@ function parseRouteHome(value: string | undefined): RouteHome | null {
 const SELECT = {
   id: true, name: true, email: true, role: true,
   avatarInitial: true, avatarUrl: true, active: true,
+  // Whether the public booking flow may assign this rep new appointments —
+  // the switch in Admin → Calendar settings. Not sensitive; reps see it too.
+  acceptsPublicBooking: true,
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -62,6 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Object.assign(data, rest);
       if (_role !== undefined) data.role = _role;
       if (_active !== undefined) data.active = _active;
+      if (rest.acceptsPublicBooking !== undefined) {
+        data.acceptsPublicBooking = rest.acceptsPublicBooking === true;
+      }
     } else {
       for (const f of ['name', 'email', 'avatarUrl', 'avatarInitial'] as const) {
         if (rest[f] !== undefined) data[f] = rest[f];

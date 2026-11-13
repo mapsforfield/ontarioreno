@@ -13,6 +13,12 @@ export type User = {
   contractorId?: string | null;
   /** Display name of the linked contractor (returned by login/me). */
   contractorName?: string | null;
+  /**
+   * Public booking may assign this rep NEW appointments. Off = paused: the
+   * forms and the text flow stop offering their times; appointments they
+   * already have are untouched. Absent (older payloads) reads as on.
+   */
+  acceptsPublicBooking?: boolean;
 };
 
 export type FinancingStatus =

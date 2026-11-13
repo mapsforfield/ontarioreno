@@ -160,6 +160,7 @@ export default function PortalAdmin() {
     resetUserPassword,
     setDefaultCommissionRate,
     toggleUserActive,
+    setRepTakingLeads,
     updateUser,
     users,
     repAccess,
@@ -274,6 +275,20 @@ export default function PortalAdmin() {
   const [passwordResetNotice, setPasswordResetNotice] = useState('');
   const [repForm, setRepForm] = useState<RepFormState>(emptyRepForm);
   const reps = users.filter((user) => user.role === 'rep');
+  // Reps the public flow can actually hand a booking to right now. Absent
+  // flag (an older payload) reads as on, matching the column default.
+  const takesLeads = (u: User) => u.active && u.acceptsPublicBooking !== false;
+  const repsTakingLeads = reps.filter(takesLeads);
+  const toggleTakingLeads = (rep: User) => {
+    const on = !takesLeads(rep);
+    if (!on && repsTakingLeads.length === 1) {
+      const ok = window.confirm(
+        `${rep.name} is the only rep taking new bookings. Pausing them means the website calendar shows no times at all until someone is turned back on. Pause anyway?`
+      );
+      if (!ok) return;
+    }
+    setRepTakingLeads(rep.id, on, currentUser ?? undefined);
+  };
   const editingUser = reps.find((rep) => rep.id === editingUserId);
   const filteredActivities = activities
     .filter((activity) =>
@@ -545,6 +560,52 @@ export default function PortalAdmin() {
               Save settings
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-[0.5rem] border border-slate-200 p-4">
+          <h3 className="text-lg font-black text-slate-950">Who gets new bookings</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Turn a rep off to stop the website forms and text booking from giving them new
+            appointments. Everything already on their calendar stays exactly as it is. Turn
+            them back on whenever you like — it saves instantly.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {reps.filter((rep) => rep.active).map((rep) => {
+              const on = takesLeads(rep);
+              return (
+                <button
+                  key={rep.id}
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  onClick={() => toggleTakingLeads(rep)}
+                  className={`flex items-center justify-between gap-3 rounded-[0.5rem] border px-4 py-3 text-left transition ${
+                    on ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-slate-900">{rep.name}</span>
+                    <span className={`block text-xs font-bold ${on ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {on ? 'Taking new bookings' : 'Paused — no new bookings'}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? 'left-[1.375rem]' : 'left-0.5'}`}
+                    />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {reps.some((rep) => rep.active) && repsTakingLeads.length === 0 && (
+            <p className="mt-3 text-sm font-bold text-red-600">
+              Every rep is paused — the website calendar is offering no times right now.
+            </p>
+          )}
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

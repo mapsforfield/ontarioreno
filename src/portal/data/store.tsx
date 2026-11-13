@@ -140,6 +140,8 @@ type PortalDataContextValue = PortalDataState & {
     actor?: User
   ) => void;
   toggleUserActive: (userId: string, actor?: User) => void;
+  /** Pause / resume a rep for NEW public bookings. Existing visits untouched. */
+  setRepTakingLeads: (userId: string, on: boolean, actor?: User) => void;
   /** @deprecated auth is now handled by /api/auth/login — always returns null */
   authenticateUser: (email: string, password: string) => User | null;
   changeUserPassword: (
@@ -1534,6 +1536,34 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         apiCall(`/api/users/${userId}`, {
           method: 'PATCH',
           body: JSON.stringify({ active: !currentUser?.active }),
+        });
+      },
+
+      setRepTakingLeads: (userId, on, actor) => {
+        setState((current) => {
+          const existingUser = current.users.find((u) => u.id === userId);
+          return {
+            ...current,
+            activities: existingUser
+              ? prependActivity(current.activities, actor, {
+                  actionLabel: `${existingUser.name} ${
+                    on ? 'resumed for new bookings' : 'paused for new bookings'
+                  }`,
+                  actionType: 'rep_booking_paused',
+                  entityId: existingUser.id,
+                  entityLabel: existingUser.name,
+                  entityType: 'rep',
+                  metadata: { acceptsPublicBooking: on },
+                })
+              : current.activities,
+            users: current.users.map((u) =>
+              u.id === userId ? { ...u, acceptsPublicBooking: on } : u
+            ),
+          };
+        });
+        apiCall(`/api/users/${userId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ acceptsPublicBooking: on }),
         });
       },
 
