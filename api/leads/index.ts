@@ -103,6 +103,8 @@ import { priorNotesForHomeowner } from '../../lib/prior-notes.js';
 import { isResubmission } from '../../lib/flow-resubmission.js';
 import { attributionFields } from '../../lib/traffic-attribution.js';
 import { sendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
+import { ensureDealForAppointment } from '../../lib/deal-from-appointment.js';
+import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
 // single-record / intake are all served here and routed by query param):
@@ -2305,6 +2307,17 @@ async function bookVisitForLead(params: {
       status: result.code === 'SLOT_UNAVAILABLE' ? 409 : 400,
       payload: result as unknown as Record<string, unknown>,
     };
+  }
+
+  // The booking is committed; put it on the Deals pipeline under
+  // "Appointment booked" so no rep has to add it by hand. Outside the
+  // transaction and best-effort — see lib/deal-from-appointment.ts.
+  try {
+    await ensureDealForAppointment(prisma, result.appointmentId, {
+      defaultTotalRate: DEFAULT_TOTAL_COMMISSION_RATE,
+    });
+  } catch (err) {
+    console.error('[leads/book] auto-deal failed', result.appointmentId, err);
   }
 
   return {

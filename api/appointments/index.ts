@@ -5,7 +5,8 @@ import { Resend } from 'resend';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { presignPutUrl, presignGetUrl, deleteObject, isR2Configured } from '../../lib/r2.js';
 import { ensureSchema, withSchema } from '../../lib/schema.js';
-import { reconcileLedger } from '../../lib/commission-ledger.js';
+import { reconcileLedger, DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
+import { ensureDealForAppointment } from '../../lib/deal-from-appointment.js';
 import { toContractorPayment } from '../../lib/contractor-payments.js';
 import { buildOwnershipIndex, isOwnAppointment, isOwnClient, type OwnershipIndex } from '../../lib/contractor-visibility.js';
 import { handleGrantScanCron, handleGrantsApi, handlePublicGrantPage, handleGrantsHubData } from '../../lib/grants.js';
@@ -1973,6 +1974,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch {
         // Lead linking is non-critical to creating the appointment.
       }
+    }
+
+    // ── Put it on the Deals pipeline ("Appointment booked") ──
+    // Reps used to have to press "Create deal" on every consultation; until
+    // they did, the homeowner was missing from the pipeline. Skips events and
+    // anything already linked. See lib/deal-from-appointment.ts.
+    try {
+      const auto = await ensureDealForAppointment(prisma, appointment.id, {
+        defaultTotalRate: DEFAULT_TOTAL_COMMISSION_RATE,
+      });
+      if (auto.outcome !== 'skipped') appointment = { ...appointment, dealId: auto.dealId };
+    } catch (err) {
+      console.error('[appointments/create] auto-deal failed', appointment.id, err);
     }
 
     // Best-effort push + email to assigned rep

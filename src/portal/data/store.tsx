@@ -3343,6 +3343,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               a.id === tempId ? normalizeAppointment(saved, current.deals) : a
             ),
           }));
+          // The server now puts every booking on the pipeline itself (see
+          // lib/deal-from-appointment.ts). Pull deals + commissions so the
+          // new "Appointment booked" card shows without a reload.
+          if (saved.dealId && saved.dealId !== appointmentDraft.dealId) {
+            Promise.all([
+              apiCall<Deal[]>('/api/deals'),
+              apiCall<Commission[]>('/api/commissions'),
+            ]).then(([rawDeals, commissions]) => {
+              if (!rawDeals) return;
+              const deals = rawDeals.map(normalizeDeal);
+              setState((current) => ({
+                ...current,
+                deals,
+                commissions: commissions
+                  ? syncCommissionsWithDeals(commissions, deals, currentUser?.role === 'admin')
+                  : current.commissions,
+              }));
+            });
+          }
         });
       },
 
