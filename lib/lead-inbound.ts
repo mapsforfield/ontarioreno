@@ -18,7 +18,16 @@
 import { phoneKey } from './sms-replies.js';
 import { availableSlotsForLead, spreadAcrossDays } from './lead-availability.js';
 import { runInboundReply, type ConversationState, type RunnerDeps } from './lead-conversation-runner.js';
-import type { ConversationPhase } from './lead-conversation.js';
+import type { ConversationMode, ConversationPhase } from './lead-conversation.js';
+import {
+  alertCopy,
+  bookCall,
+  callSender,
+  currentCallSlots,
+  notifyCaller,
+  sendConversationSms,
+} from './call-booking.js';
+import { torontoWallClock } from './scheduling.js';
 import type { OfferedSlot } from './lead-reply-templates.js';
 
 /** How many times a draft may offer. Two is the question; a third is a menu. */
@@ -44,6 +53,7 @@ type ConversationRow = {
   phase: string;
   offeredSlotsJson: unknown;
   lastOutbound: string;
+  mode?: string | null;
 };
 
 /**
@@ -86,6 +96,11 @@ function toSlots(raw: unknown): OfferedSlot[] {
   return raw
     .filter((s): s is OfferedSlot => !!s && typeof s === 'object')
     .filter((s) => typeof s.date === 'string' && typeof s.time === 'string');
+}
+
+/** What the opener said the enquiry was about, read back from what we sent. */
+function aboutForRow(row: ConversationRow): string {
+  return /bathroom/i.test(row.lastOutbound ?? '') ? 'your bathroom renovation' : 'your basement';
 }
 
 /**
@@ -142,16 +157,22 @@ export async function handleLeadReply(
       });
     }
 
+    const mode: ConversationMode = row.mode === 'call' ? 'call' : 'visit';
     const conversation: ConversationState = {
       id: row.id,
       leadId: row.leadId,
       phase: toPhase(row.phase),
       offeredSlots: toSlots(row.offeredSlotsJson),
       lastOutbound: row.lastOutbound ?? '',
+      mode,
     };
+    const callStore = store as never;
+    let bookedSlot: OfferedSlot | null = null;
 
     const deps: RunnerDeps = {
       listOpenSlots: async () => {
+        // Call mode offers CALL times, which need no address and no area.
+        if (mode === 'call') return currentCallSlots(callStore);
         const payload = await availableSlotsForLead(store as never, lead);
         // Spread across days: computeAvailability is chronological, so the
         // first two are usually the same morning — and offering "Tue 10am or
@@ -182,14 +203,48 @@ export async function handleLeadReply(
             ...(patch.needsHumanReason !== undefined
               ? { needsHumanReason: patch.needsHumanReason }
               : {}),
+            ...(patch.lastOutbound !== undefined ? { lastOutbound: patch.lastOutbound } : {}),
           },
         });
       },
     };
 
+    if (mode === 'call') {
+      // The clear path runs itself; see lib/lead-conversation-runner.ts.
+      deps.nowWall = () => torontoWallClock();
+      deps.send = (body, idempotencyKey) =>
+        sendConversationSms(callStore, lead.id, String(lead.phone ?? ''), body, idempotencyKey);
+      deps.bookCall = async (leadId, slot) => {
+        const result = await bookCall(callStore, leadId, slot, env);
+        if (result === 'BOOKED') bookedSlot = slot;
+        return result;
+      };
+      deps.alertHuman = async (reason, rawBody) => {
+        const copy = alertCopy(
+          reason,
+          lead.name ?? '',
+          rawBody,
+          bookedSlot ? { slot: bookedSlot, nowWall: torontoWallClock() } : undefined
+        );
+        await notifyCaller(
+          callStore,
+          lead.id,
+          `${params.messageSid}:${reason}`,
+          { ...copy, url: reason === 'CALL_BOOKED' ? '/portal/workspace' : '/portal/messages' },
+          env
+        );
+      };
+    }
+
     await runInboundReply(
       conversation,
-      { messageSid: params.messageSid, body: params.body, leadName: lead.name ?? '' },
+      {
+        messageSid: params.messageSid,
+        body: params.body,
+        leadName: lead.name ?? '',
+        sender: callSender(env),
+        about: aboutForRow(row),
+      },
       deps,
       env
     );

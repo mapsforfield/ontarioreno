@@ -1077,6 +1077,10 @@ model LeadConversation {
   needsHumanReason String @default("")
   /// Phone as we matched it, so an inbound can find this row without a join.
   phoneKey  String @default("")
+  /// 'visit' (original: drafts for approval, a pick asks for the address) or
+  /// 'call' (the opener offered two call times; clear replies send and book
+  /// themselves). See ConversationMode in lib/lead-conversation.ts.
+  mode      String @default("visit")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

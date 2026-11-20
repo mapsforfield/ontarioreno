@@ -17,7 +17,7 @@
 // than to squeeze out a guess.
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Classification, ConversationPhase, ReplyIntent } from './lead-conversation.js';
+import type { Classification, ConversationMode, ConversationPhase, ReplyIntent } from './lead-conversation.js';
 import { slotLabel, type OfferedSlot } from './lead-reply-templates.js';
 
 export type ClassifyInput = {
@@ -29,6 +29,10 @@ export type ClassifyInput = {
   offeredSlots: OfferedSlot[];
   /** What we last said to them, so a reply like "yes" can be resolved. */
   lastOutbound: string;
+  /** 'call' when the times offered are for a short phone call. */
+  mode?: ConversationMode;
+  /** Ontario wall clock now, so "tonight" and "tomorrow" have a referent. */
+  nowWall?: string;
 };
 
 const VALID_INTENTS: ReplyIntent[] = [
@@ -82,7 +86,8 @@ Rules that matter more than coverage:
 3. Only use gave_address when actual address text is present, and copy it exactly as they typed it into addressText. Do not correct, complete, expand or reformat it. "It's the blue house" is not an address.
 4. A message can do two things ("weekends, and how much roughly?"). Report the one that decides what we should say back — here, asked_price, because answering it also re-offers times.
 5. Politeness is not agreement. "Ok", "thanks", "sounds good" and "sure" answer nothing on their own. If the message does not actually answer what we asked, that is unclear.
-6. Not interested must be explicit. Hesitation, silence about the times, or asking a hard question is not a no.`;
+6. Not interested must be explicit. Hesitation, silence about the times, or asking a hard question is not a no.
+7. When the conversation is about a phone CALL, the offered times are for that call. "Call me now" or "call me whenever" is wants_call, not picked_slot. asked_duration means how long the call takes. "Yes" alone, after we offered two times, does not say which, so it is unclear.`;
 
 /**
  * Schema the model's answer must satisfy. Anything else is treated as unclear.
@@ -120,6 +125,8 @@ function userPrompt(input: ClassifyInput): string {
     ? input.offeredSlots.map((s, i) => `  ${i}: ${slotLabel(s)}`).join('\n')
     : '  (none offered yet)';
   return [
+    `Conversation about: ${input.mode === 'call' ? 'booking a short phone call' : 'booking an in-home visit'}`,
+    ...(input.nowWall ? [`Ontario time now: ${slotLabel({ date: input.nowWall.slice(0, 10), time: input.nowWall.slice(11, 16) })}`] : []),
     `Conversation state: ${input.phase}`,
     '',
     'Times we offered, by index:',
