@@ -521,6 +521,7 @@ async function sendLeadCallOpener(
         leadId: lead.id,
         phase: 'awaiting_time_choice',
         mode: 'call',
+        sender: callSender(),
         offeredSlotsJson: slots,
         lastOutbound: planned[0].body,
         phoneKey: phoneKey(lead.phone),

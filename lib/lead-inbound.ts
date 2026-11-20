@@ -55,6 +55,8 @@ type ConversationRow = {
   offeredSlotsJson: unknown;
   lastOutbound: string;
   mode?: string | null;
+  /** Who the opener was signed as. Empty: the current default. */
+  sender?: string | null;
 };
 
 /**
@@ -262,7 +264,8 @@ export async function handleLeadReply(
         messageSid: params.messageSid,
         body: params.body,
         leadName: lead.name ?? '',
-        sender: callSender(env),
+        // The name the opener used, so "who is this?" never switches names.
+        sender: (row.sender ?? '').trim() || callSender(env),
         about: aboutForRow(row),
       },
       deps,
