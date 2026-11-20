@@ -89,6 +89,7 @@ import {
   smsProviderConfigured,
   type BookingContext,
   type SubmissionContext,
+  planLeadCallOpener,
 } from '../../lib/notifications.js';
 import {
   describeCause,
@@ -96,6 +97,9 @@ import {
   type AddressResolutionCause,
 } from '../../lib/address-resolution.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
+import { openerSendWall, pickCallSlots } from '../../lib/call-slots.js';
+import { callSender, takenCallWalls, welcomeMode } from '../../lib/call-booking.js';
+import { phoneKey } from '../../lib/sms-replies.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
 import { seedBookingNotes } from '../../lib/consultation-notes.js';
@@ -467,10 +471,76 @@ function leadBookingUrl(room: WelcomeRoom = 'basement'): string {
  * anything that is not a 2xx — turning a Twilio outage into a retry storm that
  * duplicates leads would cost far more than a missed text.
  */
+/**
+ * The call opener: two real call times instead of a link, and the
+ * conversation row that lets the reply book one. Returns false whenever it did
+ * not queue a text, so the caller can send the link text instead and no lead is
+ * ever left with no first contact.
+ */
+async function sendLeadCallOpener(
+  lead: { id: string; name: string; phone: string },
+  room: Exclude<WelcomeRoom, 'london_aru'>,
+): Promise<boolean> {
+  try {
+    if (!lead.phone?.trim()) return false;
+    const sendWall = openerSendWall(torontoWallClock());
+    const slots = pickCallSlots(sendWall, await takenCallWalls(prisma));
+    const planned = planLeadCallOpener({
+      leadId: lead.id,
+      name: lead.name ?? '',
+      phone: lead.phone,
+      senderName: callSender(),
+      room,
+      slots,
+      sendWall,
+    });
+    if (planned.length === 0) return false;
+
+    // The thread first: if the homeowner answers, the reply must find the
+    // times we offered. A lead already holding a thread is not re-opened.
+    const existing = await prisma.leadConversation.findUnique({ where: { leadId: lead.id } });
+    if (existing) return false;
+    await prisma.leadConversation.create({
+      data: {
+        leadId: lead.id,
+        phase: 'awaiting_time_choice',
+        mode: 'call',
+        offeredSlotsJson: slots,
+        lastOutbound: planned[0].body,
+        phoneKey: phoneKey(lead.phone),
+      },
+    });
+
+    await prisma.notificationOutbox.createMany({
+      data: planned.map((n) => ({
+        leadId: lead.id,
+        channel: n.channel,
+        kind: n.kind,
+        recipient: n.recipient,
+        subject: n.subject,
+        body: n.body,
+        html: n.html ?? '',
+        sendAfter: n.sendAfter,
+        expiresAt: n.expiresAt,
+        idempotencyKey: n.idempotencyKey,
+      })),
+      skipDuplicates: true,
+    });
+    await drainOutbox();
+    return true;
+  } catch (err) {
+    console.error('[leads/intake] call opener failed, falling back to the link:', err);
+    return false;
+  }
+}
+
 async function sendLeadWelcome(
   lead: { id: string; name: string; phone: string },
   room: WelcomeRoom = 'basement',
 ) {
+  if (room !== 'london_aru' && welcomeMode() === 'call') {
+    if (await sendLeadCallOpener(lead, room)) return;
+  }
   try {
     const planned = planLeadWelcomeNotifications({
       leadId: lead.id,

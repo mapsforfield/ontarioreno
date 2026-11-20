@@ -21,10 +21,13 @@ export function getPushPermissionState(): NotificationPermission | 'unsupported'
 export async function registerPushNotifications(userId: string): Promise<boolean> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
 
-  // Public key is safe to hardcode — VAPID public keys are designed to be public
+  // Public key is safe to hardcode — VAPID public keys are designed to be public.
+  // Must pair with VAPID_PRIVATE_KEY on the server. Rotated November 2026: the
+  // old key's private half was never set in production, so no push ever sent.
   const vapidPublicKey =
     (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) ||
-    'BBwj7vwD5fm8niCQPvimtb4mPCLl9BAivVy0psG-DVjtAnreKcVGNL6X_a5Wjj7r5TIRNxm4cWokutIh8lblLrs';
+    'BG3j5BnH0Y3m0VxtwIN-K5ePZx3ieALRasYP8r5dtJmLKuCe4Whf7uJ26xdnHeP-pss9R-7RVKzvze5AhrKo2Dg';
+  const wantedKey = urlBase64ToUint8Array(vapidPublicKey);
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -33,12 +36,23 @@ export async function registerPushNotifications(userId: string): Promise<boolean
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return false;
 
-    // Re-use existing subscription if present (avoids unnecessary re-subscription)
+    // Re-use an existing subscription only if it was made with THIS key. One
+    // made with a previous key is undeliverable: the push service rejects
+    // every message signed by the new private key.
     let subscription = await registration.pushManager.getSubscription();
+    const currentKey = subscription?.options?.applicationServerKey;
+    if (subscription && currentKey) {
+      const a = new Uint8Array(currentKey);
+      const same = a.length === wantedKey.length && a.every((b, i) => b === wantedKey[i]);
+      if (!same) {
+        await subscription.unsubscribe().catch(() => false);
+        subscription = null;
+      }
+    }
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: wantedKey,
       });
     }
 

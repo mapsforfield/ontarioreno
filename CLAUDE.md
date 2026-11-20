@@ -282,6 +282,37 @@ rebooked, and a rep scanning the calendar would read it as handled.
 work for a rep, not a change to the booking, and the slot stays held until a
 human moves it. Guarded by `lib/sms-replies.test.ts`.
 
+## The first text books a CALL (November 2026)
+
+Basement and bathroom Meta leads no longer get a link. They get one question
+with two real call times: "Hi Sarah, it's Mark from OntarioReno about your
+basement. Does today at 4:30pm or tonight at 6pm work for a quick call?"
+Links from unknown numbers read as scams; under 1 in 5 leads booked from one.
+London ARU keeps its link (its form asks the City's conditions first).
+
+- Times: `lib/call-slots.ts`. Soonest time at least an hour out, then the other
+  part of the day (daytime → an evening, evening → next morning), 90+ min
+  apart, 10am to 8pm daily, 2 calls per half hour. Leads arriving 9:30pm to
+  8:30am are texted at 8:30am with times relative to then.
+- A conversation row is created WITH the opener (`mode: 'call'`,
+  `awaiting_time_choice`) so the reply can resolve "6 works".
+- Call mode runs itself on the clear path: a template reply is SENT, a pick is
+  BOOKED as a callback (`callbackAt` + `callback_scheduled`, not an
+  Appointment). Anything unsure is never answered by the machine; it alerts
+  the caller. Visit-mode threads still draft for approval, unchanged.
+- Alerts to the caller: an email to `TEAM_INBOX_EMAIL` and a portal push.
+  NEVER a text to ourselves: it costs Twilio money for nothing (Sabah's call).
+  A reminder EMAIL goes 5 to 20 min before each call.
+- Push: the VAPID key pair was rotated in November 2026 because the old
+  private key was never set in production (no push had ever sent). The public
+  key is in `src/portal/lib/pushNotifications.ts`; `VAPID_PUBLIC_KEY` and
+  `VAPID_PRIVATE_KEY` in Vercel must be its pair. Devices that had allowed
+  notifications re-subscribe themselves on the next portal load.
+- Env: `LEAD_WELCOME_MODE=link` restores the old link text with no deploy.
+  `LEAD_CALL_SENDER` (default Mark), `LEAD_CALL_OWNER_ID` (default `sabah`).
+- Any failure building the opener falls back to the link text, so no lead goes
+  without a first text. Guarded by `lib/call-mode.test.ts`.
+
 ## Schema
 
 `prisma/schema.prisma` is the source of truth. After editing:

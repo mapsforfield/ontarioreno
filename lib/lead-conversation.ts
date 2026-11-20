@@ -31,6 +31,20 @@ export type ConversationPhase =
   | 'needs_human';
 
 /**
+ * What the conversation is booking.
+ *
+ * 'visit': the original design. Times are in-home visits and a pick asks for
+ * the address. Replies are DRAFTS a person approves.
+ *
+ * 'call': the opener itself offers two times for a short phone call with the
+ * caller (November 2026). A pick books the call; there is no address to ask
+ * for and no rep travel to protect. Replies on the clear path send themselves,
+ * because a conversation that waits for approval is the one that stalled in
+ * October: 165 replies, almost none answered.
+ */
+export type ConversationMode = 'visit' | 'call';
+
+/**
  * What the homeowner meant. Produced by the model, consumed only here.
  *
  * `unclear` is not a failure mode to be minimised — it is the pressure-release
@@ -71,6 +85,8 @@ export type NextAction =
   | { kind: 'reply'; template: ReplyTemplateId; nextPhase: ConversationPhase }
   /** Try to book the picked slot at the given address. */
   | { kind: 'book'; addressText: string }
+  /** Call mode: book the picked time as a callback. No address involved. */
+  | { kind: 'book_call' }
   /** Say nothing, follow up never again. */
   | { kind: 'close' }
   /** Michael reads it and decides. */
@@ -100,9 +116,17 @@ const QUESTION_REPLIES: Partial<Record<ReplyIntent, ReplyTemplateId>> = {
   different_project: 'other_project',
 };
 
+/** The same questions, answered for a call instead of a visit. */
+const CALL_QUESTION_REPLIES: Partial<Record<ReplyIntent, ReplyTemplateId>> = {
+  asked_price: 'call_answer_price',
+  asked_duration: 'call_answer_duration',
+  different_project: 'call_other_project',
+};
+
 export function decideNextAction(
   phase: ConversationPhase,
-  c: Classification
+  c: Classification,
+  mode: ConversationMode = 'visit'
 ): NextAction {
   // ── 1. A human already has it ──
   // Booked, closed, or escalated: the automation had its turn. Re-entering
@@ -135,6 +159,10 @@ export function decideNextAction(
     // booking — there is no slot to hold and no address to send anyone to.
     return { kind: 'reply', template: 'wants_call', nextPhase: 'needs_human' };
   }
+  if (c.intent === 'asked_who_is_this' && mode === 'call') {
+    // Names the caller AND re-offers the times, so the thread keeps moving.
+    return { kind: 'reply', template: 'call_who_is_this', nextPhase: phase };
+  }
   if (c.intent === 'asked_who_is_this') {
     // Back to the top of the funnel: the template re-asks the opener's
     // question, so the phase does not advance.
@@ -148,7 +176,7 @@ export function decideNextAction(
 
   // A pricing / duration / other-project question is answered in place and
   // always re-offers times, so the thread keeps moving toward a booking.
-  const questionReply = QUESTION_REPLIES[c.intent];
+  const questionReply = (mode === 'call' ? CALL_QUESTION_REPLIES : QUESTION_REPLIES)[c.intent];
   if (questionReply) {
     return { kind: 'reply', template: questionReply, nextPhase: 'awaiting_time_choice' };
   }
@@ -174,6 +202,7 @@ export function decideNextAction(
         if (typeof c.pickedSlotIndex !== 'number' || c.pickedSlotIndex < 0) {
           return { kind: 'escalate', reason: 'NOT_CONFIDENT' };
         }
+        if (mode === 'call') return { kind: 'book_call' };
         return { kind: 'reply', template: 'ask_address', nextPhase: 'awaiting_address' };
       }
       // Re-stating a weekday/weekend preference after we have already offered
@@ -239,5 +268,25 @@ export function afterBooking(outcome: BookingOutcome): NextAction {
   // Taken with nothing left to offer, or the booking failed for a reason we
   // have no true sentence for. Never improvise at this point — the homeowner
   // is one message from an appointment and a wrong word here is expensive.
+  return { kind: 'escalate', reason: 'NEEDS_A_PERSON' };
+}
+
+/**
+ * What happens after trying to book a CALL. The calendar decides, not the
+ * homeowner, so it lives beside afterBooking rather than in the intent logic.
+ */
+export type CallBookingOutcome =
+  | { result: 'BOOKED' }
+  /** Full, or already in the past by the time they answered. */
+  | { result: 'SLOT_TAKEN'; alternatives: number }
+  | { result: 'CANNOT_BOOK' };
+
+export function afterCallBooking(outcome: CallBookingOutcome): NextAction {
+  if (outcome.result === 'BOOKED') {
+    return { kind: 'reply', template: 'call_booked', nextPhase: 'booked' };
+  }
+  if (outcome.result === 'SLOT_TAKEN' && outcome.alternatives >= 2) {
+    return { kind: 'reply', template: 'call_slot_taken', nextPhase: 'awaiting_time_choice' };
+  }
   return { kind: 'escalate', reason: 'NEEDS_A_PERSON' };
 }

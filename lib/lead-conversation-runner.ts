@@ -13,10 +13,19 @@
 // A `book` action is therefore NOT booked here. It is handed over with the
 // address the homeowner gave, and a person places it. Automatic booking is
 // phase 2, and it should not ship until the drafts have been watched.
+//
+// CALL MODE (November 2026) IS DIFFERENT, ON PURPOSE. The opener offers two
+// times for a short phone call. Phase 1 stalled because every reply waited on a
+// person, so in call mode the clear path runs itself: a reply drafted from a
+// template is SENT, and a picked time is BOOKED as a callback. Everything the
+// state machine escalates still goes to a person, now with a push to their
+// phone. What the model may do is unchanged: it classifies, it never writes.
 
 import {
   afterBooking,
+  afterCallBooking,
   decideNextAction,
+  type ConversationMode,
   type Classification,
   type ConversationPhase,
   type EscalationReason,
@@ -38,6 +47,8 @@ export type ConversationState = {
   phase: ConversationPhase;
   offeredSlots: OfferedSlot[];
   lastOutbound: string;
+  /** Absent reads as 'visit', the original behaviour. */
+  mode?: ConversationMode;
 };
 
 export type InboundReply = {
@@ -46,6 +57,9 @@ export type InboundReply = {
   body: string;
   /** First name is all any template uses. */
   leadName: string;
+  /** Call mode: who signs, and what the enquiry was about. */
+  sender?: string;
+  about?: string;
 };
 
 export type RunnerDeps = {
@@ -66,15 +80,32 @@ export type RunnerDeps = {
   /** Move the conversation on. */
   updateConversation: (
     id: string,
-    patch: { phase?: ConversationPhase; offeredSlots?: OfferedSlot[]; needsHumanReason?: string }
+    patch: {
+      phase?: ConversationPhase;
+      offeredSlots?: OfferedSlot[];
+      needsHumanReason?: string;
+      lastOutbound?: string;
+    }
   ) => Promise<void>;
   /** Overridable for tests. */
   classify?: typeof classifyLeadReply;
+
+  // ── Call mode only. Without `send`, call mode drafts like phase 1. ──
+  /** Text the homeowner now. `key` makes a retry a no-op. */
+  send?: (body: string, key: string) => Promise<void>;
+  /** Book the picked time. The calendar's answer, not ours. */
+  bookCall?: (leadId: string, slot: OfferedSlot) => Promise<'BOOKED' | 'SLOT_TAKEN' | 'CANNOT_BOOK'>;
+  /** Tell the caller a thread needs them. */
+  alertHuman?: (reason: string, rawBody: string) => Promise<void>;
+  /** Ontario wall clock, "YYYY-MM-DDTHH:MM". */
+  nowWall?: () => string;
 };
 
 export type RunOutcome =
   /** A draft is waiting for Michael. */
   | { kind: 'drafted'; template: ReplyTemplateId; body: string; nextPhase: ConversationPhase }
+  /** Call mode: sent without waiting for anyone. */
+  | { kind: 'sent'; template: ReplyTemplateId; body: string; nextPhase: ConversationPhase }
   /** Nothing to say; the thread is closed and follow-ups stop. */
   | { kind: 'closed' }
   /** On the Conversations page for a person to answer. */
@@ -104,6 +135,8 @@ export async function runInboundReply(
       phase: conversation.phase,
       offeredSlots: conversation.offeredSlots,
       lastOutbound: conversation.lastOutbound,
+      mode: conversation.mode,
+      nowWall: deps.nowWall?.(),
     },
     env
   );
@@ -119,13 +152,42 @@ export async function runInboundReply(
   });
 
   // ── 2. Decide ──
-  let action: NextAction = decideNextAction(conversation.phase, classification);
+  const mode: ConversationMode = conversation.mode ?? 'visit';
+  const autopilot = mode === 'call' && !!deps.send;
+  let action: NextAction = decideNextAction(conversation.phase, classification, mode);
+  let slots = conversation.offeredSlots;
+  let bookedSlot: OfferedSlot | null = null;
+
+  // ── 2b. Call mode: a picked time is booked here and now ──
+  if (action.kind === 'book_call') {
+    const picked = resolvePickedSlot(classification, conversation.offeredSlots);
+    if (!picked || !deps.bookCall || !autopilot) {
+      return escalate(conversation, deps, 'NOT_CONFIDENT', reply.body, autopilot);
+    }
+    const result = await deps.bookCall(conversation.leadId, picked);
+    let alternatives = 0;
+    if (result === 'SLOT_TAKEN') {
+      slots = (await deps.listOpenSlots(conversation.leadId)).slice(0, 2);
+      alternatives = slots.length;
+    }
+    action = afterCallBooking(
+      result === 'BOOKED'
+        ? { result: 'BOOKED' }
+        : result === 'SLOT_TAKEN'
+          ? { result: 'SLOT_TAKEN', alternatives }
+          : { result: 'CANNOT_BOOK' }
+    );
+    if (result === 'BOOKED') {
+      bookedSlot = picked;
+      slots = [picked];
+    }
+  }
 
   // ── 3. A booking is a person's job in phase 1 ──
   // The state machine is allowed to reach `book`; we deliberately do not act on
   // it yet. The address they gave is on the thread, so the handover is complete.
-  if (action.kind === 'book') {
-    return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body);
+  if (action.kind === 'book' || action.kind === 'book_call') {
+    return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body, autopilot);
   }
 
   if (action.kind === 'close') {
@@ -134,7 +196,7 @@ export async function runInboundReply(
   }
 
   if (action.kind === 'escalate') {
-    return escalate(conversation, deps, action.reason, reply.body);
+    return escalate(conversation, deps, action.reason, reply.body, autopilot);
   }
 
   // ── 4. A reply needs real times before it can be drafted ──
@@ -142,13 +204,14 @@ export async function runInboundReply(
   // moment we draft. Offering a time we cannot honour is the one failure a
   // homeowner experiences as being lied to.
   const need = SLOTS_REQUIRED[action.template];
-  let slots = conversation.offeredSlots;
-  if (need > 0) {
+  // A booked call and a slot-taken re-offer already hold the right times.
+  const slotsSettled = bookedSlot !== null || action.template === 'call_slot_taken';
+  if (need > 0 && !slotsSettled) {
     slots = await deps.listOpenSlots(conversation.leadId);
     if (slots.length < need) {
       // Nothing true to offer. Michael has options the calendar does not know
       // about; a template does not.
-      return escalate(conversation, deps, 'NO_SLOTS_AVAILABLE', reply.body);
+      return escalate(conversation, deps, 'NO_SLOTS_AVAILABLE', reply.body, autopilot);
     }
     slots = slots.slice(0, Math.max(need, 2));
   }
@@ -157,18 +220,48 @@ export async function runInboundReply(
   // before the ask-the-address draft can name it back to them.
   if (action.template === 'ask_address') {
     const picked = resolvePickedSlot(classification, conversation.offeredSlots);
-    if (!picked) return escalate(conversation, deps, 'NOT_CONFIDENT', reply.body);
+    if (!picked) return escalate(conversation, deps, 'NOT_CONFIDENT', reply.body, autopilot);
     slots = [picked];
   }
 
   let body: string;
   try {
-    body = renderReply(action.template, { name: reply.leadName, slots });
+    body = renderReply(action.template, {
+      name: reply.leadName,
+      slots,
+      now: mode === 'call' ? deps.nowWall?.() : undefined,
+      sender: reply.sender,
+      about: reply.about,
+    });
   } catch (err) {
     // A template that cannot render is a bug, and the safe response to a bug in
     // the message path is to say nothing and tell a person.
     console.error('[lead-conversation] could not render draft:', err);
-    return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body);
+    return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body, autopilot);
+  }
+
+  if (autopilot) {
+    // The phase moves BEFORE the send, for the same reason drafts move it on
+    // write: a homeowner who texts twice must not get two answers to one
+    // question. A failed send is recorded by the outbox, not retried here.
+    await deps.recordMessage({
+      conversationId: conversation.id,
+      direction: 'out',
+      body,
+      state: 'sent',
+      templateId: action.template,
+    });
+    await deps.updateConversation(conversation.id, {
+      phase: action.nextPhase,
+      offeredSlots: slots,
+      needsHumanReason: '',
+      lastOutbound: body,
+    });
+    await deps.send!(body, `${reply.messageSid}:sms:lead_conversation`);
+    if (bookedSlot && deps.alertHuman) {
+      await deps.alertHuman('CALL_BOOKED', reply.body).catch(() => undefined);
+    }
+    return { kind: 'sent', template: action.template, body, nextPhase: action.nextPhase };
   }
 
   await deps.recordMessage({
@@ -196,7 +289,8 @@ async function escalate(
   conversation: ConversationState,
   deps: RunnerDeps,
   reason: EscalationReason | 'NO_SLOTS_AVAILABLE',
-  rawBody: string
+  rawBody: string,
+  alert = false
 ): Promise<RunOutcome> {
   await deps.recordMessage({
     conversationId: conversation.id,
@@ -212,7 +306,13 @@ async function escalate(
     phase: 'needs_human',
     needsHumanReason: reason,
   });
-  void rawBody; // already on the thread from the inbound row
+  // In call mode nobody is watching a drafts page: the caller's phone is the
+  // queue. Best-effort, because the thread above is already the record.
+  if (alert && deps.alertHuman) {
+    await deps.alertHuman(reason, rawBody).catch((err: unknown) => {
+      console.error('[lead-conversation] alert failed:', err);
+    });
+  }
   return { kind: 'escalated', reason };
 }
 

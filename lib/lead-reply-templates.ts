@@ -12,6 +12,8 @@
 // So: adding a new thing we might say means adding a template here. It must
 // never mean letting the model speak freely.
 
+import { callSlotLabel, callSlotPair } from './call-slots.js';
+
 /** A bookable time, already checked against the real calendar. */
 export type OfferedSlot = {
   /** YYYY-MM-DD */
@@ -27,6 +29,16 @@ export type ReplyContext = {
   slots: OfferedSlot[];
   /** For the booked confirmation only. */
   booked?: { date: string; time: string; address: string };
+  /**
+   * Call conversations only. The Ontario wall clock ("YYYY-MM-DDTHH:MM") the
+   * homeowner will read the text at, so times can say "tonight at 6pm" rather
+   * than a date. Absent, call templates fall back to the dated label.
+   */
+  now?: string;
+  /** Who signs the text. Call templates name the caller; default Mark. */
+  sender?: string;
+  /** "your basement", "your bathroom renovation". Default "your basement". */
+  about?: string;
 };
 
 /**
@@ -45,7 +57,16 @@ export type ReplyTemplateId =
   | 'further_out'
   | 'booked_confirmation'
   | 'address_unclear'
-  | 'slot_taken';
+  | 'slot_taken'
+  // ── Call conversations ──
+  // The opener offers two times for a short PHONE call, not a site visit, so
+  // nothing here may promise a visit or ask for an address.
+  | 'call_answer_price'
+  | 'call_answer_duration'
+  | 'call_other_project'
+  | 'call_who_is_this'
+  | 'call_booked'
+  | 'call_slot_taken';
 
 /** How many real slots each template needs before it can be sent. */
 export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
@@ -62,6 +83,13 @@ export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
   address_unclear: 0,
   // Two remaining alternatives after the one they wanted was taken.
   slot_taken: 2,
+  call_answer_price: 2,
+  call_answer_duration: 2,
+  call_other_project: 2,
+  call_who_is_this: 2,
+  // The one they picked.
+  call_booked: 1,
+  call_slot_taken: 2,
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -88,6 +116,13 @@ export function slotLabel(slot: OfferedSlot): string {
 /** "Tue Sep 2, 10am or Wed Sep 3, 2pm" — the two-slot offer every template shares. */
 function twoSlots(slots: OfferedSlot[]): { first: string; second: string } {
   return { first: slotLabel(slots[0]), second: slotLabel(slots[1]) };
+}
+
+/** "tomorrow at 10am or 6pm" when we know when it will be read, dated otherwise. */
+function callPair(ctx: ReplyContext): string {
+  if (ctx.now) return callSlotPair(ctx.slots[0], ctx.slots[1], ctx.now);
+  const { first, second } = twoSlots(ctx.slots);
+  return `${first} or ${second}`;
 }
 
 /**
@@ -150,6 +185,24 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       const { first, second } = twoSlots(ctx.slots);
       return `Sorry, someone grabbed that one while we were talking. I've still got ${first} or ${second}. Either work?`;
     }
+    case 'call_answer_price':
+      return `Fair question. It depends on the size and layout, which is what the quick call is for. No cost, no pressure. Does ${callPair(ctx)} work?`;
+    case 'call_answer_duration':
+      return `Just 5 to 10 minutes. I'll ask a few questions about the space and what you have in mind. Does ${callPair(ctx)} work?`;
+    case 'call_other_project':
+      return `We do those too. Happy to talk it through on a quick call. Does ${callPair(ctx)} work?`;
+    case 'call_who_is_this': {
+      const sender = (ctx.sender ?? '').trim() || 'Mark';
+      const about = (ctx.about ?? '').trim() || 'your basement';
+      return `Sorry, should have said. It's ${sender} from OntarioReno, following up on your form about ${about}. Does ${callPair(ctx)} work for a quick call?`;
+    }
+    case 'call_booked': {
+      const when = ctx.now ? callSlotLabel(ctx.slots[0], ctx.now) : slotLabel(ctx.slots[0]);
+      const greeting = name ? `Perfect, ${name}.` : 'Perfect.';
+      return `${greeting} I'll call you ${when} from this number. Talk then.`;
+    }
+    case 'call_slot_taken':
+      return `Sorry, that time just filled up. I can do ${callPair(ctx)}. Either work?`;
   }
 }
 
@@ -170,4 +223,10 @@ export const ALL_TEMPLATE_IDS: ReplyTemplateId[] = [
   'booked_confirmation',
   'address_unclear',
   'slot_taken',
+  'call_answer_price',
+  'call_answer_duration',
+  'call_other_project',
+  'call_who_is_this',
+  'call_booked',
+  'call_slot_taken',
 ];

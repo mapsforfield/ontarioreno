@@ -12,6 +12,7 @@
 // booking quietly lost the Provider row, the customer notes and the action
 // buttons — matching a template is not the same as matching an email.
 // These modules are pure string builders: no fetch, no env vars, no DOM.
+import { callSlotPair } from './call-slots.js';
 import { generateConsultationEmailPreview } from '../src/portal/data/consultationEmails.js';
 import type { Appointment, User } from '../src/portal/data/types.js';
 import { atTimeOrWindow } from './arrival-window.js';
@@ -412,6 +413,68 @@ export function planLeadWelcomeNotifications(
       // prompt here, but it is not wrong.
       sendAfter: now.toISOString(),
       expiresAt: '',
+      idempotencyKey: `${c.leadId}:sms:lead_welcome`,
+    },
+  ];
+}
+
+// ─── The call opener (November 2026) ──────────────────────────────────────────
+
+export type LeadCallOpenerContext = {
+  leadId: string;
+  name: string;
+  phone: string;
+  /** Who signs. A real person who makes the call. */
+  senderName: string;
+  room: Exclude<WelcomeRoom, 'london_aru'>;
+  /** The two call times, from lib/call-slots.ts pickCallSlots. */
+  slots: Array<{ date: string; time: string }>;
+  /** Ontario wall clock the text goes out at; labels are relative to it. */
+  sendWall: string;
+};
+
+/**
+ * "Hi Sarah, it's Mark from OntarioReno about your basement. Does today at
+ * 4:30pm or tonight at 6pm work for a quick call?"
+ *
+ * Replaces the link text for basement and bathroom leads. No link: a link from
+ * an unknown number reads as a scam, and fewer than one lead in five clicked
+ * through to book. A question with two real times can be answered with one
+ * word, and that word books the call. London keeps its link, because its form
+ * asks the City's conditions before anything is booked.
+ */
+export function smsLeadCallOpener(c: LeadCallOpenerContext): string {
+  const name = c.name.trim().split(/\s+/)[0] ?? '';
+  const sender = c.senderName.trim() || 'Mark';
+  const greeting = name ? `Hi ${name}, ` : 'Hi, ';
+  const about = c.room === 'bathroom' ? 'your bathroom renovation' : 'your basement';
+  const [a, b] = c.slots;
+  return (
+    `${greeting}it's ${sender} from OntarioReno about ${about}. ` +
+    `Does ${callSlotPair(a, b, c.sendWall)} work for a quick call?`
+  );
+}
+
+/**
+ * The opener as an outbox row. Same idempotency key as the link text, so a
+ * lead still gets exactly one first text whichever kind it is.
+ *
+ * Expires 20 minutes before the first offered time: an opener that sat in the
+ * queue must never arrive offering "today at 10am" at 10:05.
+ */
+export function planLeadCallOpener(c: LeadCallOpenerContext): PlannedNotification[] {
+  if (!c.phone.trim() || c.slots.length < 2) return [];
+  const sendAt = torontoInstant(c.sendWall.slice(0, 10), c.sendWall.slice(11, 16));
+  const first = torontoInstant(c.slots[0].date, c.slots[0].time);
+  return [
+    {
+      channel: 'sms',
+      kind: 'lead_welcome',
+      recipient: c.phone,
+      subject: '',
+      body: smsLeadCallOpener(c),
+      sendAfter: sendAt.toISOString(),
+      expiresAt: new Date(first.getTime() - 20 * 60_000).toISOString(),
       idempotencyKey: `${c.leadId}:sms:lead_welcome`,
     },
   ];
