@@ -382,8 +382,20 @@ function mergeLeadPatch(
   return { patch, incomingRicher };
 }
 
-/** Find an existing lead matching incoming by externalId / email / normalized phone. */
-async function findExistingLead(incoming: ReturnType<typeof importLeadData>) {
+/**
+ * Find an existing lead matching incoming by externalId / email / normalized phone.
+ *
+ * `skipDeleted` is for the Meta intake only. A deleted lead is one somebody
+ * cleared out (the old Hamilton call queue was trashed in bulk, November 2026).
+ * When that person fills in a NEW ad form, merging into the trashed row hid the
+ * new enquiry and skipped the first text entirely. With this they arrive as a
+ * fresh lead. The importer keeps matching deleted rows, so re-importing an old
+ * sheet cannot bring trashed leads back.
+ */
+async function findExistingLead(
+  incoming: ReturnType<typeof importLeadData>,
+  opts: { skipDeleted?: boolean } = {},
+) {
   const phone = normPhone(incoming.phone);
   const phoneLast10 = phone.length >= 10 ? phone.slice(-10) : null;
   const email = normEmail(incoming.email);
@@ -392,11 +404,15 @@ async function findExistingLead(incoming: ReturnType<typeof importLeadData>) {
     ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
   ];
   let existing = prismaMatchers.length > 0
-    ? await prisma.lead.findFirst({ where: { OR: prismaMatchers } })
+    ? await prisma.lead.findFirst({
+        where: { OR: prismaMatchers, ...(opts.skipDeleted ? { deletedAt: null } : {}) },
+      })
     : null;
   if (!existing && phoneLast10) {
     const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT "id" FROM "Lead" WHERE right(regexp_replace("phone", '[^0-9]', '', 'g'), 10) = $1 LIMIT 1`,
+      `SELECT "id" FROM "Lead" WHERE right(regexp_replace("phone", '[^0-9]', '', 'g'), 10) = $1` +
+        (opts.skipDeleted ? ` AND "deletedAt" IS NULL` : '') +
+        ` LIMIT 1`,
       phoneLast10,
     );
     if (rows[0]) existing = await prisma.lead.findUnique({ where: { id: rows[0].id } });
@@ -614,7 +630,7 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
 
   try {
     const result = await withTables(async () => {
-      const existing = await findExistingLead(incoming);
+      const existing = await findExistingLead(incoming, { skipDeleted: true });
       if (existing) {
         // Enrich an existing lead (e.g. richer website data over a sparse Meta lead)
         // — same merge rules as the importer; never resurrects a dispositioned lead.

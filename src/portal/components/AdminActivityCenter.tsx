@@ -2,6 +2,8 @@ import {
   Banknote,
   Bell,
   CalendarPlus,
+  MessageSquareText,
+  PhoneCall,
   CheckCheck,
   ClipboardCheck,
   FileSignature,
@@ -29,6 +31,11 @@ const LAST_SEEN_KEY = 'admin_activity_lastSeen';
 // save alongside a more specific activity (status change, note, etc.), so it
 // would only add redundant noise.
 const NOISE_TYPES = new Set(['deal_edited']);
+
+// Homeowner events the admin needs to see, written by the text-message call
+// flow (lib/call-booking.ts logCallActivity). Every other homeowner activity
+// stays out of the bell, as before.
+const HOMEOWNER_TYPES = new Set(['lead_call_booked', 'lead_reply_needs_you']);
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -102,6 +109,10 @@ function describeActivity(activity: Activity): { text: string } & Visual {
       return { text: `reassigned ${label} to another rep`, icon: CalendarPlus, accent: 'text-[#1B3C6C]', ring: 'bg-[#e8f1fb]' };
     case 'commission_updated':
       return { text: `updated commission for ${label}`, icon: Banknote, accent: 'text-emerald-600', ring: 'bg-emerald-50' };
+    case 'lead_call_booked':
+      return { text: activity.actionLabel || 'booked a call by text', icon: PhoneCall, accent: 'text-emerald-600', ring: 'bg-emerald-50' };
+    case 'lead_reply_needs_you':
+      return { text: activity.actionLabel || 'texted back and needs you', icon: MessageSquareText, accent: 'text-amber-600', ring: 'bg-amber-50' };
     case 'deal_deleted':
     case 'consultation_deleted':
       return { text: `deleted ${label}`, icon: Trash2, accent: 'text-red-600', ring: 'bg-red-50' };
@@ -141,7 +152,11 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
   const repActivities = useMemo(
     () =>
       activities
-        .filter((a) => a.actorRole === 'rep' && !NOISE_TYPES.has(a.actionType))
+        .filter(
+          (a) =>
+            (a.actorRole === 'rep' && !NOISE_TYPES.has(a.actionType)) ||
+            (a.actorRole === 'homeowner' && HOMEOWNER_TYPES.has(a.actionType))
+        )
         .slice()
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [activities]
@@ -183,7 +198,11 @@ export default function AdminActivityCenter({ variant }: { variant: 'desktop' | 
   const goToActivity = (a: Activity) => {
     setOpen(false);
     // Deep-link straight to the exact record the activity refers to.
-    if (a.entityType === 'appointment' || a.actionType.startsWith('consultation')) {
+    if (a.actionType === 'lead_call_booked') {
+      navigate('/portal/workspace');
+    } else if (a.actionType === 'lead_reply_needs_you') {
+      navigate('/portal/messages');
+    } else if (a.entityType === 'appointment' || a.actionType.startsWith('consultation')) {
       // Land on the tab the activity is about (outcome, dispatch, emails, …).
       const panelTab = a.actionType.includes('outcome')
         ? 'outcome'
