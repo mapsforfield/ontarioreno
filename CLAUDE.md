@@ -300,9 +300,14 @@ London ARU keeps its link (its form asks the City's conditions first).
   BOOKED as a callback (`callbackAt` + `callback_scheduled`, not an
   Appointment). Anything unsure is never answered by the machine; it alerts
   the caller. Visit-mode threads still draft for approval, unchanged.
-- Alerts: push (needs VAPID keys, absent in production), an SMS to
-  `LEAD_CALL_OWNER_PHONE`, and an email to `TEAM_INBOX_EMAIL`. Without the phone
-  var the caller only gets email. A reminder SMS goes ~15 min before each call.
+- Alerts to the caller: an email to `TEAM_INBOX_EMAIL` and a portal push.
+  NEVER a text to ourselves: it costs Twilio money for nothing (Sabah's call).
+  A reminder EMAIL goes 5 to 20 min before each call.
+- Push: the VAPID key pair was rotated in November 2026 because the old
+  private key was never set in production (no push had ever sent). The public
+  key is in `src/portal/lib/pushNotifications.ts`; `VAPID_PUBLIC_KEY` and
+  `VAPID_PRIVATE_KEY` in Vercel must be its pair. Devices that had allowed
+  notifications re-subscribe themselves on the next portal load.
 - Env: `LEAD_WELCOME_MODE=link` restores the old link text with no deploy.
   `LEAD_CALL_SENDER` (default Mark), `LEAD_CALL_OWNER_ID` (default `sabah`).
 - Any failure building the opener falls back to the link text, so no lead goes

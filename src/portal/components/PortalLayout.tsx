@@ -132,6 +132,14 @@ export default function PortalLayout() {
   useEffect(() => {
     setPushState(getPushPermissionState());
   }, []);
+  // A device that already allowed notifications never shows the button
+  // again, so it would keep a subscription made with an old key forever.
+  // Refresh it quietly once per load; permission is already granted, so this
+  // never prompts. Best-effort.
+  useEffect(() => {
+    if (!currentUser?.id || getPushPermissionState() !== 'granted') return;
+    registerPushNotifications(currentUser.id).catch(() => false);
+  }, [currentUser?.id]);
   const handleTogglePush = async () => {
     if (!currentUser) return;
     if (pushState === 'granted') {

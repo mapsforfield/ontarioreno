@@ -78,28 +78,27 @@ export async function bookCall(
       data: { callbackAt: at, status: 'callback_scheduled' },
       select: { id: true, name: true, phone: true },
     });
-    // A booked call nobody makes is worse than no call. Reminder to the
-    // caller's phone; the drain runs every 15 minutes, so 20 minutes ahead
-    // lands it 5 to 20 minutes before the call. Expires at the call time.
-    const ownerPhone = (env.LEAD_CALL_OWNER_PHONE ?? '').trim();
-    if (ownerPhone) {
-      await store.notificationOutbox
-        .create({
-          data: {
-            leadId,
-            channel: 'sms',
-            kind: 'reply_alert',
-            recipient: ownerPhone,
-            subject: '',
-            body: `Call ${String(lead.name ?? '').trim() || 'a homeowner'} at ${slotLabel(slot)}: ${String(lead.phone ?? '')}. They booked it by text.`,
-            html: '',
-            sendAfter: new Date(at.getTime() - 20 * 60_000).toISOString(),
-            expiresAt: at.toISOString(),
-            idempotencyKey: `${leadId}:${slot.date}T${slot.time}:sms:call_reminder`,
-          },
-        })
-        .catch((err: unknown) => console.error('[call-booking] reminder queue failed:', err));
-    }
+    // A booked call nobody makes is worse than no call. Reminder EMAIL to the
+    // caller (never a text: texting ourselves costs Twilio money for nothing).
+    // The drain runs every 15 minutes, so 20 minutes ahead lands it 5 to 20
+    // minutes before the call. Expires at the call time.
+    const who = String(lead.name ?? '').trim() || 'a homeowner';
+    await store.notificationOutbox
+      .create({
+        data: {
+          leadId,
+          channel: 'email',
+          kind: 'reply_alert',
+          recipient: callerInbox(env),
+          subject: `Call ${who} at ${slotLabel(slot)}`,
+          body: `Call ${who} at ${slotLabel(slot)}: ${String(lead.phone ?? '')}. They booked it by text.\n\nhttps://ontarioreno.ca/portal/workspace`,
+          html: '',
+          sendAfter: new Date(at.getTime() - 20 * 60_000).toISOString(),
+          expiresAt: at.toISOString(),
+          idempotencyKey: `${leadId}:${slot.date}T${slot.time}:email:call_reminder`,
+        },
+      })
+      .catch((err: unknown) => console.error('[call-booking] reminder queue failed:', err));
     // The history line a rep reads on the lead. actorUserId-style foreign keys
     // need a real user, so it is attributed to the caller.
     await store.interaction
@@ -179,15 +178,20 @@ export async function pushToUser(
   }
 }
 
+/** Where the caller's alert emails go: the fast Gmail-hosted team inbox. */
+export function callerInbox(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.TEAM_INBOX_EMAIL ?? '').trim() || 'mapsforfield@gmail.com';
+}
+
 /**
- * Tell the caller, on every channel that actually reaches them.
+ * Tell the caller: an email and a portal push notification.
  *
- * Push alone is not enough: production has no VAPID keys (November 2026) and
- * the caller had no push subscription, so a push-only alert was silence. A
- * text to the caller's own phone (LEAD_CALL_OWNER_PHONE) is the channel that
- * cannot be missed; the team inbox email is the record. Both go through the
- * outbox, keyed on the homeowner's message, so a webhook retry cannot double
- * alert. Never throws.
+ * Deliberately NOT a text. Alerting ourselves by SMS spends Twilio money on
+ * every booking for something email and push do for free (Sabah's call,
+ * November 2026). Push needs VAPID keys in production and a device that has
+ * allowed notifications; until both exist the email is what arrives. The
+ * email goes through the outbox, keyed on the homeowner's message, so a
+ * webhook retry cannot double alert. Never throws.
  */
 export async function notifyCaller(
   store: Store,
@@ -197,40 +201,22 @@ export async function notifyCaller(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<void> {
   await pushToUser(store, callOwnerId(env), copy, env);
-  const link = `https://ontarioreno.ca${copy.url}`;
-  const rows: Array<Record<string, unknown>> = [];
-  const phone = (env.LEAD_CALL_OWNER_PHONE ?? '').trim();
-  if (phone) {
-    rows.push({
-      channel: 'sms',
-      recipient: phone,
-      subject: '',
-      body: `${copy.title}. ${copy.body} ${link}`,
-      idempotencyKey: `${messageKey}:sms:caller_alert`,
-    });
-  }
-  const inbox = (env.TEAM_INBOX_EMAIL ?? '').trim() || 'mapsforfield@gmail.com';
-  rows.push({
-    channel: 'email',
-    recipient: inbox,
-    subject: copy.title,
-    body: `${copy.body}\n\n${link}`,
-    idempotencyKey: `${messageKey}:email:caller_alert`,
-  });
-  for (const row of rows) {
-    await store.notificationOutbox
-      .create({
-        data: {
-          leadId,
-          kind: 'reply_alert',
-          html: '',
-          sendAfter: new Date().toISOString(),
-          expiresAt: '',
-          ...row,
-        },
-      })
-      .catch((err: unknown) => console.error('[call-booking] alert queue failed:', err));
-  }
+  await store.notificationOutbox
+    .create({
+      data: {
+        leadId,
+        channel: 'email',
+        kind: 'reply_alert',
+        recipient: callerInbox(env),
+        subject: copy.title,
+        body: `${copy.body}\n\nhttps://ontarioreno.ca${copy.url}`,
+        html: '',
+        sendAfter: new Date().toISOString(),
+        expiresAt: '',
+        idempotencyKey: `${messageKey}:email:caller_alert`,
+      },
+    })
+    .catch((err: unknown) => console.error('[call-booking] alert queue failed:', err));
   await drainOutbox(store).catch(() => null);
 }
 
