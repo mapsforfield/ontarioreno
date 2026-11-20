@@ -288,7 +288,8 @@ export type Activity = {
   id: string;
   actorUserId: string;
   actorName: string;
-  actorRole: PortalRole;
+  /** 'homeowner' for things a homeowner did by text (confirmed a visit, booked a call). */
+  actorRole: PortalRole | 'homeowner';
   actionType: string;
   actionLabel: string;
   entityType: ActivityEntityType;

@@ -75,7 +75,10 @@ export async function bookCall(
 
     const lead = await store.lead.update({
       where: { id: leadId },
-      data: { callbackAt: at, status: 'callback_scheduled' },
+      // Assigned to the caller: the admin call queue only lists ASSIGNED leads,
+      // and new Meta leads arrive unassigned, so without this a call booked by
+      // text never appeared in the queue it is meant to be made from.
+      data: { callbackAt: at, status: 'callback_scheduled', assignedRepId: callOwnerId(env) },
       select: { id: true, name: true, phone: true },
     });
     // A booked call nobody makes is worse than no call. Reminder EMAIL to the
@@ -218,6 +221,43 @@ export async function notifyCaller(
     })
     .catch((err: unknown) => console.error('[call-booking] alert queue failed:', err));
   await drainOutbox(store).catch(() => null);
+}
+
+/**
+ * Put the alert in the portal's Team Activity bell too.
+ *
+ * actorUserId must be a REAL user (the live database has a foreign key there;
+ * see the note in lib/sms-inbound.ts), so it is the caller. The homeowner is
+ * named in actorName with actorRole 'homeowner', which is what the bell
+ * renders. Never throws.
+ */
+export async function logCallActivity(
+  store: Store,
+  a: {
+    leadId: string;
+    leadName: string;
+    type: 'lead_call_booked' | 'lead_reply_needs_you';
+    label: string;
+    metadata: Record<string, unknown>;
+  },
+  env: NodeJS.ProcessEnv = process.env
+): Promise<void> {
+  const who = a.leadName.trim() || 'A homeowner';
+  await store.activity
+    ?.create({
+      data: {
+        actorUserId: callOwnerId(env),
+        actorName: who,
+        actorRole: 'homeowner',
+        actionType: a.type,
+        actionLabel: a.label,
+        entityType: 'lead',
+        entityId: a.leadId,
+        entityLabel: who,
+        metadata: a.metadata,
+      },
+    })
+    .catch((err: unknown) => console.error('[call-booking] activity row failed:', err));
 }
 
 /** What the caller's phone says, by reason. */

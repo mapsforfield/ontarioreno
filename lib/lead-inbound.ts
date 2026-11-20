@@ -24,11 +24,12 @@ import {
   bookCall,
   callSender,
   currentCallSlots,
+  logCallActivity,
   notifyCaller,
   sendConversationSms,
 } from './call-booking.js';
 import { torontoWallClock } from './scheduling.js';
-import type { OfferedSlot } from './lead-reply-templates.js';
+import { slotLabel, type OfferedSlot } from './lead-reply-templates.js';
 
 /** How many times a draft may offer. Two is the question; a third is a menu. */
 const SLOTS_TO_OFFER = 2;
@@ -231,6 +232,25 @@ export async function handleLeadReply(
           lead.id,
           `${params.messageSid}:${reason}`,
           { ...copy, url: reason === 'CALL_BOOKED' ? '/portal/workspace' : '/portal/messages' },
+          env
+        );
+        // And in the portal's Team Activity bell, beside the reps' updates.
+        const slot = reason === 'CALL_BOOKED' ? bookedSlot : null;
+        await logCallActivity(
+          callStore,
+          {
+            leadId: lead.id,
+            leadName: lead.name ?? '',
+            type: slot ? 'lead_call_booked' : 'lead_reply_needs_you',
+            label: slot
+              ? `booked a call by text for ${slotLabel(slot)}`
+              : `texted back and needs you: "${rawBody.slice(0, 80)}"`,
+            metadata: {
+              repliedWith: rawBody,
+              reason,
+              ...(slot ? { callDate: slot.date, callTime: slot.time } : {}),
+            },
+          },
           env
         );
       };
