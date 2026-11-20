@@ -1081,6 +1081,10 @@ model LeadConversation {
   /// 'call' (the opener offered two call times; clear replies send and book
   /// themselves). See ConversationMode in lib/lead-conversation.ts.
   mode      String @default("visit")
+  /// Who the opener was signed as ("Mark", "Michael"). Every later reply that
+  /// names the sender uses this, so a thread never switches names. Empty means
+  /// the current default (LEAD_CALL_SENDER).
+  sender    String @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
