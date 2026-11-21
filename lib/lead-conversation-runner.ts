@@ -260,6 +260,11 @@ export async function runInboundReply(
     await deps.send!(body, `${reply.messageSid}:sms:lead_conversation`);
     if (bookedSlot && deps.alertHuman) {
       await deps.alertHuman('CALL_BOOKED', reply.body).catch(() => undefined);
+    } else if (action.nextPhase === 'needs_human' && deps.alertHuman) {
+      // We answered AND handed the thread to a person ("not now", "just call
+      // me"). Replying first must not skip the alert: Colin's "new year" reply
+      // reached nobody but the Messages inbox.
+      await deps.alertHuman('NEEDS_A_PERSON', reply.body).catch(() => undefined);
     }
     return { kind: 'sent', template: action.template, body, nextPhase: action.nextPhase };
   }

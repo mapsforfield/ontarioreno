@@ -168,6 +168,11 @@ export function decideNextAction(
     // question, so the phase does not advance.
     return { kind: 'reply', template: 'who_is_this', nextPhase: phase };
   }
+  if (c.intent === 'later_timeframe' && mode === 'call') {
+    // Call threads: a short close, not a question. The visit-mode template
+    // below asked "roughly when?" of someone who had just said "the new year".
+    return { kind: 'reply', template: 'call_later_close', nextPhase: 'needs_human' };
+  }
   if (c.intent === 'later_timeframe') {
     // They are interested but not now. Michael decides when to chase, because
     // "a few months" is not a date and nothing here should invent one.

@@ -66,7 +66,9 @@ export type ReplyTemplateId =
   | 'call_other_project'
   | 'call_who_is_this'
   | 'call_booked'
-  | 'call_slot_taken';
+  | 'call_slot_taken'
+  // "Not now" in a call thread: close politely and hand to a person.
+  | 'call_later_close';
 
 /** How many real slots each template needs before it can be sent. */
 export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
@@ -90,6 +92,7 @@ export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
   // The one they picked.
   call_booked: 1,
   call_slot_taken: 2,
+  call_later_close: 0,
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -203,6 +206,10 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
     }
     case 'call_slot_taken':
       return `Sorry, that time just filled up. I can do ${callPair(ctx)}. Either work?`;
+    case 'call_later_close':
+      // They said when ("in the new year", "spring"). Asking again, or offering
+      // next week, reads as not listening. "then" fits whatever they said.
+      return `No problem${name ? `, ${name}` : ''}. I'll check back with you then. Thanks!`;
   }
 }
 
@@ -229,4 +236,5 @@ export const ALL_TEMPLATE_IDS: ReplyTemplateId[] = [
   'call_who_is_this',
   'call_booked',
   'call_slot_taken',
+  'call_later_close',
 ];
