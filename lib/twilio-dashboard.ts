@@ -40,7 +40,15 @@ export function normalizeMessage(m: Record<string, unknown>): DashboardMessage {
     body: String(m.body ?? ''),
     direction: String(m.direction ?? ''),
     status: String(m.status ?? ''),
-    dateSent: (m.date_sent as string) || (m.date_created as string) || null,
+    // Inbound: when it REACHED us (date_created). Twilio stamps an inbound
+    // date_sent a few seconds late, when it finished processing, so an
+    // automatic reply sent in that gap had the SAME second and could render
+    // above the text it answered (Colin, Nov 21: his 11:51:57 text shown
+    // under our 11:52:02 reply).
+    dateSent:
+      String(m.direction ?? '') === 'inbound'
+        ? (m.date_created as string) || (m.date_sent as string) || null
+        : (m.date_sent as string) || (m.date_created as string) || null,
     numMedia: Number(m.num_media ?? 0),
     media: [],
   };

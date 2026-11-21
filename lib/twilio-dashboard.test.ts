@@ -71,6 +71,21 @@ test('a queued message with no date_sent falls back to date_created', () => {
   assert.ok(Number.isFinite(new Date(m.dateSent!).getTime()));
 });
 
+test('an inbound text is timed by when it reached us, so a fast reply sorts after it', () => {
+  const inbound = normalizeMessage(restRow({
+    direction: 'inbound',
+    date_created: 'Sat, 21 Nov 2026 16:51:57 +0000',
+    date_sent: 'Sat, 21 Nov 2026 16:52:02 +0000',
+  }));
+  const reply = normalizeMessage(restRow({
+    sid: 'SM2',
+    date_created: 'Sat, 21 Nov 2026 16:52:02 +0000',
+    date_sent: 'Sat, 21 Nov 2026 16:52:02 +0000',
+  }));
+  assert.equal(inbound.dateSent, 'Sat, 21 Nov 2026 16:51:57 +0000');
+  assert.ok(new Date(inbound.dateSent!).getTime() < new Date(reply.dateSent!).getTime());
+});
+
 test('num_media arrives as a string and becomes a number', () => {
   // REST sends "2", the SDK sent 2. The handler skips media fetching on a
   // falsy value, and the string "0" is truthy — so getting this wrong means

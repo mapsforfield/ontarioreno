@@ -272,3 +272,22 @@ test('without a send function, call mode falls back to drafts', async () => {
   assert.equal(out.kind, 'drafted');
   assert.deepEqual(h.sent, []);
 });
+
+test('"not now" gets a gracious close, the thread goes to a person, and they are alerted', async () => {
+  const h = harness({ intent: 'later_timeframe' });
+  const out = await runInboundReply(callState(), reply('I will get back at you in the new year'), h.deps, ENV);
+  assert.equal(out.kind, 'sent');
+  assert.deepEqual(h.sent, ["No problem, Sarah. I'll check back with you then. Thanks!"]);
+  assert.equal(h.patches.at(-1)?.phase, 'needs_human');
+  assert.deepEqual(h.alerts, ['NEEDS_A_PERSON']);
+  // Never asks "when?" of someone who just said when.
+  assert.ok(!/\?/.test(h.sent[0]));
+});
+
+test('any reply that hands the thread to a person also alerts them', async () => {
+  const h = harness({ intent: 'wants_call' });
+  await runInboundReply(callState(), reply('just call me'), h.deps, ENV);
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.patches.at(-1)?.phase, 'needs_human');
+  assert.deepEqual(h.alerts, ['NEEDS_A_PERSON']);
+});
