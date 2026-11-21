@@ -29,6 +29,7 @@ import {
   sendConversationSms,
 } from './call-booking.js';
 import { torontoWallClock } from './scheduling.js';
+import { checkReplyFits } from './reply-fit-check.js';
 import { slotLabel, type OfferedSlot } from './lead-reply-templates.js';
 
 /** How many times a draft may offer. Two is the question; a third is a menu. */
@@ -215,6 +216,7 @@ export async function handleLeadReply(
     if (mode === 'call') {
       // The clear path runs itself; see lib/lead-conversation-runner.ts.
       deps.nowWall = () => torontoWallClock();
+      deps.checkFit = (i) => checkReplyFits(i, env);
       deps.send = (body, idempotencyKey) =>
         sendConversationSms(callStore, lead.id, String(lead.phone ?? ''), body, idempotencyKey);
       deps.bookCall = async (leadId, slot) => {

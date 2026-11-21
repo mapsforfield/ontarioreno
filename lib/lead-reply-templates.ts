@@ -189,7 +189,7 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       return `Sorry, someone grabbed that one while we were talking. I've still got ${first} or ${second}. Either work?`;
     }
     case 'call_answer_price':
-      return `Fair question. It depends on the size and layout, which is what the quick call is for. No cost, no pressure. Does ${callPair(ctx)} work?`;
+      return `It depends on the size and layout, which is what the quick call is for. No cost, no pressure. Does ${callPair(ctx)} work?`;
     case 'call_answer_duration':
       return `Just 5 to 10 minutes. I'll ask a few questions about the space and what you have in mind. Does ${callPair(ctx)} work?`;
     case 'call_other_project':

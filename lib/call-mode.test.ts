@@ -18,6 +18,7 @@ import { planLeadCallOpener, smsLeadCallOpener } from './notifications.js';
 import { runInboundReply, type ConversationState, type RunnerDeps } from './lead-conversation-runner.js';
 import { decideNextAction, type Classification } from './lead-conversation.js';
 import { ALL_TEMPLATE_IDS, renderReply, type OfferedSlot } from './lead-reply-templates.js';
+import { checkReplyFits, parseFitVerdict } from './reply-fit-check.js';
 
 // Tuesday 17 November 2026.
 const TUE = '2026-11-17';
@@ -284,10 +285,68 @@ test('"not now" gets a gracious close, the thread goes to a person, and they are
   assert.ok(!/\?/.test(h.sent[0]));
 });
 
-test('any reply that hands the thread to a person also alerts them', async () => {
-  const h = harness({ intent: 'wants_call' });
-  await runInboundReply(callState(), reply('just call me'), h.deps, ENV);
+test('"please call me" gets no automatic text, only an alert to the caller', async () => {
+  for (const body of ["I'm free anytime today. Please call me", 'Can I call you', 'open to a call Monday if you are free?']) {
+    const h = harness({ intent: 'wants_call' });
+    const out = await runInboundReply(callState(), reply(body), h.deps, ENV);
+    assert.equal(out.kind, 'escalated');
+    assert.deepEqual(h.sent, [], body);
+    assert.equal(h.alerts.length, 1, body);
+  }
+});
+
+test('the fit check can block an automatic reply: nothing sent, held back on the thread, caller alerted', async () => {
+  const h = harness({ intent: 'asked_price' });
+  h.deps.checkFit = async () => ({ fits: false, reason: 'ignores their credit concern' });
+  const out = await runInboundReply(callState(), reply('how much? my credit check failed'), h.deps, ENV);
+  assert.deepEqual(out, { kind: 'escalated', reason: 'REPLY_DID_NOT_FIT' });
+  assert.deepEqual(h.sent, []);
+  assert.equal(h.alerts.length, 1);
+  const held = h.messages.find((m) => m.state === 'discarded');
+  assert.match(held?.body ?? '', /^It depends on the size and layout/);
+  assert.match(held?.escalationReason ?? '', /^REPLY_DID_NOT_FIT/);
+});
+
+test('a fit check that errors blocks the reply too', async () => {
+  const h = harness({ intent: 'asked_duration' });
+  h.deps.checkFit = async () => { throw new Error('timeout'); };
+  const out = await runInboundReply(callState(), reply('how long?'), h.deps, ENV);
+  assert.equal(out.kind, 'escalated');
+  assert.deepEqual(h.sent, []);
+});
+
+test('a reply the fit check passes is sent as before', async () => {
+  const h = harness({ intent: 'asked_duration' });
+  let seen = '';
+  h.deps.checkFit = async (i) => { seen = i.proposedReply; return { fits: true, reason: 'ok' }; };
+  await runInboundReply(callState(), reply('how long is the call?'), h.deps, ENV);
+  assert.match(h.sent[0], /^Just 5 to 10 minutes\./);
+  assert.equal(seen, h.sent[0]);
+});
+
+test('a booking confirmation is not held up by the fit check', async () => {
+  const h = harness({ intent: 'picked_slot', pickedSlotIndex: 1 });
+  let called = false;
+  h.deps.checkFit = async () => { called = true; return { fits: false, reason: 'x' }; };
+  await runInboundReply(callState(), reply('6pm'), h.deps, ENV);
+  assert.equal(called, false);
   assert.equal(h.sent.length, 1);
-  assert.equal(h.patches.at(-1)?.phase, 'needs_human');
-  assert.deepEqual(h.alerts, ['NEEDS_A_PERSON']);
+});
+
+test('the price reply never claims they asked a question', () => {
+  const body = renderReply('call_answer_price', { name: 'Sarah', slots: OPENER.slots, now: at('15:10') });
+  assert.ok(!/fair question/i.test(body));
+});
+
+test('fit verdicts: only an explicit true lets a reply through', () => {
+  assert.equal(parseFitVerdict('{"fits":true,"reason":"ok"}').fits, true);
+  assert.equal(parseFitVerdict('{"fits":false,"reason":"no"}').fits, false);
+  assert.equal(parseFitVerdict('{"reason":"missing"}').fits, false);
+  assert.equal(parseFitVerdict('{"fits":"true"}').fits, false);
+  assert.equal(parseFitVerdict('not json').fits, false);
+});
+
+test('no API key means no automatic reply gets through the fit check', async () => {
+  const v = await checkReplyFits({ theirMessage: 'hi', ourPreviousMessage: '', proposedReply: 'hello' }, {} as NodeJS.ProcessEnv);
+  assert.equal(v.fits, false);
 });

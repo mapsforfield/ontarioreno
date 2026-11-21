@@ -321,6 +321,12 @@ London ARU keeps its link (its form asks the City's conditions first).
   `LEAD_CALL_SENDER` (default Mark), `LEAD_CALL_OWNER_ID` (default `sabah`).
 - Any failure building the opener falls back to the link text, so no lead goes
   without a first text. Guarded by `lib/call-mode.test.ts`.
+- **Fit check** (`lib/reply-fit-check.ts`): before any automatic reply except a
+  booking confirmation, a second model call reads their message beside our
+  reply and may only say no. No, unsure, error, timeout or refusal: the reply is
+  kept on the thread as `discarded` with `REPLY_DID_NOT_FIT` and the caller is
+  alerted. Added after Colin ("new year" answered with "roughly when?") and a
+  replay of 169 real replies. "Please call me" gets no automatic text at all.
 
 ## Schema
 

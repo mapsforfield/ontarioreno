@@ -99,6 +99,12 @@ export type RunnerDeps = {
   alertHuman?: (reason: string, rawBody: string) => Promise<void>;
   /** Ontario wall clock, "YYYY-MM-DDTHH:MM". */
   nowWall?: () => string;
+  /**
+   * Last gate before an automatic reply is sent (lib/reply-fit-check.ts).
+   * May only say no. Not consulted for a booking confirmation, whose words are
+   * fixed by the time they picked.
+   */
+  checkFit?: (i: { theirMessage: string; ourPreviousMessage: string; proposedReply: string }) => Promise<{ fits: boolean; reason: string }>;
 };
 
 export type RunOutcome =
@@ -109,7 +115,7 @@ export type RunOutcome =
   /** Nothing to say; the thread is closed and follow-ups stop. */
   | { kind: 'closed' }
   /** On the Conversations page for a person to answer. */
-  | { kind: 'escalated'; reason: EscalationReason | 'NO_SLOTS_AVAILABLE' };
+  | { kind: 'escalated'; reason: EscalationReason | 'NO_SLOTS_AVAILABLE' | 'REPLY_DID_NOT_FIT' };
 
 /**
  * One inbound reply, start to finish.
@@ -240,6 +246,24 @@ export async function runInboundReply(
     return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body, autopilot);
   }
 
+  if (autopilot && action.template !== 'call_booked' && deps.checkFit) {
+    const verdict = await deps
+      .checkFit({ theirMessage: reply.body, ourPreviousMessage: conversation.lastOutbound, proposedReply: body })
+      .catch(() => ({ fits: false, reason: 'check failed' }));
+    if (!verdict.fits) {
+      // Kept on the thread, unsent, so the caller can see what was held back.
+      await deps.recordMessage({
+        conversationId: conversation.id,
+        direction: 'out',
+        body,
+        state: 'discarded',
+        templateId: action.template,
+        escalationReason: `REPLY_DID_NOT_FIT: ${verdict.reason}`.slice(0, 200),
+      });
+      return escalate(conversation, deps, 'REPLY_DID_NOT_FIT', reply.body, autopilot);
+    }
+  }
+
   if (autopilot) {
     // The phase moves BEFORE the send, for the same reason drafts move it on
     // write: a homeowner who texts twice must not get two answers to one
@@ -293,7 +317,7 @@ export async function runInboundReply(
 async function escalate(
   conversation: ConversationState,
   deps: RunnerDeps,
-  reason: EscalationReason | 'NO_SLOTS_AVAILABLE',
+  reason: EscalationReason | 'NO_SLOTS_AVAILABLE' | 'REPLY_DID_NOT_FIT',
   rawBody: string,
   alert = false
 ): Promise<RunOutcome> {
