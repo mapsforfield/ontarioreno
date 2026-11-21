@@ -14,6 +14,8 @@
 const CONFIG = {
   SHEET_NAME: 'Sheet1',                             // the tab to read
   API_URL: 'https://ontarioreno.ca/api/leads?intake=1',
+  // Delivers every queued text/email that is due. Called on each 5-minute run.
+  DRAIN_URL: 'https://ontarioreno.ca/api/leads?flow=drain',
   TOKEN: 'PASTE_THE_SAME_SECRET_AS_LEAD_INTAKE_TOKEN_HERE',
   SYNCED_HEADER: 'Synced',                          // a column the script manages
   SOURCE: 'website_intake',
@@ -47,6 +49,8 @@ function normHeader(h) {
 }
 
 function syncNewLeads() {
+  // First, and unconditionally: the early returns below must not skip it.
+  deliverDueMessages();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
@@ -123,6 +127,30 @@ function syncNewLeads() {
     }
   }
   console.log('Synced ' + sent + ' new lead(s).');
+}
+
+/**
+ * Ask the portal to send everything that is due: overnight first texts held
+ * until 8:30am, call reminders, visit reminders.
+ *
+ * Why it lives here: GitHub's scheduled delivery job is set to every 15
+ * minutes but in practice runs about every 7 hours, so a held text could
+ * expire unsent. This trigger fires every 5 minutes, reliably. Never throws:
+ * a delivery hiccup must not stop the lead sync above.
+ */
+function deliverDueMessages() {
+  try {
+    const res = UrlFetchApp.fetch(CONFIG.DRAIN_URL, {
+      method: 'get',
+      headers: { 'x-intake-token': CONFIG.TOKEN },
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() !== 200) {
+      console.error('Delivery ping → HTTP ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 200));
+    }
+  } catch (err) {
+    console.error('Delivery ping failed: ' + err);
+  }
 }
 
 /** Run this ONCE: authorizes the script and installs a 5-minute trigger. */
