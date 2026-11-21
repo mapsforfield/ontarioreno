@@ -3461,8 +3461,18 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
   // Reminders are scheduled at booking time; this delivers whatever is due.
   // Vercel crons run against Production only, so preview never sends.
   if (flow === 'drain') {
+    // Two callers. GitHub Actions (CRON_SECRET), scheduled every 15 minutes but
+    // in practice run about every 7 HOURS (4 runs in 24h, November 2026), and
+    // the Meta lead sheet's Apps Script (LEAD_INTAKE_TOKEN), whose Google
+    // trigger fires reliably every 5 minutes. A held message waits for one of
+    // these: Millicent Donaldson's 8:30am opener expired unsent at 9:40 because
+    // no GitHub run landed in between. Accepting the sheet's token costs
+    // nothing in safety: a drain only delivers what is already queued and due.
     const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+    const intakeToken = process.env.LEAD_INTAKE_TOKEN;
+    const viaCron = !!cronSecret && req.headers.authorization === `Bearer ${cronSecret}`;
+    const viaSheet = !!intakeToken && req.headers['x-intake-token'] === intakeToken;
+    if (!viaCron && !viaSheet) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
     const summary = await drainOutbox(100).catch((err) => ({ error: String(err) }));

@@ -179,6 +179,15 @@ we lose the trust.
 
 ## Notifications
 
+**What actually delivers a HELD message** (anything with a future `sendAfter`:
+overnight first texts, call and visit reminders) is a drain run. GitHub's
+`outbox-drain.yml` is scheduled every 15 minutes but ran only 4 times in 24h
+(November 2026), so the Meta sheet's Apps Script (`scripts/google-sheet-lead-sync.gs`,
+Google trigger every 5 min) also calls `?flow=drain` with the intake token on
+every run. A held opener for Millicent Donaldson expired unsent before this
+existed. Messages sent at the moment of an event are drained inline and never
+needed either.
+
 Outgoing mail/SMS goes through `NotificationOutbox` + `drainOutbox`, keyed by
 `idempotencyKey`. **Real prospects receive these** — never send test messages or
 re-send with stale dates. Grant closure alerts reuse this path and also deliver
