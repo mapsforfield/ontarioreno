@@ -154,6 +154,13 @@ export function decideNextAction(
     // chasing someone who already said no.
     return { kind: 'close' };
   }
+  if (c.intent === 'wants_call' && mode === 'call') {
+    // "Please call me", "I'm free anytime today", "Can I call you". Texting
+    // back "what's a good time?" to someone who already said, or who wants to
+    // call US, reads as a bot (replay of 169 real replies, Nov 2026). Say
+    // nothing; the caller is alerted and phones them.
+    return { kind: 'escalate', reason: 'NEEDS_A_PERSON' };
+  }
   if (c.intent === 'wants_call') {
     // We ask for a time, and the answer is work for a person rather than a
     // booking — there is no slot to hold and no address to send anyone to.
