@@ -145,3 +145,37 @@ export function normalizeMedia(
     };
   });
 }
+
+/**
+ * The key a phone number is matched on: its last ten digits.
+ *
+ * Twilio hands the dashboard E.164 ("+14165550123"); leads are stored however
+ * the form or the rep typed them ("416-555-0123", "(416) 555 0123"). Ten digits
+ * is what both have in common. Mirrors `phoneKey` in lib/sms-replies.ts, which
+ * the inbound path matches leads with, so a name shown here is the same lead
+ * the automatic replies found.
+ */
+export function contactKey(raw: string): string {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+/**
+ * Lead names by phone key, for the Messages page's conversation list.
+ *
+ * Rows are expected oldest first, so when two leads share a number the most
+ * recent one (the person who just filled in a form) wins. Blank names and
+ * numbers too short to be a phone are skipped rather than mapped to "".
+ */
+export function contactNamesByPhone(
+  rows: Array<{ name?: string | null; phone?: string | null }>
+): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const row of rows) {
+    const key = contactKey(String(row.phone ?? ''));
+    const name = String(row.name ?? '').replace(/\s+/g, ' ').trim();
+    if (key.length < 10 || !name) continue;
+    names[key] = name;
+  }
+  return names;
+}

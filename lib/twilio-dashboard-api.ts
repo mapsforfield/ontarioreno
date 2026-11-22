@@ -34,7 +34,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAdmin } from './auth.js';
+import { prisma } from './prisma.js';
 import {
+  contactNamesByPhone,
   conversationQueryUrls,
   mergeMessagesBySid,
   normalizeMedia,
@@ -51,6 +53,32 @@ const MESSAGE_CACHE_MS = 60 * 1000;
 // log on every poll (the page refreshes itself every 10 seconds).
 const messageCache = new Map<string, { timestamp: number; messages: DashboardMessage[] }>();
 const mediaCache = new Map<string, DashboardMessage['media']>();
+
+// Lead names change rarely (a new Meta lead every so often), and the page asks
+// once on load and once per line switch, so five minutes is plenty fresh.
+const CONTACT_NAMES_CACHE_MS = 5 * 60 * 1000;
+let contactNamesCache: { timestamp: number; names: Record<string, string> } | null = null;
+
+/**
+ * Lead names by phone, so the conversation list can say "Colin Hart" instead
+ * of only "+1 (416) 555-0123", and search can find a lead by name.
+ *
+ * Read-only and admin-only like everything else here. Oldest first so the
+ * newest lead wins a shared number (see contactNamesByPhone).
+ */
+async function fetchContactNames(): Promise<Record<string, string>> {
+  if (contactNamesCache && Date.now() - contactNamesCache.timestamp < CONTACT_NAMES_CACHE_MS) {
+    return contactNamesCache.names;
+  }
+  const leads = await prisma.lead.findMany({
+    where: { phone: { not: '' } },
+    select: { name: true, phone: true },
+    orderBy: { submittedAt: 'asc' },
+  });
+  const names = contactNamesByPhone(leads);
+  contactNamesCache = { timestamp: Date.now(), names };
+  return names;
+}
 
 function credentials() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -268,6 +296,17 @@ export async function handleTwilioDashboard(req: VercelRequest, res: VercelRespo
           friendlyName: String(n.friendly_name || n.phone_number || ''),
         }))
       );
+      return;
+    }
+
+    if (resource === 'contacts') {
+      // Names are a nicety on top of the list. If the database is unreachable
+      // the page still works on numbers alone, so answer empty, not 500.
+      const names = await fetchContactNames().catch((error) => {
+        console.error('Twilio dashboard contact names failed:', (error as Error).message);
+        return {} as Record<string, string>;
+      });
+      res.json({ names });
       return;
     }
 

@@ -65,7 +65,9 @@
       height: 100vh;
       padding: 18px;
       display: grid;
-      grid-template-columns: 320px 1fr;
+      /* Wide enough for a name, a status and a two-line preview without
+         an ellipsis on every card; the thread keeps the rest. */
+      grid-template-columns: minmax(340px, 400px) 1fr;
       gap: 18px;
       overflow: hidden;
     }
@@ -899,6 +901,251 @@
       display: none !important;
     }
 
+    /* ─── Filters, sort, and per-conversation status ──────────────────────
+       The list used to preview only the newest message per contact, so a lead
+       whose reply came in after our opener looked like someone we had never
+       texted. Every card now says where the thread stands (waiting on us,
+       replied, texted with no reply, not delivered) and how many texts went
+       each way, and the chips above narrow the list to one of those. */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filter-chip {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(135, 155, 176, 0.28);
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--text-soft);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .filter-chip:hover {
+      background: #fff;
+      color: var(--text-main);
+    }
+
+    .filter-chip.active {
+      background: var(--blue-strong);
+      border-color: var(--blue-strong);
+      color: #fff;
+    }
+
+    .filter-count {
+      min-width: 18px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(22, 104, 199, 0.1);
+      color: var(--blue-strong);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .filter-chip.active .filter-count {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+
+    .filter-chip .filter-count.alert {
+      background: #c2410c;
+      color: #fff;
+    }
+
+    .sort-select {
+      flex: 0 0 auto;
+      border: 1px solid rgba(135, 155, 176, 0.28);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--text-soft);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 8px;
+      cursor: pointer;
+    }
+
+    /* The hint for the active chip on the left, sort on the right. */
+    .filter-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .filter-hint {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 12px;
+      line-height: 1.3;
+      color: var(--text-faint);
+    }
+
+    .sort-select {
+      margin-left: auto;
+    }
+
+    /* Inside a filter the drawers are empty, so their panel and the resizer
+       under it would only be a blank band above the list. */
+    .sidebar.list-filtered .sidebar-top-panel,
+    .sidebar.list-filtered .sidebar-resizer {
+      display: none;
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-right: 6px;
+    }
+
+    .conversation-subline {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin: -4px 0 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conversation-item.active .conversation-subline {
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .conversation-state-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 8px;
+      margin-bottom: 6px;
+    }
+
+    .conv-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+
+    .conv-status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .conv-status.state-waiting {
+      background: #fff1db;
+      color: #b45309;
+    }
+
+    .conv-status.state-replied {
+      background: #e3f6ee;
+      color: #0f7a55;
+    }
+
+    .conv-status.state-handled {
+      background: #e8eef5;
+      color: #4b6178;
+    }
+
+    .conv-status.state-noreply {
+      background: #eef1f5;
+      color: #5b6b7c;
+    }
+
+    .conv-status.state-failed {
+      background: #fde8e8;
+      color: #b42318;
+    }
+
+    .conv-counts {
+      font-size: 11px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    .conversation-item.active .conv-counts {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .conversation-item.active .conv-status {
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    /* A waiting reply is the one card that needs a person, so it carries a
+       left edge the eye can find while scrolling. */
+    .conversation-item.needs-reply {
+      box-shadow: inset 3px 0 0 #d97706;
+    }
+
+    .conversation-item.active.needs-reply {
+      box-shadow: inset 3px 0 0 #fbbf24, 0 16px 28px rgba(16, 79, 160, 0.22);
+    }
+
+    .preview-who {
+      font-weight: 700;
+      color: var(--text-main);
+      margin-right: 4px;
+    }
+
+    .conversation-item.active .preview-who {
+      color: #fff;
+    }
+
+    .thread-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .thread-done-btn {
+      border-color: rgba(180, 83, 9, 0.28);
+      color: #b45309;
+    }
+
+    .msg-delivery {
+      font-weight: 700;
+    }
+
+    .msg-delivery.failed {
+      color: #b42318;
+    }
+
     .media-modal {
       position: fixed;
       inset: 0;
@@ -1312,6 +1559,70 @@
       .conversation-item {
         padding: 11px 12px;
       }
+
+      /* Chips scroll sideways under the thumb rather than wrapping onto a
+         second row; the sort select stays pinned at the end. */
+      .filter-bar {
+        margin-top: 8px;
+      }
+
+      .filter-chip {
+        min-height: 34px;
+        padding: 6px 11px;
+        font-size: 13px;
+      }
+
+      .sort-select {
+        min-height: 34px;
+        font-size: 13px;
+      }
+
+      .filter-meta {
+        margin-top: 6px;
+      }
+
+      .filter-chip {
+        padding: 6px 10px;
+      }
+
+      /* The portal frame already says "Twilio Messages" right above this, so
+         on a phone the title gives its line to the number picker, which then
+         sits beside "+ New message" instead of on a row of its own. */
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .sidebar-title-row {
+        order: 2;
+        margin: 0;
+        flex: 0 0 auto;
+      }
+
+      .sidebar-title-row .sidebar-title {
+        display: none;
+      }
+
+      .sidebar-header .from-select {
+        order: 1;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .new-message-btn {
+        min-height: 44px;
+      }
+
+      .thread-actions {
+        gap: 6px;
+      }
+
+      /* The header status pill repeats what the list already said, and on a
+         phone the title needs the width. The Done button stays. */
+      .thread-title .conv-status {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -1332,8 +1643,23 @@
 
       <div class="search-wrap">
         <div class="search-field">
-          <input id="searchInput" class="search-input" placeholder="Filter contacts or messages" />
+          <input id="searchInput" class="search-input" type="search" placeholder="Search name, number or message" />
           <button id="clearSearchBtn" class="clear-search-btn hidden" type="button">Clear</button>
+        </div>
+        <div class="filter-bar">
+          <div id="filterChips" class="filter-chips" role="tablist" aria-label="Show conversations">
+            <button class="filter-chip active" type="button" role="tab" data-filter="all">All <span class="filter-count" data-count="all">0</span></button>
+            <button class="filter-chip" type="button" role="tab" data-filter="waiting">Waiting <span class="filter-count" data-count="waiting">0</span></button>
+            <button class="filter-chip" type="button" role="tab" data-filter="received">Received <span class="filter-count" data-count="received">0</span></button>
+            <button class="filter-chip" type="button" role="tab" data-filter="sent">Sent <span class="filter-count" data-count="sent">0</span></button>
+          </div>
+        </div>
+        <div class="filter-meta">
+          <div id="filterHint" class="filter-hint"></div>
+          <select id="sortSelect" class="sort-select" aria-label="Sort conversations">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
         </div>
       </div>
 
@@ -1355,11 +1681,14 @@
           <button id="menuBtn" class="menu-btn" type="button" aria-label="Back to conversations" aria-expanded="false"><span class="menu-btn-chevron" aria-hidden="true">&lsaquo;</span>Chats</button>
           <div class="avatar" id="threadAvatar">?</div>
           <div class="thread-header-copy">
-            <div class="thread-title"><span id="threadTitle">No conversation selected</span><span id="threadBadge" class="thread-badge hidden">0</span></div>
+            <div class="thread-title"><span id="threadTitle">No conversation selected</span><span id="threadState" class="conv-status hidden"></span><span id="threadBadge" class="thread-badge hidden">0</span></div>
             <div class="thread-subtitle" id="threadSubtitle">Choose a thread from the left</div>
           </div>
         </div>
-        <button id="refreshBtn" class="sync-btn" type="button">Sync</button>
+        <div class="thread-actions">
+          <button id="threadDoneBtn" class="sync-btn thread-done-btn hidden" type="button" title="Take this reply off Responses waiting">Done</button>
+          <button id="refreshBtn" class="sync-btn" type="button">Sync</button>
+        </div>
       </div>
 
       <div id="threadBody" class="thread-body">
@@ -1410,6 +1739,51 @@
     const mediaModalEl = document.getElementById("mediaModal");
     const mediaModalImageEl = document.getElementById("mediaModalImage");
     const SHOW_DIRECTION_DEBUG_LABELS = false;
+    const filterChipsEl = document.getElementById("filterChips");
+    const sortSelectEl = document.getElementById("sortSelect");
+    const filterHintEl = document.getElementById("filterHint");
+    const threadStateEl = document.getElementById("threadState");
+    const threadDoneBtn = document.getElementById("threadDoneBtn");
+
+    // ─── Filters, sort, names ──────────────────────────────────────────────
+    //
+    // Which slice of the list is showing. Remembered per browser, like the
+    // drawer states, so a rep who lives in "Waiting" lands back there.
+    //   all      - everything, with the Responses / Unread drawers on top
+    //   waiting  - they texted last and nobody has marked it Done
+    //   received - they have texted us at least once
+    //   sent     - we texted them and they have not replied (yet)
+    const LIST_FILTERS = ["all", "waiting", "received", "sent"];
+    const FILTER_HINTS = {
+      all: "",
+      waiting: "They texted last and nobody has answered or marked it Done.",
+      received: "Everyone who has texted this number back.",
+      sent: "We texted them. No reply yet."
+    };
+    function readStored(key, allowed, fallback) {
+      try {
+        const value = localStorage.getItem(key);
+        return allowed.includes(value) ? value : fallback;
+      } catch (err) {
+        return fallback;
+      }
+    }
+    let listFilter = readStored("messagesListFilter", LIST_FILTERS, "all");
+    let listSort = readStored("messagesListSort", ["newest", "oldest"], "newest");
+
+    // Lead names by the last ten digits of their phone (see the `contacts`
+    // resource in lib/twilio-dashboard-api.ts). Empty until it loads, and the
+    // page works on numbers alone if it never does.
+    let contactNames = {};
+
+    function contactKey(number) {
+      const digits = String(number || "").replace(/\D/g, "");
+      return digits.length > 10 ? digits.slice(-10) : digits;
+    }
+
+    function contactName(number) {
+      return contactNames[contactKey(number)] || "";
+    }
 
     // ===== NEW STATE (ADD THIS EXACTLY HERE) =====
     const unreadMap = JSON.parse(localStorage.getItem("unreadMap") || "{}");
@@ -1942,6 +2316,10 @@
         );
         const last = msgs[msgs.length - 1];
         const lastIsInbound = last && last.from !== activeNumber;
+        const sent = msgs.filter((msg) => msg.from === activeNumber);
+        const received = msgs.filter((msg) => msg.from !== activeNumber);
+        const lastSent = sent[sent.length - 1] || null;
+        const lastReceived = received[received.length - 1] || null;
 
         return {
           contact,
@@ -1951,7 +2329,15 @@
           lastDate: last?.dateSent || null,
           lastSid: last?.sid || "",
           unread: !!unreadMap[contact],
-          lastIsInbound
+          lastIsInbound,
+          // Counted within the messages this page holds (the newest few
+          // thousand on the line), which covers every recent lead.
+          sentCount: sent.length,
+          receivedCount: received.length,
+          firstSentDate: sent[0]?.dateSent || null,
+          lastSentDate: lastSent?.dateSent || null,
+          lastSentStatus: lastSent?.status || "",
+          lastReceivedDate: lastReceived?.dateSent || null
         };
       });
 
@@ -1996,6 +2382,75 @@
       responsesDoneMap[conv.contact] = conv.lastSid;
       persistResponsesDoneMap();
       renderConversationList();
+      renderThreadHeaderState();
+    }
+
+    // The header's status pill and Done button for the open thread. Done
+    // here is the same mark as Done on the card: it takes the reply off
+    // Responses waiting until they text again.
+    function renderThreadHeaderState() {
+      if (!activeConversation) {
+        threadStateEl.classList.add("hidden");
+        threadDoneBtn.classList.add("hidden");
+        return;
+      }
+      const state = conversationState(activeConversation);
+      threadStateEl.className = `conv-status state-${state.key}`;
+      threadStateEl.textContent = state.label;
+      threadDoneBtn.classList.toggle("hidden", state.key !== "waiting");
+    }
+
+    // Twilio's word for a text that never reached the phone.
+    function isFailedStatus(status) {
+      return status === "failed" || status === "undelivered";
+    }
+
+    function isWaitingOnUs(conv) {
+      return !!conv.lastIsInbound && responsesDoneMap[conv.contact] !== conv.lastSid;
+    }
+
+    // Where one thread stands, in the words the card and the header show.
+    function conversationState(conv) {
+      if (isWaitingOnUs(conv)) {
+        return { key: "waiting", label: "Waiting on you" };
+      }
+      if (!conv.lastIsInbound && conv.sentCount && isFailedStatus(conv.lastSentStatus)) {
+        return { key: "failed", label: "Not delivered" };
+      }
+      if (conv.lastIsInbound) {
+        return { key: "handled", label: "Replied, marked done" };
+      }
+      if (conv.receivedCount) {
+        return { key: "replied", label: "They replied" };
+      }
+      return { key: "noreply", label: "Texted, no reply" };
+    }
+
+    function matchesFilter(conv, filter) {
+      if (filter === "waiting") return isWaitingOnUs(conv);
+      if (filter === "received") return conv.receivedCount > 0;
+      if (filter === "sent") return conv.sentCount > 0 && conv.receivedCount === 0;
+      return true;
+    }
+
+    // Name, number (as typed or as formatted), or any text in the thread.
+    function matchesSearch(conv, search) {
+      if (!search) return true;
+      const name = contactName(conv.contact).toLowerCase();
+      if (name.includes(search)) return true;
+      if (conv.contact.toLowerCase().includes(search)) return true;
+      if (formatPhoneNumber(conv.contact).toLowerCase().includes(search)) return true;
+      const searchDigits = search.replace(/\D/g, "");
+      if (searchDigits.length >= 3 && conv.contact.replace(/\D/g, "").includes(searchDigits)) return true;
+      return conv.messages.some((msg) => (msg.body || "").toLowerCase().includes(search));
+    }
+
+    // "Newest" keeps the long-standing order (unread first, then latest
+    // activity). "Oldest" puts the longest-untouched thread first, which in
+    // the Waiting view is the homeowner who has been waiting longest.
+    function sortForList(list) {
+      if (listSort !== "oldest") return list;
+      return [...list].sort((a, b) => new Date(a.lastDate) - new Date(b.lastDate));
     }
 
     function renderConversationCard(conv, search = "", options = {}) {
@@ -2014,18 +2469,48 @@
         ? `<button class="conversation-action-btn" type="button" data-done-contact="${escapeHtml(conv.contact)}">Done</button>`
         : "";
 
+      // The card answers three questions without opening the thread: did we
+      // text them, did they answer, and is a reply waiting on us. The preview
+      // alone could not - it showed only the newest message, so a lead whose
+      // reply landed after our opener looked like one we had never texted.
+      const state = conversationState(conv);
+      const waitingClass = state.key === "waiting" ? " needs-reply" : "";
+      const name = contactName(conv.contact);
+      const title = name
+        ? highlightMatch(name, search)
+        : highlightMatch(formatPhoneNumber(conv.contact), search);
+      const subline = name
+        ? `<div class="conversation-subline">${highlightMatch(formatPhoneNumber(conv.contact), search)}</div>`
+        : "";
+
+      const facts = [];
+      if (conv.sentCount) {
+        facts.push(`Texted ${conv.sentCount}&times;`);
+      } else {
+        facts.push("Not texted by us");
+      }
+      if (conv.receivedCount) {
+        facts.push(`${conv.receivedCount} ${conv.receivedCount === 1 ? "reply" : "replies"}`);
+      }
+
+      const who = conv.lastIsInbound ? "Them:" : "You:";
+
       return `
-        <div class="conversation-item ${activeClass}${unreadClass}${actionClass}" data-contact="${escapeHtml(conv.contact)}" data-last-sid="${escapeHtml(conv.lastSid)}">
+        <div class="conversation-item ${activeClass}${unreadClass}${actionClass}${waitingClass}" data-contact="${escapeHtml(conv.contact)}" data-last-sid="${escapeHtml(conv.lastSid)}">
           ${doneButton}
           <div class="conversation-top">
             <div class="conversation-name">
-              ${highlightMatch(formatPhoneNumber(conv.contact), search)}
+              ${title}
               ${unreadDot}
             </div>
             <div class="conversation-time">${formatSidebarTime(conv.lastDate)}</div>
           </div>
-          <div class="conversation-number">${escapeHtml(conv.contact)}</div>
-          <div class="conversation-preview">${conv.lastPreview || ""}</div>
+          ${subline || `<div class="conversation-number">${escapeHtml(conv.contact)}</div>`}
+          <div class="conversation-state-row">
+            <span class="conv-status state-${state.key}">${state.label}</span>
+            <span class="conv-counts">${facts.join(" &middot; ")}</span>
+          </div>
+          <div class="conversation-preview"><span class="preview-who">${who}</span>${conv.lastPreview || ""}</div>
         </div>
       `;
     }
@@ -2169,13 +2654,81 @@
       }
     }
 
+    function renderFilterBar(searched) {
+      LIST_FILTERS.forEach((filter) => {
+        const chip = filterChipsEl.querySelector(`[data-filter="${filter}"]`);
+        const countEl = filterChipsEl.querySelector(`[data-count="${filter}"]`);
+        const count = searched.filter((conv) => matchesFilter(conv, filter)).length;
+        if (chip) {
+          chip.classList.toggle("active", filter === listFilter);
+          chip.setAttribute("aria-selected", String(filter === listFilter));
+        }
+        if (countEl) {
+          countEl.textContent = String(count);
+          countEl.classList.toggle("alert", filter === "waiting" && count > 0);
+        }
+      });
+      sortSelectEl.value = listSort;
+      filterHintEl.textContent = FILTER_HINTS[listFilter] ||
+        `${searched.length} ${searched.length === 1 ? "conversation" : "conversations"}`;
+    }
+
+    // Waiting / Received / Sent: one flat list of just those threads. The
+    // drawers belong to "All", where they lift what needs attention above
+    // everything else; inside a filter they would only repeat the list.
+    function renderFilteredList(list, search) {
+      renderResponsesDrawer([], search);
+      renderUnreadDrawer([], search);
+
+      if (!list.length) {
+        const empty = search
+          ? "No conversations here match your search."
+          : listFilter === "waiting"
+            ? "Nothing waiting. Every reply has been answered or marked Done."
+            : listFilter === "received"
+              ? "Nobody has texted this number back yet."
+              : "No one is waiting on a first reply.";
+        if (paint(conversationListEl, `<div class="search-empty">${empty}</div>`)) {
+          bindConversationClicks(conversationListEl);
+        }
+        return;
+      }
+
+      const labels = { waiting: "Waiting on you", received: "Texted us back", sent: "Texted, no reply yet" };
+      const markAll = listFilter === "waiting"
+        ? `<button id="filterMarkAllDoneBtn" class="drawer-action-btn" type="button">Mark all done</button>`
+        : "";
+      const listHtml = `
+        <div class="section-heading-row"><div class="section-heading">${labels[listFilter]} &middot; ${list.length}</div>${markAll}</div>
+        ${list.map((conv) => renderConversationCard(conv, search, { showDoneAction: isWaitingOnUs(conv) })).join("")}
+      `;
+
+      if (!paint(conversationListEl, listHtml)) return;
+      bindConversationClicks(conversationListEl);
+      conversationListEl.querySelector("#filterMarkAllDoneBtn")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        // Re-read at click time: the list may have grown since this painted.
+        conversations.filter(isWaitingOnUs).forEach((conv) => {
+          responsesDoneMap[conv.contact] = conv.lastSid;
+        });
+        persistResponsesDoneMap();
+        renderConversationList();
+        renderActiveConversation();
+      });
+    }
+
     function renderConversationList() {
       const search = searchInputEl.value.trim().toLowerCase();
       syncResponsesDoneMapState(conversations);
-      const filtered = conversations.filter((conv) =>
-        conv.contact.toLowerCase().includes(search) ||
-        conv.lastMessage.toLowerCase().includes(search)
-      );
+      const filtered = conversations.filter((conv) => matchesSearch(conv, search));
+      renderFilterBar(filtered);
+      document.querySelector(".sidebar")?.classList.toggle("list-filtered", listFilter !== "all");
+
+      if (listFilter !== "all") {
+        renderFilteredList(sortForList(filtered.filter((conv) => matchesFilter(conv, listFilter))), search);
+        return;
+      }
 
       if (!filtered.length) {
         renderResponsesDrawer([], search);
@@ -2192,10 +2745,10 @@
         ...responseConversations.map((conv) => conv.contact),
         ...unreadConversations.map((conv) => conv.contact)
       ]);
-      const regularConversations = filtered.filter((conv) => !featuredContacts.has(conv.contact));
+      const regularConversations = sortForList(filtered.filter((conv) => !featuredContacts.has(conv.contact)));
 
-      renderResponsesDrawer(responseConversations, search);
-      renderUnreadDrawer(unreadConversations, search);
+      renderResponsesDrawer(sortForList(responseConversations), search);
+      renderUnreadDrawer(sortForList(unreadConversations), search);
 
       const listHtml = `
         ${regularConversations.length ? `<div class="section-heading">All conversations</div>${regularConversations.map((conv) => renderConversationCard(conv, search)).join("")}` : `<div class="search-empty">Everything currently in view is already surfaced above.</div>`}
@@ -2209,6 +2762,8 @@
     }
 
     function renderActiveConversation() {
+      renderThreadHeaderState();
+
       if (!activeConversation && composingNew) {
         threadTitleEl.textContent = "New message";
         threadSubtitleEl.textContent = `Sending from ${formatPhoneNumber(fromNumberEl.value) || "the selected number"}`;
@@ -2230,9 +2785,18 @@
       }
 
       const lastMessage = activeConversation.messages[activeConversation.messages.length - 1];
-      threadTitleEl.textContent = formatPhoneNumber(activeConversation.contact);
-      threadSubtitleEl.textContent = `${formatCompactCount(activeConversation.messages.length, "message")} • Last activity ${formatThreadTimestamp(lastMessage?.dateSent)}`;
-      threadAvatarEl.textContent = activeConversation.contact.replace("+", "").slice(-2) || "?";
+      const activeName = contactName(activeConversation.contact);
+      threadTitleEl.textContent = activeName || formatPhoneNumber(activeConversation.contact);
+      const sentInThread = activeConversation.messages.filter((msg) => msg.from === fromNumberEl.value).length;
+      const receivedInThread = activeConversation.messages.length - sentInThread;
+      threadSubtitleEl.textContent = [
+        activeName ? formatPhoneNumber(activeConversation.contact) : "",
+        `${sentInThread} sent, ${receivedInThread} received`,
+        `Last activity ${formatThreadTimestamp(lastMessage?.dateSent)}`
+      ].filter(Boolean).join(" \u2022 ");
+      threadAvatarEl.textContent = activeName
+        ? activeName.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("")
+        : activeConversation.contact.replace("+", "").slice(-2) || "?";
       threadBadgeEl.textContent = formatCompactCount(activeConversation.messages.length, "msg");
       threadBadgeEl.classList.remove("hidden");
 
@@ -2250,6 +2814,7 @@
         ? activeConversation.messages.slice(-threadRenderLimit)
         : activeConversation.messages;
       const threadItems = buildThreadItems(visibleMessages);
+      const lastOutboundSid = [...visibleMessages].reverse().find((msg) => msg.from === activeNumber)?.sid || "";
 
       // Counts down through the thread's photos, oldest first, so the newest
       // PHONE_INLINE_IMAGES are the ones drawn inline on a phone.
@@ -2307,10 +2872,20 @@
             }).join("")
             : "";
 
+          // Whether our text actually reached the phone: always for one that
+          // failed, and for the newest one we sent, so "did it go?" never
+          // needs a trip to the Twilio console.
+          let deliveryHtml = "";
+          if (outbound && isFailedStatus(msg.status)) {
+            deliveryHtml = ` &middot; <span class="msg-delivery failed">Not delivered</span>`;
+          } else if (outbound && msg.sid === lastOutboundSid && msg.status) {
+            deliveryHtml = ` &middot; <span class="msg-delivery">${escapeHtml(msg.status.charAt(0).toUpperCase() + msg.status.slice(1))}</span>`;
+          }
+
           return `
       <div class="msg-row ${outbound ? "outbound" : "inbound"}">
         ${directionLabel}
-        <div class="msg-time">${formatThreadTimestamp(msg.dateSent)}</div>
+        <div class="msg-time">${formatThreadTimestamp(msg.dateSent)}${deliveryHtml}</div>
         <div class="bubble ${outbound ? "outbound" : "inbound"}">${msg.body ? `<div class="message-text">${linkifyMessageBody(msg.body)}</div>` : ""}${mediaHtml}</div>
       </div>
     `;
@@ -2462,6 +3037,20 @@
         if (threadFetch === thisFetch) {
           threadFetch = null;
         }
+      }
+    }
+
+    async function loadContactNames() {
+      try {
+        const res = await fetch("/api/twilio?twilioResource=contacts", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || typeof data.names !== "object" || !data.names) return;
+        contactNames = data.names;
+        renderConversationList();
+        renderActiveConversation();
+      } catch (err) {
+        // Names are a nicety; numbers still work.
       }
     }
 
@@ -2689,6 +3278,27 @@
 
     refreshBtn.addEventListener("click", () => loadMessages(false));
 
+    filterChipsEl.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-filter]");
+      if (!chip) return;
+      listFilter = chip.getAttribute("data-filter");
+      try { localStorage.setItem("messagesListFilter", listFilter); } catch (err) {}
+      renderConversationList();
+      const scroller = document.querySelector(".sidebar-body");
+      if (scroller) scroller.scrollTop = 0;
+      conversationListEl.scrollTop = 0;
+    });
+
+    sortSelectEl.addEventListener("change", () => {
+      listSort = sortSelectEl.value === "oldest" ? "oldest" : "newest";
+      try { localStorage.setItem("messagesListSort", listSort); } catch (err) {}
+      renderConversationList();
+    });
+
+    threadDoneBtn.addEventListener("click", () => {
+      if (activeConversation) markResponseDone(activeConversation);
+    });
+
     newMessageBtn.addEventListener("click", () => {
       composingNew = true;
       pendingNewContact = null;
@@ -2761,6 +3371,7 @@
     autoResizeComposer();
     applySidebarSplitHeight();
     loadPhoneNumbers();
+    loadContactNames();
 
     // Auto-poll every 10 seconds — but only while someone is actually looking.
     //
