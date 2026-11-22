@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  resolveProposedSlot,
   callSlotLabel,
   callSlotPair,
   openCallSlots,
@@ -106,42 +107,41 @@ const OPENER = {
   name: 'Sarah Whitfield',
   phone: '4165550100',
   senderName: 'Mark',
-  room: 'basement' as const,
-  slots: [{ date: TUE, time: '16:30' }, { date: TUE, time: '18:00' }],
   sendWall: at('15:10'),
 };
+/** Two fixed times, as threads opened before Nov 22 2026 still hold. */
+const OLD_SLOTS: OfferedSlot[] = [{ date: TUE, time: '16:30' }, { date: TUE, time: '18:00' }];
 
-test('opener asks one question with two real times, no link', () => {
+test("opener is Sabah's exact wording, for every ad, with no link", () => {
   assert.equal(
     smsLeadCallOpener(OPENER),
-    "Hi Sarah, it's Mark from OntarioReno about your basement. Does today at 4:30pm or tonight at 6pm work for a quick call?"
+    "Hi Sarah, it's Mark from OntarioReno. Thanks for requesting info on our basement ad, the one from $399/mo. What time works today or tomorrow for a quick 5-min call?"
   );
   assert.ok(!/https?:|\.ca\//.test(smsLeadCallOpener(OPENER)));
 });
 
-test('opener fits one SMS segment and has no em dash', () => {
-  const body = smsLeadCallOpener({ ...OPENER, name: 'Alexandrina-Marguerite', room: 'bathroom' });
-  assert.ok(body.length <= 160, `${body.length} chars`);
+test('opener fits two SMS segments and has no em dash', () => {
+  const body = smsLeadCallOpener({ ...OPENER, name: 'Alexandrina-Marguerite' });
+  assert.ok(body.length <= 306, `${body.length} chars`);
   assert.ok(!body.includes('—'));
-  assert.match(body, /your bathroom renovation/);
 });
 
 test('opener without a name still reads', () => {
   assert.match(smsLeadCallOpener({ ...OPENER, name: '' }), /^Hi, it's Mark/);
 });
 
-test('opener keeps the one-first-text key and expires before the first time', () => {
+test('opener keeps the one-first-text key and expires at the end of its day', () => {
   const [row] = planLeadCallOpener(OPENER);
   assert.equal(row.idempotencyKey, 'lead-1:sms:lead_welcome');
-  // 4:30pm Toronto (EST, UTC-5) minus 20 minutes.
-  assert.equal(row.expiresAt, '2026-11-17T21:10:00.000Z');
-  assert.equal(planLeadCallOpener({ ...OPENER, slots: OPENER.slots.slice(0, 1) }).length, 0);
+  // 11:59pm Toronto (EST, UTC-5): "today or tomorrow" must not arrive the next day.
+  assert.equal(row.expiresAt, '2026-11-18T04:59:00.000Z');
+  assert.equal(planLeadCallOpener({ ...OPENER, phone: '' }).length, 0);
 });
 
 // ─── Templates ────────────────────────────────────────────────────────────────
 
 test('no call template promises a visit, asks for an address, or uses an em dash', () => {
-  const ctx = { name: 'Sarah', slots: OPENER.slots, now: at('15:10'), sender: 'Mark', about: 'your basement' };
+  const ctx = { name: 'Sarah', slots: OLD_SLOTS, now: at('15:10'), sender: 'Mark', about: 'your basement' };
   for (const id of ALL_TEMPLATE_IDS.filter((t) => t.startsWith('call_'))) {
     const body = renderReply(id, ctx);
     assert.ok(!/visit|address|come (by|take)/i.test(body), `${id}: ${body}`);
@@ -203,7 +203,7 @@ const callState = (over: Partial<ConversationState> = {}): ConversationState => 
   id: 'conv-1',
   leadId: 'lead-1',
   phase: 'awaiting_time_choice',
-  offeredSlots: OPENER.slots,
+  offeredSlots: OLD_SLOTS,
   lastOutbound: smsLeadCallOpener(OPENER),
   mode: 'call',
   ...over,
@@ -225,7 +225,7 @@ test('"6 works" books 6pm, confirms by text, and pings the caller', async () => 
 test('a time that filled up re-offers two fresh ones', async () => {
   const h = harness({ intent: 'picked_slot', pickedSlotIndex: 0 }, 'SLOT_TAKEN');
   await runInboundReply(callState(), reply('4:30'), h.deps, ENV);
-  assert.match(h.sent[0], /^Sorry, that time just filled up\. I can do tonight at 5pm or tomorrow at 10am\./);
+  assert.equal(h.sent[0], 'Sorry, that time just filled up. What other time works today or tomorrow?');
   assert.equal(h.patches.at(-1)?.phase, 'awaiting_time_choice');
   assert.deepEqual(h.patches.at(-1)?.offeredSlots, [{ date: TUE, time: '17:00' }, { date: '2026-11-18', time: '10:00' }]);
 });
@@ -233,7 +233,7 @@ test('a time that filled up re-offers two fresh ones', async () => {
 test('"how long is the call?" is answered and re-offers times, no one involved', async () => {
   const h = harness({ intent: 'asked_duration' });
   await runInboundReply(callState(), reply('how long?'), h.deps, ENV);
-  assert.match(h.sent[0], /^Just 5 to 10 minutes\./);
+  assert.match(h.sent[0], /^Just 5 minutes\./);
   assert.deepEqual(h.alerts, []);
 });
 
@@ -320,7 +320,7 @@ test('a reply the fit check passes is sent as before', async () => {
   let seen = '';
   h.deps.checkFit = async (i) => { seen = i.proposedReply; return { fits: true, reason: 'ok' }; };
   await runInboundReply(callState(), reply('how long is the call?'), h.deps, ENV);
-  assert.match(h.sent[0], /^Just 5 to 10 minutes\./);
+  assert.match(h.sent[0], /^Just 5 minutes\./);
   assert.equal(seen, h.sent[0]);
 });
 
@@ -334,7 +334,7 @@ test('a booking confirmation is not held up by the fit check', async () => {
 });
 
 test('the price reply never claims they asked a question', () => {
-  const body = renderReply('call_answer_price', { name: 'Sarah', slots: OPENER.slots, now: at('15:10') });
+  const body = renderReply('call_answer_price', { name: 'Sarah', slots: OLD_SLOTS, now: at('15:10') });
   assert.ok(!/fair question/i.test(body));
 });
 
@@ -349,4 +349,57 @@ test('fit verdicts: only an explicit true lets a reply through', () => {
 test('no API key means no automatic reply gets through the fit check', async () => {
   const v = await checkReplyFits({ theirMessage: 'hi', ourPreviousMessage: '', proposedReply: 'hello' }, {} as NodeJS.ProcessEnv);
   assert.equal(v.fits, false);
+});
+
+
+// ─── Their own time (Nov 22 2026) ─────────────────────────────────────────────
+
+test('a named time inside call hours is booked as said', () => {
+  assert.deepEqual(resolveProposedSlot(at('15:20'), { date: TUE, from: '19:00' }), { date: TUE, time: '19:00' });
+  assert.deepEqual(resolveProposedSlot(at('09:00'), { date: TUE, from: '14:15' }), { date: TUE, time: '14:15' });
+});
+
+test('a window books its first open half hour', () => {
+  assert.deepEqual(resolveProposedSlot(at('15:20'), { date: TUE, from: '17:00', to: '20:00' }), { date: TUE, time: '17:00' });
+  assert.deepEqual(resolveProposedSlot(at('08:00'), { date: TUE, from: '09:00', to: '12:00' }), { date: TUE, time: '10:00' });
+  assert.deepEqual(
+    resolveProposedSlot(at('15:20'), { date: TUE, from: '17:00', to: '20:00' }, [at('17:00'), at('17:00')]),
+    { date: TUE, time: '17:30' }
+  );
+});
+
+test('a time we cannot honour resolves to nothing', () => {
+  assert.equal(resolveProposedSlot(at('15:20'), { date: TUE, from: '21:00' }), null, 'after hours');
+  assert.equal(resolveProposedSlot(at('15:20'), { date: TUE, from: '09:00' }), null, 'before hours');
+  assert.equal(resolveProposedSlot(at('15:20'), { date: TUE, from: '15:25' }), null, 'too soon');
+  assert.equal(resolveProposedSlot(at('15:20'), { date: '2026-11-16', from: '12:00' }), null, 'past day');
+  assert.equal(resolveProposedSlot(at('15:20'), { date: TUE, from: '19:00' }, [at('19:00'), at('19:00')]), null, 'full');
+  assert.equal(resolveProposedSlot(at('15:20'), { date: 'Tuesday', from: '19:00' }), null, 'unparsed date');
+});
+
+test('"7 tonight" books 7pm, confirms, and alerts the caller', async () => {
+  const h = harness({ intent: 'proposed_time', proposedDate: TUE, proposedFrom: '19:00' });
+  h.deps.resolveProposed = async (p) => resolveProposedSlot(at('15:20'), p);
+  const out = await runInboundReply(callState({ offeredSlots: [] }), reply('7 tonight works'), h.deps, ENV);
+  assert.equal(out.kind, 'sent');
+  assert.deepEqual(h.booked, [{ date: TUE, time: '19:00' }]);
+  assert.deepEqual(h.sent, ["Perfect, Sarah. I'll call you tonight at 7pm from this number. Talk then."]);
+  assert.deepEqual(h.alerts, ['CALL_BOOKED']);
+});
+
+test('"10pm" is not booked or answered; the caller arranges it', async () => {
+  const h = harness({ intent: 'proposed_time', proposedDate: TUE, proposedFrom: '22:00' });
+  h.deps.resolveProposed = async (p) => resolveProposedSlot(at('15:20'), p);
+  const out = await runInboundReply(callState({ offeredSlots: [] }), reply('10pm?'), h.deps, ENV);
+  assert.equal(out.kind, 'escalated');
+  assert.deepEqual(h.booked, []);
+  assert.deepEqual(h.sent, []);
+  assert.equal(h.alerts.length, 1);
+});
+
+test('follow-up replies ask for their time, never offer two fixed slots', () => {
+  for (const id of ['call_answer_price', 'call_answer_duration', 'call_other_project', 'call_who_is_this', 'call_slot_taken'] as const) {
+    const body = renderReply(id, { name: 'Sarah', slots: [], now: at('15:10'), sender: 'Mark' });
+    assert.match(body, /What (other )?time works today or tomorrow/, id);
+  }
 });

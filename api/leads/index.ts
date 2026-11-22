@@ -97,8 +97,8 @@ import {
   type AddressResolutionCause,
 } from '../../lib/address-resolution.js';
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
-import { openerSendWall, pickCallSlots } from '../../lib/call-slots.js';
-import { callSender, takenCallWalls, welcomeMode } from '../../lib/call-booking.js';
+import { openerSendWall } from '../../lib/call-slots.js';
+import { callSender, welcomeMode } from '../../lib/call-booking.js';
 import { phoneKey } from '../../lib/sms-replies.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
@@ -495,19 +495,15 @@ function leadBookingUrl(room: WelcomeRoom = 'basement'): string {
  */
 async function sendLeadCallOpener(
   lead: { id: string; name: string; phone: string },
-  room: Exclude<WelcomeRoom, 'london_aru'>,
 ): Promise<boolean> {
   try {
     if (!lead.phone?.trim()) return false;
     const sendWall = openerSendWall(torontoWallClock());
-    const slots = pickCallSlots(sendWall, await takenCallWalls(prisma));
     const planned = planLeadCallOpener({
       leadId: lead.id,
       name: lead.name ?? '',
       phone: lead.phone,
       senderName: callSender(),
-      room,
-      slots,
       sendWall,
     });
     if (planned.length === 0) return false;
@@ -522,7 +518,8 @@ async function sendLeadCallOpener(
         phase: 'awaiting_time_choice',
         mode: 'call',
         sender: callSender(),
-        offeredSlotsJson: slots,
+        // No fixed times offered: they name their own (resolveProposedSlot).
+        offeredSlotsJson: [],
         lastOutbound: planned[0].body,
         phoneKey: phoneKey(lead.phone),
       },
@@ -555,8 +552,9 @@ async function sendLeadWelcome(
   lead: { id: string; name: string; phone: string },
   room: WelcomeRoom = 'basement',
 ) {
-  if (room !== 'london_aru' && welcomeMode() === 'call') {
-    if (await sendLeadCallOpener(lead, room)) return;
+  // Every ad, London included (Sabah, Nov 22 2026: one message for all ads).
+  if (welcomeMode() === 'call') {
+    if (await sendLeadCallOpener(lead)) return;
   }
   try {
     const planned = planLeadWelcomeNotifications({

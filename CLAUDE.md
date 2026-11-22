@@ -293,6 +293,16 @@ human moves it. Guarded by `lib/sms-replies.test.ts`.
 
 ## The first text books a CALL (November 2026)
 
+**Current wording (Sabah, Nov 22 2026), for EVERY ad, London included:**
+"Hi Stalin, it's Mark from OntarioReno. Thanks for requesting info on our
+basement ad, the one from $399/mo. What time works today or tomorrow for a
+quick 5-min call?" No fixed times are offered: the reply's own time is read
+(`proposed_time` in lib/lead-classify.ts) and booked by `resolveProposedSlot`
+in lib/call-slots.ts if it is inside 10am to 8pm, 15+ minutes away and not full.
+Anything else (after hours, a day with no time, "now") goes to the caller.
+The notes below describe the first, two-slot version; threads opened then
+still hold their offered slots and still book a pick.
+
 Basement and bathroom Meta leads no longer get a link. They get one question
 with two real call times: "Hi Sarah, it's Mark from OntarioReno about your
 basement. Does today at 4:30pm or tonight at 6pm work for a quick call?"

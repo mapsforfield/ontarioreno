@@ -63,6 +63,8 @@ export type ReplyIntent =
   | 'wants_call'
   | 'different_project'
   | 'later_timeframe'
+  /** They named their own time or window ("7 tonight", "tomorrow after 2"). */
+  | 'proposed_time'
   | 'unclear';
 
 export type Classification = {
@@ -76,6 +78,10 @@ export type Classification = {
   pickedSlotIndex?: number | null;
   /** The address as they typed it, when intent is gave_address. */
   addressText?: string | null;
+  /** proposed_time only: the date and time (or window) they named, resolved. */
+  proposedDate?: string | null;
+  proposedFrom?: string | null;
+  proposedTo?: string | null;
   /** Their own words, carried through to every escalation unedited. */
   rawBody: string;
 };
@@ -208,6 +214,12 @@ export function decideNextAction(
       return { kind: 'escalate', reason: 'INTENT_DOES_NOT_FIT_PHASE' };
 
     case 'awaiting_time_choice':
+      if (c.intent === 'proposed_time') {
+        // Their own time. Call threads book it if it is real (the runner
+        // checks call hours and capacity); visit threads have no such path.
+        if (mode === 'call' && c.proposedDate && c.proposedFrom) return { kind: 'book_call' };
+        return { kind: 'escalate', reason: 'INTENT_DOES_NOT_FIT_PHASE' };
+      }
       if (c.intent === 'picked_slot') {
         // The index has to be real. A model that says "they picked one" without
         // saying which has told us nothing we can act on.
