@@ -38,6 +38,7 @@ import {
   type ReplyTemplateId,
 } from './lead-reply-templates.js';
 import { classifyLeadReply } from './lead-classify.js';
+import type { ProposedTime } from './call-slots.js';
 import { resolvePickedSlot } from './lead-classify.js';
 
 /** The conversation as stored. */
@@ -99,6 +100,8 @@ export type RunnerDeps = {
   alertHuman?: (reason: string, rawBody: string) => Promise<void>;
   /** Ontario wall clock, "YYYY-MM-DDTHH:MM". */
   nowWall?: () => string;
+  /** The time they named, as a bookable call slot, or null if we cannot honour it. */
+  resolveProposed?: (p: ProposedTime) => Promise<OfferedSlot | null>;
   /**
    * Last gate before an automatic reply is sent (lib/reply-fit-check.ts).
    * May only say no. Not consulted for a booking confirmation, whose words are
@@ -166,7 +169,17 @@ export async function runInboundReply(
 
   // ── 2b. Call mode: a picked time is booked here and now ──
   if (action.kind === 'book_call') {
-    const picked = resolvePickedSlot(classification, conversation.offeredSlots);
+    let picked = resolvePickedSlot(classification, conversation.offeredSlots);
+    if (!picked && classification.intent === 'proposed_time' && deps.resolveProposed) {
+      picked = await deps.resolveProposed({
+        date: classification.proposedDate ?? '',
+        from: classification.proposedFrom ?? '',
+        to: classification.proposedTo ?? null,
+      });
+      // A real time we cannot honour (outside 10am to 8pm, past, full): a
+      // person arranges it. Haggling over times by template reads as a bot.
+      if (!picked) return escalate(conversation, deps, 'NEEDS_A_PERSON', reply.body, autopilot);
+    }
     if (!picked || !deps.bookCall || !autopilot) {
       return escalate(conversation, deps, 'NOT_CONFIDENT', reply.body, autopilot);
     }

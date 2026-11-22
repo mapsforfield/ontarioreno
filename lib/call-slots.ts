@@ -222,3 +222,61 @@ export function callSlotPair(a: OfferedSlot, b: OfferedSlot, nowWall: string): s
     ? `${pa} ${clock(a.time)} or ${clock(b.time)}`
     : `${pa} ${clock(a.time)} or ${pb} ${clock(b.time)}`;
 }
+
+// ─── Their time, not ours ─────────────────────────────────────────────────────
+
+/** What the homeowner proposed, as the classifier resolved it. */
+export type ProposedTime = {
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM, 24h. The time they named, or the start of their window. */
+  from: string;
+  /** HH:MM, 24h. End of their window ("after 5", "tomorrow afternoon"). Absent for an exact time. */
+  to?: string | null;
+};
+
+/** Never book a proposed time sooner than this: a call needs a moment's notice. */
+export const PROPOSED_LEAD_MINUTES = 15;
+/** A call that starts after this would run past the end of call hours. */
+const LAST_START_BUFFER = 15;
+
+/**
+ * Turn the time a homeowner named into a call we can honestly make, or null.
+ *
+ * An exact time ("7pm", "tomorrow at 2:15") is booked AS SAID, if it is inside
+ * call hours, at least 15 minutes away and not already holding two calls. A
+ * window ("after 5", "tomorrow afternoon") books its first open half hour.
+ * Null means: outside hours, in the past, too far out, or full. The caller
+ * hands that to a person rather than haggling by text.
+ */
+export function resolveProposedSlot(
+  nowWall: string,
+  p: ProposedTime,
+  taken: string[] = [],
+  hours: CallHours = DEFAULT_CALL_HOURS
+): OfferedSlot | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date) || !/^\d{2}:\d{2}$/.test(p.from)) return null;
+  const nowDate = nowWall.slice(0, 10);
+  const diff = dayDiff(nowDate, p.date);
+  if (diff < 0 || diff > LOOKAHEAD_DAYS) return null;
+  if (!hours.days.includes(weekday(p.date))) return null;
+
+  const earliest = minuteOf(nowWall.slice(11, 16)) + PROPOSED_LEAD_MINUTES;
+  const ok = (m: number) =>
+    m >= hours.startMinute &&
+    m <= hours.endMinute - LAST_START_BUFFER &&
+    diff * 1440 + m >= earliest &&
+    taken.filter((t) => t.slice(0, 16) === `${p.date}T${hhmm(m)}`).length < CALLS_PER_SLOT;
+
+  const from = minuteOf(p.from);
+  const to = p.to && /^\d{2}:\d{2}$/.test(p.to) ? minuteOf(p.to) : null;
+  if (to === null) return ok(from) ? { date: p.date, time: hhmm(from) } : null;
+
+  // A window: the first open half hour inside it (and inside call hours).
+  let m = Math.max(from, hours.startMinute);
+  if (m % CALL_STEP_MINUTES) m += CALL_STEP_MINUTES - (m % CALL_STEP_MINUTES);
+  for (; m < to; m += CALL_STEP_MINUTES) {
+    if (ok(m)) return { date: p.date, time: hhmm(m) };
+  }
+  return null;
+}

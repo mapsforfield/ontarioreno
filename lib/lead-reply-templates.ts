@@ -85,13 +85,14 @@ export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
   address_unclear: 0,
   // Two remaining alternatives after the one they wanted was taken.
   slot_taken: 2,
-  call_answer_price: 2,
-  call_answer_duration: 2,
-  call_other_project: 2,
-  call_who_is_this: 2,
+  // Call threads ask for THEIR time (Nov 22 2026), so these need no slots.
+  call_answer_price: 0,
+  call_answer_duration: 0,
+  call_other_project: 0,
+  call_who_is_this: 0,
   // The one they picked.
   call_booked: 1,
-  call_slot_taken: 2,
+  call_slot_taken: 0,
   call_later_close: 0,
 };
 
@@ -189,15 +190,16 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       return `Sorry, someone grabbed that one while we were talking. I've still got ${first} or ${second}. Either work?`;
     }
     case 'call_answer_price':
-      return `It depends on the size and layout, which is what the quick call is for. No cost, no pressure. Does ${callPair(ctx)} work?`;
+      return `It depends on the size and layout, which is what the quick call is for. No cost, no pressure. What time works today or tomorrow?`;
     case 'call_answer_duration':
-      return `Just 5 to 10 minutes. I'll ask a few questions about the space and what you have in mind. Does ${callPair(ctx)} work?`;
+      return `Just 5 minutes. I'll ask a few questions about the space and what you have in mind. What time works today or tomorrow?`;
     case 'call_other_project':
-      return `We do those too. Happy to talk it through on a quick call. Does ${callPair(ctx)} work?`;
+      return `We do those too. Happy to talk it through on a quick call. What time works today or tomorrow?`;
     case 'call_who_is_this': {
       const sender = (ctx.sender ?? '').trim() || 'Mark';
       const about = (ctx.about ?? '').trim() || 'your basement';
-      return `Sorry, should have said. It's ${sender} from OntarioReno, following up on your form about ${about}. Does ${callPair(ctx)} work for a quick call?`;
+      void about;
+      return `Sorry, should have said. It's ${sender} from OntarioReno. You requested info on our basement ad. What time works today or tomorrow for a quick 5-min call?`;
     }
     case 'call_booked': {
       const when = ctx.now ? callSlotLabel(ctx.slots[0], ctx.now) : slotLabel(ctx.slots[0]);
@@ -205,7 +207,7 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       return `${greeting} I'll call you ${when} from this number. Talk then.`;
     }
     case 'call_slot_taken':
-      return `Sorry, that time just filled up. I can do ${callPair(ctx)}. Either work?`;
+      return `Sorry, that time just filled up. What other time works today or tomorrow?`;
     case 'call_later_close':
       // They said when ("in the new year", "spring"). Asking again, or offering
       // next week, reads as not listening. "then" fits whatever they said.

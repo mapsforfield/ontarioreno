@@ -12,7 +12,6 @@
 // booking quietly lost the Provider row, the customer notes and the action
 // buttons — matching a template is not the same as matching an email.
 // These modules are pure string builders: no fetch, no env vars, no DOM.
-import { callSlotPair } from './call-slots.js';
 import { generateConsultationEmailPreview } from '../src/portal/data/consultationEmails.js';
 import type { Appointment, User } from '../src/portal/data/types.js';
 import { atTimeOrWindow } from './arrival-window.js';
@@ -426,32 +425,30 @@ export type LeadCallOpenerContext = {
   phone: string;
   /** Who signs. A real person who makes the call. */
   senderName: string;
-  room: Exclude<WelcomeRoom, 'london_aru'>;
-  /** The two call times, from lib/call-slots.ts pickCallSlots. */
-  slots: Array<{ date: string; time: string }>;
-  /** Ontario wall clock the text goes out at; labels are relative to it. */
+  /** Ontario wall clock the text goes out at (8:30am for overnight leads). */
   sendWall: string;
 };
 
 /**
- * "Hi Sarah, it's Mark from OntarioReno about your basement. Does today at
- * 4:30pm or tonight at 6pm work for a quick call?"
+ * The first text to EVERY ad lead (Sabah's wording, Nov 22 2026):
+ * "Hi Stalin, it's Mark from OntarioReno. Thanks for requesting info on our
+ * basement ad, the one from $399/mo. What time works today or tomorrow for a
+ * quick 5-min call?"
  *
- * Replaces the link text for basement and bathroom leads. No link: a link from
- * an unknown number reads as a scam, and fewer than one lead in five clicked
- * through to book. A question with two real times can be answered with one
- * word, and that word books the call. London keeps its link, because its form
- * asks the City's conditions before anything is booked.
+ * One message for all ads, on purpose, so there is never confusion about which
+ * ad gets which text. It names the ad they just tapped so they don't mistake us
+ * for a contractor they spoke to before, and it asks for THEIR time instead of
+ * offering two fixed slots: whatever time they reply with is booked if it is
+ * inside call hours (lib/call-slots.ts resolveProposedSlot). No link.
  */
 export function smsLeadCallOpener(c: LeadCallOpenerContext): string {
   const name = c.name.trim().split(/\s+/)[0] ?? '';
   const sender = c.senderName.trim() || 'Mark';
   const greeting = name ? `Hi ${name}, ` : 'Hi, ';
-  const about = c.room === 'bathroom' ? 'your bathroom renovation' : 'your basement';
-  const [a, b] = c.slots;
   return (
-    `${greeting}it's ${sender} from OntarioReno about ${about}. ` +
-    `Does ${callSlotPair(a, b, c.sendWall)} work for a quick call?`
+    `${greeting}it's ${sender} from OntarioReno. ` +
+    `Thanks for requesting info on our basement ad, the one from $399/mo. ` +
+    `What time works today or tomorrow for a quick 5-min call?`
   );
 }
 
@@ -459,13 +456,13 @@ export function smsLeadCallOpener(c: LeadCallOpenerContext): string {
  * The opener as an outbox row. Same idempotency key as the link text, so a
  * lead still gets exactly one first text whichever kind it is.
  *
- * Expires 20 minutes before the first offered time: an opener that sat in the
- * queue must never arrive offering "today at 10am" at 10:05.
+ * Expires at the end of the day it was meant for: "today or tomorrow" read the
+ * next day would quietly mean a different day.
  */
 export function planLeadCallOpener(c: LeadCallOpenerContext): PlannedNotification[] {
-  if (!c.phone.trim() || c.slots.length < 2) return [];
+  if (!c.phone.trim()) return [];
   const sendAt = torontoInstant(c.sendWall.slice(0, 10), c.sendWall.slice(11, 16));
-  const first = torontoInstant(c.slots[0].date, c.slots[0].time);
+  const endOfDay = torontoInstant(c.sendWall.slice(0, 10), '23:59');
   return [
     {
       channel: 'sms',
@@ -474,7 +471,7 @@ export function planLeadCallOpener(c: LeadCallOpenerContext): PlannedNotificatio
       subject: '',
       body: smsLeadCallOpener(c),
       sendAfter: sendAt.toISOString(),
-      expiresAt: new Date(first.getTime() - 20 * 60_000).toISOString(),
+      expiresAt: endOfDay.toISOString(),
       idempotencyKey: `${c.leadId}:sms:lead_welcome`,
     },
   ];
