@@ -15,6 +15,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  contactKey,
+  contactNamesByPhone,
   conversationKey,
   conversationQueryUrls,
   mediaProxyUrl,
@@ -23,6 +25,7 @@ import {
   normalizeMessage,
   sortMessagesNewestFirst,
 } from './twilio-dashboard.js';
+import { phoneKey } from './sms-replies.js';
 
 const OUR_NUMBER = '+16475585900';
 
@@ -226,4 +229,34 @@ test('phone numbers are escaped into the query', () => {
 
   assert.ok(outbound.includes('%2B'), 'the + in an E.164 number must be encoded');
   assert.equal(new URL(outbound).searchParams.get('From'), OUR_NUMBER);
+});
+
+// ─── Lead names on the conversation list ─────────────────────────────────────
+
+test('a contact key matches the one the inbound path finds leads with', () => {
+  for (const raw of ['+14165550123', '416-555-0123', '(416) 555 0123', '1 416 555 0123', '', '12345']) {
+    assert.equal(contactKey(raw), phoneKey(raw), raw);
+  }
+});
+
+test('a Twilio number and a hand-typed lead phone land on the same name', () => {
+  const names = contactNamesByPhone([{ name: 'Colin Hart', phone: '(416) 555-0123' }]);
+  assert.equal(names[contactKey('+14165550123')], 'Colin Hart');
+});
+
+test('when two leads share a number, the most recent one is shown', () => {
+  const names = contactNamesByPhone([
+    { name: 'Old Lead', phone: '4165550123' },
+    { name: 'New Lead', phone: '+1 416 555 0123' },
+  ]);
+  assert.equal(names['4165550123'], 'New Lead');
+});
+
+test('blank names and too-short numbers are skipped, never mapped to blank', () => {
+  const names = contactNamesByPhone([
+    { name: '   ', phone: '4165550123' },
+    { name: 'Short', phone: '5550123' },
+    { name: null, phone: null },
+  ]);
+  assert.deepEqual(names, {});
 });
