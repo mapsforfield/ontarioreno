@@ -3287,7 +3287,7 @@
 
     refreshBtn.addEventListener("click", () => loadMessages(false));
 
-    // Call bridge: Twilio rings the agent's Quo phone, they press 1, and the
+    // Call bridge: Twilio rings the agent's Quo phone, connects on answer, and the
     // lead sees the Twilio number they have been texting.
     callBtn.addEventListener("click", async () => {
       if (!activeConversation) return;
@@ -3295,7 +3295,7 @@
       const to = activeConversation.contact;
       const name = contactName(to);
       const label = name || formatPhoneNumber(to);
-      if (!confirm(`Call ${label}?\n\nYour Quo phone rings first. Answer and press 1, and ${label} sees ${formatPhoneNumber(from)}.`)) return;
+      if (!confirm(`Call ${label}?\n\nYour Quo phone rings first. Answer it and ${label} is dialed, seeing ${formatPhoneNumber(from)}.`)) return;
       try {
         callBtn.disabled = true;
         setStatus("Ringing your Quo phone...");
@@ -3306,7 +3306,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to start call");
-        setStatus(`Ringing ${formatPhoneNumber(data.agent)}. Answer and press 1 to connect to ${label}.`);
+        setStatus(`Ringing ${formatPhoneNumber(data.agent)}. Answer it to connect to ${label}.`);
       } catch (err) {
         setStatus(err.message || "Failed to start call", true);
       } finally {

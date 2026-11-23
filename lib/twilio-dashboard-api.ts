@@ -32,7 +32,6 @@
 // (/portal/conversations), the outbox, or any templated send path — those still
 // own every automated message.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAdmin } from './auth.js';
 import { prisma } from './prisma.js';
@@ -233,64 +232,25 @@ async function enrichWithMedia(messages: DashboardMessage[]): Promise<DashboardM
 // ─── Call bridge: call a lead from Quo, showing the Twilio number ───────────
 //
 // Quo can only place calls as a number inside Quo, and leads know the Twilio
-// number from the texts. So the call starts in Twilio instead:
+// number from the texts. So the call starts in Twilio instead: `call` (admin)
+// has Twilio ring the agent's phone (Quo) from the Twilio number, and the
+// moment they answer, the inline TwiML dials the lead with callerId = the
+// Twilio number and joins the two legs.
 //
-//   1. `call` (admin): Twilio rings the agent's phone (Quo) from the Twilio
-//      number and asks them to press 1.
-//   2. `bridge-connect` (Twilio's callback, no session): on "1", Twilio dials
-//      the lead with callerId = the Twilio number and joins the two legs.
-//
-// The press-1 step is there so Quo voicemail or a missed call never dials the
-// lead into a dead line. The callback carries an HMAC of from|to signed with
-// the Twilio auth token, so nobody can use it to dial arbitrary numbers.
+// There used to be a press-1 step. Quo's audio comes up a beat after
+// answering, so the prompt was missed and calls timed out without ever
+// dialing the lead. Instead the agent leg rings for at most
+// AGENT_RING_SECONDS, short enough that Quo voicemail does not pick up and
+// get bridged to the lead.
 const CALL_BRIDGE_AGENT_NUMBER = process.env.CALL_BRIDGE_AGENT_NUMBER || '+16479885484';
+const AGENT_RING_SECONDS = '15';
 const E164 = /^\+[1-9]\d{7,14}$/;
-
-function bridgeToken(from: string, to: string) {
-  return createHmac('sha256', process.env.TWILIO_AUTH_TOKEN ?? '')
-    .update(`${from}|${to}`)
-    .digest('hex');
-}
 
 function xmlEscape(s: string) {
   return s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-function sendTwiml(res: VercelResponse, xml: string) {
-  res.setHeader('Content-Type', 'text/xml');
-  res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><Response>${xml}</Response>`);
-}
-
-function handleBridgeConnect(req: VercelRequest, res: VercelResponse) {
-  const from = String(req.query.from ?? '');
-  const to = String(req.query.to ?? '');
-  const t = String(req.query.t ?? '');
-  const expected = bridgeToken(from, to);
-  const valid =
-    E164.test(from) &&
-    E164.test(to) &&
-    t.length === expected.length &&
-    timingSafeEqual(Buffer.from(t), Buffer.from(expected));
-  if (!valid) return sendTwiml(res, '<Hangup/>');
-
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  const digits = String(body.Digits ?? req.query.Digits ?? '');
-  if (digits !== '1') return sendTwiml(res, '<Say>Call cancelled.</Say><Hangup/>');
-
-  return sendTwiml(
-    res,
-    `<Dial callerId="${xmlEscape(from)}" answerOnBridge="true" timeout="30">` +
-      `<Number>${xmlEscape(to)}</Number></Dial>`
-  );
-}
-
 export async function handleTwilioDashboard(req: VercelRequest, res: VercelResponse) {
-  // Twilio's own callback during a bridged call. No portal session exists on
-  // that request; the HMAC in the URL is the auth.
-  if (String(req.query.twilioResource ?? '') === 'bridge-connect') {
-    return handleBridgeConnect(req, res);
-  }
-
   const user = await requireAdmin(req, res);
   if (!user) return;
 
@@ -319,20 +279,16 @@ export async function handleTwilioDashboard(req: VercelRequest, res: VercelRespo
         return;
       }
 
-      const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '');
-      const action =
-        `https://${host}/api/twilio?` +
-        new URLSearchParams({ twilioResource: 'bridge-connect', from, to, t: bridgeToken(from, to) });
       const who = String(name ?? '').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 40).trim() || 'your lead';
       const twiml =
-        `<Response><Gather numDigits="1" timeout="10" method="POST" action="${xmlEscape(action)}">` +
-        `<Say>Call to ${xmlEscape(who)}. Press 1 to connect.</Say></Gather>` +
-        `<Say>No answer. Goodbye.</Say></Response>`;
+        `<Response><Pause length="1"/><Say>Connecting you to ${xmlEscape(who)}.</Say>` +
+        `<Dial callerId="${xmlEscape(from)}" answerOnBridge="true" timeout="30">` +
+        `<Number>${xmlEscape(to)}</Number></Dial></Response>`;
 
       const r = await fetch(`${base(creds.accountSid)}/Calls.json`, {
         method: 'POST',
         headers: { Authorization: creds.auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ From: from, To: CALL_BRIDGE_AGENT_NUMBER, Twiml: twiml, Timeout: '25' }),
+        body: new URLSearchParams({ From: from, To: CALL_BRIDGE_AGENT_NUMBER, Twiml: twiml, Timeout: AGENT_RING_SECONDS }),
       });
       const payload = (await r.json().catch(() => ({}))) as { sid?: string; message?: string };
       if (!r.ok) {
