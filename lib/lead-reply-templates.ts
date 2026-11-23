@@ -207,7 +207,7 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       const sender = (ctx.sender ?? '').trim() || 'Mark';
       const about = (ctx.about ?? '').trim() || 'your basement';
       void about;
-      return `Sorry, should have said. It's ${sender} from OntarioReno. You requested info on our basement ad. What time works today or tomorrow for a quick 5-min call?`;
+      return `Sorry, should have said. It's ${sender} from OntarioReno. You asked about finishing your basement. What time works today or tomorrow for a quick 5-min call?`;
     }
     case 'call_booked': {
       const when = ctx.now ? callSlotLabel(ctx.slots[0], ctx.now) : slotLabel(ctx.slots[0]);

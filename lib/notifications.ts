@@ -430,10 +430,14 @@ export type LeadCallOpenerContext = {
 };
 
 /**
- * The first text to EVERY ad lead (Sabah's wording, Nov 22 2026):
- * "Hi Stalin, it's Mark from OntarioReno. Thanks for requesting info on our
- * basement ad, the one from $399/mo. What time works today or tomorrow for a
- * quick 5-min call?"
+ * The first text to EVERY ad lead (Sabah, Nov 22 2026):
+ * "Hi Stalin, it's Mark from OntarioReno. Thanks for asking about finishing
+ * your basement from $399/mo. What time works today or tomorrow for a quick
+ * 5-min call?"
+ *
+ * "Finishing your basement" is the point. The earlier "our basement ad, the
+ * one from $399/mo" named a basement and a monthly price with no verb, and a
+ * lead read it as a $399 rental.
  *
  * One message for all ads, on purpose, so there is never confusion about which
  * ad gets which text. It names the ad they just tapped so they don't mistake us
@@ -447,7 +451,7 @@ export function smsLeadCallOpener(c: LeadCallOpenerContext): string {
   const greeting = name ? `Hi ${name}, ` : 'Hi, ';
   return (
     `${greeting}it's ${sender} from OntarioReno. ` +
-    `Thanks for requesting info on our basement ad, the one from $399/mo. ` +
+    `Thanks for asking about finishing your basement from $399/mo. ` +
     `What time works today or tomorrow for a quick 5-min call?`
   );
 }

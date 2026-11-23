@@ -116,7 +116,7 @@ const OLD_SLOTS: OfferedSlot[] = [{ date: TUE, time: '16:30' }, { date: TUE, tim
 test("opener is Sabah's exact wording, for every ad, with no link", () => {
   assert.equal(
     smsLeadCallOpener(OPENER),
-    "Hi Sarah, it's Mark from OntarioReno. Thanks for requesting info on our basement ad, the one from $399/mo. What time works today or tomorrow for a quick 5-min call?"
+    "Hi Sarah, it's Mark from OntarioReno. Thanks for asking about finishing your basement from $399/mo. What time works today or tomorrow for a quick 5-min call?"
   );
   assert.ok(!/https?:|\.ca\//.test(smsLeadCallOpener(OPENER)));
 });
