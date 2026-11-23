@@ -307,8 +307,14 @@ export async function handleTwilioDashboard(req: VercelRequest, res: VercelRespo
 
   try {
     if (req.method === 'POST' && resource === 'call') {
-      const { from, to, name } = (req.body ?? {}) as { from?: string; to?: string; name?: string };
-      if (!from || !to || !E164.test(from) || !E164.test(to)) {
+      const raw = (req.body ?? {}) as { from?: string; to?: string; name?: string };
+      const name = raw.name;
+      // The Call Queue sends no `from` (it uses the lead-text number) and its
+      // phones can carry Meta's "p:" prefix or no country code.
+      const from = String(raw.from || process.env.TWILIO_FROM_NUMBER || '');
+      const toDigits = String(raw.to ?? '').replace(/\D/g, '');
+      const to = toDigits.length === 10 ? `+1${toDigits}` : toDigits ? `+${toDigits}` : '';
+      if (!E164.test(from) || !E164.test(to)) {
         res.status(400).json({ error: 'from and to must be phone numbers like +14165550123' });
         return;
       }
