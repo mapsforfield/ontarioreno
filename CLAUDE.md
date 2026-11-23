@@ -294,9 +294,10 @@ human moves it. Guarded by `lib/sms-replies.test.ts`.
 ## The first text books a CALL (November 2026)
 
 **Current wording (Sabah, Nov 22 2026), for EVERY ad, London included:**
-"Hi Stalin, it's Mark from OntarioReno. Thanks for requesting info on our
-basement ad, the one from $399/mo. What time works today or tomorrow for a
-quick 5-min call?" No fixed times are offered: the reply's own time is read
+"Hi Stalin, it's Mark from OntarioReno. Thanks for asking about finishing
+your basement from $399/mo. What time works today or tomorrow for a quick
+5-min call?" ("Finishing your basement" replaced "our basement ad, the one
+from $399/mo", which a lead read as a $399/mo rental.) No fixed times are offered: the reply's own time is read
 (`proposed_time` in lib/lead-classify.ts) and booked by `resolveProposedSlot`
 in lib/call-slots.ts if it is inside 10am to 8pm, 15+ minutes away and not full.
 Anything else (after hours, a day with no time, "now") goes to the caller.

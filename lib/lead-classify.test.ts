@@ -170,3 +170,9 @@ test('a good live answer is returned with their words attached', async () => {
   assert.equal(c.confident, true);
   assert.equal(c.rawBody, 'weekends are better for us');
 });
+
+test('prefers_text is a recognised intent', () => {
+  const c = parseClassification(JSON.stringify({ intent: 'prefers_text', confident: true }), 'I can text though');
+  assert.equal(c.intent, 'prefers_text');
+  assert.equal(c.confident, true);
+});

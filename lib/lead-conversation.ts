@@ -65,6 +65,12 @@ export type ReplyIntent =
   | 'later_timeframe'
   /** They named their own time or window ("7 tonight", "tomorrow after 2"). */
   | 'proposed_time'
+  /**
+   * Call mode: they cannot or would rather not take a call ("working all day,
+   * I can text though") and named no time for one. Answered with the
+   * consultation booking link so they can pick a time themselves.
+   */
+  | 'prefers_text'
   | 'unclear';
 
 export type Classification = {
@@ -180,6 +186,17 @@ export function decideNextAction(
     // Back to the top of the funnel: the template re-asks the opener's
     // question, so the phase does not advance.
     return { kind: 'reply', template: 'who_is_this', nextPhase: phase };
+  }
+  if (c.intent === 'prefers_text' && mode === 'call') {
+    // Asking "what time works?" again of someone who just said they cannot
+    // talk is the loop that reads as a bot. The booking link lets them choose
+    // a time on their own, and a person owns the thread from here so the link
+    // is never sent twice.
+    return { kind: 'reply', template: 'call_booking_link', nextPhase: 'needs_human' };
+  }
+  if (c.intent === 'prefers_text') {
+    // Visit threads have no link template. A person answers.
+    return { kind: 'escalate', reason: 'NEEDS_A_PERSON' };
   }
   if (c.intent === 'later_timeframe' && mode === 'call') {
     // Call threads: a short close, not a question. The visit-mode template
