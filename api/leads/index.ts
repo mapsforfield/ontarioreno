@@ -108,6 +108,7 @@ import { isResubmission } from '../../lib/flow-resubmission.js';
 import { attributionFields } from '../../lib/traffic-attribution.js';
 import { sendOutcomeNudges } from '../../lib/outcome-nudge-send.js';
 import { ensureDealForAppointment } from '../../lib/deal-from-appointment.js';
+import { ensureClientForAppointment } from '../../lib/client-from-appointment.js';
 import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../lib/commission-ledger.js';
 
 // Single leads function (Vercel Hobby caps deployments at 12 functions, so list /
@@ -2394,6 +2395,16 @@ async function bookVisitForLead(params: {
       status: result.code === 'SLOT_UNAVAILABLE' ? 409 : 400,
       payload: result as unknown as Record<string, unknown>,
     };
+  }
+
+  // Put the homeowner in Clients. This flow never did, so a homeowner who
+  // booked themselves could not be found in Clients search at all. Runs
+  // before the deal so the new deal carries the clientId. Best-effort — see
+  // lib/client-from-appointment.ts.
+  try {
+    await ensureClientForAppointment(prisma, result.appointmentId);
+  } catch (err) {
+    console.error('[leads/book] auto-client failed', result.appointmentId, err);
   }
 
   // The booking is committed; put it on the Deals pipeline under

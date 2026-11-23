@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireAuth } from '../../lib/auth.js';
 import { sendAppointmentNotification } from '../../lib/appointment-notify.js';
 import { mergeNotes } from '../../lib/consultation-notes.js';
+import { withOutcomeNotes } from '../../lib/deal-outcome-notes.js';
 import { resolvesRescheduleRequest } from '../../lib/sms-reply-resolution.js';
 import { arrivalWindowOf } from '../../lib/arrival-window.js';
 import {
@@ -64,7 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const notes = String(data.internalNotes ?? data.notes ?? '');
       try {
         if (appointment.dealId) {
-          await prisma.deal.update({ where: { id: appointment.dealId }, data: { notes } }).catch(() => {});
+          // Keep the outcome report on the deal when the booking notes are
+          // re-synced over it. See lib/deal-outcome-notes.ts.
+          const dealNotes = appointment.outcomeSubmitted
+            ? withOutcomeNotes(notes, appointment.outcomeNotes, { visitDate: appointment.appointmentDate })
+            : notes;
+          await prisma.deal.update({ where: { id: appointment.dealId }, data: { notes: dealNotes } }).catch(() => {});
         }
         // The client profile is the homeowner's running history across every
         // consultation they have ever booked, so this sync MERGES. It used to
@@ -84,6 +90,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       } catch {
         // notes sync is non-critical
+      }
+    }
+
+    // ── Outcome report → linked deal ──
+    // Deals are created at booking now, before the visit, so the outcome a
+    // rep files afterwards has to be carried over or the deal never shows it.
+    // Only when the outcome changed and the notes sync above did not already
+    // write the deal. See lib/deal-outcome-notes.ts.
+    if (
+      appointment.dealId &&
+      appointment.outcomeSubmitted &&
+      data.internalNotes === undefined &&
+      data.notes === undefined &&
+      (data.outcomeNotes !== undefined || data.outcomeSubmitted !== undefined) &&
+      (before?.outcomeNotes !== appointment.outcomeNotes || !before?.outcomeSubmitted)
+    ) {
+      try {
+        const deal = await prisma.deal.findUnique({ where: { id: appointment.dealId }, select: { notes: true } });
+        if (deal) {
+          const merged = withOutcomeNotes(deal.notes, appointment.outcomeNotes, {
+            previousOutcomeNotes: before?.outcomeNotes,
+            visitDate: appointment.appointmentDate,
+          });
+          if (merged !== deal.notes) {
+            await prisma.deal.update({ where: { id: appointment.dealId }, data: { notes: merged } });
+          }
+        }
+      } catch {
+        // non-critical, like the notes sync above
       }
     }
 
