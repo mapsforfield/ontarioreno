@@ -347,10 +347,10 @@ function CustomerCard({
   const tel = telHref(lead.phone);
 
   // Separate from "Call now" (straight from Quo): Twilio rings the Quo phone,
-  // the rep presses 1, and the lead sees the Twilio number they were texted from.
+  // it connects on answer, and the lead sees the Twilio number they were texted from.
   const [twilioCalling, setTwilioCalling] = useState(false);
   const handleTwilioCall = async () => {
-    if (!window.confirm(`Call ${lead.name || 'this lead'} from the Twilio number?\n\nYour Quo phone rings first. Answer and press 1 to connect.`)) return;
+    if (!window.confirm(`Call ${lead.name || 'this lead'} from the Twilio number?\n\nYour Quo phone rings first. Answer it and the lead is dialed.`)) return;
     setTwilioCalling(true);
     try {
       const res = await fetch('/api/twilio?twilioResource=call', {
@@ -360,7 +360,7 @@ function CustomerCard({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to start call');
-      showToast({ message: 'Ringing your Quo phone. Answer and press 1 to connect.' });
+      showToast({ message: 'Ringing your Quo phone. Answer it to connect.' });
     } catch (err) {
       showToast({ message: (err as Error).message || 'Failed to start call', variant: 'error' });
     } finally {
@@ -593,7 +593,7 @@ function CustomerCard({
               type="button"
               onClick={handleTwilioCall}
               disabled={twilioCalling}
-              title="Rings your Quo phone first. Press 1 and the lead sees the Twilio number from the texts."
+              title="Rings your Quo phone first. Answer and the lead sees the Twilio number from the texts."
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-[0.85rem] border border-emerald-600/40 bg-white px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
             >
               <PhoneCall className="h-4 w-4" /> {twilioCalling ? 'Ringing your Quo phone…' : 'Call from Twilio number'}
