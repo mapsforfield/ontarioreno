@@ -61,6 +61,8 @@ export type InboundReply = {
   /** Call mode: who signs, and what the enquiry was about. */
   sender?: string;
   about?: string;
+  /** Call mode: the consultation booking page for this lead's project. */
+  bookingUrl?: string;
 };
 
 export type RunnerDeps = {
@@ -251,6 +253,7 @@ export async function runInboundReply(
       now: mode === 'call' ? deps.nowWall?.() : undefined,
       sender: reply.sender,
       about: reply.about,
+      bookingUrl: reply.bookingUrl,
     });
   } catch (err) {
     // A template that cannot render is a bug, and the safe response to a bug in

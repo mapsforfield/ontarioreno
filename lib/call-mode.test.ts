@@ -20,6 +20,7 @@ import { runInboundReply, type ConversationState, type RunnerDeps } from './lead
 import { decideNextAction, type Classification } from './lead-conversation.js';
 import { ALL_TEMPLATE_IDS, renderReply, type OfferedSlot } from './lead-reply-templates.js';
 import { checkReplyFits, parseFitVerdict } from './reply-fit-check.js';
+import { bookingUrlFor } from './lead-inbound.js';
 
 // Tuesday 17 November 2026.
 const TUE = '2026-11-17';
@@ -402,4 +403,74 @@ test('follow-up replies ask for their time, never offer two fixed slots', () => 
     const body = renderReply(id, { name: 'Sarah', slots: [], now: at('15:10'), sender: 'Mark' });
     assert.match(body, /What (other )?time works today or tomorrow/, id);
   }
+});
+
+// ─── "Can't talk, I can text": the booking link ───────────────────────────────
+
+const BATHROOM_LINK = 'https://ontarioreno.ca/consultation/bathroom';
+
+test('"working all day, I can text" gets the booking link, then the thread goes to a person', async () => {
+  const h = harness({ intent: 'prefers_text' });
+  const out = await runInboundReply(
+    callState(),
+    { ...reply('I will be working all day tomorrow. I can text though'), bookingUrl: BATHROOM_LINK },
+    h.deps,
+    ENV
+  );
+  assert.equal(out.kind, 'sent');
+  assert.deepEqual(h.sent, [
+    `No problem, Sarah. You can book a free in-home consultation for any day and time that suits you here: ${BATHROOM_LINK}`,
+  ]);
+  // A person owns it now, so the link is never sent twice and the caller knows.
+  assert.equal(h.patches.at(-1)?.phase, 'needs_human');
+  assert.deepEqual(h.alerts, ['NEEDS_A_PERSON']);
+  assert.deepEqual(h.booked, []);
+});
+
+test('a second reply after the link is never answered automatically', async () => {
+  const h = harness({ intent: 'prefers_text' });
+  const out = await runInboundReply(callState({ phase: 'needs_human' }), reply('still busy'), h.deps, ENV);
+  assert.equal(out.kind, 'escalated');
+  assert.deepEqual(h.sent, []);
+});
+
+test('an unsure "can\'t talk" reads goes to a person, no link', async () => {
+  const h = harness({ intent: 'prefers_text', confident: false });
+  const out = await runInboundReply(callState(), reply('busy'), h.deps, ENV);
+  assert.equal(out.kind, 'escalated');
+  assert.deepEqual(h.sent, []);
+});
+
+test('the fit check can hold the link back', async () => {
+  const h = harness({ intent: 'prefers_text' });
+  h.deps.checkFit = async () => ({ fits: false, reason: 'they asked a question' });
+  const out = await runInboundReply(callState(), reply('busy, how much is it?'), h.deps, ENV);
+  assert.equal(out.kind, 'escalated');
+  assert.deepEqual(h.sent, []);
+});
+
+test('the link only goes out on call threads', () => {
+  assert.deepEqual(decideNextAction('awaiting_time_choice', c({ intent: 'prefers_text' }), 'call'), {
+    kind: 'reply', template: 'call_booking_link', nextPhase: 'needs_human',
+  });
+  assert.deepEqual(decideNextAction('opened', c({ intent: 'prefers_text' }), 'visit'), {
+    kind: 'escalate', reason: 'NEEDS_A_PERSON',
+  });
+});
+
+test('booking link copy: no em dash, no name when we have none, basement page by default', () => {
+  const body = renderReply('call_booking_link', { name: '', slots: [] });
+  assert.equal(
+    body,
+    'No problem. You can book a free in-home consultation for any day and time that suits you here: https://ontarioreno.ca/consultation/basement'
+  );
+  assert.ok(!body.includes('—'));
+  assert.match(renderReply('call_booking_link', { name: 'Jamie', slots: [], bookingUrl: BATHROOM_LINK }), /^No problem, Jamie\. .*\/consultation\/bathroom$/);
+});
+
+test('bathroom threads link the bathroom page, everything else the basement page, env overrides win', () => {
+  assert.equal(bookingUrlFor('Hi Jamie, thanks for asking about your bathroom renovation'), BATHROOM_LINK);
+  assert.equal(bookingUrlFor('Hi Colin, it is Mark from OntarioReno about your basement', {} as NodeJS.ProcessEnv), 'https://ontarioreno.ca/consultation/basement');
+  assert.equal(bookingUrlFor(null, {} as NodeJS.ProcessEnv), 'https://ontarioreno.ca/consultation/basement');
+  assert.equal(bookingUrlFor('basement', { LEAD_WELCOME_BOOKING_URL: 'https://example.test/b' } as NodeJS.ProcessEnv), 'https://example.test/b');
 });

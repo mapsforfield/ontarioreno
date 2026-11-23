@@ -110,6 +110,18 @@ function aboutForRow(row: ConversationRow): string {
 }
 
 /**
+ * The consultation page a "can't talk, I can text" reply links to. Same pages
+ * and env overrides as the welcome text in api/leads, read from the same clue
+ * as aboutForRow, so a bathroom lead never lands on the basement form.
+ */
+export function bookingUrlFor(lastOutbound: string | null | undefined, env: NodeJS.ProcessEnv = process.env): string {
+  if (/bathroom/i.test(lastOutbound ?? '')) {
+    return env.LEAD_WELCOME_BATHROOM_BOOKING_URL ?? 'https://ontarioreno.ca/consultation/bathroom';
+  }
+  return env.LEAD_WELCOME_BOOKING_URL ?? 'https://ontarioreno.ca/consultation/basement';
+}
+
+/**
  * Handle an inbound text from a lead with no appointment.
  *
  * Returns false when the message was not ours to handle — no matching lead, the
@@ -273,6 +285,7 @@ export async function handleLeadReply(
         // The name the opener used, so "who is this?" never switches names.
         sender: (row.sender ?? '').trim() || callSender(env),
         about: aboutForRow(row),
+        bookingUrl: bookingUrlFor(row.lastOutbound, env),
       },
       deps,
       env

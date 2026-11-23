@@ -39,7 +39,12 @@ export type ReplyContext = {
   sender?: string;
   /** "your basement", "your bathroom renovation". Default "your basement". */
   about?: string;
+  /** The consultation booking page for this lead. Default the basement page. */
+  bookingUrl?: string;
 };
+
+/** Where call_booking_link points when the caller did not say. */
+export const DEFAULT_BOOKING_URL = 'https://ontarioreno.ca/consultation/basement';
 
 /**
  * Every template we are willing to send. The classifier chooses one of these
@@ -68,7 +73,9 @@ export type ReplyTemplateId =
   | 'call_booked'
   | 'call_slot_taken'
   // "Not now" in a call thread: close politely and hand to a person.
-  | 'call_later_close';
+  | 'call_later_close'
+  // "Can't talk, I can text": the consultation booking link, then a person.
+  | 'call_booking_link';
 
 /** How many real slots each template needs before it can be sent. */
 export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
@@ -94,6 +101,7 @@ export const SLOTS_REQUIRED: Record<ReplyTemplateId, number> = {
   call_booked: 1,
   call_slot_taken: 0,
   call_later_close: 0,
+  call_booking_link: 0,
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -212,6 +220,12 @@ export function renderReply(id: ReplyTemplateId, ctx: ReplyContext): string {
       // They said when ("in the new year", "spring"). Asking again, or offering
       // next week, reads as not listening. "then" fits whatever they said.
       return `No problem${name ? `, ${name}` : ''}. I'll check back with you then. Thanks!`;
+    case 'call_booking_link': {
+      // Sabah's own wording from the Messages page (Nov 22 2026). The one call
+      // template that names the consultation: the form books it, not us.
+      const url = (ctx.bookingUrl ?? '').trim() || DEFAULT_BOOKING_URL;
+      return `No problem${name ? `, ${name}` : ''}. You can book a free in-home consultation for any day and time that suits you here: ${url}`;
+    }
   }
 }
 
@@ -239,4 +253,5 @@ export const ALL_TEMPLATE_IDS: ReplyTemplateId[] = [
   'call_booked',
   'call_slot_taken',
   'call_later_close',
+  'call_booking_link',
 ];

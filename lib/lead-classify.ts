@@ -48,6 +48,7 @@ const VALID_INTENTS: ReplyIntent[] = [
   'different_project',
   'later_timeframe',
   'proposed_time',
+  'prefers_text',
   'unclear',
 ];
 
@@ -79,6 +80,7 @@ Return one intent:
 - different_project: they asked about work other than a basement
 - later_timeframe: interested, but not for a while
 - proposed_time: they named a specific time or a window for the call ("7 tonight", "tomorrow at 2", "after 5 today", "Thursday evening")
+- prefers_text: on a CALL conversation only, they can't take a call or would rather not (busy or at work all day, "I can text though", can't talk on the phone) and named no time for one
 - unclear: anything else, or anything you are not sure about
 
 Rules that matter more than coverage:
@@ -90,7 +92,8 @@ Rules that matter more than coverage:
 5. Politeness is not agreement. "Ok", "thanks", "sounds good" and "sure" answer nothing on their own. If the message does not actually answer what we asked, that is unclear.
 6. Not interested must be explicit. Hesitation, silence about the times, or asking a hard question is not a no.
 7. When the conversation is about a phone CALL, the offered times are for that call. "Call me now" or "call me whenever" is wants_call, not picked_slot. asked_duration means how long the call takes. "Yes" alone, after we offered two times, does not say which, so it is unclear.
-8. For proposed_time, resolve the date and time using "Ontario time now" below. Give proposedDate as YYYY-MM-DD and proposedFrom as HH:MM (24h). For an exact time leave proposedTo out. For a window give proposedTo too: "after 5" today is 17:00 to 20:00; "afternoon" is 12:00 to 17:00; "evening" or "tonight" with no hour is 17:00 to 20:00; "morning" is 09:00 to 12:00. A day with no time at all ("Tuesday works") is NOT proposed_time, it is unclear. "Now", "anytime", "call me whenever" are wants_call, not proposed_time. If you cannot tell which date they mean, it is unclear. If we offered no times, any time they name is proposed_time, never picked_slot.`;
+8. For proposed_time, resolve the date and time using "Ontario time now" below. Give proposedDate as YYYY-MM-DD and proposedFrom as HH:MM (24h). For an exact time leave proposedTo out. For a window give proposedTo too: "after 5" today is 17:00 to 20:00; "afternoon" is 12:00 to 17:00; "evening" or "tonight" with no hour is 17:00 to 20:00; "morning" is 09:00 to 12:00. A day with no time at all ("Tuesday works") is NOT proposed_time, it is unclear. "Now", "anytime", "call me whenever" are wants_call, not proposed_time. If you cannot tell which date they mean, it is unclear. If we offered no times, any time they name is proposed_time, never picked_slot.
+9. prefers_text is only for a CALL conversation; on a visit conversation the same message is unclear. If they name any time they could talk, it is proposed_time instead. "Call me" is wants_call. Not wanting the project, or not for months, is not_interested or later_timeframe. Being busy one day while still asking for a call another day is not prefers_text.`;
 
 /**
  * Schema the model's answer must satisfy. Anything else is treated as unclear.
