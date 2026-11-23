@@ -35,11 +35,14 @@ const FIELD_MAP = {
   // Fallback for adName when the ad name is blank — Meta test leads, and leads
   // from a form not attached to an ad, carry only the form's name.
   formName: ['formname'],
+  // Where they tapped the ad: Meta writes "fb" or "ig". The first text names
+  // it ("on our basement ad on Instagram") so it matches what they just did.
+  platform: ['platform'],
 };
 
 // ONLY these extra columns are captured as qualifying "answers" on the lead —
-// every other column on the sheet (Meta ad ids, campaign, platform, etc.) is
-// ignored. (ad_name is read separately, via FIELD_MAP.adName.) "Label shown on the lead": [matching header aliases].
+// every other column on the sheet (Meta ad ids, campaign, etc.) is ignored.
+// (platform is read separately, via FIELD_MAP.platform.) (ad_name is read separately, via FIELD_MAP.adName.) "Label shown on the lead": [matching header aliases].
 const ANSWER_MAP = {
   'Hamilton homeowner?': ['areyouahamiltonhomeowner'],
 };
@@ -107,6 +110,7 @@ function syncNewLeads() {
       sourceDetail: get('sourceDetail'),
       submittedAt: get('submittedAt'),
       adName: get('adName') || get('formName'),
+      platform: get('platform'),
       extraAnswers: extraAnswers,
     };
 

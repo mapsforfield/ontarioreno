@@ -15,7 +15,7 @@ import {
   openerSendWall,
   pickCallSlots,
 } from './call-slots.js';
-import { planLeadCallOpener, smsLeadCallOpener } from './notifications.js';
+import { metaPlatform, planLeadCallOpener, smsLeadCallOpener } from './notifications.js';
 import { runInboundReply, type ConversationState, type RunnerDeps } from './lead-conversation-runner.js';
 import { decideNextAction, type Classification } from './lead-conversation.js';
 import { ALL_TEMPLATE_IDS, renderReply, type OfferedSlot } from './lead-reply-templates.js';
@@ -116,13 +116,13 @@ const OLD_SLOTS: OfferedSlot[] = [{ date: TUE, time: '16:30' }, { date: TUE, tim
 test("opener is Sabah's exact wording, for every ad, with no link", () => {
   assert.equal(
     smsLeadCallOpener(OPENER),
-    "Hi Sarah, it's Mark from OntarioReno. Thanks for asking about finishing your basement from $399/mo. What time works today or tomorrow for a quick 5-min call?"
+    "Hi Sarah, it's Mark from OntarioReno. You tapped Get Quote on our basement ad. What time works today or tomorrow for a quick 5-min call?"
   );
   assert.ok(!/https?:|\.ca\//.test(smsLeadCallOpener(OPENER)));
 });
 
 test('opener fits two SMS segments and has no em dash', () => {
-  const body = smsLeadCallOpener({ ...OPENER, name: 'Alexandrina-Marguerite' });
+  const body = smsLeadCallOpener({ ...OPENER, name: 'Alexandrina-Marguerite', platform: 'instagram' });
   assert.ok(body.length <= 306, `${body.length} chars`);
   assert.ok(!body.includes('—'));
 });
@@ -473,4 +473,29 @@ test('bathroom threads link the bathroom page, everything else the basement page
   assert.equal(bookingUrlFor('Hi Colin, it is Mark from OntarioReno about your basement', {} as NodeJS.ProcessEnv), 'https://ontarioreno.ca/consultation/basement');
   assert.equal(bookingUrlFor(null, {} as NodeJS.ProcessEnv), 'https://ontarioreno.ca/consultation/basement');
   assert.equal(bookingUrlFor('basement', { LEAD_WELCOME_BOOKING_URL: 'https://example.test/b' } as NodeJS.ProcessEnv), 'https://example.test/b');
+});
+
+// ─── The opener names where they tapped the ad ────────────────────────────────
+
+test('opener says Instagram or Facebook when the sheet says so', () => {
+  assert.equal(
+    smsLeadCallOpener({ ...OPENER, platform: 'instagram' }),
+    "Hi Sarah, it's Mark from OntarioReno. You tapped Get Quote on our basement ad on Instagram. What time works today or tomorrow for a quick 5-min call?"
+  );
+  assert.match(smsLeadCallOpener({ ...OPENER, platform: 'facebook' }), /on our basement ad on Facebook\. What time/);
+  assert.match(smsLeadCallOpener({ ...OPENER, platform: '' }), /on our basement ad\. What time/);
+});
+
+test('opener carries no price, so $399/mo cannot be read as rent', () => {
+  for (const platform of ['instagram', 'facebook', ''] as const) {
+    assert.ok(!/\$|\/mo|month/i.test(smsLeadCallOpener({ ...OPENER, platform })), platform);
+  }
+});
+
+test("Meta's fb/ig values map to the app name; anything else is left out", () => {
+  assert.equal(metaPlatform('ig'), 'instagram');
+  assert.equal(metaPlatform(' IG '), 'instagram');
+  assert.equal(metaPlatform('fb'), 'facebook');
+  assert.equal(metaPlatform('Facebook'), 'facebook');
+  for (const v of ['', null, undefined, 'messenger', 'an', 'whatsapp']) assert.equal(metaPlatform(v), '', String(v));
 });
