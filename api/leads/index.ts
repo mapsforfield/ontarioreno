@@ -90,6 +90,8 @@ import {
   type BookingContext,
   type SubmissionContext,
   planLeadCallOpener,
+  metaPlatform,
+  type MetaPlatform,
 } from '../../lib/notifications.js';
 import {
   describeCause,
@@ -495,6 +497,7 @@ function leadBookingUrl(room: WelcomeRoom = 'basement'): string {
  */
 async function sendLeadCallOpener(
   lead: { id: string; name: string; phone: string },
+  platform: MetaPlatform = '',
 ): Promise<boolean> {
   try {
     if (!lead.phone?.trim()) return false;
@@ -505,6 +508,7 @@ async function sendLeadCallOpener(
       phone: lead.phone,
       senderName: callSender(),
       sendWall,
+      platform,
     });
     if (planned.length === 0) return false;
 
@@ -551,10 +555,11 @@ async function sendLeadCallOpener(
 async function sendLeadWelcome(
   lead: { id: string; name: string; phone: string },
   room: WelcomeRoom = 'basement',
+  platform: MetaPlatform = '',
 ) {
   // Every ad, London included (Sabah, Nov 22 2026: one message for all ads).
   if (welcomeMode() === 'call') {
-    if (await sendLeadCallOpener(lead)) return;
+    if (await sendLeadCallOpener(lead, platform)) return;
   }
   try {
     const planned = planLeadWelcomeNotifications({
@@ -622,7 +627,12 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
   // first text talks about, and is kept on the lead so a rep can see it.
   const adName = clean(data.adName);
   const welcomeRoom = welcomeRoomForAd(adName);
-  if (adName && !incoming.sourceDetail) incoming.sourceDetail = `Ad: ${adName}`;
+  // Facebook or Instagram, from the sheet's platform column. Named in the first
+  // text and shown to reps beside the ad name.
+  const platform = metaPlatform(data.platform);
+  if (adName && !incoming.sourceDetail) {
+    incoming.sourceDetail = `Ad: ${adName}${platform ? ` (${platform === 'instagram' ? 'Instagram' : 'Facebook'})` : ''}`;
+  }
   if (!incoming.name && !incoming.phone && !incoming.email) {
     return res.status(400).json({ error: 'A name, phone, or email is required.' });
   }
@@ -663,7 +673,7 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
     // Best-effort throughout: the lead is committed and a texting problem must
     // never turn a captured lead into an error the sender will retry.
     if (!result.merged && result.lead) {
-      await sendLeadWelcome(result.lead, welcomeRoom);
+      await sendLeadWelcome(result.lead, welcomeRoom, platform);
     }
     // Merge → 200, create → 201; always ok so the sender never retry-storms.
     return res.status(result.merged ? 200 : 201).json({ ok: true, ...result });

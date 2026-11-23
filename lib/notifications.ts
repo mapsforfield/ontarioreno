@@ -427,17 +427,35 @@ export type LeadCallOpenerContext = {
   senderName: string;
   /** Ontario wall clock the text goes out at (8:30am for overnight leads). */
   sendWall: string;
+  /** Where they tapped the ad. '' when the sheet did not say. */
+  platform?: MetaPlatform;
 };
+
+export type MetaPlatform = 'facebook' | 'instagram' | '';
+
+/**
+ * Meta's lead sheet writes the platform as "fb" or "ig". Anything else
+ * (blank, test leads, a new value Meta adds) is '' and the text simply leaves
+ * the platform out, rather than naming the wrong app.
+ */
+export function metaPlatform(raw: unknown): MetaPlatform {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (v === 'ig' || v === 'instagram') return 'instagram';
+  if (v === 'fb' || v === 'facebook') return 'facebook';
+  return '';
+}
+
+const PLATFORM_LABEL: Record<MetaPlatform, string> = { facebook: 'Facebook', instagram: 'Instagram', '': '' };
 
 /**
  * The first text to EVERY ad lead (Sabah, Nov 22 2026):
- * "Hi Stalin, it's Mark from OntarioReno. Thanks for asking about finishing
- * your basement from $399/mo. What time works today or tomorrow for a quick
- * 5-min call?"
+ * "Hi Stalin, it's Mark from OntarioReno. You tapped Get Quote on our basement
+ * ad on Instagram. What time works today or tomorrow for a quick 5-min call?"
  *
- * "Finishing your basement" is the point. The earlier "our basement ad, the
- * one from $399/mo" named a basement and a monthly price with no verb, and a
- * lead read it as a $399 rental.
+ * It names the action they just took and where, and nothing they have not
+ * already seen. No price: "the one from $399/mo" was read as a $399 rental,
+ * and explaining the monthly payment in a text is new information the ad did
+ * not give them. The price is explained on the call.
  *
  * One message for all ads, on purpose, so there is never confusion about which
  * ad gets which text. It names the ad they just tapped so they don't mistake us
@@ -451,7 +469,7 @@ export function smsLeadCallOpener(c: LeadCallOpenerContext): string {
   const greeting = name ? `Hi ${name}, ` : 'Hi, ';
   return (
     `${greeting}it's ${sender} from OntarioReno. ` +
-    `Thanks for asking about finishing your basement from $399/mo. ` +
+    `You tapped Get Quote on our basement ad${PLATFORM_LABEL[c.platform ?? ''] ? ` on ${PLATFORM_LABEL[c.platform ?? '']}` : ''}. ` +
     `What time works today or tomorrow for a quick 5-min call?`
   );
 }
