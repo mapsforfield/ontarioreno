@@ -40,6 +40,7 @@ import {
   type RateLimitRule,
 } from '../../lib/rate-limit.js';
 import { ensureSchema } from '../../lib/schema.js';
+import { shouldWelcomeReturningLead } from '../../lib/returning-lead.js';
 import {
   areaForMunicipality,
   programBySlug,
@@ -650,7 +651,32 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
         if (Object.keys(patch).length > 0) {
           await prisma.lead.update({ where: { id: existing.id }, data: patch });
         }
-        return { id: existing.id, merged: true };
+        // A homeowner coming back through a fresh form fill is a new arrival
+        // for texting purposes, even though the lead row is old. Checked against
+        // the row as it was BEFORE this merge.
+        const [conversation, welcome] = await Promise.all([
+          prisma.leadConversation.findUnique({ where: { leadId: existing.id }, select: { id: true } }),
+          prisma.notificationOutbox.findUnique({
+            where: { idempotencyKey: `${existing.id}:sms:lead_welcome` },
+            select: { id: true },
+          }),
+        ]);
+        const welcomeReturning = shouldWelcomeReturningLead({
+          status: existing.status,
+          phone: existing.phone,
+          createdAt: existing.createdAt,
+          fillAt: hasIncomingDate ? new Date(dateRaw) : null,
+          hasConversation: Boolean(conversation),
+          hadWelcome: Boolean(welcome),
+          now: new Date(),
+        });
+        return {
+          id: existing.id,
+          merged: true,
+          ...(welcomeReturning
+            ? { returning: true, lead: { id: existing.id, name: existing.name, phone: existing.phone ?? '' } }
+            : {}),
+        };
       }
       const created = await prisma.lead.create({
         data: {
@@ -672,7 +698,11 @@ async function handleIntake(req: VercelRequest, res: VercelResponse) {
     //
     // Best-effort throughout: the lead is committed and a texting problem must
     // never turn a captured lead into an error the sender will retry.
-    if (!result.merged && result.lead) {
+    //
+    // Exception: a lead we knew but never reached, back through a FRESH form
+    // fill (see lib/returning-lead.ts). Retries and old-row re-syncs still
+    // merge silently.
+    if (result.lead && (!result.merged || ('returning' in result && result.returning))) {
       await sendLeadWelcome(result.lead, welcomeRoom, platform);
     }
     // Merge → 200, create → 201; always ok so the sender never retry-storms.
