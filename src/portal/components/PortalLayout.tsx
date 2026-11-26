@@ -23,7 +23,8 @@ import {
   TableProperties,
   Trophy,
   UserRound,
-  X, Megaphone, Wallet
+  X, Megaphone, Wallet,
+  PanelLeftClose, PanelLeftOpen, Rows3
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import PullToRefresh from './PullToRefresh';
@@ -41,6 +42,7 @@ import { countNeedsAttention } from '../data/needsAttention';
 import { usePortalData } from '../data/store';
 import { repCanAccess, featureForPath, type RepFeatureKey } from '../data/repFeatures';
 import { torontoToday } from '../lib/time';
+import { useCompactModeSetting, useCompactRailExpanded } from '../lib/compactMode';
 import AdminActivityCenter from './AdminActivityCenter';
 import GlobalSearch from './GlobalSearch';
 import Toaster from './Toaster';
@@ -176,6 +178,11 @@ export default function PortalLayout() {
       alert(`Push error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+
+  // Compact window mode (admin toggle, per device) — see lib/compactMode.ts.
+  const [compactMode, setCompactMode] = useCompactModeSetting();
+  const [railExpanded, setRailExpanded] = useCompactRailExpanded();
+  const showRail = compactMode && !railExpanded;
 
   const [isPasswordPanelOpen, setIsPasswordPanelOpen] = useState(false);
   const[isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -320,8 +327,73 @@ export default function PortalLayout() {
     currentUser?.avatarInitial
   );
 
+  // The admin "View as…" picker, shared by the full header and the slim
+  // compact-mode bar so the two can never offer different lists.
+  const viewAsOptions = (
+    <>
+      <option value="">View as…</option>
+      <optgroup label="Reps">
+        {users
+          .filter((user) => user.role === 'rep' && user.active)
+          .map((rep) => (
+            <option key={rep.id} value={rep.id}>
+              {rep.name}
+            </option>
+          ))}
+      </optgroup>
+      {users.some((user) => user.role === 'contractor' && user.active) && (
+        <optgroup label="Contractors">
+          {users
+            .filter((user) => user.role === 'contractor' && user.active)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+        </optgroup>
+      )}
+    </>
+  );
+  const viewAsControl = isAdmin && !viewingAsRepId && (
+    <label className="flex items-center gap-2 rounded-full border border-white bg-white px-3 py-2 shadow-sm">
+      <Eye className="h-4 w-4 text-[#1B3C6C]" />
+      <span className="sr-only">View the portal as a rep or contractor</span>
+      <select
+        value=""
+        onChange={(event) => event.target.value && setViewAs(event.target.value)}
+        title="See the portal exactly as a rep or contractor sees it — read-only"
+        className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 focus:ring-0"
+      >
+        {viewAsOptions}
+      </select>
+    </label>
+  );
+
+  const railButton =
+    'flex h-7 w-7 shrink-0 items-center justify-center rounded-[0.4rem] text-blue-100/70 transition hover:bg-white/10 hover:text-white';
+
+  const compactToggle = isAdmin && !viewingAsRepId ? (
+    <button
+      type="button"
+      onClick={() => setCompactMode(!compactMode)}
+      className={cn(
+        'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold shadow-sm transition',
+        compactMode
+          ? 'border-[#1B3C6C] bg-[#1B3C6C] py-1.5 text-white hover:bg-[#153158]'
+          : 'border-white bg-white py-2 text-slate-700 hover:text-[#1B3C6C]'
+      )}
+      title={compactMode
+        ? 'Back to the full layout'
+        : 'Compact window mode: a slim header and an icon-only menu, for stacked or small windows. Saved on this computer only.'}
+      aria-pressed={compactMode}
+    >
+      <Rows3 className="h-4 w-4" />
+      {compactMode ? 'Compact on' : 'Compact view'}
+    </button>
+  ) : null;
+
   return (
-    <div className="portal-app min-h-screen bg-[#eef3f8] text-slate-950">
+    <div className={cn('portal-app min-h-screen bg-[#eef3f8] text-slate-950', compactMode && 'portal-compact')}>
       <PullToRefresh onRefresh={refetch} />
       <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} className="fixed inset-x-0 top-0 z-40 border-b border-white/65 bg-white/88 px-4 pb-3 pt-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between">
@@ -372,13 +444,28 @@ export default function PortalLayout() {
           scrolls. Sign out is therefore always on screen regardless of window
           height, which is the right trade — a rep can scroll to find a page,
           but should never have to hunt for the way out. */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[17.5rem] flex-col overflow-hidden border-r border-white/70 bg-[#071525] px-5 py-6 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)] lg:flex">
+      <aside className={cn(
+        'fixed inset-y-0 left-0 z-30 hidden w-[17.5rem] flex-col overflow-hidden border-r border-white/70 bg-[#071525] px-5 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)]',
+        showRail ? 'lg:hidden' : 'lg:flex',
+        compactMode ? 'py-4' : 'py-6'
+      )}>
         <div className="flex h-full min-h-0 flex-col">
           <div className="shrink-0">
-            <div className="px-1 pt-1">
-              <img src="/logo-sidebar.png" alt="OntarioReno" className="h-11 w-auto" />
+            <div className="flex items-center justify-between gap-2 px-1 pt-1">
+              <img src="/logo-sidebar.png" alt="OntarioReno" className={cn('w-auto', compactMode ? 'h-9' : 'h-11')} />
+              {compactMode && (
+                <button
+                  type="button"
+                  onClick={() => setRailExpanded(false)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.5rem] text-blue-100/70 transition hover:bg-white/10 hover:text-white"
+                  title="Collapse the menu"
+                  aria-label="Collapse the menu"
+                >
+                  <PanelLeftClose className="h-4.5 w-4.5" />
+                </button>
+              )}
             </div>
-            <div className="mt-8 rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4">
+            <div className={cn('mt-8 rounded-[0.5rem] border border-white/10 bg-white/[0.06] p-4', compactMode && 'hidden')}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-100/70">
                 Broker Portal
               </p>
@@ -399,7 +486,7 @@ export default function PortalLayout() {
 
           {/* min-h-0 is required: without it a flex child refuses to shrink
               below its content and the overflow never engages. */}
-          <nav className="mt-7 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+          <nav className={cn('min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1', compactMode ? 'mt-4' : 'mt-7')}>
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
@@ -462,9 +549,116 @@ export default function PortalLayout() {
         </div>
       </aside>
 
+      {/* Compact window mode: the sidebar as a 4rem icon rail. Every section
+          the full sidebar lists is here (same visibleNavItems), just without
+          labels; the expand button brings the full one back. */}
+      {showRail && (
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-[4.5rem] flex-col items-center border-r border-white/70 bg-[#071525] py-2.5 text-white shadow-[18px_0_42px_rgba(7,21,37,0.12)] lg:flex">
+          {/* Height is the scarce thing in a stacked window, so the controls
+              pair up two to a row and every section fits a ~600px window
+              without scrolling. The nav still scrolls (visibly) below that. */}
+          <div className="flex shrink-0 gap-1">
+            <button
+              type="button"
+              onClick={() => setRailExpanded(true)}
+              className={railButton}
+              title="Expand the menu (profile, password)"
+              aria-label="Expand the menu"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className={railButton}
+              title="Search (Ctrl+K)"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          </div>
+          <nav className="mt-2 flex min-h-0 w-full flex-1 flex-col items-center gap-0.5 overflow-y-auto border-t border-white/10 pt-2 [scrollbar-color:rgba(255,255,255,0.25)_transparent] [scrollbar-width:thin]">
+            {visibleNavItems.map((item) => {
+              const showBadge = item.href === '/portal/appointments' && needsAttentionCount > 0;
+              return (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  title={item.label}
+                  aria-label={item.label}
+                  className={({ isActive }) =>
+                    cn(
+                      'relative flex h-[2.125rem] w-10 shrink-0 items-center justify-center rounded-[0.5rem] transition',
+                      isActive
+                        ? 'bg-white text-[#102b4c] shadow-[0_10px_20px_rgba(0,0,0,0.18)]'
+                        : 'text-blue-50/75 hover:bg-white/10 hover:text-white'
+                    )
+                  }
+                >
+                  <item.icon className="h-4.5 w-4.5" />
+                  {showBadge && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[0.5rem] font-black text-white ring-1 ring-[#071525]">
+                      {needsAttentionCount > 9 ? '9+' : needsAttentionCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </nav>
+          {/* The header's controls live here while the rail is up, so the
+              page itself starts at the very top of a short window. */}
+          <div className="mt-2 flex shrink-0 flex-col items-center gap-1.5 border-t border-white/10 pt-2">
+            {isAdmin && !viewingAsRepId && (
+              <div className="flex gap-1">
+                <label
+                  className={cn(railButton, 'relative cursor-pointer')}
+                  title="View as a rep or contractor (read-only)"
+                >
+                  <Eye className="h-4 w-4" />
+                  <select
+                    value=""
+                    onChange={(event) => event.target.value && setViewAs(event.target.value)}
+                    aria-label="View the portal as a rep or contractor"
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                  >
+                    {viewAsOptions}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCompactMode(false)}
+                  className={cn(railButton, 'bg-white/10 text-white hover:bg-white/20')}
+                  title="Compact view is on. Click for the full layout."
+                  aria-label="Turn off compact view"
+                >
+                  <Rows3 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <AdminActivityCenter variant="desktop" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className={cn(railButton, 'text-red-200/80 hover:bg-red-500/20 hover:text-red-100')}
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+
       <main
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-        className="min-h-screen px-4 pb-24 sm:px-6 lg:ml-[17.5rem] lg:px-8 lg:pb-10 lg:pt-8 xl:px-10 2xl:px-12"
+        className={cn(
+          'min-h-screen px-4 pb-24 sm:px-6 lg:pb-10',
+          compactMode
+            ? cn('lg:px-4 lg:!pt-3 xl:px-5', showRail ? 'lg:ml-[4.5rem]' : 'lg:ml-[17.5rem]')
+            : 'lg:ml-[17.5rem] lg:px-8 lg:pt-8 xl:px-10 2xl:px-12'
+        )}
       >
         {/* Full-width content with comfortable gutters — consistent across every
             page so navigation never jumps. */}
@@ -512,7 +706,14 @@ export default function PortalLayout() {
           {/* The contractor pays the 45-day balances; when one is due it is
               said loudly, on every page of their portal. */}
           {isContractor && <ContractorPaymentAlert />}
-          <div className="mb-6 hidden items-center justify-between lg:flex">
+          {compactMode && !showRail && (
+            <div className="mb-2 hidden items-center justify-end gap-2 lg:flex [&_label]:py-1.5">
+              {viewAsControl}
+              <AdminActivityCenter variant="desktop" />
+              {compactToggle}
+            </div>
+          )}
+          <div className={cn('mb-6 hidden items-center justify-between', !compactMode && 'lg:flex')}>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#32639b]">
                 Private access
@@ -524,41 +725,9 @@ export default function PortalLayout() {
             <div className="flex items-center gap-3">
               {/* Admin-only, and only when not already viewing — the banner
                   above owns the exit. */}
-              {isAdmin && !viewingAsRepId && (
-                <label className="flex items-center gap-2 rounded-full border border-white bg-white px-3 py-2 shadow-sm">
-                  <Eye className="h-4 w-4 text-[#1B3C6C]" />
-                  <span className="sr-only">View the portal as a rep or contractor</span>
-                  <select
-                    value=""
-                    onChange={(event) => event.target.value && setViewAs(event.target.value)}
-                    title="See the portal exactly as a rep or contractor sees it — read-only"
-                    className="border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 focus:ring-0"
-                  >
-                    <option value="">View as…</option>
-                    <optgroup label="Reps">
-                      {users
-                        .filter((user) => user.role === 'rep' && user.active)
-                        .map((rep) => (
-                          <option key={rep.id} value={rep.id}>
-                            {rep.name}
-                          </option>
-                        ))}
-                    </optgroup>
-                    {users.some((user) => user.role === 'contractor' && user.active) && (
-                      <optgroup label="Contractors">
-                        {users
-                          .filter((user) => user.role === 'contractor' && user.active)
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                      </optgroup>
-                    )}
-                  </select>
-                </label>
-              )}
-              <AdminActivityCenter variant="desktop" />
+              {viewAsControl}
+              {!compactMode && <AdminActivityCenter variant="desktop" />}
+              {!compactMode && compactToggle}
               <div className="flex items-center gap-2 rounded-full border border-white bg-white px-4 py-2 shadow-sm">
                 <BarChart3 className="h-4 w-4 text-[#1B3C6C]" />
                 <span className="text-sm font-semibold text-slate-700">

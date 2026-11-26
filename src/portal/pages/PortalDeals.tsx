@@ -10,6 +10,7 @@ import LostReasonDialog from '../components/LostReasonPicker';
 import { celebrateWin } from '../lib/celebrate';
 import { showToast } from '../lib/toast';
 import { usePortalAuth } from '../auth';
+import { usePortalCompact } from '../lib/compactMode';
 import BalanceClockControl from '../components/BalanceClockControl';
 import DealQuickSheet from '../components/DealQuickSheet';
 import MobilePipeline from '../components/MobilePipeline';
@@ -295,6 +296,8 @@ export default function PortalDeals() {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, isAdmin } = usePortalAuth();
+  // Admin compact window mode (stacked windows) — see lib/compactMode.ts.
+  const compactWindow = usePortalCompact();
   const {
     addContractorDispatch,
     addDealActivity,
@@ -1270,7 +1273,7 @@ OntarioReno Broker Portal`;
   };
 
   return (
-    <div className="space-y-5 max-lg:space-y-4 max-lg:overflow-x-clip">
+    <div className={cn('max-lg:space-y-4 max-lg:overflow-x-clip', compactWindow ? 'space-y-3' : 'space-y-5')}>
       {lostPrompt && (
         <LostReasonDialog
           dealName={lostPrompt.name}
@@ -1284,10 +1287,10 @@ OntarioReno Broker Portal`;
       )}
       <header className="flex flex-col gap-3 max-sm:flex-row max-sm:items-center max-sm:justify-between sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] max-lg:hidden sm:text-sm">
+          <p className={cn('text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] max-lg:hidden sm:text-sm', compactWindow && 'lg:hidden')}>
             Deal CRM
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] max-lg:mt-0 sm:mt-2 sm:text-3xl">
+          <h1 className={cn('font-black tracking-[-0.02em] max-lg:mt-0', compactWindow ? 'text-2xl' : 'mt-1 text-2xl sm:mt-2 sm:text-3xl')}>
             Pipeline<span className="max-sm:hidden"> workspace</span>
           </h1>
           <p className="mt-0.5 text-sm font-bold text-slate-500 lg:hidden">
@@ -1370,8 +1373,8 @@ OntarioReno Broker Portal`;
         );
       })()}
 
-      <div className="grid gap-4 max-lg:grid-cols-1 max-lg:gap-3 xl:grid-cols-2">
-      <section className="rounded-[0.5rem] border border-white bg-white p-4 shadow-sm max-lg:p-3">
+      <div className={cn('grid max-lg:grid-cols-1 max-lg:gap-3 xl:grid-cols-2', compactWindow ? 'gap-3 lg:grid-cols-2' : 'gap-4')}>
+      <section className={cn('rounded-[0.5rem] border border-white bg-white shadow-sm max-lg:p-3', compactWindow ? 'p-3' : 'p-4')}>
         <div className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-slate-50 px-3 py-2.5 transition focus-within:border-[#1B3C6C] focus-within:bg-white">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
@@ -1498,7 +1501,7 @@ OntarioReno Broker Portal`;
 
       {/* ── Board-wide period + what happened in it (admin and reps) ── */}
       {currentUser && (
-        <section className={cn('rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block', mobileFiltersOpen ? 'block' : 'hidden')}>
+        <section className={cn('rounded-[0.5rem] border border-white bg-white shadow-sm lg:block', compactWindow ? 'p-3' : 'p-4', mobileFiltersOpen ? 'block' : 'hidden')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-[#32639b]" />
@@ -1559,7 +1562,7 @@ OntarioReno Broker Portal`;
               </label>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className={cn('grid grid-cols-2 gap-2 sm:grid-cols-4', compactWindow ? 'mt-2' : 'mt-3')}>
             {[
               {
                 label: boardPeriodActive ? 'New in pipeline' : 'Open pipeline',
@@ -1586,10 +1589,10 @@ OntarioReno Broker Portal`;
                 tone: 'text-slate-900',
               },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-[0.5rem] border border-slate-100 bg-slate-50 px-3 py-2">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.12em] text-slate-400">{stat.label}</p>
+              <div key={stat.label} className={cn('rounded-[0.5rem] border border-slate-100 bg-slate-50 px-3', compactWindow ? 'py-1.5' : 'py-2')}>
+                <p className="truncate text-[0.62rem] font-black uppercase tracking-[0.12em] text-slate-400">{stat.label}</p>
                 <p className={cn('mt-0.5 text-lg font-black leading-tight', stat.tone)}>{stat.value}</p>
-                <p className="text-[0.68rem] font-semibold text-slate-400">{stat.sub}</p>
+                <p className={cn('text-[0.68rem] font-semibold text-slate-400', compactWindow && 'lg:hidden')}>{stat.sub}</p>
               </div>
             ))}
           </div>
@@ -1615,7 +1618,7 @@ OntarioReno Broker Portal`;
             </div>
           )}
           {boardPeriodActive && (
-            <p className="mt-2 text-[0.68rem] font-semibold text-slate-400">
+            <p className={cn('mt-2 text-[0.68rem] font-semibold text-slate-400', compactWindow && 'lg:hidden')}>
               Open deals by date created · Won by win date · Lost by last update
             </p>
           )}
