@@ -19,6 +19,8 @@ import {
   UserX,
   Video,
   X,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -873,6 +875,53 @@ export default function PortalAppointments() {
   // Auto-open a consultation when navigated here from the dashboard
   const location = useLocation();
   const handledNavState = useRef<string | null>(null);
+
+  // ── Calendar-only view (?view=calendar) ─────────────────────────────────
+  // A portal window given over to the dispatch calendar alone: everything
+  // else on this page is hidden on desktop, and the month grid stretches to
+  // fill the window. It lives in the URL so a stacked window can be
+  // bookmarked straight to it. Desktop only; phones never see the toggle and
+  // ignore the flag. Panels and dialogs still open as normal.
+  const calendarOnly = new URLSearchParams(location.search).get('view') === 'calendar';
+  const setCalendarOnly = (on: boolean) => {
+    const params = new URLSearchParams(location.search);
+    if (on) params.set('view', 'calendar');
+    else params.delete('view');
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  };
+  const calendarSectionRef = useRef<HTMLElement | null>(null);
+  const [calendarFill, setCalendarFill] = useState<{ height: number; pull: number } | null>(null);
+  useEffect(() => {
+    if (!calendarOnly) {
+      setCalendarFill(null);
+      return;
+    }
+    // Measure rather than guess: the space above the section differs between
+    // compact mode and the full layout, and with the view-as banner up.
+    const measure = () => {
+      const el = calendarSectionRef.current;
+      // Only the month grid stretches; week, day and map keep their
+      // natural height and the page scrolls as usual.
+      if (!el || window.innerWidth < 1024 || calendarView !== 'month') {
+        setCalendarFill(null);
+        return;
+      }
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      // The page's bottom padding would push the document 2-3rem past the
+      // window; pull it back so a 12px gap is all that is left, no scroll.
+      const main = el.closest('main');
+      const padBottom = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 0;
+      setCalendarFill({
+        height: Math.max(480, Math.floor(window.innerHeight - top - 12)),
+        pull: Math.max(0, padBottom - 12),
+      });
+    };
+    measure();
+    window.scrollTo(0, 0);
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [calendarOnly, calendarView]);
   // Set when the create drawer was opened from a Lead (Sales Workspace) so we
   // can link the new appointment back to that lead server-side.
   const prefillLeadIdRef = useRef<string | null>(null);
@@ -2413,6 +2462,8 @@ export default function PortalAppointments() {
         className={`cursor-pointer rounded-[0.5rem] border border-slate-200 bg-white transition hover:border-[#b8c9dd] hover:bg-[#f6faff] ${
           compact ? (compactWindow ? 'min-h-16 p-1.5' : 'min-h-20 p-2') : 'min-h-32 p-3'
         } ${
+          compact && calendarOnly && calendarView === 'month' ? 'lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-width:thin]' : ''
+        } ${
           isOutsideMonth && calendarView === 'month' ? 'opacity-55' : ''
         }`}
       >
@@ -2543,7 +2594,7 @@ export default function PortalAppointments() {
       {/* On a phone the header used to stack three full-width buttons and a
           two-line title above the list. One row of actions now, so Today is on
           the first screen. */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <header className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4 ${calendarOnly ? 'lg:hidden' : ''}`}>
         <div>
           <p className={`text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm ${compactWindow ? 'lg:hidden' : ''}`}>
             Consultation Center
@@ -2596,6 +2647,7 @@ export default function PortalAppointments() {
         </div>
       </header>
 
+      <div className={calendarOnly ? 'lg:hidden' : 'contents'}>
       <RepliesBox
         appointments={visibleAppointments}
         getRepName={getRepName}
@@ -2605,10 +2657,11 @@ export default function PortalAppointments() {
           setPanelTab('details');
         }}
       />
+      </div>
 
       {/* Phones get one compact row; the four full cards filled the first
           screen before a single consultation showed. */}
-      <section className={`grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 ${compactWindow ? 'lg:grid-cols-4 lg:gap-3' : ''}`}>
+      <section className={`grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 ${compactWindow ? 'lg:grid-cols-4 lg:gap-3' : ''} ${calendarOnly ? 'lg:hidden' : ''}`}>
         {metrics.map((metric) => (
           <article
             key={metric.label}
@@ -3174,7 +3227,7 @@ export default function PortalAppointments() {
       {/* ── End mobile section nav ──────────────────────────────── */}
 
       {/* Desktop: Consultation Filters */}
-      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block lg:p-5">
+      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3204,7 +3257,7 @@ export default function PortalAppointments() {
       </section>
 
       {/* Desktop: Today's Agenda */}
-      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:block lg:p-5">
+      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
         <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3228,7 +3281,7 @@ export default function PortalAppointments() {
       </section>
 
       {/* Desktop: Upcoming & Dispatch Gaps — collapsed list */}
-      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
+      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
         <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3456,13 +3509,19 @@ export default function PortalAppointments() {
         </div>
       </section>
 
-      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
-        <div className={`flex flex-col gap-3 border-b border-slate-200 lg:flex-row lg:items-center lg:justify-between ${compactWindow ? 'pb-3' : 'pb-4'}`}>
+      <section
+        ref={calendarSectionRef}
+        style={calendarFill ? { height: calendarFill.height, marginBottom: -calendarFill.pull } : undefined}
+        className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${
+          calendarOnly ? 'lg:!mt-0 lg:flex lg:flex-col' : 'lg:block'
+        } ${calendarOnly && compactWindow ? 'sm:p-3' : ''}`}
+      >
+        <div className={`flex shrink-0 flex-col gap-3 border-b border-slate-200 lg:flex-row lg:items-center lg:justify-between ${compactWindow || calendarOnly ? 'pb-3' : 'pb-4'}`}>
           <div>
             <p className={`text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] ${compactWindow ? 'lg:hidden' : ''}`}>
               Consultation Dispatch
             </p>
-            <h2 className={`font-black tracking-[-0.02em] ${compactWindow ? 'text-xl' : 'mt-2 text-2xl'}`}>
+            <h2 className={`font-black tracking-[-0.02em] ${compactWindow ? 'text-xl' : 'mt-2 text-2xl'} ${calendarOnly ? 'whitespace-nowrap' : ''}`}>
               {calendarView === 'month'
                 ? monthLabel
                 : calendarView === 'week'
@@ -3470,7 +3529,7 @@ export default function PortalAppointments() {
                   : formatAppointmentDate(toDateKey(cursorDate))}
             </h2>
           </div>
-          <div className="hidden flex-wrap items-center gap-2 sm:flex">
+          <div className={`hidden flex-wrap items-center gap-2 sm:flex ${calendarOnly ? "lg:justify-end" : ""}`}>
             {/* Rep filter — admin only */}
             {isAdmin && (
               <select
@@ -3552,12 +3611,39 @@ export default function PortalAppointments() {
             >
               <ChevronRight className="h-4 w-4" />
             </button>
+            {calendarOnly && (
+              <button
+                type="button"
+                onClick={openCreatePanel}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#1B3C6C] px-4 py-2 text-sm font-black text-white transition hover:bg-[#153158]"
+                title="Schedule a consultation"
+              >
+                <Plus className="h-4 w-4" />
+                Schedule
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCalendarOnly(!calendarOnly)}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                calendarOnly
+                  ? 'border-[#1B3C6C] bg-[#e8f1fb] text-[#1B3C6C] hover:bg-[#d9e8f8]'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              title={calendarOnly
+                ? 'Show the whole Consultations page again'
+                : 'Calendar only: fill this window with the calendar (bookmark the page to keep a window for it)'}
+              aria-label={calendarOnly ? 'Exit calendar-only view' : 'Calendar-only view'}
+              aria-pressed={calendarOnly}
+            >
+              {calendarOnly ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
         {/* Smart legend — adapts to the colors visible in the current view */}
         {calendarView !== 'map' && legendEntries.length > 0 && (
-          <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <div className={`flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${calendarOnly ? 'mt-2.5' : 'mt-3.5'}`}>
             <span className="mr-0.5 text-[0.6rem] font-black uppercase tracking-[0.16em] text-slate-400">
               Legend
             </span>
@@ -3574,8 +3660,10 @@ export default function PortalAppointments() {
         )}
 
         {calendarView === 'month' && (
-          <div className="mt-4 hidden overflow-x-auto sm:block">
-            <div className="grid min-w-[44rem] grid-cols-7 gap-1.5 md:min-w-[52rem] md:gap-2">
+          <div className={`mt-4 hidden overflow-x-auto sm:block ${calendarOnly ? 'lg:mt-3 lg:min-h-0 lg:flex-1' : ''}`}>
+            <div
+              className={`grid min-w-[44rem] grid-cols-7 gap-1.5 md:min-w-[52rem] md:gap-2 ${calendarOnly ? 'lg:h-full lg:auto-rows-[minmax(0,1fr)]' : ''}`}
+            >
               {monthDays.map((date) => renderDayColumn(date, true))}
             </div>
           </div>
@@ -3840,7 +3928,7 @@ export default function PortalAppointments() {
 
       </section>
 
-      <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
+      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
         <div className="border-b border-slate-200 pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
             Schedule
