@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import { CLOSED_PROGRAM_INTAKE } from '../lib/programClosures';
+import { readAttribution } from '../lib/attributionCapture';
+import { projectTypeFromHamiltonForm } from '../../lib/project-review';
 
 /**
  * `variant` decides what this form promises, not what it collects.
@@ -70,7 +72,9 @@ export default function HamiltonGrantForm({ variant = 'grant' }: Props) {
     ];
 
     const payload = {
-      projectType: `Hamilton Grant - ${formData.projectType}`,
+      // The grant is closed on every page that uses 'closed'; the office alert
+      // must not call these leads grant applications.
+      projectType: `${isClosed ? 'Hamilton Basement Financing' : 'Hamilton Grant'} - ${formData.projectType}`,
       budget: '',
       timeline: formData.timeline,
       name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -100,6 +104,27 @@ export default function HamiltonGrantForm({ variant = 'grant' }: Props) {
           body: JSON.stringify(payload),
         }
       );
+
+      // ALSO create the lead in the portal. Until November 2026 this form only
+      // reached the Apps Script above, so its homeowners existed in an inbox
+      // and nowhere else. Same intake as /match (dedupe, attribution, text);
+      // see lib/project-review.ts. A failure here never blocks the homeowner:
+      // the Apps Script alert above has already gone.
+      await fetch('/api/leads?flow=project_review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form: isClosed ? 'hamilton_closed' : 'hamilton_grant',
+          projectType: projectTypeFromHamiltonForm(formData.projectType),
+          name: payload.name,
+          email: formData.email.trim(),
+          phone: formData.phone.replace(/\D/g, ''),
+          city: 'Hamilton',
+          address: formData.address.trim(),
+          notes: payload.message.split(' | ').join('\n'),
+          attribution: readAttribution(),
+        }),
+      }).catch(() => null);
 
       if (typeof window !== 'undefined' && (window as any).fbq) {
         (window as any).fbq('track', 'Lead', {

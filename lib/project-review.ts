@@ -109,3 +109,44 @@ export function planProjectReviewSms(c: {
     body: smsProjectReview({ name: c.name, projectType: c.projectType, bookingUrl }),
   };
 }
+
+// ─── Other forms that feed the same intake ───────────────────────────────────
+// The Hamilton guide pages carry their own form (src/components/
+// HamiltonGrantForm.tsx). Until November 2026 it posted ONLY to the Apps Script,
+// so its leads reached an inbox and never the portal — and the alert still
+// called them "Hamilton Grant" after the grant closed.
+//
+// It now posts here too. Its labels differ from /match's, so they are mapped
+// onto the /match option labels: one vocabulary in the portal, and the same
+// text decision as /match. Anything unmapped arrives unchanged and gets no
+// text, which is the safe direction.
+
+const HAMILTON_FORM_PROJECT_TYPES: Record<string, string> = {
+  'Legal Secondary Suite': 'Legal basement / secondary suite',
+  'Garden Suite / Detached Unit': 'Garden suite',
+  'Laneway Suite / Detached Unit': 'Garden suite',
+  'Not sure yet': 'Not sure yet',
+};
+
+export function projectTypeFromHamiltonForm(label: string): string {
+  const key = (label ?? '').trim();
+  return HAMILTON_FORM_PROJECT_TYPES[key] ?? key;
+}
+
+/**
+ * Where a project_review submission came from, as the portal shows it.
+ *
+ * Allow-listed: a public endpoint must not let a caller write arbitrary text
+ * into sourceDetail. Unknown or missing keys fall back to /match, which is
+ * what every submission said before this existed.
+ */
+export const PROJECT_REVIEW_FORMS: Record<string, string> = {
+  match: 'Project Review (/match)',
+  hamilton_closed: 'Hamilton Basement Financing Form (grant closed)',
+  hamilton_grant: 'Hamilton Grant Form',
+};
+
+export function projectReviewSourceDetail(form: unknown): string {
+  const key = typeof form === 'string' ? form.trim() : '';
+  return PROJECT_REVIEW_FORMS[key] ?? PROJECT_REVIEW_FORMS.match;
+}

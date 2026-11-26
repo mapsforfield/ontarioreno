@@ -79,7 +79,7 @@ import {
   SYSTEM_BOOKING_USER_NAME,
   type BookingDeps,
 } from '../../lib/public-booking.js';
-import { planProjectReviewSms } from '../../lib/project-review.js';
+import { planProjectReviewSms, projectReviewSourceDetail } from '../../lib/project-review.js';
 import { fetchThread, missingFromThread } from '../../lib/twilio-thread-sync.js';
 import {
   planBookingNotifications,
@@ -2594,7 +2594,8 @@ async function handlePublicFlow(req: VercelRequest, res: VercelResponse) {
     const incoming = importLeadData({
       ...body,
       source: 'website_intake',
-      sourceDetail: 'Project Review (/match)',
+      // Allow-listed; anything unknown reads as /match, as it always did.
+      sourceDetail: projectReviewSourceDetail(body.form),
     });
 
     const lead = await withTables(async () => {

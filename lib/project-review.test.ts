@@ -5,6 +5,8 @@ import {
   planProjectReviewSms,
   smsProjectReview,
   PROJECT_TYPES_NO_LINK,
+  projectTypeFromHamiltonForm,
+  projectReviewSourceDetail,
 } from './project-review.js';
 
 // The eight options a homeowner can actually pick, copied from the labels in
@@ -100,4 +102,33 @@ test('planning: a mapped type produces the link and the body together', () => {
     assert.equal(plan.bookingUrl, 'https://ontarioreno.ca/consultation/basement');
     assert.match(plan.body, /consultation\/basement/);
   }
+});
+
+// ─── Hamilton guide form ─────────────────────────────────────────────────────
+
+test('hamilton form: a secondary suite lands as the /match label and earns the basement link', () => {
+  const projectType = projectTypeFromHamiltonForm('Legal Secondary Suite');
+  assert.equal(projectType, 'Legal basement / secondary suite');
+  const plan = planProjectReviewSms({ name: 'Syed', phone: '6470000000', projectType });
+  assert.equal(plan.send, true);
+});
+
+test('hamilton form: garden and laneway both map to garden suite', () => {
+  assert.equal(projectTypeFromHamiltonForm('Garden Suite / Detached Unit'), 'Garden suite');
+  assert.equal(projectTypeFromHamiltonForm('Laneway Suite / Detached Unit'), 'Garden suite');
+});
+
+test('hamilton form: "Not sure yet" still gets no text', () => {
+  const plan = planProjectReviewSms({
+    name: 'Syed',
+    phone: '6470000000',
+    projectType: projectTypeFromHamiltonForm('Not sure yet'),
+  });
+  assert.equal(plan.send, false);
+});
+
+test('source detail: allow-listed, defaults to /match', () => {
+  assert.equal(projectReviewSourceDetail('hamilton_closed'), 'Hamilton Basement Financing Form (grant closed)');
+  assert.equal(projectReviewSourceDetail(undefined), 'Project Review (/match)');
+  assert.equal(projectReviewSourceDetail('<script>anything'), 'Project Review (/match)');
 });
