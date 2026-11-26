@@ -50,7 +50,7 @@ function Warning({ children }: { children: ReactNode }) {
 /* Bathroom — as published on the previous /bathroom-renovations page. */
 /* ------------------------------------------------------------------ */
 
-const BATHROOM_ROWS: [string, string][] = [
+export const BATHROOM_ROWS: [string, string][] = [
   ['Demolition & prep', '$1,500 – $4,000'],
   ['Waterproofing & shower prep', '$2,500 – $6,000'],
   ['Tile supply & installation', '$5,000 – $14,000+'],

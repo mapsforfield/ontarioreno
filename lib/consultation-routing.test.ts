@@ -789,7 +789,9 @@ test('the kitchen form asks three project types and three timelines', () => {
     projectTypes.options.map((o) => o.value),
     ['full_remodel', 'cabinets_countertops', 'unsure']
   );
-  const timelines = KITCHEN_FINANCING_PROGRAM.questions.find((q) => q.key === 'timeline')!;
+  // Since November 2026 the kitchen flow is calendar-first and asks timing
+  // AFTER the booking, so the question lives in prepQuestions now. Same options.
+  const timelines = [...KITCHEN_FINANCING_PROGRAM.questions, ...KITCHEN_FINANCING_PROGRAM.prepQuestions].find((q) => q.key === 'timeline')!;
   assert.deepEqual(
     timelines.options.map((o) => o.value),
     ['asap', '1_3_months', 'exploring']

@@ -7,7 +7,8 @@
 // not drift.
 
 import { useState } from 'react';
-import { ArrowLeft, CalendarDays, Check, ChevronDown, MapPin } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, ChevronDown, MapPin, Phone } from 'lucide-react';
+import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../../lib/contact';
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, type CalendarEvent } from '../../../lib/calendar-links';
 
 export type Question = {
@@ -177,6 +178,33 @@ export function OfferStrip({ offer }: { offer: OfferLockup }) {
 
 export type ShellBanner = { src: string; alt: string; offer?: OfferLockup };
 
+/**
+ * The way out, above every booking card. The flow has no site header, so a
+ * homeowner who wanted another look at the page they came from had only the
+ * browser's back button — easy to miss on a phone. History-back when there is
+ * somewhere to go back to (keeps their scroll position on the page they came
+ * from); the home page otherwise, e.g. arriving straight from an ad or a text.
+ * The phone number sits beside it for anyone who would rather just ask.
+ */
+function ExitBar() {
+  const goBack = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer.startsWith(window.location.origin)) {
+      e.preventDefault();
+      window.history.back();
+    }
+  };
+  return (
+    <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+      <a href="/" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-slate-500 transition hover:text-slate-800">
+        <ArrowLeft className="h-4 w-4" /> Back to site
+      </a>
+      <a href={PUBLIC_PHONE_HREF} className="inline-flex min-h-[44px] items-center gap-1.5 text-[#1B3C6C]">
+        <Phone className="h-4 w-4" /> {PUBLIC_PHONE_DISPLAY}
+      </a>
+    </div>
+  );
+}
+
 export function Shell({ children, title, step, totalSteps = 5, onBack, banner }: {
   children: React.ReactNode; title?: string; step?: number; totalSteps?: number; onBack?: () => void;
   banner?: ShellBanner;
@@ -196,8 +224,9 @@ export function Shell({ children, title, step, totalSteps = 5, onBack, banner }:
     // seam to line up because there are no two edges meeting — the white simply
     // starts where the photo stops.
     return (
-      <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-6 sm:items-center sm:py-12">
+      <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-3 sm:items-center sm:py-12">
         <div className="w-full max-w-md">
+          <ExitBar />
           <div className="overflow-hidden rounded-2xl shadow-xl">
             <div className="relative">
               <img
@@ -283,8 +312,9 @@ export function Shell({ children, title, step, totalSteps = 5, onBack, banner }:
   }
 
   return (
-    <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-8 sm:items-center sm:py-12">
+    <div className="flex min-h-screen justify-center bg-[#f0f4f8] px-4 py-3 sm:items-center sm:py-12">
       <div className="w-full max-w-md">
+        <ExitBar />
         <div className="mb-5 text-center">
           <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-[#1B3C6C] px-5 py-2">
             <span className="text-xs font-bold uppercase tracking-widest text-white/80">OntarioReno</span>

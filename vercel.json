@@ -1,6 +1,9 @@
 {
   "redirects": [
-    { "source": "/commercial/owners", "destination": "/commercial", "permanent": false }
+    { "source": "/commercial/owners", "destination": "/commercial", "permanent": false },
+    { "source": "/2024/:rest*", "destination": "/", "permanent": true },
+    { "source": "/2025/:rest*", "destination": "/", "permanent": true },
+    { "source": "/category/:rest*", "destination": "/", "permanent": true }
   ],
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.png" },

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { BasementCityLinks } from '../components/BasementCityLinks';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -91,10 +92,10 @@ export default function PickeringBasementRenovation() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovation in Pickering | OntarioReno</title>
+        <title>Basement Renovations Pickering | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
-          content="Planning a basement renovation in Pickering? Learn what finished basements usually involve, what City of Pickering permits may apply, and how family-use and legal basement planning differ."
+          content="Basement renovations in Pickering: $45K basic finish to $90K+ legal suite. City of Pickering permit help, financing and a free in-home visit."
         />
         <link
           rel="canonical"
@@ -198,6 +199,9 @@ export default function PickeringBasementRenovation() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="pickering" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">

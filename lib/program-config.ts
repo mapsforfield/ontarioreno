@@ -223,6 +223,16 @@ export type ProgramConfig = {
    */
   booksWithoutVerifiedAddress?: boolean;
   /**
+   * Book a homeowner who answers the project type with "Not sure yet".
+   *
+   * Only meaningful alongside 'calendar_early', for the same reason as
+   * booksWithoutVerifiedAddress: they have already chosen a time, and "not
+   * sure which kitchen job" is a question for the visit, not doubt about
+   * whether we would come. The booking still carries PROJECT_TYPE_UNCERTAIN so
+   * the rep knows. A blank project type still blocks.
+   */
+  booksUncertainProjectType?: boolean;
+  /**
    * An address outside Ontario becomes a CALL-BACK rather than a decline.
    *
    * The decline is not wrong — we genuinely will not drive to Gatineau — but
@@ -1135,8 +1145,22 @@ export const KITCHEN_FINANCING_PROGRAM: ProgramConfig = {
   fundingGuidance: KITCHEN_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['full_remodel', 'cabinets_countertops'],
   nurtureTimelines: [],
-  questions: [KITCHEN_PROJECT_TYPE, KITCHEN_TIMELINE, KITCHEN_CONTRIBUTION],
-  prepQuestions: KITCHEN_PREP_QUESTIONS,
+  // Calendar first, as the basement and bathroom flows (owner's call, November
+  // 2026: kitchen and garden suite were the two booking pages that still asked
+  // for an address before showing a single time, despite /book promising "pick
+  // your project to see open times"). Same shape as the bathroom: one question
+  // before the booking, then name, mobile and address. TIMELINE and the payment
+  // question are not gone — they moved to prepQuestions, after the booking,
+  // where the rep's brief still receives them. nurtureTimelines is [], so the
+  // timeline answer could never have changed the routing anyway.
+  questions: [KITCHEN_PROJECT_TYPE],
+  addressPlacement: 'final',
+  bookingFlow: 'calendar_early',
+  booksWithoutVerifiedAddress: true,
+  capturesOutOfAreaLeads: true,
+  booksUncertainProjectType: true,
+  prepFinancingNote: 'Monthly plans from about $199 a month, on approved credit, with nothing upfront.',
+  prepQuestions: [...KITCHEN_PREP_QUESTIONS, KITCHEN_TIMELINE, KITCHEN_CONTRIBUTION],
   // Nobody prices cabinetry and a possible wall removal off a photo.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Kitchen Renovation Consultation',
@@ -1322,8 +1346,23 @@ export const GARDEN_SUITE_FINANCING_PROGRAM: ProgramConfig = {
   fundingGuidance: GARDEN_SUITE_FUNDING_GUIDANCE,
   eligibleProjectTypes: ['garden_suite', 'laneway_suite', 'garage_conversion'],
   nurtureTimelines: [],
-  questions: [GARDEN_SUITE_PROJECT_TYPE, TIMELINE, GARDEN_SUITE_CONTRIBUTION],
-  prepQuestions: GARDEN_SUITE_PREP_QUESTIONS,
+  // Calendar first, as the basement (see the kitchen program for why). The ONE
+  // difference: the funding question stays BEFORE the booking. Its subtext is
+  // where a homeowner learns the financing is capped at $100,000 against a
+  // $250,000+ build, and that must reach them before they hold an afternoon for
+  // a visit — not in a prep question after it. TIMELINE moved to prep;
+  // nurtureTimelines is [], so it never changed routing.
+  questions: [GARDEN_SUITE_PROJECT_TYPE, GARDEN_SUITE_CONTRIBUTION],
+  addressPlacement: 'final',
+  bookingFlow: 'calendar_early',
+  booksWithoutVerifiedAddress: true,
+  capturesOutOfAreaLeads: true,
+  booksUncertainProjectType: true,
+  bookingBanner: {
+    src: '/images/garden-suite.jpg',
+    alt: 'A detached garden suite in a residential back yard',
+  },
+  prepQuestions: [...GARDEN_SUITE_PREP_QUESTIONS, TIMELINE],
   // Servicing and setbacks are decided standing in the yard, not on a call.
   consultationMode: 'in_person',
   appointmentProjectTypeLabel: 'Garden Suite Consultation',

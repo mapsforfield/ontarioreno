@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, CircleDollarSign, Home, ShieldCheck } from 'lucide-react';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const costBreakdown = [
   {
@@ -38,10 +39,10 @@ export default function HamiltonBasementRenovationCost() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovation Cost in Hamilton (2026 Guide) | OntarioReno</title>
+        <title>Basement Renovation Hamilton | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
-          content="Learn the typical basement renovation cost in Hamilton, what drives pricing, how legal suite costs differ, and how financing or Hamilton grant options may fit your project."
+          content="Basement renovation in Hamilton: $45K basic finish to $90K+ legal suite, Stoney Creek to Waterdown. Permit help and a free in-home visit."
         />
         <link
           rel="canonical"
@@ -122,6 +123,9 @@ export default function HamiltonBasementRenovationCost() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="hamilton" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">

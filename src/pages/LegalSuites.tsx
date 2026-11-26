@@ -22,6 +22,10 @@ import {
 import { BASEMENT_COST_TABS } from '../data/projects/costContent';
 import { PageMeta } from '../components/PageMeta';
 
+// The hero photo: the kitchenette lower unit's living area (office-confirmed).
+const HERO_PROJECT = SUITE_PROJECTS.find((p) => p.slug === 'suite-lower-unit-with-kitchenette') ?? SUITE_PROJECTS[0];
+const HERO_PHOTO = HERO_PROJECT.finished[0];
+
 export default function LegalSuites() {
   const [costsOpen, setCostsOpen] = useState(false);
 
@@ -29,22 +33,43 @@ export default function LegalSuites() {
     <div className="bg-slate-50 min-h-screen">
       <PageMeta
         path="/legal-suites"
-        title="Legal Secondary Suites in Ontario | Zoning, Code & Costs | OntarioReno"
+        title="Legal Basement Suites in Ontario | Code & Costs | OntarioReno"
         description="How to build a legal, code-compliant basement suite in Ontario: zoning, fire separation, egress, HVAC separation, and what real pricing looks like."
       />
-      {/* Hero */}
-      <section className="bg-slate-900 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Hero. It used to be a plain dark block of text, which is all a phone
+          showed on load. It now leads with a real lower unit from the project
+          files (SUITE_PROJECTS, office-confirmed) behind the same headline,
+          copy and both CTAs. The caption names what was BUILT and where; it
+          does not claim legal status — see the note in data/projects/suites. */}
+      <section className="relative isolate overflow-hidden bg-slate-900 text-white">
+        {/* Phones: the photo is its own band at the top, fading into the
+            navy, so it is actually SEEN rather than buried under the text.
+            Wider screens: full-bleed behind the copy, darkened on the left. */}
+        <div className="relative h-72 sm:h-96 md:absolute md:inset-0 md:-z-10 md:h-auto">
+          <img
+            src={HERO_PHOTO.src}
+            srcSet={HERO_PHOTO.srcSet}
+            sizes="100vw"
+            alt={HERO_PHOTO.alt}
+            width={HERO_PHOTO.width}
+            height={HERO_PHOTO.height}
+            fetchPriority="high"
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0)_45%,rgba(15,23,42,1)_100%)] md:hidden" />
+          <div className="absolute inset-0 hidden md:block bg-[linear-gradient(90deg,rgba(15,23,42,0.95)_0%,rgba(15,23,42,0.82)_45%,rgba(15,23,42,0.35)_100%)]" />
+        </div>
+        <div className="relative max-w-7xl mx-auto -mt-12 px-4 pb-12 sm:px-6 md:mt-0 md:py-24 lg:px-8">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-600/20 text-emerald-400 text-sm font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-600/25 text-emerald-300 text-sm font-medium mb-5 backdrop-blur-sm">
               <ShieldCheck className="w-4 h-4" /> High ROI Project
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+            <h1 className="text-4xl md:text-6xl font-bold mb-5 leading-tight">
               Legal Secondary Suites in Ontario
             </h1>
 
-            <p className="text-xl text-slate-300 mb-8">
+            <p className="text-lg md:text-xl text-slate-200 mb-6">
               The definitive guide to building a legal, code-compliant income
               suite. Learn about zoning, fire separation, egress, HVAC
               separation, and what real pricing looks like in Ontario.
@@ -57,6 +82,14 @@ export default function LegalSuites() {
                 legal secondary suite in Hamilton
               </Link>.
             </p>
+
+            <ul className="mb-7 flex flex-wrap gap-2 text-sm font-semibold">
+              {['Separate entrance', 'Fire separation', 'Egress windows', 'Own HVAC & laundry'].map((t) => (
+                <li key={t} className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-300" /> {t}
+                </li>
+              ))}
+            </ul>
 
             {/* Both paths stay live. A legal suite is a basement build, so
                 the booking goes to the basement consultation. */}
@@ -74,6 +107,10 @@ export default function LegalSuites() {
                 Start Project Review <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
+
+            <p className="mt-6 text-xs text-slate-300/90">
+              Pictured: a finished lower unit we built{HERO_PROJECT.location ? ` in ${HERO_PROJECT.location}` : ''}.
+            </p>
           </div>
         </div>
       </section>

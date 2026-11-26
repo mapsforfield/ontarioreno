@@ -12,14 +12,14 @@ import { FALLBACK_TILES, PRIMARY_TILES, probeTiles, type TileProvider } from '..
 // this after mount; the pins' CSS (.atag, .ocluster, .grantmapbox) still lives
 // in GrantsHub's CSS block.
 
-export type MapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
+export type MapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string; state?: 'open' | 'check' | 'closed' };
+
+const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function tagIcon(c: MapCity) {
   const badge = c.count > 1 ? `<i>${c.count}</i>` : '';
-  return L.divIcon({ className: '', html: `<div class="atag">${c.amount || 'Incentive'}${badge}</div>`, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -42] });
+  return L.divIcon({ className: '', html: `<div class="atag${c.state && c.state !== 'open' ? ` atag-${c.state}` : ''}">${esc(c.amount || 'Incentive')}${badge}</div>`, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -42] });
 }
-
-const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // Cluster nearby pins so the dense Golden Horseshoe doesn't overlap into a blob;
 // spread-out cities keep their amount pins. Click a cluster to expand.
@@ -34,8 +34,10 @@ function ClusterLayer({ cities }: { cities: MapCity[] }) {
     });
     cities.forEach((c) => {
       const m = L.marker([c.lat, c.lng], { icon: tagIcon(c) });
-      m.bindPopup(`<div class="grantpop"><b>${esc(c.city)}</b><br>${c.count} program${c.count > 1 ? 's' : ''}${c.amount ? ` · ${esc(c.amount)}` : ''}<br><a href="${esc(c.href)}">View →</a></div>`);
+      m.bindPopup(`<div class="grantpop"><b>${esc(c.city)}</b><br>${c.count} program${c.count > 1 ? 's' : ''}${c.amount ? ` · ${esc(c.amount)}` : ''}${c.state === 'closed' ? '<br><small>Closed to new applications</small>' : ''}<br><a href="${esc(c.href)}">View →</a></div>`);
       m.on('mouseover', () => m.openPopup());
+      // Phones have no hover: a tap must open the same popup.
+      m.on('click', () => m.openPopup());
       group.addLayer(m);
     });
     map.addLayer(group);

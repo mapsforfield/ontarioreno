@@ -209,3 +209,60 @@ test('each calendar-early program shows its own photo and claims only its own te
     }
   }
 });
+
+// ─── Kitchen and garden suite on the same flow (November 2026) ───────────────
+//
+// They were the two booking pages that still asked for an address before
+// showing a single time. Same shape as the bathroom now, with one deliberate
+// difference: the garden suite's funding question stays before the booking,
+// because its subtext is where the $100,000 cap is disclosed.
+
+for (const slug of ['kitchen', 'garden-suite']) {
+  const program = programBySlug(slug)!;
+
+  test(`the ${slug} flow is calendar-first`, () => {
+    assert.equal(program.bookingFlow, 'calendar_early');
+    assert.equal(program.addressPlacement, 'final');
+    assert.equal(program.booksWithoutVerifiedAddress, true);
+  });
+
+  test(`every ${slug} answer before the booking reaches the calendar`, () => {
+    // The homeowner has already chosen a time when they answer these; an
+    // option that routes to MANUAL_REVIEW would take the slot back from them.
+    const [first, ...rest] = program.questions;
+    for (const option of first.options) {
+      const answers: Record<string, string> = { [first.key]: option.value };
+      for (const q of rest) answers[q.key] = q.options[0].value;
+      const routed = routeConsultation({
+        addressState: 'ADDRESS_VERIFIED',
+        area: program.schedulingArea,
+        program,
+        answers,
+      });
+      assert.equal(routed.outcome, 'DIRECT_CALENDAR', `${slug}: ${option.value} lost the booking`);
+    }
+    for (const q of rest) {
+      for (const option of q.options) {
+        const routed = routeConsultation({
+          addressState: 'ADDRESS_VERIFIED',
+          area: program.schedulingArea,
+          program,
+          answers: { [first.key]: first.options[0].value, [q.key]: option.value },
+        });
+        assert.equal(routed.outcome, 'DIRECT_CALENDAR', `${slug}: ${q.key}=${option.value} lost the booking`);
+      }
+    }
+  });
+}
+
+test('the garden suite cap is disclosed before the booking, not after', () => {
+  const garden = programBySlug('garden-suite')!;
+  const funding = garden.questions.find((q) => q.key === 'contribution');
+  assert.ok(funding, 'the funding question moved behind the booking — the $100,000 cap would reach the homeowner too late');
+  assert.match(funding!.help ?? '', /\$100,000/);
+});
+
+test('the kitchen rep still gets timing and payment — after the booking', () => {
+  const prep = programBySlug('kitchen')!.prepQuestions.map((q) => q.key);
+  for (const key of ['timeline', 'contribution']) assert.ok(prep.includes(key), `kitchen lost the ${key} answer`);
+});

@@ -80,7 +80,7 @@ export default function BarrieBasementRenovation() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovation in Barrie | OntarioReno</title>
+        <title>Basement Renovations Barrie | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
           content="Planning a basement renovation in Barrie? Compare finished basements, legal secondary suites, garden suites, Barrie funding programs, permit requirements, and project costs."

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { BasementCityLinks } from '../components/BasementCityLinks';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -91,10 +92,10 @@ export default function AjaxBasementRenovation() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovations in Ajax | Finishing & Legal Suites | OntarioReno</title>
+        <title>Basement Renovations Ajax | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
-          content="Basement finishing and legal basement suites in Ajax, built by vetted local contractors. See typical costs and Town of Ajax permit steps, then book a free in-home project review."
+          content="Basement renovations in Ajax: $45K basic finish to $90K+ legal suite. Town of Ajax permit help, financing and a free in-home visit."
         />
         <link
           rel="canonical"
@@ -197,6 +198,9 @@ export default function AjaxBasementRenovation() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="ajax" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
