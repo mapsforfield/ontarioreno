@@ -355,3 +355,30 @@
     animation: none;
   }
 }
+
+/* ── Portal: compact window mode (admin toggle, lib/compactMode.ts) ─────────
+   For stacked windows ~600px tall. Every portal page opens its sections with
+   a small uppercase "eyebrow" above an h1/h2 ("REP AGENDA / Today's Agenda").
+   In compact mode the eyebrow goes and the heading shrinks, on every page at
+   once, so the content starts higher. Desktop only; phones are untouched. */
+@media (min-width: 1024px) {
+  .portal-compact .portal-page p.uppercase:has(+ h1),
+  .portal-compact .portal-page p.uppercase:has(+ h2) {
+    display: none;
+  }
+  .portal-compact .portal-page p.uppercase + h1,
+  .portal-compact .portal-page p.uppercase + h2 {
+    margin-top: 0;
+  }
+  .portal-compact .portal-page h1.text-2xl,
+  .portal-compact .portal-page h1.text-3xl,
+  .portal-compact .portal-page h2.text-2xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  /* Pill filters (calendar rep/contractor) size to their text instead of
+     taking a full row each and pushing the month grid down. */
+  .portal-compact .portal-page select.rounded-full {
+    width: auto;
+  }
+}

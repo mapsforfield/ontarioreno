@@ -26,6 +26,7 @@ import QuickOutcomeSheet from '../components/QuickOutcomeSheet';
 import RepliesBox, { REPLY_LABEL } from '../components/RepliesBox';
 import { OPEN_REPLY_STATUSES } from '../../../lib/sms-reply-resolution';
 import { usePortalAuth } from '../auth';
+import { usePortalCompact } from '../lib/compactMode';
 
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
@@ -762,6 +763,8 @@ function getOutcomeBadge(appointment: Appointment) {
 
 export default function PortalAppointments() {
   const { currentUser, isAdmin } = usePortalAuth();
+  // Admin compact window mode (stacked windows) — see lib/compactMode.ts.
+  const compactWindow = usePortalCompact();
   const {
     addContractorDispatch,
     addAppointment,
@@ -2408,7 +2411,7 @@ export default function PortalAppointments() {
         key={dateKey}
         onClick={openDayView}
         className={`cursor-pointer rounded-[0.5rem] border border-slate-200 bg-white transition hover:border-[#b8c9dd] hover:bg-[#f6faff] ${
-          compact ? 'min-h-20 p-2' : 'min-h-32 p-3'
+          compact ? (compactWindow ? 'min-h-16 p-1.5' : 'min-h-20 p-2') : 'min-h-32 p-3'
         } ${
           isOutsideMonth && calendarView === 'month' ? 'opacity-55' : ''
         }`}
@@ -2450,7 +2453,7 @@ export default function PortalAppointments() {
             )}
           </div>
         </div>
-        <div className={`${compact ? 'mt-2 space-y-2.5' : 'mt-3 space-y-3'}`}>
+        <div className={`${compact ? (compactWindow ? 'mt-1.5 space-y-1.5' : 'mt-2 space-y-2.5') : 'mt-3 space-y-3'}`}>
           {visibleAppointments.map((appointment) => (
             <span key={appointment.id} onClick={(e) => e.stopPropagation()}>
               <AppointmentPill
@@ -2499,7 +2502,7 @@ export default function PortalAppointments() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className={compactWindow ? 'space-y-3' : 'space-y-5'}>
       {quickOutcomeAppointment && (
         <QuickOutcomeSheet
           appointment={quickOutcomeAppointment}
@@ -2542,10 +2545,10 @@ export default function PortalAppointments() {
           the first screen. */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm">
+          <p className={`text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] sm:text-sm ${compactWindow ? 'lg:hidden' : ''}`}>
             Consultation Center
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 sm:text-3xl">
+          <h1 className={`mt-1 text-2xl font-black tracking-[-0.02em] sm:mt-2 ${compactWindow ? 'lg:mt-0' : 'sm:text-3xl'}`}>
             <span className="sm:hidden">Consultations</span>
             <span className="hidden sm:inline">OntarioReno consultation board</span>
           </h1>
@@ -2605,18 +2608,18 @@ export default function PortalAppointments() {
 
       {/* Phones get one compact row; the four full cards filled the first
           screen before a single consultation showed. */}
-      <section className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      <section className={`grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 ${compactWindow ? 'lg:grid-cols-4 lg:gap-3' : ''}`}>
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-[0.5rem] border border-white bg-white px-2 py-2.5 text-center shadow-sm sm:p-5 sm:text-left"
+            className={`rounded-[0.5rem] border border-white bg-white px-2 py-2.5 text-center shadow-sm sm:p-5 sm:text-left ${compactWindow ? 'lg:px-4 lg:py-2.5' : ''}`}
           >
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.06em] text-slate-500 sm:hidden">{metric.short}</p>
             <p className="hidden text-sm font-semibold text-slate-500 sm:block">{metric.label}</p>
-            <p className="mt-0.5 text-xl font-black tracking-[-0.02em] sm:mt-3 sm:text-3xl">
+            <p className={`mt-0.5 text-xl font-black tracking-[-0.02em] sm:mt-3 sm:text-3xl ${compactWindow ? 'lg:mt-0.5 lg:text-2xl' : ''}`}>
               {metric.value}
             </p>
-            <p className="mt-4 hidden text-sm font-medium text-slate-500 sm:block">
+            <p className={`mt-4 hidden text-sm font-medium text-slate-500 sm:block ${compactWindow ? 'lg:hidden' : ''}`}>
               {metric.detail}
             </p>
           </article>
@@ -3454,12 +3457,12 @@ export default function PortalAppointments() {
       </section>
 
       <section className="hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 lg:block">
-        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className={`flex flex-col gap-3 border-b border-slate-200 lg:flex-row lg:items-center lg:justify-between ${compactWindow ? 'pb-3' : 'pb-4'}`}>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
+            <p className={`text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] ${compactWindow ? 'lg:hidden' : ''}`}>
               Consultation Dispatch
             </p>
-            <h2 className="mt-2 text-2xl font-black tracking-[-0.02em]">
+            <h2 className={`font-black tracking-[-0.02em] ${compactWindow ? 'text-xl' : 'mt-2 text-2xl'}`}>
               {calendarView === 'month'
                 ? monthLabel
                 : calendarView === 'week'
