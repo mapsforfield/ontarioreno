@@ -63,7 +63,7 @@ export default function BasementsNext() {
     <div className="bg-slate-50">
       <PageMeta
         path="/basements"
-        title="Basement Renovations in Ontario | Finished Projects & Costs | OntarioReno"
+        title="Basement Renovations Ontario | Costs & Projects | OntarioReno"
         description="Finished basements from across Ontario, completed by vetted contractors. See what was done to each space, what drives the cost, and book a free in-home project review."
       />
       {/* ---- Masthead. Boxed to the same max-w-7xl gutter as the Navbar. ---- */}

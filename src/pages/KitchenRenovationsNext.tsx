@@ -59,7 +59,7 @@ export default function KitchenRenovationsNext() {
     <div className="bg-slate-50">
       <PageMeta
         path="/kitchen-renovations"
-        title="Kitchen Renovations in Ontario | Finished Projects & Costs | OntarioReno"
+        title="Kitchen Renovations Ontario | Costs & Projects | OntarioReno"
         description="Finished kitchen renovations from across Ontario by vetted contractors. See what was done to each room, what drives the cost, and book a free in-home project review."
       />
       {/* ---- Masthead. Boxed to the same max-w-7xl gutter as the Navbar. ---- */}

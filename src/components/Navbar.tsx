@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SERVICE_PICKER_HREF, bookingHrefFor } from '../lib/bookingRoutes';
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { ChevronDown, Menu, X, Phone } from 'lucide-react';
+import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../lib/contact';
 import { cn } from '../lib/utils';
 import { buttonStyles } from '../lib/uiStyles';
 
@@ -489,9 +490,17 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center gap-1 md:hidden">
+            <a
+              href={PUBLIC_PHONE_HREF}
+              aria-label={`Call OntarioReno at ${PUBLIC_PHONE_DISPLAY}`}
+              className="rounded-[0.95rem] p-2.5 text-[#1B3C6C] transition hover:bg-slate-100"
+            >
+              <Phone className="h-5 w-5" />
+            </a>
             <button
               onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
               className="rounded-[0.95rem] p-2.5 text-slate-600 transition hover:bg-slate-100 hover:text-[#1B3C6C]"
               type="button"
             >

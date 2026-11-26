@@ -25,6 +25,7 @@ const STATUS: Record<string, { c: string; t: string }> = {
 
 const CSS = `
 .atag{position:absolute;transform:translate(-50%,-100%);background:#1B3C6C;color:#fff;font-weight:800;font-size:13px;padding:6px 12px;border-radius:16px;white-space:nowrap;box-shadow:0 4px 9px rgba(15,23,42,.35);border:2px solid #fff;font-family:inherit;cursor:pointer}
+.atag-closed{background:#94a3b8}.atag-check{background:#b45309}
 .atag:after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff}
 .atag i{position:absolute;top:-9px;right:-9px;background:#fff;color:#1B3C6C;border-radius:999px;font-size:10px;font-style:normal;font-weight:800;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;border:1.5px solid #1B3C6C;padding:0 3px}
 .grantpop b{color:#1B3C6C}.grantpop a{display:inline-block;margin-top:6px;background:#1B3C6C;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700}
@@ -88,7 +89,7 @@ export default function GrantsHub() {
       {/* Map */}
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-bold tracking-[-0.02em] text-slate-900 md:text-3xl">Where the grants are</h2>
-        <p className="mt-1 text-slate-600">Hover a marker to see the programs available in that city.</p>
+        <p className="mt-1 text-slate-600">Tap a marker to see the programs available in that city.</p>
         {/* z-0 keeps Leaflet's high internal z-indexes contained below the sticky header (z-50). */}
         <div className="relative z-0 mt-6">
           {mounted ? (

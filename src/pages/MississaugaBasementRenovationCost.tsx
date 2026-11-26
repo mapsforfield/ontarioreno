@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, CircleDollarSign, Home, ShieldCheck } from 'lucide-react';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const costBreakdown = [
   {
@@ -38,7 +39,7 @@ export default function MississaugaBasementRenovationCost() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovation Cost in Mississauga (2026 Guide) | OntarioReno</title>
+        <title>Basement Renovation Cost Mississauga (2026) | OntarioReno</title>
         <meta
           name="description"
           content="Learn the typical basement renovation cost in Mississauga, what drives pricing in older and newer homes, and how legal suite work changes the budget."
@@ -101,6 +102,9 @@ export default function MississaugaBasementRenovationCost() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="mississauga" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { BasementCityLinks } from '../components/BasementCityLinks';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -91,10 +92,10 @@ export default function BramptonBasementRenovation() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Basement Renovations in Brampton | Finishing & Legal Suites | OntarioReno</title>
+        <title>Basement Renovations Brampton | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
-          content="Basement finishing and legal basement suites in Brampton, built by vetted local contractors. See typical costs and City of Brampton permit steps, then book a free in-home project review."
+          content="Basement renovations in Brampton: $45K basic finish to $90K+ legal suite. City of Brampton permit help, financing and a free in-home visit."
         />
         <link
           rel="canonical"
@@ -201,6 +202,9 @@ export default function BramptonBasementRenovation() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="brampton" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">

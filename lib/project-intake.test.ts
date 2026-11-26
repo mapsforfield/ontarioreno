@@ -65,10 +65,13 @@ test('no budget or payment answer is sent from /match', () => {
 test('timelines translate into the program vocabulary, never invented', () => {
   const kitchen = programBySlug('kitchen')!;
   const garden = programBySlug('garden-suite')!;
-  assert.equal(timelineForProgram(kitchen, 'asap'), 'asap');
-  // Kitchen folded "3+ months" into "exploring" on purpose.
-  assert.equal(timelineForProgram(kitchen, '3_plus_months'), 'exploring');
-  assert.equal(timelineForProgram(garden, '3_plus_months'), '3_plus_months');
+  // November 2026: kitchen and garden suite moved to the calendar-first flow,
+  // where timing is a prep question asked AFTER the booking — exactly as the
+  // basement and bathroom. A /match timeline therefore has no pre-booking
+  // question to land in, and is not sent (never invented into another key).
+  assert.equal(timelineForProgram(kitchen, 'asap'), '');
+  assert.equal(timelineForProgram(kitchen, '3_plus_months'), '');
+  assert.equal(timelineForProgram(garden, '3_plus_months'), '');
   assert.equal(timelineForProgram(kitchen, 'next_decade'), '');
   assert.equal(timelineForProgram(WINDOWS_DOORS_PROGRAM, 'asap'), '');
 });

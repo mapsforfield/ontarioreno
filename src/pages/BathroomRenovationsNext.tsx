@@ -83,8 +83,8 @@ export default function BathroomRenovationsNext() {
     <div className="bg-slate-50">
       <PageMeta
         path="/bathroom-renovations"
-        title="Bathroom Renovations in Ontario | Finished Projects & Costs | OntarioReno"
-        description="Finished bathroom renovations from across Ontario by vetted contractors, including the work behind the walls that decides how long a bathroom lasts. See costs and book a free review."
+        title="Bathroom Renovations Ontario | Costs & Free Visit | OntarioReno"
+        description="Bathroom renovations across Ontario by vetted contractors: showers, tile, vanities and full rebuilds. See real finished bathrooms and costs, then book a free in-home visit."
       />
       {/* ---- Masthead. Short: it does not own a whole screen on its own.
 
@@ -287,6 +287,12 @@ export default function BathroomRenovationsNext() {
             See the full breakdown
           </button>
         </div>
+        <p className="mx-auto mt-5 max-w-7xl text-sm text-slate-600">
+          Shower, vanity and tub costs line by line:{' '}
+          <Link to="/bathroom-renovation-cost-ontario" className="font-semibold text-[#2b5a96] underline underline-offset-4">
+            Bathroom renovation cost in Ontario
+          </Link>
+        </p>
       </section>
 
       {/* The live band component, so the closing CTA is the real one. */}

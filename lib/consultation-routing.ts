@@ -111,7 +111,10 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // A recognised area whose program is not live yet (Simcoe at launch) must be
   // reviewed by a person, never declined — we do serve there.
   if (area && (!program || !program.enabled)) reasons.push('PROGRAM_NOT_ENABLED');
-  if (UNCERTAIN.has(projectType)) reasons.push('PROJECT_TYPE_UNCERTAIN');
+  // See booksUncertainProjectType: an explicit "not sure" may book on a program
+  // that opts in. A blank answer never does.
+  const uncertainBooks = projectType === 'unsure' && !!program?.booksUncertainProjectType;
+  if (UNCERTAIN.has(projectType) && !uncertainBooks) reasons.push('PROJECT_TYPE_UNCERTAIN');
   // No funding answer blocks the calendar — not even "not sure".
   //
   // "Not sure yet / Need guidance" is a REQUEST for the conversation, not doubt
@@ -165,6 +168,7 @@ export function routeConsultation(input: RoutingInput): RoutingResult {
   // the address on this booking was never confirmed before they plan the day
   // around it.
   if (addressUnverified) booked.push('ADDRESS_UNVERIFIED');
+  if (uncertainBooks) booked.push('PROJECT_TYPE_UNCERTAIN');
   if (contribution === 'need_financing') booked.push('WANTS_FINANCING');
   if (contribution === 'unsure') booked.push('NEEDS_FUNDING_GUIDANCE');
   // An early timeline that this program chose to book anyway is TAGGED, never

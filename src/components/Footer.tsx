@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Mail, MapPin, ArrowRight } from 'lucide-react';
+import { Mail, MapPin, ArrowRight, Phone } from 'lucide-react';
+import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../lib/contact';
 
 type FooterProps = {
   compactOnMobile?: boolean;
@@ -37,6 +38,10 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
                 info@ontarioreno.ca
               </a>
             </div>
+
+            <a href={PUBLIC_PHONE_HREF} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <Phone className="h-4 w-4" /> {PUBLIC_PHONE_DISPLAY}
+            </a>
 
             <p className="mt-7 text-sm leading-6 text-slate-400">
               Ontario renovation opportunity and fulfillment network.
@@ -153,6 +158,21 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
                   Ontario Pricing Data
                 </Link>
               </li>
+              <li>
+                <Link to="/legal-basement-requirements-in-ontario" className="transition-colors hover:text-[#5694CF]">
+                  Legal Basement Requirements
+                </Link>
+              </li>
+              <li>
+                <Link to="/contractor-partners" className="transition-colors hover:text-[#5694CF]">
+                  For Contractors
+                </Link>
+              </li>
+              <li>
+                <Link to="/commercial/contractors" className="transition-colors hover:text-[#5694CF]">
+                  Commercial Contractors
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -160,6 +180,12 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
             <h3 className="mb-6 font-semibold text-white">Contact</h3>
 
             <ul className="space-y-4 text-sm">
+              <li className="flex items-center gap-3">
+                <Phone className="h-4 w-4 text-slate-500" />
+                <a href={PUBLIC_PHONE_HREF} className="transition-colors hover:text-[#5694CF]">
+                  {PUBLIC_PHONE_DISPLAY}
+                </a>
+              </li>
               <li className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-slate-500" />
                 <a

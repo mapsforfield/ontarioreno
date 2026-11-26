@@ -1383,9 +1383,12 @@ export function renderHubHtml(pages: HubPage[], programs: HubProgram[]): string 
     if (!co) continue;
     const key = p.city.toLowerCase();
     const ex = cityAgg.get(key);
-    if (ex) { ex.count++; if (!ex.amount) ex.amount = shortAmount(p.maxAmount); }
+    // Only an open program may put a dollar amount on a pin (see HubMapCity).
+    const st = pinState(publicStatus(p));
+    const tag = st === 'open' ? shortAmount(p.maxAmount) : st === 'closed' ? 'Closed' : CHECK_STATUS_LABEL;
+    if (ex) { ex.count++; if (st === 'open' && (!ex.amount || ex.amount === 'Closed' || ex.amount === CHECK_STATUS_LABEL)) ex.amount = tag; }
     // rows are highest-score first, so the first program per city sets the tag.
-    else cityAgg.set(key, { city: p.city, lat: co[0], lng: co[1], count: 1, href: linkFor(p) || '/match?ref=grants-hub', amount: shortAmount(p.maxAmount) });
+    else cityAgg.set(key, { city: p.city, lat: co[0], lng: co[1], count: 1, href: linkFor(p) || '/match?ref=grants-hub', amount: tag });
   }
   const mapData = ldJson([...cityAgg.values()]);
 
@@ -1524,7 +1527,39 @@ export function publicStatus(p: { status: string; publicStatusOverride?: string 
 }
 
 export type HubRow = { city: string; name: string; amount: string; status: string; href: string; sourceUrl: string | null; fundingType: string; lat: number | null; lng: number | null };
-export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string };
+/**
+ * `state` is what the PIN may say. A pin is the loudest thing on /grants and
+ * carries no caveat, so it only ever shows a dollar amount for a program that is
+ * open (or upcoming). A city whose every program is closed shows "Closed"; one
+ * with only lapsed/unknown programs shows "Check status". Before this, closed
+ * Hamilton and St. Catharines both pinned "$40k" on the public map.
+ */
+export type HubMapCity = { city: string; lat: number; lng: number; count: number; amount: string; href: string; state: 'open' | 'check' | 'closed' };
+
+/** Which pin state a hub row contributes. Exported for the integrity test. */
+export function pinState(status: string): HubMapCity['state'] {
+  if (status === 'active' || status === 'upcoming') return 'open';
+  if (status === 'closed') return 'closed';
+  return 'check';
+}
+const PIN_RANK: Record<HubMapCity['state'], number> = { open: 2, check: 1, closed: 0 };
+
+/** Aggregate hub rows into one pin per city, never advertising money that isn't there. */
+export function aggregateMapCities(rows: HubRow[]): HubMapCity[] {
+  const agg = new Map<string, HubMapCity>();
+  for (const r of rows) {
+    if (r.lat == null || r.lng == null) continue;
+    const key = r.city.toLowerCase();
+    const state = pinState(r.status);
+    const label = state === 'open' ? pillLabel(r.amount, r.fundingType) : state === 'closed' ? 'Closed' : CHECK_STATUS_LABEL;
+    const ex = agg.get(key);
+    if (!ex) { agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: label, href: r.href, state }); continue; }
+    ex.count++;
+    // The best state in the city wins the pin, with its own amount and link.
+    if (PIN_RANK[state] > PIN_RANK[ex.state]) { ex.state = state; ex.amount = label; ex.href = r.href; }
+  }
+  return [...agg.values()];
+}
 
 /** Structured hub data (JSON) for the React /grants page: curated existing pages
  *  + scanner-approved programs, plus map aggregation. */
@@ -1559,17 +1594,9 @@ export async function getHubData(): Promise<{ updatedLabel: string; rows: HubRow
     rows.push({ city: p.city, name: p.name, amount: displayAmount, status: publicStatus(p), href, sourceUrl: officialSourceFromProgram(p), fundingType: p.fundingType, lat: co?.[0] ?? null, lng: co?.[1] ?? null });
   }
 
-  const agg = new Map<string, HubMapCity>();
-  for (const r of rows) {
-    if (r.lat == null || r.lng == null) continue;
-    const key = r.city.toLowerCase();
-    const ex = agg.get(key);
-    if (ex) ex.count++;
-    else agg.set(key, { city: r.city, lat: r.lat, lng: r.lng, count: 1, amount: pillLabel(r.amount, r.fundingType), href: r.href });
-  }
   const latest = programs.reduce((a, p) => Math.max(a, new Date(p.updatedAt).getTime()), 0);
   const updatedLabel = latest ? new Date(latest).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-  return { updatedLabel, rows, mapCities: [...agg.values()] };
+  return { updatedLabel, rows, mapCities: aggregateMapCities(rows) };
 }
 
 /** Public JSON for the React hub: GET /api/appointments?resource=grants-hub-data */

@@ -27,6 +27,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
@@ -116,16 +117,41 @@ console.log(`prerender: ${written}/${routes.length} public pages written${failed
 // replaces the copy in dist/; public/sitemap.xml is left as it is.
 // No <lastmod>: stamping every URL with the build date on every deploy is a
 // signal Google learns to ignore.
+// The /grants/:slug pages are generated from scanned programs, so they are not
+// in App.tsx and were missing from the sitemap entirely (18 live pages in Nov
+// 2026). Their slugs come from the live hub API. If it cannot be reached the
+// sitemap simply omits them, exactly as before — never a build failure.
+function grantPageRoutes() {
+  // In a child process: an in-process fetch here left an open socket that
+  // crashed Node on exit on Windows (libuv UV_HANDLE_CLOSING assertion).
+  const script = `
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 8000).unref();
+    const r = await fetch('https://ontarioreno.ca/api/appointments?resource=grants-hub-data', { signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    process.stdout.write(JSON.stringify((d.rows ?? []).map((x) => x.href)));
+  `;
+  try {
+    const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { timeout: 12000, encoding: 'utf8' });
+    return [...new Set(JSON.parse(out).filter((h) => typeof h === 'string' && /^\/grants\/[a-z0-9-]+$/.test(h)))];
+  } catch (err) {
+    const reason = String(err?.message ?? err).split(/\r?\n/)[0];
+    console.warn(`prerender: grant pages left out of sitemap — ${reason}`);
+    return [];
+  }
+}
+const sitemapRoutes = [...new Set([...routes, ...grantPageRoutes()])];
+
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[...routes]
+${[...sitemapRoutes]
   .sort((a, b) => (a === '/' ? -1 : b === '/' ? 1 : a.localeCompare(b)))
   .map((r) => `  <url>\n    <loc>https://ontarioreno.ca${r === '/' ? '/' : r}</loc>\n  </url>`)
   .join('\n')}
 </urlset>
 `;
 fs.writeFileSync(path.join(dist, 'sitemap.xml'), sitemap);
-console.log(`prerender: sitemap.xml written with ${routes.length} URLs`);
+console.log(`prerender: sitemap.xml written with ${sitemapRoutes.length} URLs`);
 if (failed.includes('/')) throw new Error('prerender: the home page failed to render');
 if (failed.length > routes.length / 2) throw new Error('prerender: most routes failed — the pre-render itself is broken');
 process.exit(0);

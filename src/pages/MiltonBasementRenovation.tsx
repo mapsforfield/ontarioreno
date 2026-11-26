@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { BasementCityLinks } from '../components/BasementCityLinks';
+import { CityLocalSnapshot } from '../components/CityLocalSnapshot';
 
 const lastUpdated = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -91,10 +92,10 @@ export default function MiltonBasementRenovation() {
   return (
     <div className="bg-slate-50 min-h-screen">
       <Helmet>
-        <title>Basement Renovation in Milton | OntarioReno</title>
+        <title>Basement Renovations Milton | Costs & Permits | OntarioReno</title>
         <meta
           name="description"
-          content="Planning a basement renovation in Milton? Learn what newer unfinished basements usually cost to finish, what permits may be required, and how to compare family-use and legal-suite options."
+          content="Basement renovations in Milton: $45K basic finish to $90K+ legal suite. Town of Milton permit help, financing and a free in-home visit."
         />
         <link
           rel="canonical"
@@ -197,6 +198,9 @@ export default function MiltonBasementRenovation() {
           </div>
         </div>
       </section>
+
+      {/* City facts block — see components/CityLocalSnapshot. */}
+      <CityLocalSnapshot cityKey="milton" />
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">

@@ -267,3 +267,20 @@ test('the calculator does not advertise a closed program as funded', () => {
     'The calculator no longer flags its programs as closed.',
   );
 });
+
+test('a map pin never shows a dollar amount for a closed or lapsed program', async () => {
+  const { aggregateMapCities } = await import('./grants.ts');
+  const row = (city: string, amount: string, status: string) => ({ city, name: `${city} program`, amount, status, href: `/${city}`, sourceUrl: null, fundingType: 'grant', lat: 43, lng: -79 });
+  const pins = aggregateMapCities([
+    row('Hamilton', '$40k', 'closed'),
+    row('London', '$45k', 'Check status'),
+    row('Kingston', '$5k', 'closed'),
+    row('Kingston', '$40k', 'active'),
+  ]);
+  const by = Object.fromEntries(pins.map((p) => [p.city, p]));
+  assert.equal(by.Hamilton.amount, 'Closed', 'Closed Hamilton is pinned with a dollar amount on /grants again.');
+  assert.equal(by.Hamilton.state, 'closed');
+  assert.ok(!/\$/.test(by.London.amount), 'A lapsed program is pinned with a dollar amount on /grants.');
+  assert.equal(by.Kingston.state, 'open', 'An open program in a city should win the pin over a closed one.');
+  assert.equal(by.Kingston.count, 2);
+});

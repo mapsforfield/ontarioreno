@@ -83,7 +83,7 @@ export default function Financing() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Helmet>
-        <title>Ontario Renovation Financing | Monthly Payment Options | OntarioReno</title>
+        <title>Renovation Financing Ontario | Monthly Payments | OntarioReno</title>
         <meta
           name="description"
           content="Explore monthly payment options for basement, kitchen, bathroom, and legal suite renovations in Ontario. Learn how renovation financing works and see example payment ranges."
