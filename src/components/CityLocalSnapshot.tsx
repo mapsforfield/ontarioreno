@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { ServiceSchema } from './StructuredData';
 import { ArrowRight, CircleDollarSign, FileText, MapPin, Phone } from 'lucide-react';
 import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../lib/contact';
 
@@ -117,8 +118,17 @@ const COST_BANDS = [
 
 export function CityLocalSnapshot({ cityKey }: { cityKey: keyof typeof CITY_FACTS }) {
   const f = CITY_FACTS[cityKey];
+  const { pathname } = useLocation();
   if (!f) return null;
   return (
+    <>
+    <ServiceSchema
+      name={`Basement renovation in ${f.city}`}
+      serviceType="Basement renovation"
+      path={pathname}
+      city={f.city}
+      description={`Basement finishing, renovation and legal secondary suites in ${f.city}, Ontario, with ${f.municipality} permit guidance and a free in-home consultation.`}
+    />
     <section className="border-b border-slate-200 bg-white px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1B3C6C]">{f.city} at a glance</p>
@@ -196,5 +206,6 @@ export function CityLocalSnapshot({ cityKey }: { cityKey: keyof typeof CITY_FACT
         </div>
       </div>
     </section>
+    </>
   );
 }

@@ -7,6 +7,8 @@ const Home = lazy(() => import('./pages/Home'));
 const GrantsHub = lazy(() => import('./pages/GrantsHub'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const BathroomRenovationCostOntario = lazy(() => import('./pages/BathroomRenovationCostOntario'));
+const KitchenRenovationCostOntario = lazy(() => import('./pages/KitchenRenovationCostOntario'));
+const ShowerRenovationOntario = lazy(() => import('./pages/ShowerRenovationOntario'));
 const GrantLandingPage = lazy(() => import('./pages/GrantLandingPage'));
 /*
  * The basements page. Same arrangement as the bathroom and kitchen pairs:
@@ -262,6 +264,8 @@ export default function App({ location }: { location?: string } = {}) {
           <Route path="kitchen-renovations" element={<KitchenRenovationsNext />} />
           <Route path="bathroom-renovations" element={<BathroomRenovationsNext />} />
           <Route path="bathroom-renovation-cost-ontario" element={<BathroomRenovationCostOntario />} />
+          <Route path="kitchen-renovation-cost-ontario" element={<KitchenRenovationCostOntario />} />
+          <Route path="shower-renovation-ontario" element={<ShowerRenovationOntario />} />
           <Route path="windows" element={<WindowsDoors />} />
           <Route path="commercial" element={<Commercial audience="owner" />} />
           <Route path="commercial/contractors" element={<Commercial />} />

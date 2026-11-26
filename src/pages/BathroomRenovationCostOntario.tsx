@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Phone } from 'lucide-react';
 import { PageMeta } from '../components/PageMeta';
+import { ServiceSchema } from '../components/StructuredData';
 import { BookConsultationBand } from '../components/BookConsultationCta';
 import { BATHROOM_COST_TABS, BATHROOM_ROWS } from '../data/projects/costContent';
 import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../lib/contact';
@@ -50,6 +51,13 @@ export default function BathroomRenovationCostOntario() {
         path="/bathroom-renovation-cost-ontario"
         title="Bathroom Renovation Cost in Ontario (2026) | OntarioReno"
         description="What a bathroom renovation costs in Ontario: line-by-line ranges for tile, waterproofing, showers, vanities, tubs and plumbing, and what moves the price."
+      />
+
+      <ServiceSchema
+        name="Bathroom renovation in Ontario"
+        serviceType="Bathroom renovation"
+        path="/bathroom-renovation-cost-ontario"
+        description="Bathroom renovations across Ontario: showers, tile, vanities, tubs and full rebuilds, priced in the home with a free consultation."
       />
 
       <section className="bg-slate-900 text-white">

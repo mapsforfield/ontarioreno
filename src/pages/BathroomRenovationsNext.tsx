@@ -8,6 +8,7 @@ import { ProjectDossierCompact } from '../components/project/ProjectDossierCompa
 import { BATHROOM_PROJECTS } from '../data/projects/bathroom';
 import { BATHROOM_COST_TABS } from '../data/projects/costContent';
 import { PageMeta } from '../components/PageMeta';
+import { ServiceSchema } from '../components/StructuredData';
 
 /**
  * The bathroom page, served at /bathroom-renovations.
@@ -85,6 +86,12 @@ export default function BathroomRenovationsNext() {
         path="/bathroom-renovations"
         title="Bathroom Renovations Ontario | Costs & Free Visit | OntarioReno"
         description="Bathroom renovations across Ontario by vetted contractors: showers, tile, vanities and full rebuilds. See real finished bathrooms and costs, then book a free in-home visit."
+      />
+      <ServiceSchema
+        name="Bathroom renovation in Ontario"
+        serviceType="Bathroom renovation"
+        path="/bathroom-renovations"
+        description="Bathroom renovations across Ontario by vetted contractors: showers, tile, vanities and full rebuilds, priced in the home with a free consultation."
       />
       {/* ---- Masthead. Short: it does not own a whole screen on its own.
 
@@ -291,6 +298,10 @@ export default function BathroomRenovationsNext() {
           Shower, vanity and tub costs line by line:{' '}
           <Link to="/bathroom-renovation-cost-ontario" className="font-semibold text-[#2b5a96] underline underline-offset-4">
             Bathroom renovation cost in Ontario
+          </Link>
+          {' · '}
+          <Link to="/shower-renovation-ontario" className="font-semibold text-[#2b5a96] underline underline-offset-4">
+            Shower &amp; tub-to-shower conversions
           </Link>
         </p>
       </section>

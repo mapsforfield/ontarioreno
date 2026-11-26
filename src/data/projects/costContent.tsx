@@ -174,7 +174,7 @@ export const BATHROOM_COST_TABS: CostTab[] = [
 /* Kitchen — as published on the previous /kitchen-renovations page. */
 /* ---------------------------------------------------------------- */
 
-const KITCHEN_ROWS: [string, string][] = [
+export const KITCHEN_ROWS: [string, string][] = [
   ['Cabinetry', '$10,000 – $25,000+'],
   ['Countertops', '$3,500 – $10,000+'],
   ['Backsplash', '$1,500 – $4,500'],

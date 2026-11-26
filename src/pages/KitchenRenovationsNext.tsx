@@ -8,6 +8,7 @@ import { ProjectDossierCompact } from '../components/project/ProjectDossierCompa
 import { KITCHEN_MORE_PHOTOS, KITCHEN_PROJECTS } from '../data/projects/kitchen';
 import { KITCHEN_COST_TABS } from '../data/projects/costContent';
 import { PageMeta } from '../components/PageMeta';
+import { ServiceSchema } from '../components/StructuredData';
 
 /**
  * The kitchen page, served at /kitchen-renovations.
@@ -61,6 +62,12 @@ export default function KitchenRenovationsNext() {
         path="/kitchen-renovations"
         title="Kitchen Renovations Ontario | Costs & Projects | OntarioReno"
         description="Finished kitchen renovations from across Ontario by vetted contractors. See what was done to each room, what drives the cost, and book a free in-home project review."
+      />
+      <ServiceSchema
+        name="Kitchen renovation in Ontario"
+        serviceType="Kitchen renovation"
+        path="/kitchen-renovations"
+        description="Kitchen renovations across Ontario by vetted contractors, priced in the home with a free consultation."
       />
       {/* ---- Masthead. Boxed to the same max-w-7xl gutter as the Navbar. ---- */}
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:min-h-[min(66vh,560px)] lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-16">
@@ -203,6 +210,12 @@ export default function KitchenRenovationsNext() {
             See the full breakdown
           </button>
         </div>
+        <p className="mx-auto mt-5 max-w-7xl text-sm text-slate-600">
+          Cabinets, counters and appliances line by line:{' '}
+          <Link to="/kitchen-renovation-cost-ontario" className="font-semibold text-[#2b5a96] underline underline-offset-4">
+            Kitchen renovation cost in Ontario
+          </Link>
+        </p>
       </section>
 
       <BookConsultationBand
