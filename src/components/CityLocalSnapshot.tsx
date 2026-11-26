@@ -17,8 +17,9 @@ import { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_HREF } from '../lib/contact';
  *   - the permit lines restate what the site's own permit pages already say,
  *     plus the province-wide rule (Ontario's 2022 Bill 23) allowing up to three
  *     residential units on most serviced residential lots.
- *   - areas are the communities each office covers, as confirmed by the owner
- *     (November 2026).
+ *   - areas are EXAMPLES. The whole city is covered (owner, November 2026);
+ *     the block says so above the names, so a neighbourhood left off the list
+ *     never reads as one we do not serve.
  *   - no past job's price, ever (see data/projects/types.ts).
  */
 
@@ -171,12 +172,17 @@ export function CityLocalSnapshot({ cityKey }: { cityKey: keyof typeof CITY_FACT
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-center gap-2 font-semibold text-slate-900">
-              <MapPin className="h-5 w-5 text-[#1B3C6C]" /> Areas we cover
+              <MapPin className="h-5 w-5 text-[#1B3C6C]" /> We cover all of {f.city}
             </div>
-            <ul className="mt-4 flex flex-wrap gap-2">
+            {/* The names are examples, never the boundary: every part of the
+                city is covered (owner, November 2026). The copy must never
+                read as a list of the only places we go. */}
+            <p className="mt-4 text-sm text-slate-600">Every neighbourhood, including:</p>
+            <ul className="mt-3 flex flex-wrap gap-2">
               {f.areas.map((a) => (
                 <li key={a} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700">{a}</li>
               ))}
+              <li className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-sm text-slate-500">and the rest of {f.city}</li>
             </ul>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Link to="/consultation/basement" className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#2b5a96] px-4 py-2.5 text-sm font-semibold text-white">
