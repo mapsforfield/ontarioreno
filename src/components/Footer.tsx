@@ -159,6 +159,21 @@ export default function Footer({ compactOnMobile = false }: FooterProps) {
                 </Link>
               </li>
               <li>
+                <Link to="/bathroom-renovation-cost-ontario" className="transition-colors hover:text-[#5694CF]">
+                  Bathroom Cost Guide
+                </Link>
+              </li>
+              <li>
+                <Link to="/kitchen-renovation-cost-ontario" className="transition-colors hover:text-[#5694CF]">
+                  Kitchen Cost Guide
+                </Link>
+              </li>
+              <li>
+                <Link to="/shower-renovation-ontario" className="transition-colors hover:text-[#5694CF]">
+                  Shower &amp; Tub-to-Shower
+                </Link>
+              </li>
+              <li>
                 <Link to="/legal-basement-requirements-in-ontario" className="transition-colors hover:text-[#5694CF]">
                   Legal Basement Requirements
                 </Link>

@@ -472,6 +472,12 @@ export default function Costs() {
                   Read Kitchen Guide
                 </Link>
                 <Link
+                  to="/kitchen-renovation-cost-ontario"
+                  className="block w-full text-center border border-slate-300 hover:bg-slate-50 text-slate-900 font-semibold py-3 rounded-xl transition-colors"
+                >
+                  Kitchen Cost Breakdown
+                </Link>
+                <Link
                   to="/match"
                   className="block w-full text-center bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 rounded-xl transition-colors"
                 >

@@ -8,6 +8,7 @@ import { ProjectDossierCompact } from '../components/project/ProjectDossierCompa
 import { BASEMENT_MORE_PHOTOS, BASEMENT_PROJECTS } from '../data/projects/basement';
 import { BASEMENT_COST_TABS } from '../data/projects/costContent';
 import { PageMeta } from '../components/PageMeta';
+import { ServiceSchema } from '../components/StructuredData';
 import { BasementCityLinks } from '../components/BasementCityLinks';
 
 /**
@@ -65,6 +66,12 @@ export default function BasementsNext() {
         path="/basements"
         title="Basement Renovations Ontario | Costs & Projects | OntarioReno"
         description="Finished basements from across Ontario, completed by vetted contractors. See what was done to each space, what drives the cost, and book a free in-home project review."
+      />
+      <ServiceSchema
+        name="Basement renovation in Ontario"
+        serviceType="Basement renovation"
+        path="/basements"
+        description="Basement finishing, renovation and legal secondary suites across Ontario by vetted contractors, priced in the home with a free consultation."
       />
       {/* ---- Masthead. Boxed to the same max-w-7xl gutter as the Navbar. ---- */}
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:min-h-[min(66vh,560px)] lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-16">
