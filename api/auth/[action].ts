@@ -26,6 +26,11 @@ import {
   denyContractor,
 } from '../../lib/auth.js';
 import { serveBundle, AUTH_BUNDLE } from '../../lib/bundle.js';
+import {
+  SECTION_LAYOUT_PREFIX,
+  cleanSectionOrder,
+  parseSectionLayouts,
+} from '../../lib/section-layout.js';
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'OntarioReno <info@ontarioreno.ca>';
 const MAX_FIELD_LENGTH = 2_000;
@@ -227,6 +232,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         update: { value: JSON.stringify(clean) },
         create: { key: 'note_templates', value: JSON.stringify(clean) },
       }));
+      return res.status(200).json(clean);
+    }
+
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
+
+  // ── /api/auth/section-layout ──────────────────────────────────────────────
+  // Each user's own drag-arranged section order, per page. Personal: read and
+  // written only for the signed-in user. Writes are refused while an admin is
+  // viewing as a rep (requireAuth), so looking at Steven's view can never
+  // rearrange Steven's page. See lib/section-layout.ts.
+  if (action === 'section-layout') {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    const key = `${SECTION_LAYOUT_PREFIX}${user.id}`;
+
+    if (req.method === 'GET') {
+      const row = await withSchema(() => prisma.setting.findUnique({ where: { key } }));
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(parseSectionLayouts(row?.value));
+    }
+
+    if (req.method === 'POST') {
+      const body = (req.body ?? {}) as { page?: unknown; order?: unknown };
+      const page = typeof body.page === 'string' ? body.page : '';
+      if (!/^[a-z0-9_-]{1,40}$/i.test(page)) return res.status(400).json({ error: 'Bad page.' });
+      const row = await withSchema(() => prisma.setting.findUnique({ where: { key } }));
+      const layouts = parseSectionLayouts(row?.value);
+      const order = cleanSectionOrder(body.order);
+      if (order.length > 0) layouts[page] = order;
+      else delete layouts[page]; // empty order = back to the page's default
+      const clean = parseSectionLayouts(layouts);
+      await withSchema(() =>
+        prisma.setting.upsert({
+          where: { key },
+          update: { value: JSON.stringify(clean) },
+          create: { key, value: JSON.stringify(clean) },
+        })
+      );
       return res.status(200).json(clean);
     }
 

@@ -124,4 +124,5 @@ export const AUTH_BUNDLE: BundleParts = {
   rep_access: { action: 'rep-access' },
   note_templates: { action: 'note-templates' },
   scheduling_settings: { action: 'scheduling-settings' },
+  section_layout: { action: 'section-layout' },
 };
