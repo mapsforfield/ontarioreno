@@ -29,6 +29,7 @@ import RepliesBox, { REPLY_LABEL } from '../components/RepliesBox';
 import { OPEN_REPLY_STATUSES } from '../../../lib/sms-reply-resolution';
 import { usePortalAuth } from '../auth';
 import { usePortalCompact } from '../lib/compactMode';
+import { useSectionArrangement } from '../components/SectionArrangement';
 
 import TrashPanel from '../components/TrashPanel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
@@ -72,6 +73,7 @@ type ConsultationFilter =
   | 'completed'
   | 'contractor_review'
   | 'lost'
+  | 'missing_outcome'
   | 'needs_follow_up'
   | 'scheduled'
   | 'won';
@@ -177,10 +179,17 @@ const stageProgress = [
   { label: 'Won/Lost', values: ['won', 'lost'] },
 ] as const;
 
+// Desktop section order for anyone who has not dragged their own. Lifecycle
+// sits right above the calendar it filters (Steven, Nov 2026).
+const CONSULTATION_SECTIONS = ['agenda', 'upcoming', 'lifecycle', 'calendar', 'schedule'] as const;
+
 const consultationFilters: Array<{ label: string; value: ConsultationFilter }> = [
   { label: 'All', value: 'all' },
   { label: 'Scheduled', value: 'scheduled' },
   { label: 'Completed', value: 'completed' },
+  // The visit is over and nobody has logged how it went — the same test that
+  // puts the "How did it go? Log outcome" button on a row (outcomeDue).
+  { label: 'Missing Outcome', value: 'missing_outcome' },
   { label: 'Needs Follow-Up', value: 'needs_follow_up' },
   { label: 'Contractor Review', value: 'contractor_review' },
   { label: 'Won', value: 'won' },
@@ -767,6 +776,7 @@ export default function PortalAppointments() {
   const { currentUser, isAdmin } = usePortalAuth();
   // Admin compact window mode (stacked windows) — see lib/compactMode.ts.
   const compactWindow = usePortalCompact();
+  const arrange = useSectionArrangement('consultations', CONSULTATION_SECTIONS);
   const {
     addContractorDispatch,
     addAppointment,
@@ -1041,8 +1051,24 @@ export default function PortalAppointments() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, visibleAppointments.length]);
 
+  // Declared here, ahead of the filters, because 'missing_outcome' reads them.
+  const today = torontoToday();
+  /** The visit is over (or marked completed) and nobody has said how it went. */
+  const outcomeDue = (appointment: Appointment) => {
+    if (isEventType(appointment.appointmentType) || appointment.outcomeSubmitted) return false;
+    if (['cancelled', 'no_show', 'rescheduled'].includes(appointment.status)) return false;
+    if (appointment.status === 'completed') return true;
+    if (appointment.appointmentDate < today) return true;
+    if (appointment.appointmentDate > today || !appointment.appointmentTime) return false;
+    const [h, m] = appointment.appointmentTime.split(':').map(Number);
+    const end = h * 60 + m + (appointment.durationMinutes || 60);
+    const nowParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const nowMin = (Number(nowParts.find((x) => x.type === 'hour')?.value ?? 0) % 24) * 60 + Number(nowParts.find((x) => x.type === 'minute')?.value ?? 0);
+    return nowMin >= end;
+  };
   const matchesConsultationFilter = (appointment: Appointment) => {
     if (consultationFilter === 'all') return true;
+    if (consultationFilter === 'missing_outcome') return outcomeDue(appointment);
     if (consultationFilter === 'scheduled') {
       return ['confirmed', 'rescheduled', 'scheduled'].includes(appointment.status);
     }
@@ -1075,6 +1101,15 @@ export default function PortalAppointments() {
   const filteredAppointments = visibleAppointments
     .filter(inPairScope)
     .filter(matchesConsultationFilter);
+  // Every visit still waiting on its outcome, newest first — counted on the
+  // "Missing Outcome" chip and listed under the chips when it is picked, so
+  // last month's misses are not hidden behind the calendar's month.
+  const missingOutcomeAppointments = visibleAppointments
+    .filter(inPairScope)
+    .filter(outcomeDue)
+    .sort((a, b) =>
+      `${b.appointmentDate}T${b.appointmentTime}`.localeCompare(`${a.appointmentDate}T${a.appointmentTime}`)
+    );
   // Calendar-specific filters: rep (admin only) + contractor (everyone).
   const calendarAppointments = filteredAppointments.filter((a) => {
     if (isAdmin && calendarRepFilter !== 'all' && a.assignedRepId !== calendarRepFilter) return false;
@@ -1111,7 +1146,6 @@ export default function PortalAppointments() {
           label: `${a.projectType || 'consultation'} on ${a.appointmentDate}`,
         }))
     : [];
-  const today = torontoToday();
   const todayAppointments = filteredAppointments.filter(
     (appointment) => appointment.appointmentDate === today
   );
@@ -1142,19 +1176,6 @@ export default function PortalAppointments() {
     }
   };
   const lostDeals = lostDealIds(deals);
-  /** The visit is over (or marked completed) and nobody has said how it went. */
-  const outcomeDue = (appointment: Appointment) => {
-    if (isEventType(appointment.appointmentType) || appointment.outcomeSubmitted) return false;
-    if (['cancelled', 'no_show', 'rescheduled'].includes(appointment.status)) return false;
-    if (appointment.status === 'completed') return true;
-    if (appointment.appointmentDate < today) return true;
-    if (appointment.appointmentDate > today || !appointment.appointmentTime) return false;
-    const [h, m] = appointment.appointmentTime.split(':').map(Number);
-    const end = h * 60 + m + (appointment.durationMinutes || 60);
-    const nowParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
-    const nowMin = (Number(nowParts.find((x) => x.type === 'hour')?.value ?? 0) % 24) * 60 + Number(nowParts.find((x) => x.type === 'minute')?.value ?? 0);
-    return nowMin >= end;
-  };
   const getAttentionInfo = (appointment: Appointment) => {
     const actions: string[] = [];
     // Events (showroom visit, supplier meeting, etc.) don't have outcome
@@ -3162,6 +3183,9 @@ export default function PortalAppointments() {
                     }
                   >
                     {filter.label}
+                    {filter.value === 'missing_outcome' && missingOutcomeAppointments.length > 0 && (
+                      <span className="ml-1 tabular-nums opacity-80">{missingOutcomeAppointments.length}</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -3226,8 +3250,16 @@ export default function PortalAppointments() {
       </div>
       {/* ── End mobile section nav ──────────────────────────────── */}
 
+      {/* Desktop sections. Each user can drag these into their own order
+          (SectionArrangement) with CSS `order` only; the JSX below stays put.
+          Phones have their own tabbed layout above and never see this. */}
+      <div className={`hidden lg:flex lg:flex-col ${compactWindow ? 'lg:gap-3' : 'lg:gap-5'}`}>
       {/* Desktop: Consultation Filters */}
-      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
+      <section
+        {...arrange.sectionProps('lifecycle')}
+        className={`group/section relative hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'} ${arrange.isDragging('lifecycle') ? 'opacity-50' : ''}`}
+      >
+        {arrange.handle('lifecycle', 'Lifecycle view')}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3250,14 +3282,38 @@ export default function PortalAppointments() {
                 }
               >
                 {filter.label}
+                {filter.value === 'missing_outcome' && missingOutcomeAppointments.length > 0 && (
+                  <span
+                    className={`ml-1.5 rounded-full px-1.5 py-px text-[0.62rem] tabular-nums ${
+                      consultationFilter === filter.value ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {missingOutcomeAppointments.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
+        {/* The calendar only shows one month, so a visit from last month with
+            no outcome would be invisible there. Picking the filter lists all
+            of them here, each with its Log outcome button. */}
+        {consultationFilter === 'missing_outcome' && (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            {renderGroupedAgenda(
+              missingOutcomeAppointments,
+              'Every finished visit has an outcome logged.'
+            )}
+          </div>
+        )}
       </section>
 
       {/* Desktop: Today's Agenda */}
-      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
+      <section
+        {...arrange.sectionProps('agenda')}
+        className={`group/section relative hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm lg:p-5 ${calendarOnly ? '' : 'lg:block'} ${arrange.isDragging('agenda') ? 'opacity-50' : ''}`}
+      >
+        {arrange.handle('agenda', "Today's Agenda")}
         <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3281,7 +3337,11 @@ export default function PortalAppointments() {
       </section>
 
       {/* Desktop: Upcoming & Dispatch Gaps — collapsed list */}
-      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
+      <section
+        {...arrange.sectionProps('upcoming')}
+        className={`group/section relative hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'} ${arrange.isDragging('upcoming') ? 'opacity-50' : ''}`}
+      >
+        {arrange.handle('upcoming', 'Upcoming & Dispatch Gaps')}
         <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
@@ -3510,12 +3570,17 @@ export default function PortalAppointments() {
       </section>
 
       <section
+        {...arrange.sectionProps('calendar')}
         ref={calendarSectionRef}
-        style={calendarFill ? { height: calendarFill.height, marginBottom: -calendarFill.pull } : undefined}
-        className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${
+        style={{
+          ...arrange.sectionProps('calendar').style,
+          ...(calendarFill ? { height: calendarFill.height, marginBottom: -calendarFill.pull } : {}),
+        }}
+        className={`group/section relative hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${
           calendarOnly ? 'lg:!mt-0 lg:flex lg:flex-col' : 'lg:block'
-        } ${calendarOnly && compactWindow ? 'sm:p-3' : ''}`}
+        } ${calendarOnly && compactWindow ? 'sm:p-3' : ''} ${arrange.isDragging('calendar') ? 'opacity-50' : ''}`}
       >
+        {!calendarOnly && arrange.handle('calendar', 'Calendar')}
         <div className={`flex shrink-0 flex-col gap-3 border-b border-slate-200 lg:flex-row lg:items-center lg:justify-between ${compactWindow || calendarOnly ? 'pb-3' : 'pb-4'}`}>
           <div>
             <p className={`text-xs font-bold uppercase tracking-[0.16em] text-[#32639b] ${compactWindow ? 'lg:hidden' : ''}`}>
@@ -3928,7 +3993,11 @@ export default function PortalAppointments() {
 
       </section>
 
-      <section className={`hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'}`}>
+      <section
+        {...arrange.sectionProps('schedule')}
+        className={`group/section relative hidden rounded-[0.5rem] border border-white bg-white p-4 shadow-sm sm:p-5 ${calendarOnly ? '' : 'lg:block'} ${arrange.isDragging('schedule') ? 'opacity-50' : ''}`}
+      >
+        {arrange.handle('schedule', 'Upcoming and recent consultations')}
         <div className="border-b border-slate-200 pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#32639b]">
             Schedule
@@ -4064,6 +4133,9 @@ export default function PortalAppointments() {
           )}
         </div>
       </section>
+      {!calendarOnly && arrange.resetLink}
+      </div>
+      {/* End desktop sections */}
 
       {(isCreating || selectedAppointment) && (
         <div className="fixed inset-0 z-[95] bg-slate-950/45 p-0 backdrop-blur-sm sm:p-5">

@@ -58,6 +58,7 @@ import type { LeadSlotsPayload } from '../../../lib/lead-slots';
 import { mergeNotes } from '../../../lib/consultation-notes';
 import { DEFAULT_TOTAL_COMMISSION_RATE } from '../../../lib/commission-ledger';
 import { countableJobs } from '../../../lib/change-orders';
+import { parseSectionLayouts, type SectionLayouts } from '../../../lib/section-layout';
 import {
   schedulingDefaults,
   type SchedulingSettings,
@@ -122,6 +123,8 @@ type PortalDataState = {
   noteTemplates: NoteTemplate[];
   /** Admin-configurable calendar rules (daily cap, radius, lead time, horizon). */
   schedulingSettings: SchedulingSettings;
+  /** The signed-in user's own drag-arranged section order, per page. */
+  sectionLayouts: SectionLayouts;
 };
 
 type ContractorDispatchDraft = Omit<
@@ -341,6 +344,8 @@ type PortalDataContextValue = PortalDataState & {
   getInteractionsForLead: (leadId: string) => Interaction[];
   setRepAccess: (access: Record<string, boolean>) => Promise<void>;
   setNoteTemplates: (templates: NoteTemplate[]) => Promise<void>;
+  /** Save this user's section order for one page ([] resets to the default). */
+  setSectionOrder: (page: string, order: string[]) => Promise<void>;
   setSchedulingSettings: (settings: SchedulingSettings) => Promise<void>;
   addTrackerRow: (repId: string, draft?: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
   updateTrackerRow: (id: string, updates: Partial<SaleTrackerRow>) => Promise<SaleTrackerRow | null>;
@@ -427,6 +432,7 @@ const emptyState: PortalDataState = {
   loadError: false,
   repAccess: {},
   noteTemplates: [],
+  sectionLayouts: {},
   // The shipped defaults, so a render before the fetch lands shows the real
   // numbers rather than zeroes.
   schedulingSettings: schedulingDefaults(),
@@ -930,6 +936,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         rep_access: '/api/auth/rep-access',
         note_templates: '/api/auth/note-templates',
         scheduling_settings: '/api/auth/scheduling-settings',
+        section_layout: '/api/auth/section-layout',
       }),
       apiCall<Lead[]>('/api/leads'),
     ]).then(([users, contractorParts, dealParts, appointmentParts, commissions, authParts, leads]) => [
@@ -952,7 +959,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       authParts.scheduling_settings as SchedulingSettings | null,
       dealParts.contract_presets as ContractPreset[] | null,
       contractorParts.finance_partners as FinancePartner[] | null,
-    ] as const).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners]) => {
+      authParts.section_layout,
+    ] as const).then(([users, contractors, rawDeals, appointments, commissions, activities, clients, trackerRows, households, daysOff, salesAgreements, dealDocuments, tasks, leads, repAccess, noteTemplates, schedulingSettings, contractPresets, financePartners, sectionLayouts]) => {
       // Deals API now embeds proposals and dispatches — extract them
       type RawDeal = Deal & { proposals?: ProposalHistory[]; dispatches?: ContractorDispatch[] };
       const rawDealList = (rawDeals ?? []) as RawDeal[];
@@ -995,6 +1003,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         noteTemplates: noteTemplates ?? [],
         schedulingSettings: schedulingSettings ?? schedulingDefaults(),
         contractPresets: contractPresets ?? [],
+        sectionLayouts: parseSectionLayouts(sectionLayouts),
       });
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -1902,6 +1911,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           repAccess: current.repAccess,
           noteTemplates: current.noteTemplates,
           schedulingSettings: current.schedulingSettings,
+          sectionLayouts: current.sectionLayouts,
         }));
 
         apiCall<Deal & { _commissionId?: string }>('/api/deals', {
@@ -4259,6 +4269,30 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(settings),
         });
         if (saved) setState((current) => ({ ...current, schedulingSettings: saved }));
+      },
+
+      // Deliberately NOT apiCall: a successful apiCall write rings the realtime
+      // doorbell and every open portal refetches everything — for a change
+      // that only ever affects this one user's screen. Optimistic, and a
+      // failed save just leaves the new order in place until the next load.
+      setSectionOrder: async (page, order) => {
+        setState((current) => {
+          const next = { ...current.sectionLayouts };
+          if (order.length > 0) next[page] = order;
+          else delete next[page];
+          return { ...current, sectionLayouts: next };
+        });
+        try {
+          const res = await fetch('/api/auth/section-layout', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', ...viewAsHeaders() },
+            body: JSON.stringify({ page, order }),
+          });
+          if (!res.ok) console.error('[store] section layout save →', res.status);
+        } catch (err) {
+          console.error('[store] section layout save threw', err);
+        }
       },
 
       setNoteTemplates: async (templates) => {
