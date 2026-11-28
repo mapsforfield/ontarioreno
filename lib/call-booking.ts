@@ -26,11 +26,14 @@ export function callSender(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /**
- * 'call' unless switched off. LEAD_WELCOME_MODE=link restores the old
- * link-to-the-booking-page text without a deploy.
+ * 'link' unless switched. The link text is the first text again (Nov 27 2026):
+ * it booked 37% of Meta leads within three days against 13% for the call
+ * opener, and the call ask now comes as a follow-up two hours later
+ * (lib/lead-followup.ts). LEAD_WELCOME_MODE=call restores the call opener
+ * without a deploy.
  */
 export function welcomeMode(env: NodeJS.ProcessEnv = process.env): 'call' | 'link' {
-  return (env.LEAD_WELCOME_MODE ?? '').trim().toLowerCase() === 'link' ? 'link' : 'call';
+  return (env.LEAD_WELCOME_MODE ?? '').trim().toLowerCase() === 'call' ? 'call' : 'link';
 }
 
 /** Loose on purpose: callers pass the real Prisma client. */

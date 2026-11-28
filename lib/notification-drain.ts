@@ -9,6 +9,7 @@ import {
   REMINDER_KINDS,
   type ReminderAppointment,
 } from './reminder-resync.js';
+import { FOLLOWUP_KIND, followUpSender, followUpSkipReason, openFollowUpThread } from './lead-followup.js';
 
 export type DrainSummary = {
   considered: number;
@@ -35,6 +36,7 @@ export type OutboxStore = {
         channel: string;
         kind?: string;
         appointmentId?: string | null;
+        leadId?: string | null;
         recipient: string;
         subject: string;
         body: string;
@@ -166,6 +168,23 @@ export async function drainOutbox(
       row.expiresAt = verdict.expiresAt;
     }
 
+    // ── The call follow-up only goes to a lead who is still silent ──
+    // Queued two hours ahead at intake; whether it is still wanted is only
+    // knowable now. See lib/lead-followup.ts.
+    if (row.kind === FOLLOWUP_KIND) {
+      const skip = await followUpSkipReason(prisma, row);
+      if (skip) {
+        await prisma.notificationOutbox
+          .update({
+            where: { id: row.id },
+            data: { state: 'suppressed', stateReason: skip, attempts: row.attempts + 1 },
+          })
+          .catch(() => {});
+        summary.suppressed++;
+        continue;
+      }
+    }
+
     // ── Claim the row before anything is sent ──
     // This is a compare-and-set: the update only matches while the row is
     // still `pending`, so of two drains racing for it exactly one gets a
@@ -242,6 +261,11 @@ export async function drainOutbox(
         },
       })
       .catch(() => {});
+
+    // A sent follow-up opens the call thread, so "6pm works" books a callback.
+    if (row.kind === FOLLOWUP_KIND && state === 'sent') {
+      await openFollowUpThread(prisma, row, followUpSender(row.body));
+    }
   }
 
   return summary;

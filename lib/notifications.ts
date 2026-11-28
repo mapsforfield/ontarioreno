@@ -46,7 +46,11 @@ export type NotificationKind =
   | 'reply_unclear'
   // A /match "Start Project Review" submission, texted the booking form that
   // fits what they asked for. See lib/project-review.ts.
-  | 'project_review_booking';
+  | 'project_review_booking'
+  // Two hours after the link text, to a lead who has neither booked nor
+  // replied: asks for a quick call instead. Checked again at send time.
+  // See lib/lead-followup.ts.
+  | 'lead_followup';
 
 export type PlannedNotification = {
   channel: NotificationChannel;

@@ -102,6 +102,7 @@ import {
 import { drainOutbox as drainSharedOutbox } from '../../lib/notification-drain.js';
 import { openerSendWall } from '../../lib/call-slots.js';
 import { callSender, welcomeMode } from '../../lib/call-booking.js';
+import { planLeadFollowUp } from '../../lib/lead-followup.js';
 import { phoneKey } from '../../lib/sms-replies.js';
 import { findNoteTemplate, parseNoteTemplates } from '../../lib/note-templates.js';
 import { sendMetaEvent, splitName } from '../../lib/meta-capi.js';
@@ -593,6 +594,37 @@ async function sendLeadWelcome(
     await drainOutbox();
   } catch (err) {
     console.error('[leads/intake] welcome sms failed:', err);
+    return;
+  }
+  // Text 2: a call ask two hours later, sent only if they are still silent
+  // then (checked by the drain). Basement and bathroom ads; London's form
+  // already asks the City's conditions before it offers a call.
+  if (room === 'london_aru') return;
+  try {
+    const followUp = planLeadFollowUp({
+      leadId: lead.id,
+      name: lead.name ?? '',
+      phone: lead.phone ?? '',
+      senderName: leadWelcomeSender(),
+    });
+    if (followUp.length === 0) return;
+    await prisma.notificationOutbox.createMany({
+      data: followUp.map((n) => ({
+        leadId: lead.id,
+        channel: n.channel,
+        kind: n.kind,
+        recipient: n.recipient,
+        subject: n.subject,
+        body: n.body,
+        html: n.html ?? '',
+        sendAfter: n.sendAfter,
+        expiresAt: n.expiresAt,
+        idempotencyKey: n.idempotencyKey,
+      })),
+      skipDuplicates: true,
+    });
+  } catch (err) {
+    console.error('[leads/intake] follow-up queue failed:', err);
   }
 }
 
