@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../auth';
 import { usePortalData } from '../data/store';
+import { matchesPersonSearch } from '../../../lib/people-search';
 
 type Result = {
   kind: 'client' | 'deal' | 'consultation';
@@ -40,18 +41,18 @@ export default function GlobalSearch({ open, onClose }: { open: boolean; onClose
       digits.length >= 3 && (p ?? '').replace(/\D/g, '').includes(digits);
 
     const clientHits: Result[] = clients
-      .filter((c) => matchText(c.name, c.email, c.city, c.address) || matchPhone(c.phone))
+      .filter((c) => matchText(c.name, c.email, c.city, c.address) || matchPhone(c.phone) || matchesPersonSearch({ name: c.name, phone: c.phone, other: [c.email, c.city, c.address] }, term))
       .slice(0, 6)
       .map((c) => ({ kind: 'client', id: c.id, title: c.name, subtitle: [c.phone, c.city].filter(Boolean).join(' · ') || 'Client' }));
 
     const dealHits: Result[] = deals
-      .filter((d) => matchText(d.homeownerName, d.projectType, d.city, d.address) || matchPhone(d.phone))
+      .filter((d) => matchText(d.homeownerName, d.projectType, d.city, d.address) || matchPhone(d.phone) || matchesPersonSearch({ name: d.homeownerName, phone: d.phone, other: [d.email, d.projectType, d.city, d.address] }, term))
       .slice(0, 6)
       .map((d) => ({ kind: 'deal', id: d.id, title: d.homeownerName || 'Deal', subtitle: [d.projectType, d.city].filter(Boolean).join(' · ') || 'Deal' }));
 
     const appts = currentUser ? getVisibleAppointmentsForUser(currentUser) : [];
     const consultHits: Result[] = appts
-      .filter((a) => matchText(a.customerName, a.title, a.projectType, a.city, a.address) || matchPhone(a.phone))
+      .filter((a) => matchText(a.customerName, a.title, a.projectType, a.city, a.address) || matchPhone(a.phone) || matchesPersonSearch({ name: a.customerName, phone: a.phone, other: [a.email, a.title, a.projectType, a.city, a.address] }, term))
       .slice(0, 6)
       .map((a) => ({ kind: 'consultation', id: a.id, title: a.customerName || a.title || 'Consultation', subtitle: [a.appointmentDate, a.city].filter(Boolean).join(' · ') || 'Consultation' }));
 

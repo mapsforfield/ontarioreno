@@ -25,6 +25,7 @@ import ClientFinanceCard from '../components/ClientFinanceCard';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { showToast } from '../lib/toast';
 import type { Client, Household } from '../data/types';
+import { matchesPersonSearch } from '../../../lib/people-search';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -267,14 +268,13 @@ export default function PortalClients() {
   const q = search.toLowerCase();
   const filteredClients = useMemo(() => {
     if (!q) return clients;
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        c.city.toLowerCase().includes(q) ||
-        (c.postalCode ?? '').toLowerCase().includes(q) ||
-        c.projectTypes.some((pt) => pt.toLowerCase().includes(q))
+    // Word-by-word, name with or without spaces, phone in any format.
+    // See lib/people-search.ts.
+    return clients.filter((c) =>
+      matchesPersonSearch(
+        { name: c.name, phone: c.phone, other: [c.email, c.city, c.postalCode, ...c.projectTypes] },
+        q
+      )
     );
   }, [clients, q]);
 

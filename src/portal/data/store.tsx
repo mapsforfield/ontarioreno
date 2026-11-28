@@ -64,6 +64,7 @@ import {
   type SchedulingSettings,
 } from '../../../lib/scheduling-settings';
 import { resolvesRescheduleRequest } from '../../../lib/sms-reply-resolution';
+import { withOutcomeNotes } from '../../../lib/deal-outcome-notes';
 
 type ContractorDraft = Omit<Contractor, 'id'>;
 type FinancePartnerDraft = Omit<FinancePartner, 'id'>;
@@ -3611,12 +3612,38 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           }
 
           // Sync notes to linked deal when internalNotes/notes change on the appointment
-          const linkedDealNotesUpdate =
+          const linkedDealNotesFromAppointment =
             nextAppointment?.dealId &&
             previousAppointment &&
             (updates.internalNotes !== undefined || updates.notes !== undefined)
               ? (updates.internalNotes ?? updates.notes ?? null)
               : null;
+
+          // …and carry the outcome report onto the deal. Auto-created deals
+          // exist before the visit, so without this the rep's account of it
+          // never reached the deal. Same calculation as api/appointments/[id].
+          // See lib/deal-outcome-notes.ts.
+          const outcomeNotesChanged =
+            previousAppointment?.outcomeNotes !== nextAppointment?.outcomeNotes ||
+            (!previousAppointment?.outcomeSubmitted && nextAppointment?.outcomeSubmitted);
+          let linkedDealNotesUpdate: string | null = linkedDealNotesFromAppointment;
+          if (
+            nextAppointment?.dealId &&
+            previousAppointment &&
+            nextAppointment.outcomeSubmitted &&
+            (nextAppointment.outcomeNotes ?? '').trim() &&
+            (outcomeNotesChanged || linkedDealNotesFromAppointment !== null)
+          ) {
+            const base =
+              linkedDealNotesFromAppointment ??
+              current.deals.find((d) => d.id === nextAppointment.dealId)?.notes ??
+              '';
+            const merged = withOutcomeNotes(base, nextAppointment.outcomeNotes, {
+              previousOutcomeNotes: previousAppointment.outcomeNotes,
+              visitDate: nextAppointment.appointmentDate,
+            });
+            if (merged !== base || linkedDealNotesFromAppointment !== null) linkedDealNotesUpdate = merged;
+          }
 
           // Sync notes to matching client record
           if (
