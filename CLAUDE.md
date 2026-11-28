@@ -291,6 +291,27 @@ rebooked, and a rep scanning the calendar would read it as handled.
 work for a rep, not a change to the booking, and the slot stays held until a
 human moves it. Guarded by `lib/sms-replies.test.ts`.
 
+## Link text first, call follow-up second (Nov 27 2026)
+
+The link text is the default first text again (`welcomeMode()` in
+lib/call-booking.ts). Measured on Meta leads, booked within 3 days: link text
+37% (Oct 11 to Nov 19, 117 leads), call opener 13% (Nov 20 to 24, 16 leads).
+Reply rates were ~20% for both; the link's self-bookings were what was lost.
+
+- Text 1: the October link text, unchanged, signed `LEAD_WELCOME_SENDER`
+  (default Michael).
+- Text 2 (`lib/lead-followup.ts`, kind `lead_followup`): 2 hours later, only
+  10am to 8pm (else 10am next), expires 8pm that day. "Hi Sarah, Michael again.
+  If a quick call is easier than the form, what time works today or tomorrow?"
+  Basement and bathroom only; London keeps its own form.
+- Decided at SEND time by the drain: skipped if the lead is not `new`, has an
+  appointment, has a thread, texted us, or booked on their number since
+  arriving. A failed check means no text.
+- When it sends, the thread opens in call mode (`awaiting_time_choice`), so a
+  time in the reply books a callback as below. A reply to text 1 before that
+  still opens a visit-mode thread, as in October.
+- `LEAD_WELCOME_MODE=call` restores the call opener below with no deploy.
+
 ## The first text books a CALL (November 2026)
 
 **Current wording (Sabah, Nov 22 2026), for EVERY ad, London included:**
